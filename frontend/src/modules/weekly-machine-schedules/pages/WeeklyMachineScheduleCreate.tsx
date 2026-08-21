@@ -237,19 +237,17 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 </div>
 
                 {weekStartDate ? (
-                    <div className="bg-card rounded-2xl shadow-sm border border-line mb-6">
-
-
+                    <div className="bg-card rounded-2xl shadow-xs border border-line-soft mb-6 overflow-hidden">
                         <div className="p-0">
                             {loadingPo ? (
-                                <div className="text-center p-10 text-ink-subtle">Loading...</div>
+                                <div className="text-center p-10 text-ink-subtle font-medium">Loading...</div>
                             ) : (displayOrders.length > 0 || alreadyScheduled.length > 0) ? (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm text-ink-muted">
-                                        <thead className="bg-card-2 border-b border-line text-ink-muted">
+                                    <table className="w-full text-left text-sm text-ink">
+                                        <thead className="bg-card-2 border-b border-line-soft text-xs font-extrabold text-ink uppercase tracking-wider">
                                             <tr>
                                                 <th className="px-4 py-3" style={{ width: "50px", textAlign: "center" }}>
-                                                    <FaCheck className="text-ink-subtle" />
+                                                    <FaCheck className="text-ink-subtle mx-auto" />
                                                 </th>
                                                 <th className="px-4 py-3">Production Order</th>
                                                 <th className="px-4 py-3">Product</th>
@@ -258,27 +256,27 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                                 <th className="px-4 py-3">Status / Priority</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-line">
+                                        <tbody className="divide-y divide-line-soft">
                                             {/* Render Pending Orders first */}
                                             {displayOrders.map((po: any) => {
                                                 const targetQty = Number(po.targetQty);
                                                 const isSelected = !!selectedOrders[po.productionOrderId];
 
                                                 return (
-                                                    <tr key={po.productionOrderId} className={`hover:bg-card-2 transition-colors ${isSelected ? "bg-blue-50" : ""}`}>
+                                                    <tr key={po.productionOrderId} className={`hover:bg-card-2 transition-colors ${isSelected ? "bg-primary/15 border-l-4 border-l-primary" : ""}`}>
                                                         <td className="px-4 py-3 text-center">
                                                             <input
                                                                 type="checkbox"
-                                                                className="form-check-input"
+                                                                className="form-check-input accent-primary"
                                                                 style={{ cursor: "pointer", width: "1.2rem", height: "1.2rem" }}
                                                                 checked={isSelected}
                                                                 onChange={() => handleToggleSelect(po.productionOrderId)}
                                                             />
                                                         </td>
                                                         <td className="px-4 py-3 font-bold text-ink">{po.productionOrderId}</td>
-                                                        <td className="px-4 py-3">{po.productItem?.productName || "-"}</td>
+                                                        <td className="px-4 py-3 font-semibold text-ink">{po.productItem?.productName || "-"}</td>
 
-                                                        <td className="px-4 py-3">{targetQty} <span className="small text-ink-subtle">PCS</span></td>
+                                                        <td className="px-4 py-3 font-semibold text-ink">{targetQty} <span className="small text-ink-muted">PCS</span></td>
                                                         <td className="px-4 py-3"><StatusBadge status={po.priority || 'MEDIUM'} /></td>
                                                     </tr>
                                                 );
@@ -286,7 +284,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
                                             {/* Render Already Scheduled Orders below them if week is selected */}
                                             {weekStartDate && alreadyScheduled.length > 0 && alreadyScheduled.map((program: any) => (
-                                                <tr key={`sched-${program.weeklyProgramId}`} className="hover:bg-card-2 transition-colors text-ink-subtle bg-card">
+                                                <tr key={`sched-${program.weeklyProgramId}`} className="hover:bg-card-2 transition-colors text-ink-subtle bg-card-2/40">
                                                     <td className="px-4 py-3 text-center">
                                                         {/* No checkbox for already scheduled items */}
                                                     </td>
@@ -301,13 +299,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                     </table>
                                 </div>
                             ) : (
-                                <div className="text-center p-5 text-ink-subtle">
+                                <div className="text-center p-5 text-ink-subtle font-medium">
                                     No ready production orders (RM_AVAILABLE) found for scheduling.
                                 </div>
                             )}
                         </div>
                         {selectedCount > 0 && (
-                            <div className="flex justify-end items-center gap-3 p-6 border-t border-line bg-card-2 rounded-b-2xl">
+                            <div className="flex justify-end items-center gap-3 p-6 border-t border-line-soft bg-card-2 rounded-b-2xl">
                                 <span className="font-bold text-primary">{selectedCount} Selected</span>
                                 {can("weekly_programs.create") && (
                                     <CustomButton
@@ -321,7 +319,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="text-center p-10 border-2 border-dashed border-line rounded-2xl bg-card text-ink-subtle mb-6 shadow-sm">
+                    <div className="text-center p-10 border-2 border-dashed border-line-soft rounded-2xl bg-card text-ink-subtle mb-6 shadow-xs">
                         <div className="text-lg font-medium mb-1">Waiting for Week Start Date</div>
                         <div className="text-sm opacity-80">Please select a Week Start Date above to view and allocate ready production orders.</div>
                     </div>

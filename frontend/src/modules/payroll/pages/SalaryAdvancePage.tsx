@@ -58,25 +58,25 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
       {/* backdrop */}
       <div className="flex-1 bg-black/40 backdrop-blur-xs transition-opacity" onClick={onClose} />
       {/* panel */}
-      <div className="w-full max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full relative z-10">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+      <div className="w-full max-w-md bg-card border-l border-line-soft shadow-2xl flex flex-col h-full relative z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line-soft bg-card">
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-primary" />
-            <h2 className="text-base font-bold text-slate-800">Add Salary Advance</h2>
+            <h2 className="text-base font-bold text-ink">Add Salary Advance</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-card-2 text-ink-muted">
             <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-white">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-card">
           {/* Employee */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Employee <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-ink-muted mb-1">Employee <span className="text-red-500">*</span></label>
             <select
               value={employeeId}
               onChange={e => setEmployeeId(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
               required
             >
               <option value="">Select employee…</option>
@@ -90,7 +90,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
 
           {/* Amount */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Amount (₹) <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-ink-muted mb-1">Amount (₹) <span className="text-red-500">*</span></label>
             <input
               type="number"
               min="1"
@@ -98,42 +98,42 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
               value={amount}
               onChange={e => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
               required
             />
           </div>
 
           {/* Date */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Disbursed Date <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-ink-muted mb-1">Disbursed Date <span className="text-red-500">*</span></label>
             <input
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
               required
             />
           </div>
 
           {/* Reason */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Reason <span className="text-slate-400">(optional)</span></label>
+            <label className="block text-xs font-semibold text-ink-muted mb-1">Reason <span className="text-ink-subtle">(optional)</span></label>
             <input
               type="text"
               maxLength={200}
               value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="e.g. Medical emergency"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
             />
           </div>
         </form>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end bg-white">
+        <div className="px-6 py-4 border-t border-line-soft flex gap-3 justify-end bg-card">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-ink-muted hover:bg-card-2 transition-colors"
           >
             Cancel
           </button>
@@ -200,7 +200,7 @@ const SalaryAdvancePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-6 space-y-6">
+    <div className="min-h-screen bg-page p-6 space-y-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -208,8 +208,8 @@ const SalaryAdvancePage: React.FC = () => {
             <Wallet size={20} className="text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800">Salary Advance</h1>
-            <p className="text-xs text-slate-500">Record and track advances given to employees</p>
+            <h1 className="text-xl font-extrabold text-ink">Salary Advance</h1>
+            <p className="text-xs text-ink-muted">Record and track advances given to employees</p>
           </div>
         </div>
         {canCreateAdvance && (
@@ -225,18 +225,18 @@ const SalaryAdvancePage: React.FC = () => {
 
       {/* ── Error banner ── */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl text-sm text-red-700">
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-sm text-red-500">
           <AlertTriangle size={16} />
           {error}
         </div>
       )}
 
       {/* ── Table card ── */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line-soft">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-slate-800">All Advances</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+            <h2 className="text-base font-bold text-ink">All Advances</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-card-2 text-ink-muted border border-line-soft">
               {advances.length}
             </span>
           </div>
@@ -261,7 +261,7 @@ const SalaryAdvancePage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                <tr className="bg-card-2 border-b border-line-soft text-xs font-bold text-ink-muted uppercase tracking-wide">
                   <th className="px-5 py-3 text-left">Employee</th>
                   <th className="px-5 py-3 text-right">Amount</th>
                   <th className="px-5 py-3 text-left">Date</th>
@@ -272,33 +272,33 @@ const SalaryAdvancePage: React.FC = () => {
                   <th className="px-5 py-3 text-center">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-line-soft">
                 {advances.map(adv => {
                   const pending = Number(adv.amount) - Number(adv.recoveredAmount);
                   const canDelete = canDeleteAdvance && adv.status === 'PENDING' && Number(adv.recoveredAmount) === 0;
                   return (
-                    <tr key={adv.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={adv.id} className="hover:bg-card-2/60 transition-colors">
                       <td className="px-5 py-3.5">
-                        <div className="font-semibold text-slate-800">{adv.employee.fullName}</div>
-                        <div className="text-xs text-slate-400">{adv.employee.empCode}</div>
+                        <div className="font-semibold text-ink">{adv.employee.fullName}</div>
+                        <div className="text-xs text-ink-subtle">{adv.employee.empCode}</div>
                       </td>
-                      <td className="px-5 py-3.5 text-right font-semibold text-slate-800">
+                      <td className="px-5 py-3.5 text-right font-semibold text-ink font-mono">
                         {fmtRs(Number(adv.amount))}
                       </td>
-                      <td className="px-5 py-3.5 text-slate-600 whitespace-nowrap">
+                      <td className="px-5 py-3.5 text-ink-muted whitespace-nowrap">
                         {fmtDate(adv.disbursedDate)}
                       </td>
-                      <td className="px-5 py-3.5 text-slate-500 max-w-[180px] truncate">
-                        {adv.reason ?? <span className="text-slate-300">—</span>}
+                      <td className="px-5 py-3.5 text-ink-muted max-w-[180px] truncate">
+                        {adv.reason ?? <span className="text-ink-subtle">—</span>}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-slate-600">
+                      <td className="px-5 py-3.5 text-right text-ink-muted font-mono">
                         {fmtRs(Number(adv.recoveredAmount))}
                       </td>
-                      <td className="px-5 py-3.5 text-right font-semibold text-slate-800">
+                      <td className="px-5 py-3.5 text-right font-semibold text-ink font-mono">
                         {fmtRs(pending)}
                       </td>
                       <td className="px-5 py-3.5 text-center">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${STATUS_STYLE[adv.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${STATUS_STYLE[adv.status] ?? 'bg-card-2 text-ink-muted'}`}>
                           {adv.status}
                         </span>
                       </td>
@@ -306,13 +306,13 @@ const SalaryAdvancePage: React.FC = () => {
                         {canDelete ? (
                           <button
                             onClick={() => setDeleteId(adv.id)}
-                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-500/10 transition-colors"
                             title="Delete advance"
                           >
                             <Trash2 size={15} />
                           </button>
                         ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                          <span className="text-ink-subtle text-xs">—</span>
                         )}
                       </td>
                     </tr>
@@ -335,22 +335,22 @@ const SalaryAdvancePage: React.FC = () => {
 
       {/* ── Delete confirmation modal ── */}
       {deleteId != null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
+          <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 border border-line-soft">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                <Trash2 size={18} className="text-red-600" />
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <Trash2 size={18} className="text-red-500" />
               </div>
-              <h3 className="text-base font-bold text-slate-800">Delete Advance?</h3>
+              <h3 className="text-base font-bold text-ink">Delete Advance?</h3>
             </div>
-            <p className="text-sm text-slate-600 mb-5">
+            <p className="text-sm text-ink-muted mb-5">
               This action cannot be undone. The advance will be permanently removed.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeleteId(null)}
                 disabled={deleting}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-ink-muted hover:bg-card-2 transition-colors"
               >
                 Cancel
               </button>

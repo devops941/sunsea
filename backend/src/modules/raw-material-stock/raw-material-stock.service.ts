@@ -43,10 +43,13 @@ class RawMaterialStockService {
     });
   }
 
-  async findAll(query?: { search?: string; storeId?: string }) {
+  async findAll(query?: { search?: string; storeId?: string; storeCategory?: string }) {
     const whereClause: any = {};
     if (query?.storeId) {
       whereClause.storeId = query.storeId;
+    }
+    if (query?.storeCategory) {
+      whereClause.store = { storeCategory: query.storeCategory };
     }
     if (query?.search) {
       whereClause.OR = [

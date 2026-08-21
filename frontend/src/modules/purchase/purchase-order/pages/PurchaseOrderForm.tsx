@@ -945,27 +945,27 @@ const PurchaseOrderForm: React.FC = () => {
 
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white border border-gray-200">
-        <div className="px-6 py-4">
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs">
+        <div className="px-6 py-5 border-b border-line-soft">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-2xl font-extrabold text-ink tracking-tight">
                 {isEdit ? (isLocked ? "View Purchase Order" : "Edit Purchase Order") : "Create Purchase Order"}
               </h2>
             </div>
             <div><BackButton text="Back to List" /></div>
           </div>
         </div>
-        <form className="px-6 py-3 space-y-4" noValidate>
+        <form className="px-6 py-6 space-y-6" noValidate>
           {isLocked && (
-            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-center gap-2 text-sm">
-              <span className="font-semibold">View Only Mode:</span>
+            <div className="mb-4 p-4 bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl flex items-center gap-2 text-sm font-semibold">
+              <span className="font-bold">View Only Mode:</span>
               This Purchase Order is in '{formData.status}' status and cannot be edited. Only Draft orders can be modified.
             </div>
           )}
 
           {/* Main Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} disabled />
             </div>
@@ -992,7 +992,7 @@ const PurchaseOrderForm: React.FC = () => {
                 searchable
                 disabled={isLocked || isEdit}
               />
-              {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
+              {errors.supplierId && <div className="text-red-400 mt-1 text-sm font-medium">{errors.supplierId}</div>}
             </div>
             <div>
               <SelectInput
@@ -1005,14 +1005,14 @@ const PurchaseOrderForm: React.FC = () => {
                 searchable
                 disabled={isLocked}
               />
-              {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
+              {errors.storeId && <div className="text-red-400 mt-1 text-sm font-medium">{errors.storeId}</div>}
             </div>
 
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-6">
             <div>
-              <h6 className="text-lg font-semibold text-gray-800 mb-4">Billing</h6>
+              <h6 className="text-lg font-bold text-ink mb-3">Billing</h6>
               <AddressForm
                 addressValue={formData.billingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, billingAddressLine1: val }))}
@@ -1034,8 +1034,8 @@ const PurchaseOrderForm: React.FC = () => {
               />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
+              <div className="flex items-center justify-between mb-3">
+                <h6 className="text-lg font-bold text-ink mb-0">Shipping</h6>
               </div>
 
               <AddressForm
@@ -1060,24 +1060,24 @@ const PurchaseOrderForm: React.FC = () => {
           </div>
 
           <div className="flex justify-between items-center mb-4 mt-6">
-            <span className="text-lg font-semibold text-gray-800">Order Items</span>
+            <span className="text-lg font-bold text-ink">Order Items</span>
             <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" disabled={isLocked} />
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50/80">
+          <div className="rounded-xl border border-line-soft bg-card-2 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
+            <table className="min-w-full divide-y divide-line-soft">
+              <thead className="bg-card-2 border-b border-line-soft">
                 <tr>
-                  <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-12 border-b border-slate-200">#</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RAW MATERIAL</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">QTY & UOM</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (₹)</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TOTAL (₹)</th>
-                  <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
+                  <th className="px-3 py-3 text-center text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider w-12 border-b border-line-soft">#</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">RAW MATERIAL</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft min-w-[200px]">QTY & UOM</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">UNIT PRICE (₹)</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">TAX %</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">TOTAL (₹)</th>
+                  <th className="px-3 py-3 text-center text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider w-16 border-b border-line-soft"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line-soft">
                 {formData.items.map((item, index) => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
@@ -1090,8 +1090,8 @@ const PurchaseOrderForm: React.FC = () => {
                   const gstAmount = taxableAmount * (taxPercent / 100);
                   const lineTotal = taxableAmount + gstAmount;
                   return (
-                    <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
-                      <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
+                    <tr key={index} className="hover:bg-card/60 transition-colors duration-200">
+                      <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-ink-subtle text-center">{index + 1}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <SelectInput
                           noMargin={true}
@@ -1144,24 +1144,19 @@ const PurchaseOrderForm: React.FC = () => {
                           disabled={isLocked}
                         />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{lineTotal.toFixed(2)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right font-extrabold text-ink">₹{lineTotal.toFixed(2)}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-center">
-                        <button
-                          type="button"
-                          className="text-rose-400 hover:text-rose-600 hover:bg-rose-100 p-2 rounded-md disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all duration-200 inline-flex items-center justify-center"
+                        <DeleteButton
                           onClick={() => removeItem(index)}
-                          title="Remove item"
                           disabled={isLocked}
-                        >
-                          <FaTrash size={14} />
-                        </button>
+                        />
                       </td>
                     </tr>
                   );
                 })}
                 {formData.items.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-4 text-center text-slate-400 font-medium">
+                    <td colSpan={7} className="px-3 py-6 text-center text-ink-subtle font-bold">
                       No items added — click "Add Item" to begin
                     </td>
                   </tr>
@@ -1175,16 +1170,16 @@ const PurchaseOrderForm: React.FC = () => {
               <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
             </div>
             <div>
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-                <h6 className="mb-3 font-bold text-blue-600">Order Summary</h6>
-                <div className="flex justify-between mb-2"><span>Subtotal:</span><span>₹{formData.subtotal.toFixed(2)}</span></div>
+              <div className="bg-card-2 rounded-xl border border-line-soft p-5 shadow-xs">
+                <h6 className="mb-3 font-extrabold text-primary text-base">Order Summary</h6>
+                <div className="flex justify-between mb-2 text-ink-subtle text-sm font-semibold"><span>Subtotal:</span><span className="text-ink font-extrabold">₹{formData.subtotal.toFixed(2)}</span></div>
 
                 {isInterState ? (
                   gstRateBreakdown.length === 0 ? (
-                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+₹{formData.totalIgst.toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total IGST:</span><span>+₹{formData.totalIgst.toFixed(2)}</span></div>
                   ) : (
                     gstRateBreakdown.map((group) => (
-                      <div key={`igst-${group.gstRate}`} className="flex justify-between mb-2 text-green-600 text-sm">
+                      <div key={`igst-${group.gstRate}`} className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
                         <span>IGST {group.gstRate}%:</span>
                         <span>+₹{group.igstAmount.toFixed(2)}</span>
                       </div>
@@ -1193,17 +1188,17 @@ const PurchaseOrderForm: React.FC = () => {
                 ) : (
                   gstRateBreakdown.length === 0 ? (
                     <>
-                      <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total CGST:</span><span>+₹{formData.totalCgst.toFixed(2)}</span></div>
-                      <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total SGST:</span><span>+₹{formData.totalSgst.toFixed(2)}</span></div>
+                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total CGST:</span><span>+₹{formData.totalCgst.toFixed(2)}</span></div>
+                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total SGST:</span><span>+₹{formData.totalSgst.toFixed(2)}</span></div>
                     </>
                   ) : (
                     gstRateBreakdown.map((group) => (
                       <React.Fragment key={`gst-${group.gstRate}`}>
-                        <div className="flex justify-between mb-2 text-green-600 text-sm">
+                        <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
                           <span>CGST {group.cgstRate}%:</span>
                           <span>+₹{group.cgstAmount.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between mb-2 text-green-600 text-sm">
+                        <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
                           <span>SGST {group.sgstRate}%:</span>
                           <span>+₹{group.sgstAmount.toFixed(2)}</span>
                         </div>
@@ -1211,14 +1206,14 @@ const PurchaseOrderForm: React.FC = () => {
                     ))
                   )
                 )}
-                <hr className="my-2 border-gray-300" />
-                <div className="flex justify-between font-bold"><span>Net Amount:</span><span>₹{formData.netAmount.toFixed(2)}</span></div>
+                <hr className="my-3 border-line-soft" />
+                <div className="flex justify-between text-base font-extrabold text-ink"><span>Net Amount:</span><span className="text-primary text-lg font-black">₹{formData.netAmount.toFixed(2)}</span></div>
               </div>
             </div>
           </div>
 
           {!isLocked && (
-            <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+            <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
               <CustomButton
                 text={isSubmitting ? "Saving..." : "Save as Draft"}
                 icon={isSubmitting ? undefined : FaSave}

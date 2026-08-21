@@ -75,7 +75,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
       {show && (
         <div
           ref={popoverRef}
-          className="absolute top-full right-0 mt-2 w-[300px] bg-card border border-line rounded-lg shadow-lg p-4 z-50"
+          className="absolute top-full right-0 mt-2 w-[300px] bg-card border border-line-soft rounded-2xl shadow-xl p-4 z-50 text-ink"
         >
           <div className="flex items-center justify-between mb-4">
             <span className="font-bold text-primary text-sm">Filter</span>

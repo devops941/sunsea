@@ -266,15 +266,17 @@ const ProductForm: React.FC = () => {
             newErrors.minimumQty = "Minimum Stock Qty must be 0 or greater.";
         }
 
-        // Validate grade rates: at least one must be filled and all filled ones must be > 0
-        const filledGradeRates = Object.entries(gradeRates).filter(([, v]) => v.toString().trim() !== "");
-        if (filledGradeRates.length === 0) {
-            newErrors.gradeRates = "At least one grade rate is required.";
-        } else {
-            for (const [gradeName, val] of filledGradeRates) {
-                const n = Number(val);
-                if (isNaN(n) || n <= 0) {
-                    newErrors[`gradeRate_${gradeName}`] = "Must be > 0";
+        // Validate grade rates only when grades are configured
+        if (customerGrades.length > 0) {
+            const filledGradeRates = Object.entries(gradeRates).filter(([, v]) => v.toString().trim() !== "");
+            if (filledGradeRates.length === 0) {
+                newErrors.gradeRates = "At least one grade rate is required.";
+            } else {
+                for (const [gradeName, val] of filledGradeRates) {
+                    const n = Number(val);
+                    if (isNaN(n) || n <= 0) {
+                        newErrors[`gradeRate_${gradeName}`] = "Must be > 0";
+                    }
                 }
             }
         }
@@ -527,18 +529,18 @@ const ProductForm: React.FC = () => {
     if (isLoadingData) {
         return (
             <div className="flex justify-center items-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white  border border-gray-200">
+            <div className="bg-card rounded-xl border border-line-soft shadow-xs">
                 {/* Page Header */}
-                <div className="px-6 py-4 border-b border-gray-100">
+                <div className="px-6 py-4 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-gray-800">{isEditMode ? "Edit Product" : "Create Product"}</h2>
+                        <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Product" : "Create Product"}</h2>
                         <BackButton text="Back to List" to="/products" />
                     </div>
                 </div>
@@ -546,7 +548,7 @@ const ProductForm: React.FC = () => {
                 <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
                     {/* Basic Information */}
                     <div>
-                        <h6 className="text-base font-semibold text-gray-800 mb-3">Basic Information</h6>
+                        <h6 className="text-base font-semibold text-ink mb-3">Basic Information</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                             <TextInput
                                 label="Product Code"
@@ -641,7 +643,7 @@ const ProductForm: React.FC = () => {
                             {/* ── Dynamic grade-based rates ── */}
                             {customerGrades.length > 0 && (
                                 <div className="col-span-full">
-                                    <p className="text-sm font-medium text-gray-700 mb-2">
+                                    <p className="text-sm font-medium text-ink mb-2">
                                         Grade Rates (₹) <span className="text-rose-500">*</span>
                                     </p>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -688,7 +690,7 @@ const ProductForm: React.FC = () => {
                     {/* Raw Materials Composition */}
                     <div className="pt-2">
                         <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-gray-800 m-0">
+                            <h6 className="text-base font-semibold text-ink m-0">
                                 Raw Materials Composition (BOM) <span className="text-rose-500 ml-1">*</span>
                             </h6>
                             <CustomButton
@@ -701,18 +703,18 @@ const ProductForm: React.FC = () => {
                             />
                         </div>
                         {rawMaterials.length > 0 ? (
-                            <div className="border border-slate-200 rounded-xl overflow-visible">
+                            <div className="border border-line-soft rounded-xl overflow-visible bg-card">
                                 <table className="w-full text-left text-sm whitespace-nowrap">
-                                    <thead className="bg-slate-50 text-slate-600">
+                                    <thead className="bg-card-2 text-ink-muted border-b border-line-soft">
                                         <tr>
-                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[60%]">Raw Material</th>
-                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[30%]">Percentage (%)</th>
-                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[10%] text-center">Action</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-line-soft w-[60%]">Raw Material</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-line-soft w-[30%]">Percentage (%)</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-line-soft w-[10%] text-center">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
+                                    <tbody className="divide-y divide-line-soft">
                                         {rawMaterials.map((rm, idx) => (
-                                            <tr key={`rm-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                                            <tr key={`rm-${idx}`} className="hover:bg-card-2/60 transition-colors">
                                                 <td className="px-4 py-3 align-top">
                                                     <SelectInput
                                                         hideLabel={true}
@@ -744,18 +746,18 @@ const ProductForm: React.FC = () => {
                                     </tbody>
                                 </table>
                                 {errors.rawMaterials && (
-                                    <div className="px-4 py-2 bg-red-50 text-red-600 text-sm font-medium border-t border-slate-200">
+                                    <div className="px-4 py-2 bg-red-500/10 text-red-400 text-sm font-medium border-t border-line-soft">
                                         {errors.rawMaterials}
                                     </div>
                                 )}
                             </div>
                         ) : (
                             <div>
-                                <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.rawMaterials ? 'bg-rose-50/50 border-rose-300 text-rose-600 font-medium' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.rawMaterials ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-medium' : 'bg-card-2 border-line-soft text-ink-subtle'}`}>
                                     No raw materials added. Click "Add Raw Material" to specify the composition.
                                 </div>
                                 {errors.rawMaterials && (
-                                    <p className="mt-1.5 text-sm text-rose-500 font-medium">{errors.rawMaterials}</p>
+                                    <p className="mt-1.5 text-sm text-rose-400 font-medium">{errors.rawMaterials}</p>
                                 )}
                             </div>
                         )}
@@ -764,7 +766,7 @@ const ProductForm: React.FC = () => {
                     {/* Capacity Setup — create mode only */}
                     {!isEditMode && <div className="pt-2 mt-4">
                         <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-gray-800 m-0">Initial Capacity Setup</h6>
+                            <h6 className="text-base font-semibold text-ink m-0">Initial Capacity Setup</h6>
                             <CustomButton
                                 text="Add Capacity Setup"
                                 icon={FaPlus}
@@ -777,9 +779,9 @@ const ProductForm: React.FC = () => {
                         {initialCapacities.length > 0 ? (
                             <div className="space-y-4">
                                 {initialCapacities.map((cap, idx) => (
-                                    <div key={`cap-${idx}`} className="p-4 border border-slate-200 rounded-xl bg-slate-50/50">
-                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200/80">
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capacity Setup #{idx + 1}</span>
+                                    <div key={`cap-${idx}`} className="p-4 border border-line-soft rounded-xl bg-card-2">
+                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-line-soft">
+                                            <span className="text-xs font-bold text-ink-muted uppercase tracking-wider">Capacity Setup #{idx + 1}</span>
                                             <DeleteButton onClick={() => handleRemoveInitialCapacity(idx)} />
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -864,15 +866,15 @@ const ProductForm: React.FC = () => {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
-                                No {isEditMode ? "snapshots" : "initial capacity"} added. Click "{isEditMode ? "Add Snapshot" : "Add Capacity Setup"}" to configure machines and operators.
+                            <div className="text-sm italic p-4 rounded-xl bg-card-2 border border-dashed border-line-soft text-ink-subtle text-center">
+                                No initial capacity added. Click "Add Capacity Setup" to configure machines and operators.
                             </div>
                         )}
                     </div>}
 
                     {/* Status & Description */}
                     <div className="pt-6">
-                        <h6 className="text-base font-semibold text-gray-800 mb-3">Status & Description</h6>
+                        <h6 className="text-base font-semibold text-ink mb-3">Status & Description</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                             <SelectInput
                                 label="Status"
@@ -898,19 +900,19 @@ const ProductForm: React.FC = () => {
 
                     {/* Product Images */}
                     <div className="pt-2">
-                        <h6 className="text-base font-semibold text-gray-800 mb-3">Product Images</h6>
+                        <h6 className="text-base font-extrabold text-ink mb-3">Product Images</h6>
                         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                            <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-white flex flex-col justify-center h-32">
+                            <div className="col-span-1 md:col-span-2 border border-line-soft rounded-xl p-4 bg-card-2 flex flex-col justify-center h-32">
                                 <input
                                     ref={fileInputRef}
                                     type="file"
                                     multiple
                                     accept="image/png,image/jpeg,image/webp"
-                                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                                    className="w-full text-sm text-ink-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/15 file:text-primary hover:file:bg-primary/25 cursor-pointer"
                                     onChange={handleImageChange}
                                     disabled={remainingSlots <= 0}
                                 />
-                                <p className="text-xs text-slate-500 mt-2">
+                                <p className="text-xs text-ink-subtle mt-2">
                                     Maximum {MAX_IMAGES} images. First is primary.<br />
                                     {remainingSlots > 0 ? `${remainingSlots} slot(s) remaining.` : "Image limit reached."}
                                 </p>
@@ -920,14 +922,14 @@ const ProductForm: React.FC = () => {
                             </div>
 
                             {existingImages.map((img, index) => (
-                                <div key={`existing-${img.id}`} className="col-span-1 border border-slate-200 rounded-xl p-2 relative h-32 flex items-center justify-center bg-white shadow-sm">
+                                <div key={`existing-${img.id}`} className="col-span-1 border border-line-soft rounded-xl p-2 relative h-32 flex items-center justify-center bg-card-2 shadow-xs">
                                     <img
                                         src={getImageUrl(img.imageUrl)}
                                         alt={`Product image ${index + 1}`}
                                         className="max-h-full max-w-full object-contain rounded-lg"
                                     />
                                     {index === 0 && (
-                                        <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded">
+                                        <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">
                                             Primary
                                         </span>
                                     )}
@@ -942,18 +944,18 @@ const ProductForm: React.FC = () => {
                             ))}
 
                             {newImagePreviews.map((preview, index) => (
-                                <div key={`new-${index}`} className="col-span-1 border border-slate-200 rounded-xl p-2 relative h-32 flex items-center justify-center bg-white shadow-sm">
+                                <div key={`new-${index}`} className="col-span-1 border border-line-soft rounded-xl p-2 relative h-32 flex items-center justify-center bg-card-2 shadow-xs">
                                     <img
                                         src={preview}
                                         alt={`New image ${index + 1}`}
                                         className="max-h-full max-w-full object-contain rounded-lg"
                                     />
                                     {existingImages.length === 0 && index === 0 && (
-                                        <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded">
+                                        <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">
                                             Primary
                                         </span>
                                     )}
-                                    <span className="absolute bottom-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded">
+                                    <span className="absolute bottom-2 left-2 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded">
                                         New
                                     </span>
                                     <button
@@ -967,9 +969,9 @@ const ProductForm: React.FC = () => {
                             ))}
 
                             {!hasAnyImage && (
-                                <div className="col-span-1 border border-slate-200 rounded-xl p-2 h-32 flex flex-col items-center justify-center bg-white text-slate-400">
-                                    <FaImage size={24} className="mb-2" />
-                                    <span className="text-xs">No images</span>
+                                <div className="col-span-1 border border-line-soft rounded-xl p-2 h-32 flex flex-col items-center justify-center bg-card-2 text-ink-subtle">
+                                    <FaImage size={24} className="mb-2 opacity-50" />
+                                    <span className="text-xs font-medium">No images</span>
                                 </div>
                             )}
                         </div>

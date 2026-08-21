@@ -72,23 +72,23 @@ const Tabs: React.FC<TabsProps> = ({
                 }`;
         }
 
-        // default primary — matches the segmented control look from screenshot
+        // default primary — matches the segmented control look
         return `flex items-center gap-2 whitespace-nowrap rounded-md px-5 py-2
             text-sm font-semibold transition-all duration-200
             disabled:opacity-45 disabled:cursor-not-allowed
             ${isActive
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
+                ? "bg-card text-ink shadow-xs border border-line-soft"
+                : "text-ink-muted hover:text-ink hover:bg-card-2/50"
             }`;
     };
 
     // ---- container classes per variant ----
     const listContainerClasses =
         variant === "secondary"
-            ? "flex items-center gap-4 border-b-2 border-black/5 w-full min-w-max"
+            ? "flex items-center gap-4 border-b-2 border-line-soft w-full min-w-max"
             : pill
-                ? "inline-flex items-center gap-0 bg-gray-100 p-1.5 rounded-lg min-w-max"
-                : "inline-flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100 min-w-max";
+                ? "inline-flex items-center gap-0 bg-card-2 p-1.5 rounded-lg min-w-max"
+                : "inline-flex items-center gap-1.5 bg-card-2 p-1.5 rounded-xl border border-line-soft min-w-max";
 
     return (
         <div className={`w-full ${className}`}>

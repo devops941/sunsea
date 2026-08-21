@@ -317,18 +317,10 @@ const QuotationList: React.FC = () => {
                                     {(item.status === 'MD_APPROVED' || item.status === 'CUSTOMER_APPROVED') && (
                                         <button
                                             type="button"
-                                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                                            onClick={async () => {
-                                                try {
-                                                    await salesOrderService.convertToSalesOrder(item.id);
-                                                    toast.success("Converted to sales order!");
-                                                    fetchOrders();
-                                                } catch (err: any) {
-                                                    toast.error(err?.response?.data?.message || "Failed to convert to sales order");
-                                                }
-                                            }}
+                                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap"
+                                            onClick={() => navigate('/sales-invoices/create', { state: { preselectedOrderId: String(item.id) } })}
                                         >
-                                            Convert to SO
+                                            Create Invoice
                                         </button>
                                     )}
                                     {item.status === 'PENDING_MD_APPROVAL' && (

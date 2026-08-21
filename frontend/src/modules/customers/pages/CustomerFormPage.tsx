@@ -122,7 +122,7 @@ const CtrlText = ({ field, label, placeholder, required, type, disabled, error, 
 // Groups a set of fields under a labeled heading so related inputs read as one unit.
 const FieldGroup = ({ title, children }: { icon?: React.ElementType; title: string; children: React.ReactNode }) => (
   <div className="space-y-4">
-    <h5 className="font-bold text-slate-700 flex items-center gap-2">
+    <h5 className="font-bold text-ink flex items-center gap-2">
       {title}
     </h5>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
@@ -261,21 +261,22 @@ const CustomerFormPage: React.FC = () => {
 
 
   if (loading) {
-    return <div className="p-6 text-center text-slate-500">Loading customer details...</div>;
+    return <div className="p-6 text-center text-ink-muted">Loading customer details...</div>;
   }
 
   return (
     <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
-      <div className="bg-white overflow-visible flex-1 flex flex-col">
-        <div className="px-6 py-4">
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible flex-1 flex flex-col">
+        <div className="px-6 py-4 border-b border-line-soft">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 className="text-xl font-bold text-slate-800 flex items-start">
+            <h3 className="text-xl font-bold text-ink flex items-start">
               {isEditMode ? 'Edit Customer' : 'Create Customer'}
               <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("customerId")}</span>
             </h3>
             <CustomButton
               text="Back to List"
               icon={FaArrowLeft}
+              variant="secondary"
               onClick={() => navigate("/customers")}
             />
           </div>

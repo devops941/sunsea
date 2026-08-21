@@ -106,7 +106,7 @@ const CATEGORIES: { value: SalaryCategory; label: string }[] = [
 
 // ─── Stepper ──────────────────────────────────────────────────────────────────
 const StepHeader: React.FC<{ current: number }> = ({ current }) => (
-  <div className="bg-white border-b border-border px-6 py-4">
+  <div className="bg-card border-b border-line-soft px-6 py-4">
     <div className="flex items-center max-w-4xl mx-auto">
       {STEPS.map((step, idx) => {
         const done = current > step.id;
@@ -116,15 +116,15 @@ const StepHeader: React.FC<{ current: number }> = ({ current }) => (
             <div className="flex flex-col items-center min-w-0">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all ${done ? 'bg-emerald-500 border-emerald-500 text-white' :
                 active ? 'bg-primary border-primary text-white shadow-md' :
-                  'bg-white border-border text-text-muted'
+                  'bg-card-2 border-line-soft text-ink-subtle'
                 }`}>
                 {done ? <Check size={16} /> : <step.icon size={14} />}
               </div>
-              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${active ? 'text-primary' : done ? 'text-emerald-600' : 'text-text-muted'
+              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${active ? 'text-primary' : done ? 'text-emerald-500' : 'text-ink-subtle'
                 }`}>{step.label}</span>
             </div>
             {idx < STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-1 mb-5 transition-colors ${done ? 'bg-emerald-400' : 'bg-border'}`} />
+              <div className={`flex-1 h-0.5 mx-1 mb-5 transition-colors ${done ? 'bg-emerald-500' : 'bg-line-soft'}`} />
             )}
           </React.Fragment>
         );
@@ -176,28 +176,28 @@ const Step1: React.FC<Step1Props> = ({
   return (
     <div className="w-full space-y-6">
       <div className="text-center sm:text-left">
-        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Select Payroll Period</h2>
-        <p className="text-sm text-slate-500 mt-1">Choose the period type and target employee category for this payroll run.</p>
+        <h2 className="text-xl font-extrabold text-ink tracking-tight">Select Payroll Period</h2>
+        <p className="text-sm text-ink-muted mt-1">Choose the period type and target employee category for this payroll run.</p>
       </div>
 
       {/* 2-Column Responsive Grid for Full-Width Layout (Equal Height Cards) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Card 1: Payroll Type & Period */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6 space-y-5 h-full flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="bg-card rounded-2xl border border-line-soft shadow-xs hover:shadow-md transition-shadow p-6 space-y-5 h-full flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-line-soft pb-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-blue-50 text-primary">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
                 <CalendarRange size={18} />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Payroll Schedule</h3>
-                <p className="text-sm font-semibold text-slate-800">Frequency & Timeline</p>
+                <h3 className="text-xs font-bold text-ink-subtle uppercase tracking-widest">Payroll Schedule</h3>
+                <p className="text-sm font-semibold text-ink">Frequency & Timeline</p>
               </div>
             </div>
           </div>
 
           {/* Type toggle buttons */}
-          <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100/70 rounded-xl border border-slate-200/50">
+          <div className="grid grid-cols-2 gap-3 p-1.5 bg-card-2 rounded-xl border border-line-soft">
             {(['MONTHLY', 'WEEKLY'] as const).map(t => {
               const isActive = runType === t;
               return (
@@ -206,7 +206,7 @@ const Step1: React.FC<Step1Props> = ({
                   onClick={() => setRunType(t)}
                   className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 cursor-pointer ${isActive
                     ? 'bg-primary text-white shadow-sm shadow-primary/30 scale-[1.01]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    : 'text-ink-muted hover:text-ink hover:bg-card/60'
                     }`}
                 >
                   {t === 'MONTHLY'
@@ -221,21 +221,21 @@ const Step1: React.FC<Step1Props> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Month</label>
+                  <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Select Month</label>
                   <select
                     value={month}
                     onChange={e => setMonth(Number(e.target.value))}
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
                   >
                     {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Year</label>
+                  <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Select Year</label>
                   <select
                     value={year}
                     onChange={e => setYear(Number(e.target.value))}
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
                   >
                     {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
@@ -243,19 +243,19 @@ const Step1: React.FC<Step1Props> = ({
               </div>
 
               {/* Period status card */}
-              <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-slate-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
+                  <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold">
                     <CalendarDays size={18} />
                   </div>
                   <div>
                     <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Period</p>
-                    <p className="text-base font-extrabold text-slate-900">{MONTHS[month - 1]} {year}</p>
+                    <p className="text-base font-extrabold text-ink">{MONTHS[month - 1]} {year}</p>
                   </div>
                 </div>
-                <div className="text-right border-l border-blue-200/60 pl-5">
-                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Calendar Days</p>
-                  <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-slate-500">days</span></p>
+                <div className="text-right border-l border-blue-500/20 pl-5">
+                  <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">Calendar Days</p>
+                  <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-ink-muted">days</span></p>
                 </div>
               </div>
             </div>
@@ -333,18 +333,18 @@ const Step1: React.FC<Step1Props> = ({
         </div>
 
         {/* Card 2: Employee Category */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6 space-y-4 h-full flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="bg-card rounded-2xl border border-line-soft shadow-xs hover:shadow-md transition-shadow p-6 space-y-4 h-full flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-line-soft pb-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
+              <div className="p-2 rounded-xl bg-card-2 text-ink-muted">
                 <Users size={18} />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Target Selection</h3>
-                <p className="text-sm font-semibold text-slate-800">Employee Category</p>
+                <h3 className="text-xs font-bold text-ink-subtle uppercase tracking-widest">Target Selection</h3>
+                <p className="text-sm font-semibold text-ink">Employee Category</p>
               </div>
             </div>
-            <span className="text-xs font-bold text-primary bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
+            <span className="text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">
               {filtered.length} Selected
             </span>
           </div>
@@ -360,15 +360,15 @@ const Step1: React.FC<Step1Props> = ({
                   key={c.value}
                   onClick={() => setCategory(c.value)}
                   className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${isSelected
-                    ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/60'
+                    ? 'border-primary bg-primary/10 text-ink shadow-xs ring-2 ring-primary/20'
+                    : 'border-line-soft bg-card-2 text-ink-muted hover:border-line hover:bg-card'
                     }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-primary' : 'bg-slate-300'}`} />
-                    <span className="text-xs sm:text-sm font-bold text-slate-800">{c.label}</span>
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-primary' : 'bg-ink-subtle/50'}`} />
+                    <span className="text-xs sm:text-sm font-bold text-ink">{c.label}</span>
                   </div>
-                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-primary/20 text-primary' : 'bg-card text-ink-subtle border border-line-soft'}`}>
                     {count} emp
                   </span>
                 </button>
@@ -2282,24 +2282,24 @@ const PayrollRun: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-page flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-border px-6 py-4">
+      <div className="bg-card border-b border-line-soft px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">Run Payroll</h1>
-            <p className="text-sm text-text-secondary mt-0.5">
+            <h1 className="text-xl font-bold text-ink">Run Payroll</h1>
+            <p className="text-sm text-ink-muted mt-0.5">
               {periodLabel} · {runType === 'MONTHLY' ? 'Monthly' : 'Weekly'} Run
             </p>
           </div>
           {step > 1 && currentRun && (
-            <div className="bg-slate-50 rounded-lg border border-border px-4 py-2 text-sm">
-              <span className="text-text-muted">Run: </span>
-              <span className="font-mono text-xs text-text-primary">{currentRun.runCode}</span>
-              <span className="mx-2 text-border">·</span>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${currentRun.status === 'LOCKED' ? 'bg-emerald-100 text-emerald-700' :
-                currentRun.status === 'APPROVED' ? 'bg-blue-100 text-blue-700' :
-                  'bg-amber-100 text-amber-700'
+            <div className="bg-card-2 rounded-lg border border-line-soft px-4 py-2 text-sm">
+              <span className="text-ink-subtle">Run: </span>
+              <span className="font-mono text-xs text-ink font-bold">{currentRun.runCode}</span>
+              <span className="mx-2 text-line-soft">·</span>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${currentRun.status === 'LOCKED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                currentRun.status === 'APPROVED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                  'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                 }`}>{currentRun.status}</span>
             </div>
           )}

@@ -114,7 +114,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
             text-xs font-bold uppercase
             tracking-[0.5px]
             transition-colors duration-250
-            ${error ? "text-red-500" : "text-slate-500"}
+            ${error ? "text-red-500" : "text-ink-muted"}
             group-focus-within:text-primary
           `}
         >
@@ -131,31 +131,31 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
             text-[15px] font-medium
             transition-all duration-250
             ${error
-              ? "border-red-500 bg-white"
-              : "border-slate-300 bg-white hover:border-slate-400 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
+              ? "border-red-500 bg-card-2"
+              : "border-line-soft bg-card-2 hover:border-line-soft/80 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
             }
-            ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "text-[#1f2937]"}
+            ${disabled ? "bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70" : "text-ink"}
           `}
           onClick={() => !disabled && setIsOpen(!isOpen)}
         >
-          <span className={`truncate ${!displayValue ? "text-[#9ca3af]" : ""}`}>
+          <span className={`truncate ${!displayValue ? "text-ink-subtle" : ""}`}>
             {displayValue || "hh:mm AM/PM"}
           </span>
-          <FaRegClock className="text-slate-400 flex-shrink-0" />
+          <FaRegClock className="text-ink-subtle flex-shrink-0" />
         </div>
 
         {isOpen && !disabled && (
-          <div className="absolute top-[40px] left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-lg w-[320px] overflow-hidden">
-            <div className="flex bg-white border-b border-slate-200">
+          <div className="absolute top-[40px] left-0 z-50 bg-card border border-line-soft rounded-xl shadow-xl w-[320px] overflow-hidden text-ink">
+            <div className="flex bg-card border-b border-line-soft">
               {/* Hour Column */}
-              <div className="flex-1 border-r border-slate-200">
-                <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">Hour</div>
+              <div className="flex-1 border-r border-line-soft">
+                <div className="text-center py-2 text-xs font-bold text-ink-subtle uppercase bg-card-2 border-b border-line-soft">Hour</div>
                 <div className="h-[200px] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
                   {hours.map((h) => (
                     <button
                       key={h}
                       type="button"
-                      className={`w-full text-center py-2 text-sm transition-colors ${hour === h ? "bg-primary text-white font-bold" : "hover:bg-slate-100 text-slate-700"}`}
+                      className={`w-full text-center py-2 text-sm transition-colors ${hour === h ? "bg-primary text-white font-bold" : "hover:bg-card-2 text-ink"}`}
                       onClick={() => handleSelectHour(h)}
                     >
                       {h}
@@ -165,14 +165,14 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
               </div>
 
               {/* Minute Column */}
-              <div className="flex-1 border-r border-slate-200">
-                <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">Min</div>
+              <div className="flex-1 border-r border-line-soft">
+                <div className="text-center py-2 text-xs font-bold text-ink-subtle uppercase bg-card-2 border-b border-line-soft">Min</div>
                 <div className="h-[200px] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
                   {minutes.map((m) => (
                     <button
                       key={m}
                       type="button"
-                      className={`w-full text-center py-2 text-sm transition-colors ${minute === m ? "bg-primary text-white font-bold" : "hover:bg-slate-100 text-slate-700"}`}
+                      className={`w-full text-center py-2 text-sm transition-colors ${minute === m ? "bg-primary text-white font-bold" : "hover:bg-card-2 text-ink"}`}
                       onClick={() => handleSelectMinute(m)}
                     >
                       {m}
@@ -183,13 +183,13 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
 
               {/* AM/PM Column */}
               <div className="flex-1">
-                <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">AM/PM</div>
+                <div className="text-center py-2 text-xs font-bold text-ink-subtle uppercase bg-card-2 border-b border-line-soft">AM/PM</div>
                 <div className="h-[200px] overflow-y-auto">
                   {["AM", "PM"].map((p) => (
                     <button
                       key={p}
                       type="button"
-                      className={`w-full text-center py-2 text-sm transition-colors ${period === p ? "bg-primary text-white font-bold" : "hover:bg-slate-100 text-slate-700"}`}
+                      className={`w-full text-center py-2 text-sm transition-colors ${period === p ? "bg-primary text-white font-bold" : "hover:bg-card-2 text-ink"}`}
                       onClick={() => handleTogglePeriod(p)}
                     >
                       {p}
@@ -199,10 +199,10 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
               </div>
             </div>
 
-            <div className="p-3 bg-white border-t border-slate-200">
+            <div className="p-3 bg-card border-t border-line-soft">
               <button
                 type="button"
-                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition-colors text-sm"
+                className="w-full py-2 bg-card-2 hover:bg-card-2/80 text-ink font-bold rounded-lg transition-colors text-sm border border-line-soft"
                 onClick={() => setIsOpen(false)}
               >
                 Done

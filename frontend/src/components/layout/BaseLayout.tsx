@@ -58,12 +58,8 @@ const BaseLayout = () => {
         <HorizontalNav />
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 overflow-y-auto bg-page flex justify-center">
-          {/* Single source of horizontal gutter for every page. Pages used to
-              get theirs from `.inner-container` (14px) plus a Bootstrap
-              `Container fluid` (~12px) stacked on top of each other; both are
-              now flat so the spacing lives here only. */}
-          <div className="w-full max-w-[1600px] mx-auto px-4">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto bg-page">
+          <div className="w-full px-4 sm:px-6 py-4">
             <Outlet />
           </div>
         </main>

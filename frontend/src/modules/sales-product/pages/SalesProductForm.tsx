@@ -215,17 +215,17 @@ const SalesProductForm: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-100">
+            <div className="bg-card rounded-xl border border-line-soft shadow-xs">
+                <div className="px-6 py-4 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-gray-800">{isEditMode ? "Edit Sales Product" : "Create Sales Product"}</h2>
+                        <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Sales Product" : "Create Sales Product"}</h2>
                         <BackButton text="Back to List" to="/sales-products" />
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
                     <div>
-                        <h6 className="text-base font-semibold text-gray-800 mb-3">Basic Information</h6>
+                        <h6 className="text-base font-semibold text-ink mb-3">Basic Information</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <TextInput
                                 label="Sales Product Name"
@@ -264,7 +264,7 @@ const SalesProductForm: React.FC = () => {
 
                     <div className="pt-2">
                         <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-gray-800 m-0">
+                            <h6 className="text-base font-semibold text-ink m-0">
                                 Component Products <span className="text-rose-500 ml-1">*</span>
                             </h6>
                             {canSave && (
@@ -282,16 +282,16 @@ const SalesProductForm: React.FC = () => {
                                 editable={canSave}
                             />
                         ) : (
-                            <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.items ? 'bg-rose-50/50 border-rose-300 text-rose-600 font-medium' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.items ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-medium' : 'bg-card-2 border-line-soft text-ink-subtle'}`}>
                                 No components added. Click "Add Component" to specify what this sales product is assembled from.
                             </div>
                         )}
                         {errors.items && fields.length > 0 && (
-                            <p className="mt-1.5 text-sm text-rose-500 font-medium">{errors.items}</p>
+                            <p className="mt-1.5 text-sm text-rose-400 font-medium">{errors.items}</p>
                         )}
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-line-soft mt-4">
                         {!isEditMode && canSave && (
                             <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} variant="secondary" disabled={isSubmitting} type="button" />
                         )}

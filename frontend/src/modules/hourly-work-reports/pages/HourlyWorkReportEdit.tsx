@@ -115,10 +115,10 @@ const HourlyWorkReportEdit: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6 min-h-screen">
-            <div className="bg-card rounded-2xl shadow-sm border border-line">
+            <div className="bg-card rounded-2xl shadow-sm border border-line-soft">
 
                 {/* Page Header */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-line">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-line-soft">
                     <div>
                         <h2 className="text-2xl font-bold text-ink m-0">Edit Hourly Production Log</h2>
                     </div>
@@ -132,10 +132,10 @@ const HourlyWorkReportEdit: React.FC = () => {
 
                         {/* Left Card: Read-Only Reference Info */}
                         <div className="lg:col-span-2">
-                            <div className="bg-card-2 border border-line rounded-lg p-5 h-full">
+                            <div className="bg-card-2 border border-line-soft rounded-lg p-5 h-full">
                                 {isEditDisabled && (
-                                    <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center gap-2 text-xs font-semibold mb-4">
-                                        <FaInfoCircle size={14} className="shrink-0 text-rose-500" />
+                                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded-xl flex items-center gap-2 text-xs font-semibold mb-4">
+                                        <FaInfoCircle size={14} className="shrink-0 text-rose-400" />
                                         <span>This log is locked (shift completed, stopped, or final hour logged).</span>
                                     </div>
                                 )}
@@ -327,8 +327,8 @@ const HourlyWorkReportEdit: React.FC = () => {
                     navigate("/hourly-work-reports");
                 }}
                 title={
-                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
-                        <FaTrophy className="text-xl text-indigo-500 animate-pulse" />
+                    <div className="flex items-center gap-2 text-indigo-400 font-bold">
+                        <FaTrophy className="text-xl text-indigo-400 animate-pulse" />
                         <span>New Production High Reached!</span>
                     </div>
                 }
@@ -344,12 +344,12 @@ const HourlyWorkReportEdit: React.FC = () => {
             >
                 <div className="text-center py-4">
                     <div className="flex justify-center mb-5">
-                        <div className="p-4 bg-indigo-50 rounded-full text-indigo-600 animate-bounce shadow-sm">
+                        <div className="p-4 bg-indigo-500/10 rounded-full text-indigo-400 animate-bounce shadow-sm">
                             <FaCrown size={44} />
                         </div>
                     </div>
                     <h3 className="text-2xl font-bold text-ink mb-2">Congratulations!</h3>
-                    <p className="text-slate-505 text-sm max-w-sm mx-auto mb-6">
+                    <p className="text-ink-muted text-sm max-w-sm mx-auto mb-6">
                         You have recorded a new highest production capacity for this product on this machine!
                     </p>
 

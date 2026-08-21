@@ -216,6 +216,8 @@ const LoginPage = () => {
                             disabled={loading}
                             autoComplete="username"
                             error={validationErrors.email}
+                            inputClassName="login-input !bg-white !text-slate-900 !border-slate-300 focus:!border-blue-600 focus:!ring-blue-600/20 placeholder:!text-slate-400 font-semibold"
+                            labelClassName="!text-slate-700 font-extrabold"
                             onChange={(e) => {
                                 setEmail(e.target.value);
                                 setValidationErrors(prev => ({ ...prev, email: "" }));
@@ -235,6 +237,8 @@ const LoginPage = () => {
                             disabled={loading}
                             autoComplete="current-password"
                             error={validationErrors.password}
+                            inputClassName="login-input !bg-white !text-slate-900 !border-slate-300 focus:!border-blue-600 focus:!ring-blue-600/20 placeholder:!text-slate-400 font-semibold"
+                            labelClassName="!text-slate-700 font-extrabold"
                             onChange={(e) => {
                                 setPassword(e.target.value);
                                 setValidationErrors(prev => ({ ...prev, password: "" }));

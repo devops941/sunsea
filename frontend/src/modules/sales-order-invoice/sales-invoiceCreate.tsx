@@ -219,12 +219,12 @@ const SalesInvoiceCreate: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft">
                 {/* Page Header */}
-                <div className="px-6 py-4 border-b border-gray-100">
+                <div className="px-6 py-4 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800">
+                            <h2 className="text-xl font-bold text-ink">
                                 Invoice Configuration
                             </h2>
                         </div>
@@ -234,11 +234,10 @@ const SalesInvoiceCreate: React.FC = () => {
                 <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
                     {/* 1. Invoice Numbering */}
                     <div>
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            {/* <FaHashtag className="text-blue-500" /> */}
+                        <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
                             Invoice Numbering
                         </h6>
-                        <p className="text-sm text-gray-500 mb-4 -mt-2.5">Configure how invoice numbers are generated</p>
+                        <p className="text-sm text-ink-muted mb-4 -mt-2.5">Configure how invoice numbers are generated</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <TextInput
@@ -250,7 +249,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                     error={errors.invoicePrefix}
                                     maxLength={3}
                                 />
-                                <small className="text-gray-400">2–3 letter prefix for invoice numbers (e.g., IN, INV)</small>
+                                <small className="text-ink-subtle">2–3 letter prefix for invoice numbers (e.g., IN, INV)</small>
                             </div>
                             <div>
                                 <TextInput
@@ -263,7 +262,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                     required
                                     error={errors.sequenceLength}
                                 />
-                                <small className="text-gray-400">Number of digits in sequence (e.g., 4 = 0001)</small>
+                                <small className="text-ink-subtle">Number of digits in sequence (e.g., 4 = 0001)</small>
                             </div>
                             <div>
                                 <TextInput
@@ -274,23 +273,22 @@ const SalesInvoiceCreate: React.FC = () => {
                                     onChange={handleChange as any}
                                     disabled
                                 />
-                                <small className="text-gray-400">Auto-incremented with each invoice.</small>
+                                <small className="text-ink-subtle">Auto-incremented with each invoice.</small>
                             </div>
                         </div>
                     </div>
 
                     {/* 2. Financial Year */}
                     <div>
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            {/* <FaCalendarAlt className="text-orange-500" /> */}
+                        <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
                             Financial Year
                         </h6>
-                        <p className="text-sm text-gray-500 mb-4 -mt-2.5">Configure financial year for invoice numbering</p>
+                        <p className="text-sm text-ink-muted mb-4 -mt-2.5">Configure financial year for invoice numbering</p>
 
-                        <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded-md border border-gray-100">
+                        <div className="mb-4 flex items-center justify-between bg-card-2 p-3.5 rounded-xl border border-line-soft">
                             <div>
-                                <div className="font-semibold text-sm text-gray-700">Auto Financial Year</div>
-                                <div className="text-xs text-gray-500">
+                                <div className="font-semibold text-sm text-ink">Auto Financial Year</div>
+                                <div className="text-xs text-ink-muted">
                                     {formData.autoFinancialYear
                                         ? "System automatically determines the financial year based on today's date"
                                         : "Manually set your financial year start date"}
@@ -299,7 +297,7 @@ const SalesInvoiceCreate: React.FC = () => {
                             <div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" name="autoFinancialYear" className="sr-only peer" checked={formData.autoFinancialYear} onChange={handleChange as any} />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                                 </label>
                             </div>
                         </div>
@@ -316,7 +314,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                     error={errors.financialYearStart}
                                     disabled={formData.autoFinancialYear}
                                 />
-                                <small className="text-gray-400">
+                                <small className="text-ink-subtle">
                                     {formData.autoFinancialYear
                                         ? "Auto-calculated — disabled while Auto Financial Year is on"
                                         : "Start date of your financial year"}
@@ -331,18 +329,17 @@ const SalesInvoiceCreate: React.FC = () => {
                                     onChange={handleChange as any}
                                     disabled
                                 />
-                                <small className="text-gray-400">Auto-calculated as one day before start date (next year)</small>
+                                <small className="text-ink-subtle">Auto-calculated as one day before start date (next year)</small>
                             </div>
                         </div>
                     </div>
 
                     {/* 3. Invoice Format */}
                     <div>
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            {/* <FaFileInvoice className="text-purple-500" /> */}
+                        <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
                             Invoice Format
                         </h6>
-                        <p className="text-sm text-gray-500 mb-4 -mt-2.5">Auto-generated invoice number format based on your settings</p>
+                        <p className="text-sm text-ink-muted mb-4 -mt-2.5">Auto-generated invoice number format based on your settings</p>
 
                         <div className="grid grid-cols-1 gap-4">
                             <div>
@@ -354,31 +351,24 @@ const SalesInvoiceCreate: React.FC = () => {
                                     required
                                     error={errors.formatTemplate}
                                 />
-                                <small className="text-gray-400">
+                                <small className="text-ink-subtle">
                                     Variables: {"{PREFIX}"} - Invoice Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence Number
                                 </small>
                             </div>
 
                             <div className="mt-2">
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Preview</label>
+                                <label className="block text-sm font-semibold text-ink mb-1">Preview</label>
                                 <div
-                                    className="p-3 mb-1 rounded text-center text-xl border border-gray-200"
-                                    style={{
-                                        background: "#f8fafc",
-                                        color: "#1e293b",
-                                        letterSpacing: "2px",
-                                        fontFamily: "monospace",
-                                        fontWeight: 600,
-                                    }}
+                                    className="p-3.5 mb-1 rounded-xl text-center text-xl font-mono font-bold tracking-widest border border-line-soft bg-card-2 text-ink"
                                 >
                                     {livePreview}
                                 </div>
-                                <small className="text-gray-400">This is how your next invoice number will look</small>
+                                <small className="text-ink-subtle">This is how your next invoice number will look</small>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
                         {canEditInvoice && (
                             <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
                         )}

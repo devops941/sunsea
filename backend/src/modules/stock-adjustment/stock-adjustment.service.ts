@@ -186,7 +186,11 @@ export class StockAdjustmentService {
         items: {
           include: {
             rawMaterial: true,
-            product: true,
+            product: {
+              include: {
+                uom: true,
+              },
+            },
             store: true,
           },
         },

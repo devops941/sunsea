@@ -19,8 +19,8 @@ import { usePermission } from "../../../hooks/usePermission";
 
 const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
-    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">{label}</p>
-    <div className="text-sm font-semibold text-slate-700">{value || "—"}</div>
+    <p className="text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold mb-1">{label}</p>
+    <div className="text-sm font-bold text-ink">{value || "—"}</div>
   </div>
 );
 
@@ -59,11 +59,11 @@ const GoodsDispatchView: React.FC = () => {
   }, [dispatch, id]);
 
   if (loading && !dispatchData) {
-    return <div className="p-8 text-center text-gray-500">Loading dispatch details...</div>;
+    return <div className="p-8 text-center text-ink-subtle font-semibold">Loading dispatch details...</div>;
   }
 
   if (!dispatchData) {
-    return <div className="p-8 text-center text-red-500">Goods Dispatch not found.</div>;
+    return <div className="p-8 text-center text-red-400 font-semibold">Goods Dispatch not found.</div>;
   }
 
   const handleGateApproval = async (action: "APPROVE" | "REJECT") => {
@@ -104,21 +104,17 @@ const GoodsDispatchView: React.FC = () => {
     }
   };
 
-
-
-
-
   return (
-    <div className="p-4 md:p-6 min-h-screen ">
-      <div className="w-full  mx-auto">
+    <div className="p-4 md:p-6 min-h-screen">
+      <div className="w-full mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+            <h2 className="text-2xl font-extrabold text-ink tracking-tight flex items-center gap-3">
               {dispatchData.dispatchNumber}
               <StatusBadge status={dispatchData.status} />
             </h2>
-            <p className="text-slate-500 text-sm mt-0.5">
+            <p className="text-ink-subtle text-sm font-semibold mt-0.5">
               Dispatch Date: {formatDate(dispatchData.dispatchDate)}
             </p>
           </div>
@@ -130,33 +126,33 @@ const GoodsDispatchView: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             {/* Items List */}
-            <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-                <h3 className="font-bold text-slate-700 text-base">Dispatched Items</h3>
+            <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
+                <h3 className="font-extrabold text-ink text-base">Dispatched Items</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                  <thead className="bg-card-2 border-b border-line-soft">
                     <tr>
                       {["PO No", "Product", "Dispatch Qty", "Received Qty"].map((h, i) => (
-                        <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
+                        <th key={h} className={`text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold px-4 py-3 ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
+                  <tbody className="divide-y divide-line-soft bg-card">
                     {dispatchData.items?.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-4 py-3 text-sm text-slate-700 font-medium">
+                      <tr key={item.id} className="hover:bg-card-2/60 transition-colors">
+                        <td className="px-4 py-3 text-sm text-ink font-bold">
                           {item.productionOrder?.productionOrderId}
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">
-                          <div className="font-semibold text-slate-700">{item.product?.productName}</div>
-                          <div className="text-xs text-slate-400 font-mono mt-0.5">{item.product?.productCode}</div>
+                        <td className="px-4 py-3 text-sm text-ink">
+                          <div className="font-bold text-ink">{item.product?.productName}</div>
+                          <div className="text-xs text-ink-subtle font-mono mt-0.5">{item.product?.productCode}</div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-slate-700">
+                        <td className="px-4 py-3 text-sm text-right font-bold text-ink">
                           {Number(item.dispatchQty)} {formatUOM(item.uom)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">
+                        <td className="px-4 py-3 text-sm text-right font-bold text-primary">
                           {dispatchData.status === "PENDING_STORE_RECEIPT" && canEdit ? (
                             <div className="flex items-center justify-end gap-2">
                               <div className="w-24">
@@ -176,13 +172,13 @@ const GoodsDispatchView: React.FC = () => {
                                   }}
                                 />
                               </div>
-                              <span className="text-xs text-slate-500 font-normal">{formatUOM(item.uom)}</span>
+                              <span className="text-xs text-ink-subtle font-semibold">{formatUOM(item.uom)}</span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-end gap-1">
                               <div>{item.receivedQty !== null && item.receivedQty !== undefined ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}</div>
                               {item.receivedQty !== null && item.receivedQty !== undefined && Number(item.receivedQty) < Number(item.dispatchQty) && (
-                                <span className="inline-flex items-center bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200">
+                                <span className="inline-flex items-center bg-red-500/15 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
                                   {Number(item.dispatchQty) - Number(item.receivedQty)} {formatUOM(item.uom)} Missing
                                 </span>
                               )}
@@ -197,10 +193,9 @@ const GoodsDispatchView: React.FC = () => {
             </div>
 
             {/* Vehicle Info */}
-            <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-               
-                <h3 className="font-bold text-slate-700 text-base">Vehicle Information</h3>
+            <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
+                <h3 className="font-extrabold text-ink text-base">Vehicle Information</h3>
               </div>
               <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-5">
                 <InfoField label="Vehicle Number" value={dispatchData.vehicleNumber} />
@@ -219,13 +214,13 @@ const GoodsDispatchView: React.FC = () => {
           <div className="lg:col-span-1 space-y-6">
             {/* Gate Approval Actions */}
             {dispatchData.status === "PENDING_GATE_APPROVAL" && canEdit && (
-              <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-                  <h3 className="font-bold text-slate-700 text-base">Gate Approval</h3>
+              <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
+                  <h3 className="font-extrabold text-ink text-base">Gate Approval</h3>
                 </div>
                 <div className="p-5 space-y-4">
                   <textarea
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#5D87FF]/30 focus:border-[#5D87FF] transition-colors resize-none placeholder:text-slate-400 bg-white"
+                    className="w-full px-3.5 py-2.5 border border-line-soft rounded-xl text-sm text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-ink-subtle bg-card-2"
                     placeholder="Enter approval or rejection remarks here..."
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
@@ -235,14 +230,14 @@ const GoodsDispatchView: React.FC = () => {
                     <button
                       onClick={() => handleGateApproval("APPROVE")}
                       disabled={loading}
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <FaCheck className="w-4 h-4" /> Approve
                     </button>
                     <button
                       onClick={() => handleGateApproval("REJECT")}
                       disabled={loading}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-red-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <FaTimes className="w-4 h-4" /> Reject
                     </button>
@@ -253,18 +248,18 @@ const GoodsDispatchView: React.FC = () => {
 
             {/* Store Receipt Actions */}
             {dispatchData.status === "PENDING_STORE_RECEIPT" && canEdit && (
-              <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-                  <h3 className="font-bold text-slate-700 text-base">Store Receipt</h3>
+              <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
+                  <h3 className="font-extrabold text-ink text-base">Store Receipt</h3>
                 </div>
                 <div className="p-5 space-y-4">
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                    <p className="text-xs text-blue-700 leading-relaxed">
-                      Approving this will automatically update the Finished Goods Stock in <span className="font-semibold">{dispatchData.store?.storeName || "the destination store"}</span>.
+                  <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
+                    <p className="text-xs text-primary font-medium leading-relaxed">
+                      Approving this will automatically update the Finished Goods Stock in <span className="font-bold">{dispatchData.store?.storeName || "the destination store"}</span>.
                     </p>
                   </div>
                   <textarea
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#5D87FF]/30 focus:border-[#5D87FF] transition-colors resize-none placeholder:text-slate-400 bg-white"
+                    className="w-full px-3.5 py-2.5 border border-line-soft rounded-xl text-sm text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-ink-subtle bg-card-2"
                     placeholder="Enter receipt or rejection remarks here..."
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
@@ -274,14 +269,14 @@ const GoodsDispatchView: React.FC = () => {
                     <button
                       onClick={() => handleStoreReceipt("APPROVE")}
                       disabled={loading}
-                      className="flex-1 bg-[#5D87FF] hover:bg-[#4b6fe0] text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-[#5D87FF]/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 bg-primary hover:bg-primary/90 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <FaCheck className="w-4 h-4" /> Receive Stock
                     </button>
                     <button
                       onClick={() => handleStoreReceipt("REJECT")}
                       disabled={loading}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-red-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <FaTimes className="w-4 h-4" /> Reject
                     </button>
@@ -291,39 +286,39 @@ const GoodsDispatchView: React.FC = () => {
             )}
 
             {/* Timeline / History */}
-            <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-                <h3 className="font-bold text-slate-700 text-base">Status History</h3>
+            <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
+                <h3 className="font-extrabold text-ink text-base">Status History</h3>
               </div>
               <div className="p-5 space-y-6">
-                <div className="relative pl-6 border-l-2 border-slate-200">
-                  <div className="absolute w-3 h-3 bg-slate-300 rounded-full -left-[7px] top-1"></div>
-                  <p className="text-sm font-semibold text-slate-700">Dispatch Created</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dispatchData.createdAt)}</p>
+                <div className="relative pl-6 border-l-2 border-line-soft">
+                  <div className="absolute w-3 h-3 bg-ink-subtle rounded-full -left-[7px] top-1"></div>
+                  <p className="text-sm font-bold text-ink">Dispatch Created</p>
+                  <p className="text-xs text-ink-subtle font-semibold mt-0.5">{formatDateTime(dispatchData.createdAt)}</p>
                 </div>
                 
                 {dispatchData.gateApprovedAt && (
-                  <div className={`relative pl-6 border-l-2 ${dispatchData.status === 'GATE_REJECTED' ? 'border-red-200' : 'border-slate-200'}`}>
-                    <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 ${dispatchData.status === 'GATE_REJECTED' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
-                    <p className="text-sm font-semibold text-slate-700">
+                  <div className={`relative pl-6 border-l-2 ${dispatchData.status === 'GATE_REJECTED' ? 'border-red-500/30' : 'border-line-soft'}`}>
+                    <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 ${dispatchData.status === 'GATE_REJECTED' ? 'bg-red-500' : 'bg-primary'}`}></div>
+                    <p className="text-sm font-bold text-ink">
                       {dispatchData.status === 'GATE_REJECTED' ? 'Gate Rejected' : 'Gate Approved'}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dispatchData.gateApprovedAt)}</p>
+                    <p className="text-xs text-ink-subtle font-semibold mt-0.5">{formatDateTime(dispatchData.gateApprovedAt)}</p>
                     {dispatchData.gateRemarks && (
-                      <p className="text-xs text-slate-500 mt-1 italic">"{dispatchData.gateRemarks}"</p>
+                      <p className="text-xs text-ink-subtle mt-1 italic">"{dispatchData.gateRemarks}"</p>
                     )}
                   </div>
                 )}
 
                 {dispatchData.storeReceivedAt && (
                   <div className="relative pl-6 border-transparent">
-                    <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 ${dispatchData.status === 'STORE_REJECTED' ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                    <p className="text-sm font-semibold text-slate-700">
+                    <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 ${dispatchData.status === 'STORE_REJECTED' ? 'bg-red-500' : 'bg-emerald-500'}`}></div>
+                    <p className="text-sm font-bold text-ink">
                       {dispatchData.status === 'STORE_REJECTED' ? 'Store Rejected' : 'Warehouse Received'}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dispatchData.storeReceivedAt)}</p>
+                    <p className="text-xs text-ink-subtle font-semibold mt-0.5">{formatDateTime(dispatchData.storeReceivedAt)}</p>
                     {dispatchData.storeRemarks && (
-                      <p className="text-xs text-slate-500 mt-1 italic">"{dispatchData.storeRemarks}"</p>
+                      <p className="text-xs text-ink-subtle mt-1 italic">"{dispatchData.storeRemarks}"</p>
                     )}
                   </div>
                 )}

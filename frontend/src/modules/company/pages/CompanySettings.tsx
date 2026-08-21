@@ -301,23 +301,22 @@ const CompanySettings: React.FC = () => {
   // Normal Settings/Edit Screen Design (Matches CreateOrder.tsx)
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-lg  border-gray-200">
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs">
         {/* Page Header */}
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-line-soft">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-ink">
                 {isEditMode ? 'Edit Company Settings' : 'Create Company'}
               </h2>
             </div>
-
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
           {/* General Information */}
           <div>
-            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
               General Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -327,9 +326,6 @@ const CompanySettings: React.FC = () => {
               <div className="hidden">
                 <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
               </div>
-              {/* <div>
-                <TextInput label="Short Name" name="shortName" value={formData.shortName || ""} onChange={handleChange} placeholder="Enter Short Name" />
-              </div> */}
               <div>
                 <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
                   { value: "INR", label: "INR - Indian Rupee" }
@@ -340,7 +336,7 @@ const CompanySettings: React.FC = () => {
 
           {/* Registration Details */}
           <div>
-            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
               Registration Details
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -352,7 +348,7 @@ const CompanySettings: React.FC = () => {
 
           {/* Address Information */}
           <div>
-            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
                Address Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -392,7 +388,7 @@ const CompanySettings: React.FC = () => {
 
           {/* Contact Information */}
           <div>
-            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
               Contact Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -424,7 +420,7 @@ const CompanySettings: React.FC = () => {
 
           {/* System Information */}
           <div>
-            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
              System Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
@@ -438,7 +434,7 @@ const CompanySettings: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
             {canEdit && (
                 <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
             )}

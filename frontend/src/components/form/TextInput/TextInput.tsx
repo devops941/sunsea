@@ -16,6 +16,8 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   preventNegative?: boolean;
   as?: "input" | "textarea";
   rows?: number;
+  inputClassName?: string;
+  labelClassName?: string;
   onChange?: (event: any) => void;
 }
 
@@ -33,6 +35,8 @@ const TextInput: React.FC<TextInputProps> = ({
   error,
   disabled = false,
   preventNegative,
+  inputClassName = "",
+  labelClassName = "",
   onChange,
   onKeyDown,
   onPaste,
@@ -71,11 +75,12 @@ const TextInput: React.FC<TextInputProps> = ({
           htmlFor={name}
           className={`
             flex items-center gap-[6px] mb-2
-            text-[12px] font-bold uppercase
+            text-[12px] font-extrabold uppercase
             tracking-[0.5px]
             transition-colors duration-250
-            ${error ? "text-red-500" : "text-slate-500"}
+            ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
+            ${labelClassName}
           `}
         >
           {icon && (
@@ -83,7 +88,7 @@ const TextInput: React.FC<TextInputProps> = ({
               className={`
                 flex items-center text-sm
                 transition-colors duration-250
-                ${error ? "text-red-500" : "text-primary"}
+                ${error ? "text-red-400" : "text-primary"}
                 group-focus-within:text-primary
               `}
             >
@@ -92,7 +97,7 @@ const TextInput: React.FC<TextInputProps> = ({
           )}
           <span>{label}</span>
           {required && (
-            <span className="text-[#e53935] ml-0.5">*</span>
+            <span className="text-red-500 ml-0.5">*</span>
           )}
         </label>
       )}
@@ -110,17 +115,18 @@ const TextInput: React.FC<TextInputProps> = ({
             disabled={disabled}
             rows={rows}
             className={`
-              w-full min-h-[35px] px-4 py-[5px] text-sm font-medium
+              w-full min-h-[35px] px-4 py-[5px] text-sm font-semibold
               border rounded-[5px] outline-none
               transition-all duration-250
-              placeholder-[#9ca3af]
-              text-[#1f2937]
+              placeholder:text-ink-subtle/80 placeholder:font-normal
+              text-ink
               ${error
-                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
               }
-              ${disabled ? "bg-[#f5f7f8] cursor-not-allowed text-[#9ca3af]" : ""}
+              ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-bold opacity-85" : ""}
               resize-y
+              ${inputClassName}
             `}
             {...(rest as unknown as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
           />
@@ -140,24 +146,25 @@ const TextInput: React.FC<TextInputProps> = ({
             className={`
               w-full h-10 px-4
               border rounded-[5px] outline-none
-              text-sm font-medium leading-normal
+              text-sm font-semibold leading-normal
               [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
               transition-all duration-250
-              placeholder-[#9ca3af]
-              text-[#1f2937]
+              placeholder:text-ink-subtle/80 placeholder:font-normal
+              text-ink
               ${error
-                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
               }
-              ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : ""}
+              ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-bold opacity-85" : ""}
               ${trailingIcon ? "pr-10" : ""}
+              ${inputClassName}
             `}
             {...rest}
           />
         )}
 
         {trailingIcon && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-ink-subtle">
             {trailingIcon}
           </div>
         )}

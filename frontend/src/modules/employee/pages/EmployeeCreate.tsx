@@ -208,9 +208,9 @@ const INITIAL: FormState = {
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; color?: string }> = ({
   icon: Icon, title, color = "text-primary",
 }) => (
-  <div className="flex items-center gap-2 mb-5 pb-2 border-b border-slate-100">
+  <div className="flex items-center gap-2 mb-5 pb-2 border-b border-line-soft">
     <Icon className={`${color} text-lg`} />
-    <h3 className="text-base font-semibold text-slate-700">{title}</h3>
+    <h3 className="text-base font-extrabold text-ink tracking-wide">{title}</h3>
   </div>
 );
 
@@ -243,19 +243,19 @@ const ExtCompDraft: React.FC<{
   };
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-blue-50 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 bg-indigo-600">
+    <div className="rounded-xl border border-line-soft bg-card shadow-xs overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary">
         <svg className="text-white text-sm w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
         </svg>
         <span className="text-sm font-bold text-white tracking-wide uppercase">Total Compensation</span>
-        <svg className="text-indigo-200 w-3 h-3 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+        <svg className="text-white/80 w-3 h-3 ml-auto" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
         </svg>
       </div>
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 bg-card text-ink">
         <div>
-          <label className="block text-xs font-bold uppercase tracking-[0.5px] text-slate-500 mb-1">
+          <label className="block text-xs font-extrabold uppercase tracking-[0.5px] text-ink mb-1">
             Cash in Hand Amount (₹)
           </label>
           <input
@@ -266,10 +266,10 @@ const ExtCompDraft: React.FC<{
             min={0}
             step={0.01}
             placeholder="e.g. 10000"
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+            className="w-full rounded-lg border border-line-soft bg-card-2 px-3 py-2 text-sm font-semibold text-ink placeholder:text-ink-subtle/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
-        <p className="text-xs text-slate-400 italic">
+        <p className="text-xs text-ink-subtle italic">
           This will be saved automatically when the employee record is created.
         </p>
       </div>
@@ -741,24 +741,24 @@ const EmployeeCreatePage: React.FC = () => {
         <SectionHeader icon={FaCamera} title="Profile Photo" />
         <div className="flex items-center gap-6">
           <div
-            className="w-28 h-28 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden cursor-pointer hover:border-primary transition-colors"
+            className="w-28 h-28 rounded-full border-2 border-dashed border-line-soft flex items-center justify-center bg-card-2 overflow-hidden cursor-pointer hover:border-primary transition-colors shadow-xs"
             onClick={() => photoInputRef.current?.click()}
           >
             {form.photoPreview ? (
               <img src={form.photoPreview} alt="Preview" className="w-full h-full object-cover" />
             ) : (
-              <div className="flex flex-col items-center gap-1 text-slate-400">
-                <FaCamera size={24} />
-                <span className="text-xs">Upload Photo</span>
+              <div className="flex flex-col items-center gap-1 text-ink-subtle">
+                <FaCamera size={24} className="text-primary" />
+                <span className="text-xs font-semibold">Upload Photo</span>
               </div>
             )}
           </div>
           <div>
             <button type="button" onClick={() => photoInputRef.current?.click()}
-              className="px-4 py-2 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors">
+              className="px-4 py-2 text-sm font-bold text-primary bg-primary/15 border border-primary/30 rounded-lg hover:bg-primary/25 transition-colors">
               {form.photoPreview ? "Change Photo" : "Choose Photo"}
             </button>
-            <p className="text-xs text-slate-400 mt-1">JPG, PNG, WEBP up to 5 MB</p>
+            <p className="text-xs text-ink-subtle mt-1.5 font-medium">JPG, PNG, WEBP up to 5 MB</p>
             <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoChange} />
           </div>
         </div>
@@ -1041,11 +1041,11 @@ const EmployeeCreatePage: React.FC = () => {
   return (
     <div className="w-full mx-auto space-y-0">
       {/* Header */}
-      <div className="bg-white shadow-sm border border-slate-200 rounded-t-lg">
+      <div className="bg-card shadow-xs border border-line-soft rounded-t-lg">
         <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Create Employee</h2>
-            <p className="text-sm text-slate-400 mt-0.5">Fill in the details across all sections</p>
+            <h2 className="text-xl font-bold text-ink">Create Employee</h2>
+            <p className="text-sm text-ink-subtle mt-0.5">Fill in the details across all sections</p>
           </div>
           <div className="flex items-center gap-3">
             <BackButton />
@@ -1061,7 +1061,7 @@ const EmployeeCreatePage: React.FC = () => {
 
         {/* Tab bar */}
         <div className="px-6 overflow-x-auto">
-          <div className="flex gap-0 border-b border-slate-200 min-w-max">
+          <div className="flex gap-0 border-b border-line-soft min-w-max">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1074,8 +1074,8 @@ const EmployeeCreatePage: React.FC = () => {
                     flex items-center gap-1.5 px-4 py-3 text-xs font-semibold uppercase tracking-wide
                     border-b-2 transition-all duration-200 whitespace-nowrap
                     ${isActive
-                      ? "border-primary text-primary bg-primary/5"
-                      : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                      ? "border-primary text-primary bg-primary/10"
+                      : "border-transparent text-ink-muted hover:text-ink hover:bg-card-2"
                     }
                   `}
                 >
@@ -1089,26 +1089,26 @@ const EmployeeCreatePage: React.FC = () => {
       </div>
 
       {/* Tab content */}
-      <div className="bg-white border-x border-slate-200 px-6 py-6 min-h-[420px]">
+      <div className="bg-card border-x border-line-soft px-6 py-6 min-h-[420px]">
         {tabRenderers[activeTab]()}
       </div>
 
       {/* Footer navigation */}
-      <div className="bg-white border border-slate-200 rounded-b-lg px-6 py-4 flex items-center justify-between">
+      <div className="bg-card border border-line-soft rounded-b-lg px-6 py-4 flex items-center justify-between">
         <button
           type="button"
           disabled={activeTab === 0}
           onClick={() => setActiveTab((p) => Math.max(0, p - 1))}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
             ${activeTab === 0
-              ? "text-slate-300 cursor-not-allowed"
-              : "text-slate-600 hover:bg-slate-100 border border-slate-200"
+              ? "text-ink-subtle/40 cursor-not-allowed"
+              : "text-ink-muted hover:bg-card-2 border border-line-soft"
             }`}
         >
           <FaChevronLeft size={12} /> Previous
         </button>
 
-        <span className="text-xs text-slate-400 font-medium">
+        <span className="text-xs text-ink-subtle font-medium">
           {activeTab + 1} / {TABS.length}
         </span>
 

@@ -44,12 +44,12 @@ function EditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-        <h5 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">Edit Customer Type</h5>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-xs">
+      <div className="bg-card border border-line-soft rounded-2xl shadow-xl w-full max-w-sm p-6 text-ink">
+        <h5 className="text-sm font-extrabold text-ink mb-4 uppercase tracking-wider">Edit Item</h5>
         <input
           ref={inputRef}
-          className="w-full px-3 py-2 border border-slate-300 rounded-md text-[15px] outline-none focus:border-primary focus:ring-4 focus:ring-primary/15 mb-4 transition-all"
+          className="w-full px-3 py-2 border border-line-soft bg-card-2 text-ink font-semibold rounded-xl text-[15px] outline-none focus:border-primary focus:ring-4 focus:ring-primary/15 mb-4 transition-all"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -61,14 +61,14 @@ function EditModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl border border-line-soft text-ink-subtle bg-card-2 hover:bg-card transition-colors"
           >
             <X size={14} /> Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
           >
             <Check size={14} /> Save
           </button>
@@ -219,7 +219,7 @@ export default function CreatableSelectInput({
       {label && (
         <label
           className={`flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${
-            error ? 'text-red-500' : 'text-slate-500'
+            error ? 'text-red-400' : 'text-ink-subtle font-extrabold'
           } group-focus-within:text-primary`}
         >
           <span>{label}</span>
@@ -262,27 +262,26 @@ export default function CreatableSelectInput({
           }}
           className={`
             w-full h-10 pl-4 pr-10
-            border rounded-md outline-none
-            text-[15px] font-medium
+            border rounded-xl outline-none
+            text-[15px] font-bold text-ink
             transition-all duration-250
-            ${selectedOption && !isOpen ? 'text-[#1f2937]' : 'text-[#1f2937]'}
-            placeholder:text-[#9ca3af] placeholder:font-normal
+            placeholder:text-ink-subtle/80 placeholder:font-medium
             ${
               error
-                ? 'border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15'
-                : 'border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15'
+                ? 'border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15'
+                : 'border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15'
             }
             ${isOpen ? (error ? 'border-red-500 ring-4 ring-red-500/15' : 'border-primary ring-4 ring-primary/15') : ''}
-            ${disabled || isLoading ? 'bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]' : 'bg-white'}
+            ${disabled || isLoading ? 'bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70' : ''}
           `}
         />
 
         {/* Right icons */}
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-gray-500 pointer-events-none">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-ink-subtle pointer-events-none">
           {selectedOption && !disabled && (
             <span
               role="button"
-              className="hover:text-red-400 text-gray-400 p-0.5 rounded transition-colors cursor-pointer pointer-events-auto"
+              className="hover:text-red-400 text-ink-subtle p-0.5 rounded transition-colors cursor-pointer pointer-events-auto"
               title="Clear"
               onMouseDown={(e) => { e.preventDefault(); handleClear(e); }}
             >
@@ -299,20 +298,20 @@ export default function CreatableSelectInput({
           createPortal(
             <div
               ref={portalRef}
-              className="bg-white border border-gray-100 rounded-lg shadow-lg flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
+              className="bg-card border border-line-soft rounded-xl shadow-xl flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink"
               style={dropdownStyle}
             >
               {/* Options list */}
               <div className="overflow-y-auto min-h-0 flex-1">
                 {/* Create hint when no results */}
                 {filteredOptions.length === 0 && onCreateOption && inputText.trim() && (
-                  <div className="px-4 py-2.5 text-sm text-primary/70 flex items-center gap-2">
+                  <div className="px-4 py-2.5 text-sm text-primary font-bold flex items-center gap-2">
                     <Plus size={13} />
-                    <span>Press <kbd className="px-1 py-0.5 text-xs bg-gray-100 border border-gray-200 rounded">Enter</kbd> to create &ldquo;{inputText.trim()}&rdquo;</span>
+                    <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-card-2 border border-line-soft rounded text-ink font-mono">Enter</kbd> to create &ldquo;{inputText.trim()}&rdquo;</span>
                   </div>
                 )}
                 {filteredOptions.length === 0 && !onCreateOption && (
-                  <div className="px-4 py-3 text-sm text-gray-400 text-center">No results found</div>
+                  <div className="px-4 py-3 text-sm text-ink-subtle font-semibold text-center">No results found</div>
                 )}
                 {filteredOptions.map((option) => (
                   <div
@@ -320,7 +319,7 @@ export default function CreatableSelectInput({
                     className={`
                       group/item px-4 py-2.5 text-sm cursor-pointer flex items-center justify-between
                       transition-colors duration-150
-                      ${value == option.value ? 'bg-primary/10 text-primary font-semibold' : 'text-gray-700 hover:bg-gray-50'}
+                      ${value == option.value ? 'bg-primary/15 text-primary font-bold' : 'text-ink font-semibold hover:bg-card-2'}
                     `}
                     onMouseDown={(e) => { e.preventDefault(); handleSelect(option.value); }}
                   >
@@ -330,7 +329,7 @@ export default function CreatableSelectInput({
                         <button
                           type="button"
                           title="Edit"
-                          className="opacity-0 group-hover/item:opacity-100 text-slate-400 hover:text-blue-500 p-1 rounded transition-all"
+                          className="opacity-0 group-hover/item:opacity-100 text-ink-subtle hover:text-blue-400 p-1 rounded transition-all"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -345,7 +344,7 @@ export default function CreatableSelectInput({
                         <button
                           type="button"
                           title="Delete"
-                          className="opacity-0 group-hover/item:opacity-100 text-slate-400 hover:text-red-500 p-1 rounded transition-all"
+                          className="opacity-0 group-hover/item:opacity-100 text-ink-subtle hover:text-red-400 p-1 rounded transition-all"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -368,7 +367,7 @@ export default function CreatableSelectInput({
       </div>
 
       {/* Error */}
-      {error && <div className="text-[#dc3545] text-sm font-medium mt-1">{error}</div>}
+      {error && <div className="text-[#dc3545] text-sm font-semibold mt-1">{error}</div>}
 
       {/* Edit Modal */}
       {editItem && onEditOption && (

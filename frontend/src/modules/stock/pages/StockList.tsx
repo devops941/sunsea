@@ -65,7 +65,7 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
 
     // Fetch stocks based on search and storeId
     useEffect(() => {
-        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId: activeStoreId }));
+        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId: activeStoreId, storeCategory: "RAW_MATERIAL" }));
     }, [dispatch, debouncedSearch, activeStoreId]);
 
     useEffect(() => {
@@ -123,8 +123,8 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     ];
 
     return (
-        <div className="p-4 md:p-6 bg-card">
-            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="p-4 md:p-6 ">
+            <div className=" rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>

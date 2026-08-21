@@ -51,6 +51,11 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     READY_FOR_DISPATCH: { bg: '#a7f3d0', text: '#064e3b' },        // Light Green - ready to ship
     PARTIALLY_DISPATCHED: { bg: '#fde68a', text: '#92400e' },      // Amber - partially shipped
     DISPATCHED: { bg: '#d1fae5', text: '#065f46' },                // Green - fully shipped
+    PENDING_GATE_APPROVAL: { bg: '#fef3c7', text: '#b45309' },     // Amber - awaiting gate check
+    PENDING_STORE_RECEIPT: { bg: '#e0f2fe', text: '#0369a1' },     // Sky Blue - awaiting store receipt
+    WAREHOUSE_RECEIVED: { bg: '#d1fae5', text: '#065f46' },        // Green - received at warehouse
+    GATE_REJECTED: { bg: '#fee2e2', text: '#b91c1c' },             // Red - rejected at gate
+    STORE_REJECTED: { bg: '#fee2e2', text: '#b91c1c' },            // Red - rejected at store
 
     // ========== FINAL STATES ==========
     COMPLETED: { bg: '#d1fae5', text: '#065f46' },                 // Green - Completed

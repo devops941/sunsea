@@ -144,7 +144,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-md border border-line-soft overflow-hidden">
       <div className="p-6 lg:p-8 flex flex-col min-w-0">
 
         {/* Header row (Tabs + Legend) */}
@@ -165,11 +165,11 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-[#0ea5e9] to-[#0284c7] shadow-sm" />
-              <span className="text-[12px] font-bold text-slate-600">Sales</span>
+              <span className="text-[12px] font-bold text-ink-muted">Sales</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-[#f43f5e] to-[#e11d48] shadow-sm" />
-              <span className="text-[12px] font-bold text-slate-600">Purchase</span>
+              <span className="text-[12px] font-bold text-ink-muted">Purchase</span>
             </div>
           </div>
         </div>
@@ -188,14 +188,14 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
               </linearGradient>
             </defs>
 
-            <CartesianGrid vertical={false} horizontal={true} stroke="#f1f5f9" strokeDasharray="4 4" />
+            <CartesianGrid vertical={false} horizontal={true} stroke="var(--color-line-soft)" strokeDasharray="4 4" />
 
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
               tickMargin={15}
-              tick={{ fontSize: 11, fill: "#94a3b8", fontWeight: 600 }}
+              tick={{ fontSize: 11, fill: "var(--color-ink-subtle)", fontWeight: 600 }}
             />
             <YAxis
               axisLine={false}
@@ -203,7 +203,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
               width={65}
               tickMargin={10}
               tickFormatter={(value) => `₹${value.toLocaleString()}`}
-              tick={{ fontSize: 11, fill: "#94a3b8", fontWeight: 600 }}
+              tick={{ fontSize: 11, fill: "var(--color-ink-subtle)", fontWeight: 600 }}
             />
 
             <ChartTooltip
@@ -218,8 +218,8 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
                         style={{ backgroundColor: item?.color || (name === 'sales' ? '#0ea5e9' : '#f43f5e') }}
                       />
                       <div className="flex flex-1 justify-between leading-none gap-4 items-center">
-                        <span className="text-slate-500 font-semibold capitalize">{name}</span>
-                        <span className="text-slate-800 font-mono font-bold tabular-nums ml-2">
+                        <span className="text-ink-muted font-semibold capitalize">{name}</span>
+                        <span className="text-ink font-mono font-bold tabular-nums ml-2">
                           ₹{Number(value).toLocaleString()}
                         </span>
                       </div>

@@ -8,7 +8,7 @@ export interface CommonModalProps {
     children: React.ReactNode;
     footer?: React.ReactNode;
     overflowVisible?: boolean;
-    maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "full";
+    maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "full" | "wide";
 }
 
 const maxWidthMap: Record<string, string> = {
@@ -22,7 +22,8 @@ const maxWidthMap: Record<string, string> = {
     "5xl": "max-w-5xl",
     "6xl": "max-w-6xl",
     "7xl": "max-w-7xl",
-    full: "max-w-[95vw]",
+    full: "max-w-[60vw]",
+    wide: "max-w-[95vw]",
 };
 
 const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children, footer, overflowVisible, maxWidth = "lg" }) => {

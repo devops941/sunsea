@@ -421,7 +421,7 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                 </div>
             )}
             <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <h3 className="text-xs font-extrabold text-ink uppercase tracking-wider">
                     Manual Raw Materials ({productName || `Product ${productIndex + 1}`})
                 </h3>
                 <CustomButton
@@ -442,35 +442,35 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
             </div>
 
             <div className="mt-2 mb-2">
-                <table className="w-full text-left text-sm text-slate-600">
-                    <thead className="text-slate-700">
+                <table className="w-full text-left text-sm text-ink">
+                    <thead className="text-xs font-extrabold text-ink uppercase tracking-wider">
                         <tr>
-                            <th>
+                            <th className="pb-2">
                                 STORE{" "}
                                 <span className="text-red-500">
                                     *
                                 </span>
                             </th>
-                            <th>
+                            <th className="pb-2">
                                 RAW MATERIAL{" "}
                                 <span className="text-red-500">
                                     *
                                 </span>
                             </th>
-                            <th>
+                            <th className="pb-2">
                                 REQUIRED QTY & UOM{" "}
                                 <span className="text-red-500">
                                     *
                                 </span>
                             </th>
-                            <th>REMARKS</th>
-                            <th />
+                            <th className="pb-2">REMARKS</th>
+                            <th className="pb-2" />
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-line-soft">
                         {fields.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-4 py-3 text-center text-slate-500 bg-white rounded">
+                                <td colSpan={5} className="px-4 py-3 text-center text-ink-subtle bg-card-2 rounded border border-line-soft font-medium">
                                     No raw materials added. Click 'Add Material Row' to include materials.
                                 </td>
                             </tr>
@@ -814,8 +814,11 @@ const ProductionOrderCreate: React.FC = () => {
                     const productBoms = product?.billOfMaterials || [];
 
                     if (productBoms && productBoms.length > 0) {
-                        const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
-                        const totalWeight = totalQty * weight;
+                        const rawWeight = product ? (Number(product.weightPerPiece) || 0) : 0;
+                        const weightUom = (product?.weightUom || "kg").toLowerCase().trim();
+                        // Always work in kg — convert g → kg if needed
+                        const weightInKg = weightUom === "g" ? rawWeight / 1000 : rawWeight;
+                        const totalWeight = totalQty * weightInKg;
                         
                         const expectedRms = productBoms.map((bomItem: any) => {
                             let reqQty = 0;
@@ -878,8 +881,10 @@ const ProductionOrderCreate: React.FC = () => {
                             setValue(`products.${pIdx}.rawMaterials`, newRms);
                         }
                     } else {
-                        const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
-                        const reqQty = totalQty * weight;
+                        const rawWeight = product ? (Number(product.weightPerPiece) || 0) : 0;
+                        const weightUom = (product?.weightUom || "kg").toLowerCase().trim();
+                        const weightInKg = weightUom === "g" ? rawWeight / 1000 : rawWeight;
+                        const reqQty = totalQty * weightInKg;
 
                         let updated = false;
                         const newRms = [...currentRms];
@@ -1109,11 +1114,11 @@ const ProductionOrderCreate: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
                 {/* Page Header */}
-                <div className="px-6 py-5 border-b border-slate-200">
+                <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-slate-800">
+                        <h2 className="text-xl font-bold text-ink">
                             {isEditMode
                                 ? "Edit Production Order"
                                 : "Create Production Order"}
@@ -1129,42 +1134,42 @@ const ProductionOrderCreate: React.FC = () => {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
 
-                        {/* â”€â”€ 1. Source Information â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+                        {/* ── 1. Source Information ─────────────────────────── */}
                         {watchSalesOrderId && (
                             <>
                                 <div className="md:col-span-12">
-                                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                                    <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-4">
                                         1. Selected Sales Order
                                     </h3>
                                     <div className="p-0" >
                                         {isFetchingSalesOrder ? (
-                                            <div className="text-slate-500">
-                                                Fetching Sales Order detailsâ€¦
+                                            <div className="text-ink-muted">
+                                                Fetching Sales Order details…
                                             </div>
                                         ) : selectedSalesOrder ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-card-2 p-4 rounded-xl border border-line-soft">
                                                 <div className="md:col-span-3">
-                                                    <div className="text-slate-500 text-sm">
+                                                    <div className="text-ink-muted text-sm">
                                                         Sales Order No
                                                     </div>
-                                                    <div className="font-bold text-slate-800">
+                                                    <div className="font-bold text-ink">
                                                         {selectedSalesOrder.orderNo || "-"}
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-3">
-                                                    <div className="text-slate-500 text-sm">
+                                                    <div className="text-ink-muted text-sm">
                                                         Customer
                                                     </div>
-                                                    <div className="font-bold text-slate-800">
+                                                    <div className="font-bold text-ink">
                                                         {selectedSalesOrder.customer
                                                             ?.firmName || "-"}
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-3">
-                                                    <div className="text-slate-500 text-sm">
+                                                    <div className="text-ink-muted text-sm">
                                                         Order Date
                                                     </div>
-                                                    <div className="font-bold text-slate-800">
+                                                    <div className="font-bold text-ink">
                                                         {selectedSalesOrder.orderDate
                                                             ? new Date(
                                                                 selectedSalesOrder.orderDate
@@ -1173,10 +1178,10 @@ const ProductionOrderCreate: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-3">
-                                                    <div className="text-slate-500 text-sm">
+                                                    <div className="text-ink-muted text-sm">
                                                         Due Date
                                                     </div>
-                                                    <div className="font-bold text-slate-800">
+                                                    <div className="font-bold text-ink">
                                                         {selectedSalesOrder.expectedCompletionDate
                                                             ? new Date(
                                                                 selectedSalesOrder.expectedCompletionDate
@@ -1195,10 +1200,10 @@ const ProductionOrderCreate: React.FC = () => {
                                 </div>
                                 {selectedSalesOrderItems.length > 0 && (
                                     <div className="md:col-span-12 mt-3 mb-3">
-                                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                                        <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-3">
                                             Sales Order Items
                                         </h3>
-                                        <div className="mt-2 mb-4 border rounded-lg border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="mt-2 mb-4 border rounded-lg border-line-soft shadow-sm overflow-hidden">
                                             <DataTable
                                                 columns={salesOrderColumns}
                                                 data={selectedSalesOrderItems}
@@ -1214,7 +1219,7 @@ const ProductionOrderCreate: React.FC = () => {
                         )}
                         <div className="md:col-span-12">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                <h3 className="text-xs font-extrabold text-ink uppercase tracking-wider">
                                     {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}
                                 </h3>
                                 {!watchSalesOrderId && (
@@ -1222,15 +1227,16 @@ const ProductionOrderCreate: React.FC = () => {
                                         text="Add Production"
                                         icon={FaPlus}
                                         type="button"
+                                        variant="secondary"
                                         onClick={() => appendProduct({ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] })}
                                     />
                                 )}
                             </div>
                             <div className="p-0">
                                 {productFields.map((prodItem, index) => (
-                                    <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-t border-slate-200" : ""}>
+                                    <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-t border-line-soft" : ""}>
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 grow">Product {index + 1}</h3>
+                                            <h3 className="text-lg font-bold text-ink border-b border-line-soft pb-2 grow">Product {index + 1}</h3>
                                             {!watchSalesOrderId && productFields.length > 1 && (
                                                 <DeleteButton onClick={() => removeProduct(index)} />
                                             )}
@@ -1276,7 +1282,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                     control={control}
                                                     render={({ field }) => (
                                                         <TextInput
-                                                            label="Target Quantity"
+                                                            label="Target Qty"
                                                             name={field.name}
                                                             type="number"
                                                             min="0"
@@ -1306,11 +1312,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                             error={errors.products?.[index]?.uom?.message}
                                                             category={["length", "mass", "each"]}
                                                             allowedCodes={[
-                                                                // "kg", "g", "t", "ton",
-                                                                // "l", "ml", "ltr",
-                                                                // "m", "cm", "mtr",
                                                                 "ea"
-                                                                // , "dz"
                                                             ]}
                                                         />
                                                     )}
@@ -1345,6 +1347,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                     value={field.value ? field.value.substring(0, 10) : ""}
                                                     onChange={(e) => field.onChange(e.target.value)}
                                                     required
+                                                    disabled={!!watchSalesOrderId}
                                                     error={errors.orderDate?.message}
                                                 />
                                             )}
@@ -1410,10 +1413,10 @@ const ProductionOrderCreate: React.FC = () => {
                         </div>
 
 
-                        {/* â”€â”€ 2. General Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+                        {/* ── 2. General Details ──────────────────────────── */}
                         <div className="md:col-span-12 lg:col-span-12 p-4 md:p-6">
 
-                            <h6 className="text-lg font-bold text-slate-800 mb-6">
+                            <h6 className="text-lg font-bold text-ink mb-6">
                                 2. General Details
                             </h6>
 
@@ -1453,11 +1456,12 @@ const ProductionOrderCreate: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* â”€â”€ Form Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-                    <div className="form-actions pb-4 pr-3 flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
+                    {/* ── Form Actions ──────────────────────────────────────── */}
+                    <div className="form-actions pb-4 pr-3 flex justify-end gap-3 mt-4 pt-3 border-t border-line-soft">
                         <CustomButton
                             text="Clear Form"
                             icon={FaEraser}
+                            variant="secondary"
                             onClick={() => {
                                 reset(defaultValues);
                                 setRowRmStates({});

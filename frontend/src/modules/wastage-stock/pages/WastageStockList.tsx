@@ -1,262 +1,254 @@
-import React, { useState, useMemo, useCallback } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 
+import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
+import { fetchRawMaterialStocks, rawMaterialStockCreated, rawMaterialStockUpdated, rawMaterialStockDeleted } from "../../../features/raw-materials/rawMaterialStockSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
-import EditButton from "../../../components/ui/EditButton/EditButton";
-import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-import CustomButton from "../../../components/ui/Button/Button";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
-import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 const ITEMS_PER_PAGE = 10;
 
-interface WastageEntry {
-    id: number;
-    wastageCode: string;
-    logDate: string;
-    category: string;
-    quantity: number;
-    uom: string;
-    department: string;
-    cause: string;
-    scrapUnitPrice: number;
-    status: "Stored" | "Disposed" | "Recycled" | "Sold";
-}
-
-const INITIAL_DATA: WastageEntry[] = [
-    { id: 1, wastageCode: "WST-2024-001", logDate: "2024-06-14", category: "Fabric Scraps", quantity: 45.2, uom: "KG", department: "Cutting Department", cause: "End-bit scrap cuts", scrapUnitPrice: 18.00, status: "Stored" },
-    { id: 2, wastageCode: "WST-2024-002", logDate: "2024-06-15", category: "Yarn Waste", quantity: 12.5, uom: "KG", department: "Knitting Department", cause: "Thread trim sweepings", scrapUnitPrice: 8.50, status: "Sold" },
-    { id: 3, wastageCode: "WST-2024-003", logDate: "2024-06-15", category: "Rejected Garments", quantity: 35, uom: "PCS", department: "Finishing & Packing", cause: "Measurement deviation failures", scrapUnitPrice: 50.00, status: "Recycled" },
-    { id: 4, wastageCode: "WST-2024-004", logDate: "2024-06-16", category: "Chemical Waste", quantity: 80, uom: "KG", department: "Dye House", cause: "Effluent sludge discharge", scrapUnitPrice: 0, status: "Disposed" },
-    { id: 5, wastageCode: "WST-2024-005", logDate: "2024-06-17", category: "Fabric Scraps", quantity: 50.0, uom: "KG", department: "Cutting Department", cause: "Edge trimmings", scrapUnitPrice: 18.00, status: "Stored" },
-];
+const parseBaseUom = (uomStr?: string) => {
+    if (!uomStr) return { primary: "N/A", secondary: "None", list: [] };
+    const list = uomStr.split(',').map(u => u.trim()).filter(Boolean);
+    if (list.length === 0) return { primary: "N/A", secondary: "None", list: [] };
+    const primary = list[0];
+    const secondaryList = list.slice(1);
+    const secondary = secondaryList.length > 0 ? secondaryList.join(', ') : "None";
+    return { primary, secondary, list };
+};
 
 const WastageStockList: React.FC = () => {
-    const navigate = useNavigate();
-    const [data, setData] = useState<WastageEntry[]>(INITIAL_DATA);
+    const dispatch = useAppDispatch();
+
+    const { data, loading, error } = useAppSelector((state) => state.rawMaterialStocks);
+
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [showView, setShowView] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<any>(null);
 
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<WastageEntry | null>(null);
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    // Fetch only wastage-store items
+    useEffect(() => {
+        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeCategory: "WASTAGE" }));
+    }, [dispatch, debouncedSearch]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+        }
+    }, [error]);
+
+    useSocketSync("rawMaterialStock", {
+        created: rawMaterialStockCreated,
+        updated: rawMaterialStockUpdated,
+        deleted: rawMaterialStockDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
 
-    const filteredData = useMemo(() => {
-        return data.filter(item =>
-            item.wastageCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.status.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [data, searchTerm]);
-
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedData = (data || []).slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const formatExportQty = (qty: any, uom: string) => {
+        const num = Number(qty) || 0;
+        let primaryUom = uom ? uom.split(',')[0] : "";
+        if (primaryUom.toLowerCase() === "ea") primaryUom = "PCS";
+        const displayNum = Number(num.toFixed(3)).toString();
+        return `${displayNum} ${primaryUom}`;
     };
 
-    const handleOpenView = useCallback((item: WastageEntry) => {
-        setSelectedItem(item);
-        setShowViewModal(true);
-    }, []);
-
-    const handleOpenAdd = () => {
-        navigate("/wastage-stock/create");
+    const formatDisplayQty = (qty: any, uom: string, prefix = "") => {
+        const num = Number(qty) || 0;
+        let primaryUom = uom ? uom.split(',')[0] : "";
+        if (primaryUom.toLowerCase() === "ea") primaryUom = "PCS";
+        const displayNum = Number(num.toFixed(3)).toString();
+        return (
+            <>
+                {prefix}{displayNum} {primaryUom}
+            </>
+        );
     };
 
-    const handleOpenEdit = useCallback((item: WastageEntry) => {
-        navigate(`/wastage-stock/edit/${item.id}`, { state: item });
-    }, [navigate]);
-
-    const triggerDelete = useCallback((id: number) => {
-        setItemToDelete(id);
-        setShowDeleteModal(true);
-    }, []);
-
-    const handleDeleteConfirm = () => {
-        if (itemToDelete !== null) {
-            setData(prev => prev.filter(item => item.id !== itemToDelete));
-            toast.success("Wastage Stock entry deleted successfully!");
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-        }
-    };
-
-    const getStatusPillClass = (status: string) => {
-        switch (status) {
-            case "Sold":
-            case "Recycled":
-                return "active";
-            case "Stored":
-                return "active";
-            default:
-                return "inactive"; // Disposed
-        }
-    };
+    const exportColumns = [
+        { header: "NAME", accessor: (item: any) => item.materialName || "-" },
+        { header: "ID", accessor: (item: any) => item.rawMaterialId || "-" },
+        { header: "CATEGORY", accessor: (item: any) => item.category?.categoryName || item.categoryId || "-" },
+        { header: "STORE", accessor: (item: any) => item.store?.storeName || item.storeId || "-" },
+        { header: "LOCATION", accessor: (item: any) => item.storeLocation?.locationCode || item.locationId || "-" },
+        { header: "PHYSICAL STOCK", accessor: (item: any) => formatExportQty(item.onHandQty ?? 0, item.baseUom || "") },
+        { header: "RESERVED", accessor: (item: any) => formatExportQty(item.reservedQty ?? 0, item.baseUom || "") },
+        { header: "AVAILABLE", accessor: (item: any) => formatExportQty(Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0), item.baseUom || "") },
+        { header: "STATUS", accessor: (item: any) => item.status || "Active" },
+    ];
 
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="p-4 md:p-6">
+            <div className="rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Wastage Stock Ledger</h2>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+                    <div>
+                        <h2 className="text-2xl font-bold text-ink">Wastage Stock Ledger</h2>
+                        <p className="text-sm text-ink-subtle mt-1">Materials stored in Wastage stores</p>
+                    </div>
 
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search wastage logs..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Log Wastage"
-                                    icon={FaPlus}
-                                    onClick={handleOpenAdd}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>WASTAGE CODE</th>
-                                    <th>LOG DATE</th>
-                                    <th>MATERIAL TYPE</th>
-                                    <th>QTY / UOM</th>
-                                    <th>SOURCE DEPT</th>
-                                    <th>SCRAP UNIT VALUE</th>
-                                    <th>TOTAL VALUATION</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedData.length > 0 ? (
-                                    paginatedData.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                            <td className="master-data-cell">{item.wastageCode}</td>
-                                            <td className="master-data-cell">{formatDate(item.logDate)}</td>
-                                            <td className="master-data-cell">{item.category}</td>
-                                            <td className="master-data-cell">{item.quantity} {item.uom}</td>
-                                            <td className="master-data-cell">{item.department}</td>
-                                            <td className="master-data-cell">₹{item.scrapUnitPrice.toFixed(2)}</td>
-                                            <td className="master-data-cell fw-semibold text-primary">
-                                                ₹{(item.quantity * item.scrapUnitPrice).toFixed(2)}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <span className={`status-pill status-pill--${getStatusPillClass(item.status)}`}>
-                                                    {item.status}
-                                                </span>
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                                    <DeleteButton onClick={() => triggerDelete(item.id)} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">No wastage records found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">Page {currentPage} of {totalPages}</div>
-                                <button className="pagination-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search wastage stock..."
+                        />
+                        <ExportCSVButton
+                            data={data || []}
+                            columns={exportColumns}
+                            filename="wastage_stock_ledger.csv"
+                        />
                     </div>
                 </div>
 
-                {/* View Modal */}
-                <CommonViewModal
-                    show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
-                    modalTitle="Wastage Entry Details"
-                    avatarText={selectedItem ? selectedItem.wastageCode.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedItem ? selectedItem.wastageCode : ""}
-                    headerSubtitle={selectedItem ? `${selectedItem.category} (${selectedItem.department})` : ""}
-                    sections={selectedItem ? [
+                {/* Table */}
+                <DataTable
+                    data={paginatedData || []}
+                    rowKey={(item) => item.rawMaterialId}
+                    loading={loading}
+                    emptyMessage="No wastage stock records found."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: (page) => setCurrentPage(page)
+                    }}
+                    columns={[
                         {
-                            fields: [
-                                { label: "Wastage Log Code", value: selectedItem.wastageCode },
-                                { label: "Log Date", value: formatDate(selectedItem.logDate) },
-                                { label: "Material Type", value: selectedItem.category },
-                                { label: "Source Department", value: selectedItem.department },
-                            ]
+                            header: "#",
+                            render: (_, index) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
                         },
                         {
-                            title: "Quantity & Valuation",
-                            fields: [
-                                { label: "Wastage Quantity", value: `${selectedItem.quantity} ${selectedItem.uom}` },
-                                { label: "Scrap Price per Unit", value: `₹${selectedItem.scrapUnitPrice.toFixed(2)}` },
-                                { label: "Total Estimated Value", value: `₹${(selectedItem.quantity * selectedItem.scrapUnitPrice).toFixed(2)}` },
-                                { label: "Current Status", value: selectedItem.status },
-                            ]
+                            header: "NAME",
+                            render: (item) => (
+                                <div className="flex flex-col">
+                                    <span className="font-semibold text-ink">{item.materialName || "-"}</span>
+                                    <span className="text-xs text-ink-subtle">ID: {item.rawMaterialId}</span>
+                                </div>
+                            )
                         },
                         {
-                            title: "Logs & Explanations",
-                            fields: [
-                                { label: "Wastage Cause", value: selectedItem.cause || "N/A", xs: 12 },
-                            ]
-                        }
-                    ] : []}
-                />
+                            header: "CATEGORY",
+                            render: (item) => (
+                                <span className="text-ink-muted">{item.category?.categoryName || item.categoryId || "-"}</span>
+                            )
+                        },
+                        {
+                            header: "STORE / LOCATION",
+                            render: (item) => {
+                                const locCode = item.storeLocation?.locationCode || item.store?.location?.locationCode || item.store?.location?.locationName || item.locationId || "-";
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-ink-muted">{item.store?.storeName || item.storeId || "-"}</span>
+                                        <span className="text-xs text-ink-subtle">Loc: {locCode}</span>
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            header: "PHYSICAL STOCK",
+                            render: (item) => {
+                                const baseUom = item.baseUom || "";
+                                const minStock = Number(item.minimumStock || 0);
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className="text-ink">{formatDisplayQty(item.onHandQty, baseUom)}</span>
+                                        <span className="text-xs text-ink-subtle">{formatDisplayQty(minStock, baseUom, "Min: ")}</span>
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            header: "RESERVED",
+                            render: (item) => (
+                                <span className="text-ink-muted">{formatDisplayQty(item.reservedQty, item.baseUom || "")}</span>
+                            )
+                        },
+                        {
+                            header: "AVAILABLE",
+                            render: (item) => {
+                                const baseUom = item.baseUom || "";
+                                const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
+                                const minStock = Number(item.minimumStock || 0);
+                                const reorderLevel = Number(item.reorderLevel || 0);
 
-                {/* Delete Modal */}
-                <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
-                    onConfirm={handleDeleteConfirm}
-                    title="Confirm Delete"
-                    message="Are you sure you want to delete this wastage entry?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
+                                let availColorClass = "text-green-600";
+                                if (available <= minStock) {
+                                    availColorClass = "text-red-600";
+                                } else if (available <= reorderLevel) {
+                                    availColorClass = "text-amber-600";
+                                }
+
+                                return <span className={`font-semibold ${availColorClass}`}>{formatDisplayQty(available, baseUom)}</span>;
+                            }
+                        },
+                        {
+                            header: "STATUS",
+                            render: (item) => <StatusBadge status={item.status || "Active"} />
+                        },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton
+                                        onClick={() => {
+                                            setSelectedItem(item);
+                                            setShowView(true);
+                                        }}
+                                    />
+                                </div>
+                            )
+                        }
+                    ]}
                 />
-            </Container>
+            </div>
+
+            <CommonViewModal
+                show={showView}
+                onHide={() => setShowView(false)}
+                modalTitle="Wastage Stock Details"
+                avatarText={selectedItem ? (selectedItem.materialName || "W").charAt(0).toUpperCase() : ""}
+                headerTitle={selectedItem ? (selectedItem.materialName || selectedItem.rawMaterialId) : ""}
+                sections={selectedItem ? [
+                    {
+                        fields: [
+                            { label: "Material ID", value: selectedItem.rawMaterialId },
+                            { label: "Material Name", value: selectedItem.materialName || "N/A" },
+                            { label: "Category", value: selectedItem.category?.categoryName || "N/A" },
+                            { label: "Primary UOM", value: parseBaseUom(selectedItem.baseUom).primary },
+                            { label: "Secondary UOM(s)", value: parseBaseUom(selectedItem.baseUom).secondary },
+                            { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
+                            { label: "Store Location", value: selectedItem.storeLocation?.locationCode || selectedItem.store?.location?.locationCode || selectedItem.locationId || "N/A" },
+                            { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, selectedItem.baseUom || "") },
+                            { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, selectedItem.baseUom || "") },
+                            { label: "Available Stock", value: formatExportQty(Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0), selectedItem.baseUom || "") },
+                            { label: "Batch No", value: selectedItem.batchNo || "N/A" },
+                            { label: "Narration", value: selectedItem.narration || "N/A" },
+                            { label: "Status", value: selectedItem.status || "Active" }
+                        ]
+                    }
+                ] : []}
+            />
         </div>
     );
 };

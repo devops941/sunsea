@@ -182,10 +182,10 @@ const MachineCreate: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-5 border-b border-slate-200">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
+                <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-slate-800">Create Machine</h2>
+                        <h2 className="text-xl font-bold text-ink">Create Machine</h2>
                         <BackButton text="Back to List" to="/machines" />
                     </div>
                 </div>
@@ -396,10 +396,11 @@ const MachineCreate: React.FC = () => {
 
                     </div>
 
-                    <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-slate-100">
+                    <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-line-soft">
                         <CustomButton
                             text="Clear"
                             icon={FaEraser}
+                            variant="secondary"
                             onClick={handleClear}
                             disabled={isSubmitting}
                         />

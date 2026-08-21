@@ -34,3 +34,16 @@
   box-shadow: none;
   transform: none;
 }
+
+/* Dark Theme Overrides */
+:root[data-theme="dark"] .edit-btn {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+:root[data-theme="dark"] .edit-btn:hover {
+  background: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}

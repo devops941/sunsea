@@ -331,7 +331,7 @@ const DashboardPage: React.FC = () => {
 
   /* ═══════════════ RENDER ═══════════════ */
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 min-h-screen">
+    <div className="bg-page min-h-screen">
       {loading && <CommonLoader text="Loading ..." />}
 
       <div className="w-full px-4 py-6 sm:px-6 lg:px-8 mx-auto max-w-[1440px]">
@@ -339,11 +339,11 @@ const DashboardPage: React.FC = () => {
         {/* ── HEADER ──────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-slate-800 via-indigo-700 to-purple-700 bg-clip-text text-transparent">Dashboard</h1>
-            <p className="text-slate-400 text-sm mt-1 font-medium">Complete overview of all ERP modules</p>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-ink">Dashboard</h1>
+            <p className="text-ink-muted text-sm mt-1 font-medium">Complete overview of all ERP modules</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="bg-white border border-slate-200 text-slate-600 text-sm font-semibold px-4 py-2 rounded-xl shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-2">
+            <button className="bg-card border border-line-soft text-ink text-sm font-semibold px-4 py-2 rounded-xl shadow-xs hover:bg-card-2 transition-colors flex items-center gap-2">
               Overview
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
@@ -395,16 +395,16 @@ const DashboardPage: React.FC = () => {
                   const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "No Shift";
 
                   return (
-                    <div key={i} className="flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-slate-50 to-indigo-50/50 border border-indigo-100/60 hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-200 hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                    <div key={i} className="flex items-center justify-between p-3.5 rounded-xl bg-card-2 border border-line-soft hover:bg-card hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm bg-gradient-to-br from-indigo-500 to-purple-600 text-white group-hover:scale-110 transition-transform duration-300">
                           <FaCalendarCheck size={16} />
                         </div>
                         <div>
-                          <span className="block text-[13px] font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">
+                          <span className="block text-[13px] font-bold text-ink group-hover:text-accent transition-colors">
                             {machineName}
                           </span>
-                          <span className="text-[11px] font-medium text-slate-400">
+                          <span className="text-[11px] font-medium text-ink-muted">
                             {productName} • {shiftName}
                           </span>
                         </div>
@@ -431,8 +431,8 @@ const DashboardPage: React.FC = () => {
           {showInventory && <Card title="Stock by Store" badge="Raw Materials">
             <div className="flex flex-col items-center justify-center h-[200px] relative">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Items</span>
-                <span className="text-[28px] font-black text-slate-800 leading-none">
+                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-widest">Items</span>
+                <span className="text-[28px] font-black text-ink leading-none">
                   {inventoryData.length === 1 && inventoryData[0].name === "No Stock" ? 0 : inventoryData.length}
                 </span>
               </div>
@@ -454,10 +454,10 @@ const DashboardPage: React.FC = () => {
                             />
                             <div className="flex flex-1 justify-between leading-none gap-4 items-center">
                               <div className="flex flex-col gap-1">
-                                <span className="text-slate-700 font-semibold">{name}</span>
-                                <span className="text-slate-400 text-[10px] font-medium">{payload?.products}</span>
+                                <span className="text-ink font-bold">{name}</span>
+                                <span className="text-ink-subtle text-[11px] font-semibold">{payload?.products}</span>
                               </div>
-                              <span className="text-slate-800 font-mono font-bold tabular-nums ml-2">
+                              <span className="text-ink font-mono font-bold tabular-nums ml-2">
                                 {payload?.displayValue || value}
                               </span>
                             </div>
@@ -471,10 +471,10 @@ const DashboardPage: React.FC = () => {
             </div>
             <div className="flex flex-row flex-wrap justify-center gap-x-4 gap-y-2 px-2 mt-2">
               {inventoryData.map((item, i) => (
-                <div key={i} className="flex items-center p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <div key={i} className="flex items-center p-2 rounded-lg hover:bg-card-2 transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></div>
-                    <span className="text-[13px] font-bold text-slate-700">{item.name}</span>
+                    <span className="text-[13px] font-bold text-ink">{item.name}</span>
                   </div>
                 </div>
               ))}
@@ -496,16 +496,16 @@ const DashboardPage: React.FC = () => {
                 <div className="flex items-center justify-center py-8 text-slate-400 text-sm font-medium">No Machines</div>
               ) : (
                 machineList.map((mac, i) => (
-                  <div key={i} className="flex items-center justify-between bg-gradient-to-r from-slate-50 to-slate-100/50 hover:from-blue-50 hover:to-indigo-50 rounded-xl px-4 py-3 border border-slate-100 hover:border-indigo-100 transition-all duration-200">
+                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-xl px-4 py-3 border border-line-soft transition-all duration-200">
                     <div className="flex items-center gap-3">
                       <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${mac.status === "Active" ? "bg-emerald-400 shadow-emerald-200" : "bg-slate-300"}`}></div>
-                      <span className="text-[12px] font-bold text-slate-700">{mac.name}</span>
+                      <span className="text-[12px] font-bold text-ink">{mac.name}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                         mac.status === "Active"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-slate-100 text-slate-500 border-slate-200"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
+                          : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                       }`}>{mac.status}</span>
                     </div>
                   </div>
@@ -518,7 +518,7 @@ const DashboardPage: React.FC = () => {
           {showTopProducts && <Card title="Top Products" badge="By stock level" className="min-h-[370px]">
             <div className="flex flex-col gap-3">
               {topProducts.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-slate-400 text-sm font-medium">No Products</div>
+                <div className="flex items-center justify-center h-full text-ink-muted text-sm font-medium">No Products</div>
               ) : (
                 topProducts.map((prod: any, i: number) => {
                   const maxVal = topProducts[0]?.value || 1;
@@ -535,10 +535,10 @@ const DashboardPage: React.FC = () => {
                   return (
                     <div key={i} className="flex flex-col gap-1.5">
                       <div className="flex justify-between items-end">
-                        <span className="text-[12px] font-semibold text-slate-600 truncate max-w-[140px]">{prod.name}</span>
-                        <span className="text-[12px] font-bold text-slate-800">{prod.value.toLocaleString()}</span>
+                        <span className="text-[12px] font-semibold text-ink-muted truncate max-w-[140px]">{prod.name}</span>
+                        <span className="text-[12px] font-bold text-ink">{prod.value.toLocaleString()}</span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                      <div className="w-full bg-line-soft rounded-full h-1.5">
                         <div
                           className={`h-1.5 rounded-full bg-gradient-to-r ${barColors[i % barColors.length]} transition-all duration-700`}
                           style={{ width: `${pct}%` }}
@@ -555,20 +555,20 @@ const DashboardPage: React.FC = () => {
           {showRecentSales && <Card title="Recent Sales Orders" badge="Latest 5">
             <div className="flex flex-col gap-3">
               {recentSales.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-slate-400 text-sm font-medium">No Sales Orders</div>
+                <div className="flex items-center justify-center py-8 text-ink-muted text-sm font-medium">No Sales Orders</div>
               ) : (
                 recentSales.map((so: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between bg-gradient-to-r from-slate-50 to-slate-100/50 hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-100 rounded-xl px-4 py-3 border border-slate-100 transition-all duration-200">
+                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-xl px-4 py-3 border border-line-soft transition-all duration-200">
                     <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-slate-700">{so.orderNo || `SO-${so.id}`}</span>
-                      <span className="text-[10px] font-medium text-slate-400">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
+                      <span className="text-[12px] font-bold text-ink">{so.orderNo || `SO-${so.id}`}</span>
+                      <span className="text-[10px] font-medium text-ink-muted">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-[13px] font-black text-slate-800">₹{Number(so.netAmount || 0).toLocaleString()}</span>
+                      <span className="text-[13px] font-black text-ink">₹{Number(so.netAmount || 0).toLocaleString()}</span>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                        so.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                        so.status === "CANCELLED" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                        "bg-amber-50 text-amber-700 border-amber-200"
+                        so.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30" :
+                        so.status === "CANCELLED" ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30" :
+                        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30"
                       }`}>{(so.status || "DRAFT").replace(/_/g, " ")}</span>
                     </div>
                   </div>

@@ -56,3 +56,16 @@
 
   cursor: pointer;
 }
+
+:root[data-theme="dark"] .radio-label {
+  color: #94A3B8;
+}
+
+:root[data-theme="dark"] .custom-radio .form-check-label {
+  color: #E2E8F0;
+}
+
+:root[data-theme="dark"] .custom-radio .form-check-input {
+  border-color: #334155;
+  background-color: #1C2536;
+}

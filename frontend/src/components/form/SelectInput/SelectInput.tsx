@@ -132,9 +132,23 @@ const SelectInput: React.FC<SelectInputProps> = ({
     ? (selectedOption.selectedLabel || selectedOption.label)
     : defaultOptionLabel || "Select an option";
 
-  const toPlainText = (v: any): string => typeof v === "string" ? v : "";
+  const toPlainText = (v: any): string => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "string" || typeof v === "number") return String(v);
+    if (React.isValidElement(v)) {
+      const props = v.props as any;
+      if (props?.children) {
+        if (Array.isArray(props.children)) {
+          return props.children.map(toPlainText).join(" ");
+        }
+        return toPlainText(props.children);
+      }
+    }
+    return "";
+  };
+
   const filteredOptions = searchable
-    ? options.filter((opt) => toPlainText(opt.label).toLowerCase().includes(searchTerm.toLowerCase()))
+    ? options.filter((opt) => toPlainText(opt.selectedLabel || opt.label).toLowerCase().includes(searchTerm.toLowerCase()))
     : options;
 
   return (
@@ -142,17 +156,17 @@ const SelectInput: React.FC<SelectInputProps> = ({
       {!hideLabel && (
         <label className={`
           flex items-center gap-1.5 mb-2
-          text-xs font-bold uppercase
+          text-xs font-extrabold uppercase
           tracking-[0.5px]
           transition-colors duration-250
-          ${error ? "text-red-500" : "text-slate-500"}
+          ${error ? "text-red-400" : "text-ink"}
           group-focus-within:text-primary
         `}>
           {icon && (
             <span className={`
               flex items-center text-sm
               transition-colors duration-250
-              ${error ? "text-red-500" : "text-primary"}
+              ${error ? "text-red-400" : "text-primary"}
               group-focus-within:text-primary
             `}>
               {icon}
@@ -160,7 +174,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
           )}
           <span>{label}</span>
           {required && (
-            <span className="text-[#e53935] ml-0.5">*</span>
+            <span className="text-red-500 ml-0.5">*</span>
           )}
         </label>
       )}
@@ -195,15 +209,15 @@ const SelectInput: React.FC<SelectInputProps> = ({
             className={`
               w-full h-10 pl-4 pr-10
               border rounded-md outline-none
-              text-[15px] font-medium flex items-center justify-between
+              text-[15px] font-semibold flex items-center justify-between
               transition-all duration-250 text-left
-              ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
+              ${value ? "text-ink" : "text-ink-subtle font-normal"}
               ${error
-                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
               }
               ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
-              ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+              ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-semibold opacity-85" : ""}
             `}
           />
         ) : (
@@ -220,28 +234,28 @@ const SelectInput: React.FC<SelectInputProps> = ({
             className={`
               w-full h-10 pl-4 pr-10
               border rounded-md outline-none
-              text-[15px] font-medium flex items-center justify-between
+              text-[15px] font-semibold flex items-center justify-between
               transition-all duration-250 text-left
-              ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
+              ${value ? "text-ink" : "text-ink-subtle font-normal"}
               ${error
-                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
               }
               ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
-              ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+              ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-semibold opacity-85" : ""}
             `}
           >
             <span className="truncate">{displayLabel}</span>
           </button>
         )}
 
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none">
           <FaChevronDown className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
         </span>
 
         {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
         {isOpen && createPortal(
-          <div ref={portalRef} className="bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden" style={dropdownStyle}>
+          <div ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink" style={dropdownStyle}>
             <div className="overflow-y-auto min-h-0 flex-1">
               {defaultOptionLabel && !searchTerm && (
                 <div
@@ -249,14 +263,14 @@ const SelectInput: React.FC<SelectInputProps> = ({
                   className={`
                     px-4 py-2.5 text-sm cursor-pointer
                     transition-colors duration-150
-                    ${!value ? "bg-blue-50 text-primary font-semibold" : "text-gray-500 hover:bg-gray-50"}
+                    ${!value ? "bg-primary/10 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
                   `}
                 >
                   {defaultOptionLabel}
                 </div>
               )}
               {filteredOptions.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                <div className="px-4 py-3 text-sm text-ink-subtle text-center">
                   No results found
                 </div>
               ) : (
@@ -267,10 +281,10 @@ const SelectInput: React.FC<SelectInputProps> = ({
                     className={`
                       px-4 py-2.5 text-sm cursor-pointer
                       transition-colors duration-150
-                      ${option.disabled ? "opacity-50 cursor-not-allowed text-gray-400" : ""}
+                      ${option.disabled ? "opacity-50 cursor-not-allowed text-ink-subtle" : ""}
                       ${value === option.value
                         ? "bg-primary/10 text-primary font-semibold"
-                        : "text-gray-700 hover:bg-gray-50"
+                        : "text-ink hover:bg-card-2"
                       }
                     `}
                   >

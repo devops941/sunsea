@@ -210,6 +210,41 @@
 }
 
 /* ==================================
+   DARK THEME OVERRIDES
+================================== */
+:root[data-theme="dark"] .custom-btn--secondary {
+  background: var(--color-card-2, #1C2536);
+  color: var(--color-ink, #E2E8F0);
+  border: 1px solid var(--color-line-soft, #202A3C);
+}
+
+:root[data-theme="dark"] .custom-btn--secondary:hover {
+  background: var(--color-card, #151D2C);
+  border-color: var(--color-line, #2A3548);
+}
+
+:root[data-theme="dark"] .custom-btn--outline {
+  background: transparent;
+  color: var(--color-ink, #E2E8F0);
+  border: 2px solid var(--color-line, #2A3548);
+}
+
+:root[data-theme="dark"] .custom-btn--outline:hover {
+  background: var(--color-card-2, #1C2536);
+  color: var(--color-accent, #2DD4BF);
+  border-color: var(--color-accent, #2DD4BF);
+}
+
+:root[data-theme="dark"] .custom-btn--ghost {
+  background: transparent;
+  color: var(--color-ink, #E2E8F0);
+}
+
+:root[data-theme="dark"] .custom-btn--ghost:hover {
+  background: var(--color-card-2, #1C2536);
+}
+
+/* ==================================
    ANIMATION
 ================================== */
 

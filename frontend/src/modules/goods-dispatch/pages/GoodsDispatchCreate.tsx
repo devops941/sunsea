@@ -366,7 +366,7 @@ const GoodsDispatchCreate: React.FC = () => {
                                           po.pendingDispatchQty
                                         )
                                       }
-                                      className="w-24 px-3 py-1.5 border border-line rounded-md text-sm font-medium focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
+                                      className="w-24 px-3 py-1.5 border border-line-soft rounded-md text-sm font-medium bg-card-2 text-ink focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
                                     />
                                     <span className="text-sm font-medium text-ink-subtle">{formatUOM(po.uom)}</span>
                                   </div>
@@ -377,7 +377,7 @@ const GoodsDispatchCreate: React.FC = () => {
                                     onChange={(e) =>
                                       handleRemarksChange(po.productionOrderId, e.target.value)
                                     }
-                                    className="w-[180px] px-3 py-1.5 text-xs border border-line rounded-md text-ink-muted placeholder-slate-400 focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
+                                    className="w-[180px] px-3 py-1.5 text-xs border border-line-soft rounded-md bg-card-2 text-ink placeholder:text-ink-subtle focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
                                   />
                                 </div>
                               </td>
@@ -398,7 +398,7 @@ const GoodsDispatchCreate: React.FC = () => {
               </div>
 
               {selectedPOs.length > 0 && (
-                <div className="px-6 py-3 bg-card-2 border-t border-line flex items-center justify-between text-sm font-semibold text-ink-muted">
+                <div className="px-6 py-3 bg-card-2 border-t border-line-soft flex items-center justify-between text-sm font-semibold text-ink-muted">
                   <span>Total Selected: {selectedPOs.length} Items</span>
                   <span>Total Dispatch Qty: {totalDispatchQty} Units</span>
                 </div>
@@ -406,7 +406,7 @@ const GoodsDispatchCreate: React.FC = () => {
             </div>
 
             {/* Right Half: Vehicle & Transport Details */}
-            <div className="bg-card rounded-xl shadow-sm border border-line overflow-hidden">
+            <div className="bg-card rounded-xl shadow-sm border border-line-soft overflow-hidden">
               <div className="px-6 py-4 border-b border-line-soft bg-card-2/50">
                 <h3 className="text-lg font-bold text-ink">
                   3. Vehicle & Transport Details
@@ -492,7 +492,7 @@ const GoodsDispatchCreate: React.FC = () => {
                     value={formData.remarks}
                     onChange={handleInputChange}
                     placeholder="Enter dispatch remarks..."
-                    className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-2 border border-line-soft rounded-lg text-sm bg-card-2 text-ink placeholder:text-ink-subtle focus:ring-primary focus:border-primary outline-none"
                     rows={3}
                   />
                 </div>

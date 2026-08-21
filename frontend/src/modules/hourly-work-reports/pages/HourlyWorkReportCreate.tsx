@@ -733,10 +733,10 @@ const HourlyWorkReportCreate: React.FC = () => {
     return (
 
         <div className="min-h-screen">
-            <form onSubmit={handleSubmit} className="bg-white  shadow-sm border border-slate-200">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
+            <form onSubmit={handleSubmit} className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-line-soft">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800 m-0">Hourly Production Entry</h2>
+                        <h2 className="text-2xl font-extrabold text-ink tracking-tight m-0">Hourly Production Entry</h2>
                     </div>
                     <div className="flex justify-end">
                         <BackButton to="/daily-machine-planning" text="Back to Planning" />
@@ -744,11 +744,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                 </div>
 
                 {planError && (
-                    <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
-                        <div className="text-red-500 font-bold text-lg">⚠️</div>
+                    <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center gap-3">
+                        <div className="text-red-400 font-bold text-lg">⚠️</div>
                         <div>
-                            <p className="font-bold text-red-700 text-sm">Plan Verification Failed</p>
-                            <p className="text-red-600 text-xs">{planError}</p>
+                            <p className="font-bold text-red-300 text-sm">Plan Verification Failed</p>
+                            <p className="text-red-400 text-xs font-semibold">{planError}</p>
                         </div>
                     </div>
                 )}
@@ -757,7 +757,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                     {/* Left Side: Plan Details */}
                     <div className="w-full md:w-5/12 lg:w-4/12 flex flex-col gap-6 sticky top-6 self-start">
                         <div>
-                            <h6 className="font-bold text-lg text-slate-800 m-0">Plan Details</h6>
+                            <h6 className="font-extrabold text-lg text-ink m-0">Plan Details</h6>
                         </div>
                         <div>
                             <div className="flex flex-col gap-4">
@@ -815,48 +815,48 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                             </div>
 
-                            <div className="mt-6 pt-6 border-t border-slate-200">
+                            <div className="mt-6 pt-6 border-t border-line-soft">
                                 {loadingPlan ? (
                                     <div className="text-center py-4">
-                                        <div className="animate-spin rounded-full border-2 border-indigo-600 border-t-transparent h-4 w-4 mr-2 inline-block align-middle"></div>
-                                        <span className="text-slate-500 small">Loading active plan...</span>
+                                        <div className="animate-spin rounded-full border-2 border-primary border-t-transparent h-4 w-4 mr-2 inline-block align-middle"></div>
+                                        <span className="text-ink-subtle text-xs font-semibold">Loading active plan...</span>
                                     </div>
                                 ) : activePlan ? (
-                                    <div className="p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100">
-                                        <div className="flex items-center gap-2 mb-4 font-bold text-sm tracking-wider text-indigo-600">
+                                    <div className="p-5 rounded-2xl bg-indigo-500/15 border border-indigo-500/30">
+                                        <div className="flex items-center gap-2 mb-4 font-bold text-sm tracking-wider text-indigo-400">
                                             <FaCheckCircle className="text-xl" />
                                             <span>ACTIVE PLAN LOADED</span>
                                         </div>
                                         <div className="mb-3">
-                                            <span className="text-slate-400 text-xs block">Production Order</span>
-                                            <strong className="text-lg text-indigo-700">{activePlan.productionOrderId}</strong>
+                                            <span className="text-ink-subtle text-xs font-bold block">Production Order</span>
+                                            <strong className="text-lg text-primary font-black">{activePlan.productionOrderId}</strong>
                                         </div>
                                         <div className="mb-3">
-                                            <span className="text-slate-400 text-xs block">Product</span>
-                                            <strong className="text-sm text-slate-800">{activePlan.productName}</strong>
-                                            {activePlan.productCode && <span className="text-slate-400 text-xs block"> ({activePlan.productCode})</span>}
+                                            <span className="text-ink-subtle text-xs font-bold block">Product</span>
+                                            <strong className="text-sm text-ink font-bold">{activePlan.productName}</strong>
+                                            {activePlan.productCode && <span className="text-ink-subtle text-xs block font-mono"> ({activePlan.productCode})</span>}
                                         </div>
-                                        <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-slate-200 text-center">
-                                            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100/50">
-                                                <span className="text-slate-400 block text-[10px] tracking-wider font-semibold">TARGET</span>
-                                                <strong className="text-sm text-slate-800">{activePlan.plannedQty}</strong>
+                                        <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-line-soft text-center">
+                                            <div className="bg-card-2 p-2 rounded-xl border border-line-soft">
+                                                <span className="text-ink-subtle block text-[10px] tracking-wider font-extrabold">TARGET</span>
+                                                <strong className="text-sm text-ink font-bold">{activePlan.plannedQty}</strong>
                                             </div>
-                                            <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100/50">
-                                                <span className="text-emerald-600 block text-[10px] tracking-wider font-semibold">PRODUCED</span>
-                                                <strong className="text-sm text-emerald-700">{shiftProducedQty}</strong>
+                                            <div className="bg-emerald-500/15 p-2 rounded-xl border border-emerald-500/30">
+                                                <span className="text-emerald-400 block text-[10px] tracking-wider font-extrabold">PRODUCED</span>
+                                                <strong className="text-sm text-emerald-300 font-bold">{shiftProducedQty}</strong>
                                             </div>
-                                            <div className="bg-amber-50 p-2 rounded-xl border border-amber-100/50">
-                                                <span className="text-amber-600 block text-[10px] tracking-wider font-semibold">REMAINING</span>
-                                                <strong className="text-sm text-amber-700">{remainingQtyForShift}</strong>
+                                            <div className="bg-amber-500/15 p-2 rounded-xl border border-amber-500/30">
+                                                <span className="text-amber-400 block text-[10px] tracking-wider font-extrabold">REMAINING</span>
+                                                <strong className="text-sm text-amber-300 font-bold">{remainingQtyForShift}</strong>
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="bg-amber-50 text-amber-800 p-4 rounded-xl flex items-start gap-3 border border-amber-200 shadow-sm">
-                                        <FaInfoCircle className="mt-1" />
+                                    <div className="bg-amber-500/15 text-amber-300 p-4 rounded-xl flex items-start gap-3 border border-amber-500/30 shadow-xs">
+                                        <FaInfoCircle className="mt-1 text-amber-400" />
                                         <div>
-                                            <strong>No Plan Active</strong>
-                                            <p className="mb-0 small">Please choose a valid Machine, Date, and Shift that has been planned in the weekly schedule.</p>
+                                            <strong className="font-bold">No Plan Active</strong>
+                                            <p className="mb-0 text-xs text-amber-300/90 font-medium">Please choose a valid Machine, Date, and Shift that has been planned in the weekly schedule.</p>
                                         </div>
                                     </div>
                                 )}
@@ -866,7 +866,7 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                     {/* Right Side: Hourly Entry Log */}
                     <div className="w-full md:w-7/12 lg:w-8/12 flex flex-col">
-                        <h6 className="font-bold text-lg text-slate-800 mb-6">Hourly Entry Log</h6>
+                        <h6 className="font-extrabold text-lg text-ink mb-6">Hourly Entry Log</h6>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                             <div className="flex flex-col">
@@ -1169,14 +1169,14 @@ const HourlyWorkReportCreate: React.FC = () => {
                         )}
 
                         {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
-                            <div className="mt-8 pt-6 border-t border-slate-200">
+                            <div className="mt-8 pt-6 border-t border-line-soft">
                                 {/* Info Banner */}
-                                <div className="bg-amber-50 border border-amber-200 p-4 flex items-start gap-3 rounded-xl mb-5">
+                                <div className="bg-amber-500/15 border border-amber-500/30 p-4 flex items-start gap-3 rounded-xl mb-5">
                                     <div>
-                                        <span className="text-sm font-bold text-amber-900 block mb-1">
+                                        <span className="text-sm font-bold text-amber-400 block mb-1">
                                             {stopPlanEarly ? "🛑 Production Stopped — Log Wastage (Optional)" : "Final Hour — Log Shift Wastage (Required)"}
                                         </span>
-                                        <p className="text-xs text-amber-700 leading-relaxed mb-0">
+                                        <p className="text-xs text-amber-300/90 font-medium leading-relaxed mb-0">
                                             {stopPlanEarly
                                                 ? "Wastage logging is optional when stopping early. Add rows below only if wastage occurred."
                                                 : "Since this is the final hour, please log all wastage products for this shift. At least one entry is required."}
@@ -1186,18 +1186,18 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                                 {/* Wastage error (when final hour + no rows) */}
                                 {formErrors.logWastage && (
-                                    <p className="mb-4 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                                    <p className="mb-4 text-xs font-semibold text-red-400 bg-red-500/15 border border-red-500/30 rounded-lg px-3 py-2">
                                         ⚠️ {formErrors.logWastage}
                                     </p>
                                 )}
 
                                 {/* Wastage Table — always shown (no checkbox) */}
-                                <div className="mt-4 p-5 border border-slate-200 rounded-xl bg-slate-50/50">
+                                <div className="mt-4 p-5 border border-line-soft rounded-2xl bg-card-2 shadow-xs">
                                     <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-bold text-slate-800 text-[15px] m-0 leading-tight">
+                                        <h4 className="font-bold text-ink text-[15px] m-0 leading-tight">
                                             Wastage Products
-                                            {!stopPlanEarly && <span className="text-red-500 ml-1">*</span>}
-                                            {stopPlanEarly && <span className="ml-2 text-xs text-slate-400 font-normal">(optional)</span>}
+                                            {!stopPlanEarly && <span className="text-red-400 ml-1">*</span>}
+                                            {stopPlanEarly && <span className="ml-2 text-xs text-ink-subtle font-normal">(optional)</span>}
                                         </h4>
                                         <CustomButton
                                             size="sm"
@@ -1212,26 +1212,26 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     </div>
 
                                     {wastages.length === 0 ? (
-                                        <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
+                                        <div className="text-center py-8 text-ink-subtle font-semibold text-sm border-2 border-dashed border-line-soft bg-card/40 rounded-xl">
                                             {stopPlanEarly
                                                 ? "No wastage products added. Click '+ Add Wastage Product' if needed."
                                                 : "No wastage products added yet. Click '+ Add Wastage Product' to add one."}
                                         </div>
                                     ) : (
-                                        <div className="bg-white border border-slate-200 rounded-xl overflow-visible mt-3">
+                                        <div className="bg-card border border-line-soft rounded-xl overflow-visible mt-3">
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                                     <thead>
-                                                        <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                            <th className="px-4 py-3 bg-slate-50 min-w-[160px]">Store <span className="text-red-500">*</span></th>
-                                                            <th className="px-4 py-3 bg-slate-50 min-w-[220px]">Wastage Product <span className="text-red-500">*</span></th>
-                                                            <th className="px-4 py-3 bg-slate-50 min-w-[180px]">Quantity <span className="text-red-500">*</span></th>
-                                                            <th className="px-4 py-3 bg-slate-50 text-center w-[80px]">Action</th>
+                                                        <tr className="border-b border-line-soft text-xs font-bold text-ink-subtle uppercase tracking-wider">
+                                                            <th className="px-4 py-3 bg-card-2 min-w-[160px]">Store <span className="text-red-400">*</span></th>
+                                                            <th className="px-4 py-3 bg-card-2 min-w-[220px]">Wastage Product <span className="text-red-400">*</span></th>
+                                                            <th className="px-4 py-3 bg-card-2 min-w-[180px]">Quantity <span className="text-red-400">*</span></th>
+                                                            <th className="px-4 py-3 bg-card-2 text-center w-[80px]">Action</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-slate-100">
+                                                    <tbody className="divide-y divide-line-soft">
                                                         {wastages.map((w, index) => (
-                                                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                                                            <tr key={index} className="hover:bg-card-2/60 transition-colors">
                                                                 <td className="px-4 py-3 align-top min-w-[160px]">
                                                                     <SelectInput
                                                                         label=""
@@ -1356,14 +1356,14 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                         {/* Returned Raw Materials */}
                         {(isFinalHour || stopPlanEarly) && (
-                            <div className="mt-4 p-5 border border-slate-200 rounded-xl bg-slate-50/50">
+                            <div className="mt-4 p-5 border border-line-soft rounded-2xl bg-card-2 shadow-xs">
                                 <div className="flex justify-between items-center mb-3">
                                     <div className="flex items-center gap-2">
                                         <div>
-                                            <h4 className="font-bold text-slate-800 text-[15px] m-0 leading-tight">
+                                            <h4 className="font-bold text-ink text-[15px] m-0 leading-tight">
                                                 Returned Raw Materials
                                             </h4>
-                                            <p className="text-xs text-slate-500 m-0">
+                                            <p className="text-xs text-ink-subtle m-0 font-medium">
                                                 Log remaining raw materials returned to the warehouse.
                                             </p>
                                         </div>
@@ -1379,23 +1379,23 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     />
                                 </div>
 
-                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mt-3">
+                                <div className="bg-card border border-line-soft rounded-xl overflow-hidden mt-3">
                                     {rawMaterialsUsed.length === 0 ? (
-                                        <div className="p-4 text-center text-slate-500 text-sm italic">
+                                        <div className="p-6 text-center text-ink-subtle font-semibold text-sm border-2 border-dashed border-line-soft bg-card/40 rounded-xl">
                                             No raw materials logged. Click '+ Add Raw Material' to add one.
                                         </div>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left text-sm whitespace-nowrap">
                                                 <thead>
-                                                    <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                        <th className="px-4 py-3 bg-slate-50 min-w-[160px]">Store <span className="text-red-500">*</span></th>
-                                                        <th className="px-4 py-3 bg-slate-50 min-w-[220px]">Raw Material <span className="text-red-500">*</span></th>
-                                                        <th className="px-4 py-3 bg-slate-50 min-w-[180px]">Quantity <span className="text-red-500">*</span></th>
-                                                        <th className="px-4 py-3 bg-slate-50 text-center w-[80px]">Action</th>
+                                                    <tr className="border-b border-line-soft text-xs font-bold text-ink-subtle uppercase tracking-wider">
+                                                        <th className="px-4 py-3 bg-card-2 min-w-[160px]">Store <span className="text-red-400">*</span></th>
+                                                        <th className="px-4 py-3 bg-card-2 min-w-[220px]">Raw Material <span className="text-red-400">*</span></th>
+                                                        <th className="px-4 py-3 bg-card-2 min-w-[180px]">Quantity <span className="text-red-400">*</span></th>
+                                                        <th className="px-4 py-3 bg-card-2 text-center w-[80px]">Action</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-slate-100">
+                                                <tbody className="divide-y divide-line-soft">
                                                     {rawMaterialsUsed.map((rm, index) => (
                                                         <tr key={`rm-${index}`}>
                                                             <td className="px-4 py-3 align-top min-w-[160px]">

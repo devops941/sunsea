@@ -21,7 +21,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const inputId = id || name;
   return (
     <div className="flex flex-col gap-1 w-full ">
-      <label htmlFor={inputId} className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase">
+      <label htmlFor={inputId} className="flex items-center gap-2 text-xs font-semibold text-ink-muted uppercase">
         <span>{label}</span>
         {required && <span className="text-red-500">*</span>}
       </label>
@@ -32,15 +32,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
           id={inputId}
           name={name}
           onChange={onChange}
-          className={`block w-full flex-1 text-sm text-slate-500
+          className={`block w-full flex-1 text-sm text-ink-muted
             file:mr-4 file:py-2.5 file:px-4 h-[40px]
             file:rounded-l-md file:border-0
             file:text-sm file:font-semibold
-            file:bg-[#003B73] file:text-white
-            hover:file:bg-[#002a54]
+            file:bg-primary file:text-white
+            hover:file:bg-primary/90
             focus:outline-none cursor-pointer
-            border border-slate-300 rounded-md
-            bg-white transition-all
+            border border-line-soft rounded-md
+            bg-card-2 transition-all
             ${previewUrl ? 'hidden' : ''}
           `}
         />
@@ -48,7 +48,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         {previewUrl && (
           <label 
             htmlFor={inputId}
-            className="relative border border-slate-200 rounded-md overflow-hidden bg-slate-50 p-1 h-[60px] min-w-[80px] flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors group"
+            className="relative border border-line-soft rounded-md overflow-hidden bg-card-2 p-1 h-[60px] min-w-[80px] flex items-center justify-center cursor-pointer hover:bg-card-2/80 transition-colors group"
             title="Click to change image"
           >
             <img 

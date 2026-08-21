@@ -30,7 +30,7 @@ const DateInput: React.FC<DateInputProps> = ({
         text-xs font-bold uppercase
         tracking-[0.5px]
         transition-colors duration-250
-        text-slate-500
+        text-ink-muted
         group-focus-within:text-primary
       `}>
         {icon && (
@@ -53,13 +53,13 @@ const DateInput: React.FC<DateInputProps> = ({
         min={min}
         className={`
           w-full h-[40px] px-4
-          border border-slate-300 rounded-[10px] outline-none
+          border border-line-soft rounded-[10px] outline-none
           text-[15px] font-medium
           transition-all duration-250
-          text-[#1f2937] bg-white
-          hover:border-slate-400
+          text-ink bg-card-2
+          hover:border-line-soft/80
           focus:border-primary focus:ring-4 focus:ring-primary/15
-          disabled:bg-[#E5E7EB] disabled:cursor-not-allowed disabled:text-[#6B7280]
+          disabled:bg-card-2/50 disabled:cursor-not-allowed disabled:text-ink-subtle opacity-70
         `}
       />
     </div>
