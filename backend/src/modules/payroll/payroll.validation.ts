@@ -58,6 +58,7 @@ export const upsertEmployeePayrollSchema = z.object({
     da:             z.coerce.number().min(0).default(0),
     hra:            z.coerce.number().min(0).default(0),
     otherAllowance: z.coerce.number().min(0).default(0),
+    cashInHand:     z.coerce.number().min(0).default(0),
     dailySalary:    z.coerce.number().min(0).optional(),
     bankAccount:    z.string().max(50).optional(),
     ifscCode:       z.string().max(15).optional(),
@@ -144,17 +145,6 @@ export const listRunsSchema = z.object({
     limit:  z.string().optional(),
   }),
   params: z.object({}),
-});
-
-// ─── Extended Compensation (Super Admin only) ─────────────────────────────────
-export const upsertExtendedCompSchema = z.object({
-  body: z.object({
-    offRecordAmount: z.coerce.number({
-      message: 'offRecordAmount must be a positive number',
-    }).positive('offRecordAmount must be a positive number'),
-  }),
-  query:  z.object({}),
-  params: z.object({ employeeId: z.string() }),
 });
 
 // ─── Salary Advance ───────────────────────────────────────────────────────────

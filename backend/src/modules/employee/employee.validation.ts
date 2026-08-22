@@ -113,6 +113,7 @@ const employeeBodySchema = z.object({
   da: z.number().optional().nullable(),
   hra: z.number().optional().nullable(),
   otherAllowance: z.number().optional().nullable(),
+  cashInHand: z.number().optional().nullable(),
   grossSalary: z.number().optional().nullable(),
   pfApplicable: z.boolean().optional(),
   pfNumber: z.string().optional().nullable(),

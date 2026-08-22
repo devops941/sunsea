@@ -47,6 +47,7 @@ export interface SalaryFormFields {
   medicalAllowance: string;
   specialAllowance: string;
   otherAllowance: string;
+  cashInHand: string;
   // Weekly
   weeklySalary: string;
   // Daily
@@ -569,6 +570,17 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   />
                 </>
               )}
+
+              {/* Cash in Hand — shown for all payment modes */}
+              <TextInput
+                label="Cash in Hand (₹)"
+                name="cashInHand"
+                type="number"
+                value={form.cashInHand}
+                onChange={onChange}
+                error={errors.cashInHand}
+                placeholder="Cash in hand amount"
+              />
             </div>
 
             {/* Live component balance calculator for Bank Transfer */}

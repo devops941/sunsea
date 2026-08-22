@@ -109,10 +109,6 @@ const CompanyProfile: React.FC = () => {
                 <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Address Line 1</span>
                 <span className="text-sm font-bold text-ink">{company.addressLine1 || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50 lg:col-span-2">
-                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Address Line 2</span>
-                <span className="text-sm font-bold text-ink">{company.addressLine2 || "-"}</span>
-              </div>
               <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
                 <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">City</span>
                 <span className="text-sm font-bold text-ink">{company.city || "-"}</span>

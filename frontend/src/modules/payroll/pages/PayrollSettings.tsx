@@ -81,7 +81,7 @@ const SlabConfigurator: React.FC<{
   };
   const startAdd = () => {
     setAdding(true); setEditing(null);
-    setDraft({ label: '', fromMinutes: 0, toMinutes: 0, amount: 0 });
+    setDraft({ label: '', fromMinutes: 0, toMinutes: 0, amount: 0, action: 'DEDUCT_AMOUNT', otHours: 0 });
   };
   const saveAdd = () => {
     onChange([...slabs, {
@@ -89,8 +89,8 @@ const SlabConfigurator: React.FC<{
       fromMinutes: Number(draft.fromMinutes) || 0,
       toMinutes:   Number(draft.toMinutes)   || 0,
       amount:      Number(draft.amount)      || 0,
-      action:      (draft.action as SlabEntry['action']) ?? 'DEDUCT_AMOUNT',
-      otHours:     Number(draft.otHours)     || 0,
+      action:      'DEDUCT_AMOUNT',
+      otHours:     0,
     }]);
     setAdding(false); setDraft({});
   };
@@ -101,7 +101,6 @@ const SlabConfigurator: React.FC<{
 
   // Shared form fields — 3 reusable TextInput components
   const renderSlabForm = (onSave: () => void, onCancel: () => void) => {
-    const actionVal = (draft.action ?? 'DEDUCT_AMOUNT') as string;
     return (
       <div className="border border-primary/30 rounded-xl p-4 bg-primary/10 space-y-3">
         <TextInput
@@ -112,7 +111,7 @@ const SlabConfigurator: React.FC<{
           onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
           bottom
         />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <TextInput
             label="From (min)"
             name="slab-from"
@@ -129,47 +128,15 @@ const SlabConfigurator: React.FC<{
             onChange={e => setDraft(d => ({ ...d, toMinutes: e.target.value ? Number(e.target.value) : '' as any }))}
             bottom
           />
-          {/* Action dropdown — only shown when this is used as Permission Slab */}
-          <div>
-            <label className="block text-xs font-semibold text-ink-subtle mb-1.5 uppercase tracking-wider">Action</label>
-            <select
-              value={actionVal}
-              onChange={e => setDraft(d => ({ ...d, action: e.target.value as SlabEntry['action'], amount: 0, otHours: 0 }))}
-              className="w-full border border-line-soft rounded-xl px-3 py-2 text-sm text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-card-2"
-            >
-              <option value="DEDUCT_AMOUNT">₹ Deduct Amount</option>
-              <option value="HALF_DAY">Half Day (LOP)</option>
-              <option value="HALF_DAY_PLUS_OT">Half Day + OT</option>
-            </select>
-          </div>
         </div>
-        {/* Conditional fields */}
-        {actionVal === 'DEDUCT_AMOUNT' && (
-          <TextInput
-            label="Amount (₹)"
-            name="slab-amount"
-            type="number"
-            value={draft.amount !== undefined && draft.amount !== null ? String(draft.amount) : ''}
-            onChange={e => setDraft(d => ({ ...d, amount: e.target.value ? Number(e.target.value) : '' as any }))}
-            bottom
-          />
-        )}
-        {actionVal === 'HALF_DAY_PLUS_OT' && (
-          <TextInput
-            label="Auto-add OT Hours"
-            name="slab-ot-hours"
-            type="number"
-            placeholder="e.g. 3"
-            value={draft.otHours !== undefined && draft.otHours !== null ? String(draft.otHours) : ''}
-            onChange={e => setDraft(d => ({ ...d, otHours: e.target.value ? Number(e.target.value) : '' as any }))}
-            bottom
-          />
-        )}
-        {actionVal === 'HALF_DAY' && (
-          <p className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 font-medium">
-            This slab will automatically convert the day to <strong>Half Day (0.5 LOP)</strong> with no ₹ deduction.
-          </p>
-        )}
+        <TextInput
+          label="Amount (₹)"
+          name="slab-amount"
+          type="number"
+          value={draft.amount !== undefined && draft.amount !== null ? String(draft.amount) : ''}
+          onChange={e => setDraft(d => ({ ...d, amount: e.target.value ? Number(e.target.value) : '' as any }))}
+          bottom
+        />
         <div className="flex gap-2 pt-1">
           <button
             onClick={onSave}
@@ -228,28 +195,9 @@ const SlabConfigurator: React.FC<{
                   {s.fromMinutes}{s.toMinutes === 0 ? '+ min' : ` – ${s.toMinutes} min`}
                 </span>
                 <span className="text-ink-subtle text-xs">→</span>
-                {/* Action badge */}
-                {(!s.action || s.action === 'DEDUCT_AMOUNT') && (
-                  <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-lg font-mono">
+                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-lg font-mono">
                     ₹{s.amount}
-                  </span>
-                )}
-                {s.action === 'HALF_DAY' && (
-                  <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-lg">
-                    ½ Day LOP
-                  </span>
-                )}
-                {s.action === 'HALF_DAY_PLUS_OT' && (
-                  <>
-                    <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-lg">
-                      ½ Day LOP
-                    </span>
-                    <span className="text-ink-subtle text-xs">+</span>
-                    <span className="px-2.5 py-1 text-xs font-bold bg-primary/15 text-primary border border-primary/30 rounded-lg">
-                      {s.otHours ?? 0} hrs OT
-                    </span>
-                  </>
-                )}
+                </span>
               </div>
               {/* Actions */}
               {canEdit && (
@@ -667,204 +615,118 @@ const PayrollSettings: React.FC = () => {
 
   const tabItems = [
     {
-      key: 'policy',
-      label: 'Company Policy',
+      key: 'general',
+      label: 'General',
       content: (
-        <Section title="Company Policy">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SelectInput label="Salary Calculation Method" name="salaryCalculationMethod"
-              value={config.salaryCalculationMethod ?? 'CALENDAR_DAYS'}
-              options={[
-                { value: 'CALENDAR_DAYS', label: 'Calendar Days' },
-                { value: 'WORKING_DAYS',  label: 'Working Days'  },
-                { value: 'FIXED_DAYS',    label: 'Fixed Days'    },
-              ]}
-              onChange={e => set({ salaryCalculationMethod: e.target.value })}
-            />
-            <TextInput label="Fixed Days (if fixed)" name="fixedDays" type="number"
-              value={String(config.fixedDays ?? 26)}
-              onChange={e => set({ fixedDays: Number(e.target.value) })}
-            />
+        <div className="bg-card rounded-2xl border border-line-soft p-6 shadow-xs space-y-6 text-ink">
+          {/* Company Policy */}
+          <div>
+            <h3 className="text-sm font-extrabold text-ink mb-3">Company Policy</h3>
+            <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium">
+              <Info size={14} className="mt-0.5 shrink-0" />
+              <span>Daily rate = Monthly salary ÷ Calendar days in month (e.g. ÷ 31 for August)</span>
+            </div>
           </div>
-        </Section>
-      ),
-    },
-    {
-      key: 'daily',
-      label: 'Daily Salary',
-      content: (
-        <Section title="Daily Salary Formula">
-          <RadioInput label="Formula" name="dailySalaryFormula"
-            value={config.dailySalaryFormula ?? 'MONTHLY_BY_CALENDAR'}
-            options={[
-              { value: 'MONTHLY_BY_CALENDAR', label: 'Monthly ÷ Calendar Days' },
-              { value: 'MONTHLY_BY_WORKING',  label: 'Monthly ÷ Working Days'  },
-              { value: 'FIXED_DAILY',         label: 'Fixed Daily Rate'         },
-            ]}
-            onChange={e => set({ dailySalaryFormula: e.target.value })}
-          />
-          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium mt-2">
-            <Info size={14} className="mt-0.5 shrink-0" />
-            <span>
-              {config.dailySalaryFormula === 'MONTHLY_BY_CALENDAR'
-                ? 'Daily rate = Monthly salary ÷ Calendar days in month (e.g. ÷ 31 for August)'
-                : config.dailySalaryFormula === 'MONTHLY_BY_WORKING'
-                ? `Daily rate = Monthly salary ÷ ${config.fixedDays ?? 26} (working days setting)`
-                : 'Each employee has a fixed daily rate configured individually'}
-            </span>
-          </div>
-        </Section>
-      ),
-    },
-    {
-      key: 'overtime',
-      label: 'Overtime',
-      content: (
-        <Section title="Overtime Settings">
-          <Toggle checked={config.otEnabled ?? true} onChange={v => set({ otEnabled: v })} label="Enable Overtime" />
-          {config.otEnabled && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SelectInput label="OT Method" name="otMethod"
-                  value={config.otMethod ?? 'SLAB'}
-                  options={[
-                    { value: 'HOURLY_RATE',      label: 'Hourly Rate'      },
-                    { value: 'FIXED_AMOUNT',     label: 'Fixed Amount'     },
-                    { value: 'PERCENTAGE_DAILY', label: '% of Daily Rate'  },
-                    { value: 'SLAB',             label: 'Slab-based'       },
-                  ]}
-                  onChange={e => set({ otMethod: e.target.value })}
-                />
-                {(config.otMethod === 'HOURLY_RATE' || config.otMethod === 'FIXED_AMOUNT') && (
-                  <TextInput
-                    label={config.otMethod === 'FIXED_AMOUNT' ? 'Fixed Amount per OT (₹)' : 'Rate per Hour (₹)'}
-                    name="otRatePerHour" type="number"
-                    value={String(config.otRatePerHour ?? 0)}
-                    onChange={e => set({ otRatePerHour: Number(e.target.value) })}
-                  />
-                )}
-                <TextInput label="Weekday OT Multiplier" name="weekdayOtMultiplier" type="number"
-                  value={String(config.weekdayOtMultiplier ?? 1.5)}
-                  onChange={e => set({ weekdayOtMultiplier: Number(e.target.value) })}
-                />
-                <TextInput label="Holiday OT Multiplier" name="holidayOtMultiplier" type="number"
-                  value={String(config.holidayOtMultiplier ?? 2.0)}
-                  onChange={e => set({ holidayOtMultiplier: Number(e.target.value) })}
-                />
-                <TextInput label="Max OT Hours / Day" name="maxOtHoursPerDay" type="number"
-                  value={String(config.maxOtHoursPerDay ?? 4)}
-                  onChange={e => set({ maxOtHoursPerDay: Number(e.target.value) })}
-                />
-                <TextInput label="Max OT Hours / Week" name="maxOtHoursPerWeek" type="number"
-                  value={String(config.maxOtHoursPerWeek ?? 20)}
-                  onChange={e => set({ maxOtHoursPerWeek: Number(e.target.value) })}
+
+          <hr className="border-line-soft" />
+
+          {/* Overtime */}
+          <div>
+            <h3 className="text-sm font-extrabold text-ink mb-3">Overtime</h3>
+            <Toggle checked={config.otEnabled ?? true} onChange={v => set({ otEnabled: v })} label="Enable Overtime" />
+            {config.otEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <TextInput
+                  label="Rate per Hour (₹)"
+                  name="otRatePerHour" type="number"
+                  value={String(config.otRatePerHour ?? 0)}
+                  onChange={e => set({ otRatePerHour: Number(e.target.value) })}
                 />
               </div>
-              {config.otMethod === 'SLAB' && (
-                <SlabConfigurator
-                  title="OT Slabs (by minutes)"
-                  slabs={slabs.ot}
-                  onChange={s => handleSlabChange('ot', s)}
-                  warningNote="Slabs are non-linear — verify amounts don't decrease as duration increases."
-                  canEdit={canEditSettings}
+            )}
+          </div>
+
+          <hr className="border-line-soft" />
+
+          {/* PF */}
+          <div>
+            <h3 className="text-sm font-extrabold text-ink mb-3">Provident Fund (PF)</h3>
+            <Toggle checked={config.pfEnabled ?? true} onChange={v => set({ pfEnabled: v })} label="Enable PF" />
+            {config.pfEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <SelectInput label="PF Wage Formula" name="pfWageFormula"
+                  value={config.pfWageFormula ?? 'BASIC'}
+                  options={[{ value: 'BASIC', label: 'Basic Salary' }, { value: 'GROSS', label: 'Gross Salary' }]}
+                  onChange={e => set({ pfWageFormula: e.target.value })}
                 />
-              )}
-            </>
-          )}
-        </Section>
+                <TextInput label="Max PF Wage (₹)" name="maxPfWage" type="number"
+                  value={String(config.maxPfWage ?? 15000)}
+                  onChange={e => set({ maxPfWage: Number(e.target.value) })}
+                />
+                <TextInput label="Employee PF %" name="employeePfPercent" type="number"
+                  value={String(config.employeePfPercent ?? 12)}
+                  onChange={e => set({ employeePfPercent: Number(e.target.value) })}
+                />
+                <TextInput label="Employer PF %" name="employerPfPercent" type="number"
+                  value={String(config.employerPfPercent ?? 12)}
+                  onChange={e => set({ employerPfPercent: Number(e.target.value) })}
+                />
+              </div>
+            )}
+          </div>
+
+          <hr className="border-line-soft" />
+
+          {/* ESI */}
+          <div>
+            <h3 className="text-sm font-extrabold text-ink mb-3">Employee State Insurance (ESI)</h3>
+            <Toggle checked={config.esiEnabled ?? true} onChange={v => set({ esiEnabled: v })} label="Enable ESI" />
+            {config.esiEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <TextInput label="Max ESI Salary (₹)" name="maxEsiSalary" type="number"
+                  value={String(config.maxEsiSalary ?? 21000)}
+                  onChange={e => set({ maxEsiSalary: Number(e.target.value) })}
+                />
+                <TextInput label="Employee ESI %" name="employeeEsiPercent" type="number"
+                  value={String(config.employeeEsiPercent ?? 0.75)}
+                  onChange={e => set({ employeeEsiPercent: Number(e.target.value) })}
+                />
+                <TextInput label="Employer ESI %" name="employerEsiPercent" type="number"
+                  value={String(config.employerEsiPercent ?? 3.25)}
+                  onChange={e => set({ employerEsiPercent: Number(e.target.value) })}
+                />
+              </div>
+            )}
+          </div>
+
+          <hr className="border-line-soft" />
+
+          {/* Professional Tax */}
+          <div>
+            <h3 className="text-sm font-extrabold text-ink mb-3">Professional Tax</h3>
+            <Toggle checked={config.professionalTaxEnabled ?? false} onChange={v => set({ professionalTaxEnabled: v })} label="Enable Professional Tax" />
+            {config.professionalTaxEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <TextInput label="Professional Tax Amount (₹/month)" name="professionalTaxAmount" type="number"
+                  value={String(config.professionalTaxAmount ?? 200)}
+                  onChange={e => set({ professionalTaxAmount: Number(e.target.value) })}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       ),
     },
     {
-      key: 'pf',
-      label: 'PF Settings',
+      key: 'deductions',
+      label: 'Deductions',
       content: (
-        <Section title="Provident Fund (PF)">
-          <Toggle checked={config.pfEnabled ?? true} onChange={v => set({ pfEnabled: v })} label="Enable PF" />
-          {config.pfEnabled && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <SelectInput label="PF Wage Formula" name="pfWageFormula"
-                value={config.pfWageFormula ?? 'BASIC'}
-                options={[{ value: 'BASIC', label: 'Basic Salary' }, { value: 'GROSS', label: 'Gross Salary' }]}
-                onChange={e => set({ pfWageFormula: e.target.value })}
-              />
-              <TextInput label="Max PF Wage (₹)" name="maxPfWage" type="number"
-                value={String(config.maxPfWage ?? 15000)}
-                onChange={e => set({ maxPfWage: Number(e.target.value) })}
-              />
-              <TextInput label="Employee PF %" name="employeePfPercent" type="number"
-                value={String(config.employeePfPercent ?? 12)}
-                onChange={e => set({ employeePfPercent: Number(e.target.value) })}
-              />
-              <TextInput label="Employer PF %" name="employerPfPercent" type="number"
-                value={String(config.employerPfPercent ?? 12)}
-                onChange={e => set({ employerPfPercent: Number(e.target.value) })}
-              />
-              <SelectInput label="PF Rounding Rule" name="pfRoundingRule"
-                value={config.pfRoundingRule ?? 'ROUND'}
-                options={[{ value: 'ROUND', label: 'Round' }, { value: 'FLOOR', label: 'Floor' }, { value: 'CEILING', label: 'Ceiling' }]}
-                onChange={e => set({ pfRoundingRule: e.target.value })}
-              />
-            </div>
-          )}
-        </Section>
-      ),
-    },
-    {
-      key: 'esi',
-      label: 'ESI Settings',
-      content: (
-        <Section title="Employee State Insurance (ESI)">
-          <Toggle checked={config.esiEnabled ?? true} onChange={v => set({ esiEnabled: v })} label="Enable ESI" />
-          {config.esiEnabled && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <TextInput label="Max ESI Salary (₹)" name="maxEsiSalary" type="number"
-                value={String(config.maxEsiSalary ?? 21000)}
-                onChange={e => set({ maxEsiSalary: Number(e.target.value) })}
-              />
-              <TextInput label="Employee ESI %" name="employeeEsiPercent" type="number"
-                value={String(config.employeeEsiPercent ?? 0.75)}
-                onChange={e => set({ employeeEsiPercent: Number(e.target.value) })}
-              />
-              <TextInput label="Employer ESI %" name="employerEsiPercent" type="number"
-                value={String(config.employerEsiPercent ?? 3.25)}
-                onChange={e => set({ employerEsiPercent: Number(e.target.value) })}
-              />
-              <SelectInput label="ESI Rounding Rule" name="esiRoundingRule"
-                value={config.esiRoundingRule ?? 'ROUND'}
-                options={[{ value: 'ROUND', label: 'Round' }, { value: 'FLOOR', label: 'Floor' }, { value: 'CEILING', label: 'Ceiling' }]}
-                onChange={e => set({ esiRoundingRule: e.target.value })}
-              />
-            </div>
-          )}
-        </Section>
-      ),
-    },
-    {
-      key: 'leave',
-      label: 'Leave & Attendance',
-      content: (
-        <Section title="Leave & Attendance Settings">
+        <Section title="Deductions">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TextInput label="Paid Leave / Year" name="paidLeavePerYear" type="number"
-              value={String(config.paidLeavePerYear ?? 12)}
-              onChange={e => set({ paidLeavePerYear: Number(e.target.value) })}
-            />
             <TextInput label="Late Entry Grace Period (minutes)" name="lateEntryGraceMinutes" type="number"
               value={String(config.lateEntryGraceMinutes ?? 5)}
               onChange={e => set({ lateEntryGraceMinutes: Number(e.target.value) })}
             />
-          </div>
-
-          {/* ── How grace + slabs work together ── */}
-          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium">
-            <Info size={14} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-bold mb-1">How Late Entry Deduction works</p>
-              <p>If an employee is late by ≤ <strong>{config.lateEntryGraceMinutes ?? 5} min</strong> (grace period), <strong>no deduction</strong> is applied.</p>
-              <p className="mt-1">If late by more than the grace period, the <strong>total late minutes</strong> are looked up in the slab table below and that fixed amount is deducted.</p>
-              <p className="mt-1 text-primary">Example: Late 30 min → matches slab "21–60 min → ₹50" → ₹50 deducted.</p>
-              <p className="mt-1 text-primary">If no slabs are configured, a per-minute rate (Daily Rate ÷ Working Minutes) is used as fallback.</p>
-            </div>
           </div>
 
           <SlabConfigurator
@@ -878,6 +740,17 @@ const PayrollSettings: React.FC = () => {
                 : undefined
             }
           />
+
+          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="font-bold mb-1">How Late Entry Deduction works</p>
+              <p>If an employee is late by ≤ <strong>{config.lateEntryGraceMinutes ?? 5} min</strong> (grace period), <strong>no deduction</strong> is applied.</p>
+              <p className="mt-1">If late by more than the grace period, the <strong>total late minutes</strong> are looked up in the slab table above and that fixed amount is deducted.</p>
+              <p className="mt-1 text-primary">Example: Late 30 min → matches slab "21–60 min → ₹50" → ₹50 deducted.</p>
+              <p className="mt-1 text-primary">If no slabs are configured, a per-minute rate (Daily Rate ÷ Working Minutes) is used as fallback.</p>
+            </div>
+          </div>
           <SlabConfigurator
             title="Permission Deduction Slabs"
             slabs={slabs.perm}
@@ -889,67 +762,6 @@ const PayrollSettings: React.FC = () => {
                 : undefined
             }
           />
-          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium mt-1">
-            <Info size={14} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-bold mb-1">Permission Slab Actions</p>
-              <p><strong>₹ Deduct Amount</strong> — Deduct a fixed rupee amount from net salary.</p>
-              <p className="mt-1"><strong>Half Day (LOP)</strong> — Convert the day to half day (0.5 LOP). No ₹ deduction.</p>
-              <p className="mt-1"><strong>Half Day + OT</strong> — Mark half day LOP <em>and</em> automatically add the configured OT hours to that employee's OT pay.</p>
-              <p className="mt-1 text-primary">Example: 09:00–21:00 shift. Employee arrives at 12:00 (180 min permission). Slab: <em>180+ min → Half Day + OT (3 hrs)</em>. Engine deducts 0.5 day salary and adds 3 hrs OT pay automatically.</p>
-            </div>
-          </div>
-        </Section>
-      ),
-    },
-    // {
-    //   key: 'components',
-    //   label: 'Salary Components',
-    //   content: (
-    //     <Section title="Salary Components">
-    //       <SalaryComponentsEditor comps={comps} onChange={handleCompChange} />
-    //     </Section>
-    //   ),
-    // },
-    {
-      key: 'deductions',
-      label: 'Deductions',
-      content: (
-        <Section title="Deductions">
-          <Toggle checked={config.professionalTaxEnabled ?? false} onChange={v => set({ professionalTaxEnabled: v })} label="Enable Professional Tax" />
-          {config.professionalTaxEnabled && (
-            <TextInput label="Professional Tax Amount (₹/month)" name="professionalTaxAmount" type="number"
-              value={String(config.professionalTaxAmount ?? 200)}
-              onChange={e => set({ professionalTaxAmount: Number(e.target.value) })}
-            />
-          )}
-        </Section>
-      ),
-    },
-    {
-      key: 'rounding',
-      label: 'Rounding',
-      content: (
-        <Section title="Rounding Rules">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SelectInput label="Net Salary Rounding" name="roundingRule"
-              value={config.roundingRule ?? 'ROUND'}
-              options={[
-                { value: 'ROUND',   label: 'Round (nearest)'  },
-                { value: 'FLOOR',   label: 'Floor (round down)' },
-                { value: 'CEILING', label: 'Ceiling (round up)'  },
-              ]}
-              onChange={e => set({ roundingRule: e.target.value })}
-            />
-            <SelectInput label="Decimal Precision" name="decimalPrecision"
-              value={String(config.decimalPrecision ?? 0)}
-              options={[
-                { value: '0', label: '₹0 (whole rupees)' },
-                { value: '2', label: '₹0.00 (paise)'     },
-              ]}
-              onChange={e => set({ decimalPrecision: Number(e.target.value) })}
-            />
-          </div>
         </Section>
       ),
     },

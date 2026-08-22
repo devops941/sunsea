@@ -22,6 +22,12 @@ export interface Store {
   locationDesc?: string | null;
   inchargeId?: string | number | null;
   incharge?: { fullName: string } | null;
+  location?: {
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+  } | null;
   allowNegative?: boolean;
   costMethod?: string;
   gstPlace?: string | null;

@@ -7,7 +7,7 @@ import bcrypt from "bcrypt";
 
 class EmployeeService {
   async create(data: any) {
-    const { createLoginAccount, loginAccount, da, hra, otherAllowance, ...employeeData } = data;
+    const { createLoginAccount, loginAccount, da, hra, otherAllowance, cashInHand, ...employeeData } = data;
 
     if (employeeData.createdBy && employeeData.createdBy.startsWith("admin_")) {
       employeeData.createdBy = null;
@@ -82,6 +82,7 @@ class EmployeeService {
           da: Number(da || 0),
           hra: Number(hra || 0),
           otherAllowance: Number(otherAllowance || 0),
+          cashInHand: Number(cashInHand || 0),
           bankAccount: employeeData.accountNumber || null,
           ifscCode: employeeData.ifscCode || null,
           bankName: employeeData.bankName || null,
@@ -96,6 +97,7 @@ class EmployeeService {
           da: Number(da || 0),
           hra: Number(hra || 0),
           otherAllowance: Number(otherAllowance || 0),
+          cashInHand: Number(cashInHand || 0),
           bankAccount: employeeData.accountNumber || null,
           ifscCode: employeeData.ifscCode || null,
           bankName: employeeData.bankName || null,
@@ -267,7 +269,7 @@ class EmployeeService {
     // Check if employee exists
     await this.findById(id);
 
-    const { createLoginAccount, loginAccount, da, hra, otherAllowance, ...employeeData } = data;
+    const { createLoginAccount, loginAccount, da, hra, otherAllowance, cashInHand, ...employeeData } = data;
 
     if (employeeData.updatedBy && employeeData.updatedBy.startsWith("admin_")) {
       employeeData.updatedBy = null;
@@ -317,6 +319,7 @@ class EmployeeService {
           da: Number(da || 0),
           hra: Number(hra || 0),
           otherAllowance: Number(otherAllowance || 0),
+          cashInHand: Number(cashInHand || 0),
           bankAccount: employeeData.accountNumber || null,
           ifscCode: employeeData.ifscCode || null,
           bankName: employeeData.bankName || null,
@@ -331,6 +334,7 @@ class EmployeeService {
           ...(da !== undefined && { da: Number(da || 0) }),
           ...(hra !== undefined && { hra: Number(hra || 0) }),
           ...(otherAllowance !== undefined && { otherAllowance: Number(otherAllowance || 0) }),
+          ...(cashInHand !== undefined && { cashInHand: Number(cashInHand || 0) }),
           ...(employeeData.accountNumber !== undefined && { bankAccount: employeeData.accountNumber || null }),
           ...(employeeData.ifscCode !== undefined && { ifscCode: employeeData.ifscCode || null }),
           ...(employeeData.bankName !== undefined && { bankName: employeeData.bankName || null }),

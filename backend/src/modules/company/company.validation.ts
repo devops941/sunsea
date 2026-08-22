@@ -26,7 +26,6 @@ export const updateCompanySchema = z.object({
   logoUrl: z.string().optional().nullable(),
   faviconUrl: z.string().optional().nullable(),
   addressLine1: z.string().max(255).optional().nullable(),
-  addressLine2: z.string().max(255).optional().nullable(),
   city: z.string().max(100).optional().nullable(),
   state: z.string().max(100).optional().nullable(),
   zipcode: z.string().max(20).optional().nullable(),

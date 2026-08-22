@@ -2,10 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Validate field encryption key at startup — fails fast before any request is served.
-// The import itself throws if FIELD_ENCRYPT_KEY is missing or malformed.
-import "./utils/fieldEncryption";
-
 import http from "http";
 import app from "./app";
 import { prisma } from "./config/prisma";

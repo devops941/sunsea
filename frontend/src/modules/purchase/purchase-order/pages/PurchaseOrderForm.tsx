@@ -165,6 +165,7 @@ const PurchaseOrderForm: React.FC = () => {
   const { activeUOMs, loadActiveUOMs } = useUOMs();
   const companyState = company?.state;
   const [loading, setLoading] = useState(isEdit);
+  const [shippingResetKey, setShippingResetKey] = useState(0);
   const [poNotFound, setPoNotFound] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -276,8 +277,9 @@ const PurchaseOrderForm: React.FC = () => {
 
   const refreshRawMaterials = useCallback(async () => {
     try {
-      const materials = await rawMaterialService.fetchAll();
-      setRawMaterials(materials ?? []);
+      const res = await rawMaterialService.fetchAll();
+      const materials = Array.isArray(res) ? res : (res?.rawMaterials ?? []);
+      setRawMaterials(materials);
     } catch {
       toast.error("Failed to load raw materials");
     }
@@ -442,10 +444,22 @@ const PurchaseOrderForm: React.FC = () => {
     }
 
     if (name === "storeId") {
+      const selectedStore = stores.find((s: any) => s.storeId === value);
+      // Store address is saved as JSON in locationDesc
+      let addr: any = null;
+      if (selectedStore?.locationDesc) {
+        try { addr = JSON.parse(selectedStore.locationDesc); } catch { /* not JSON */ }
+      }
       setFormData((prev) => ({
         ...prev,
         storeId: value,
+        shippingAddressLine1: addr?.addressLine || company?.addressLine1 || "",
+        shippingCity: addr?.city || company?.city || "",
+        shippingState: addr?.state || company?.state || "",
+        shippingCountry: addr?.country || company?.country || "India",
+        shippingPincode: addr?.zipcode || company?.zipcode || "",
       }));
+      setShippingResetKey((k) => k + 1);
       if (errors.storeId) {
         setErrors((prev) => ({ ...prev, storeId: "" }));
       }
@@ -474,8 +488,8 @@ const PurchaseOrderForm: React.FC = () => {
 
           const parsedUnitPrice = activePriceObj
             ? (typeof activePriceObj.price === "string" ? parseFloat(activePriceObj.price) : Number(activePriceObj.price))
-            : (rawMaterial?.unitPrice
-              ? (typeof rawMaterial.unitPrice === "string" ? parseFloat(rawMaterial.unitPrice) : Number(rawMaterial.unitPrice))
+            : (rawMaterial?.rate
+              ? (typeof rawMaterial.rate === "string" ? parseFloat(rawMaterial.rate) : Number(rawMaterial.rate))
               : 0);
 
           const qty = Number(item.quantity) || 0;
@@ -660,8 +674,8 @@ const PurchaseOrderForm: React.FC = () => {
 
       parsedUnitPrice = activePriceObj
         ? (typeof activePriceObj.price === "string" ? parseFloat(activePriceObj.price) : Number(activePriceObj.price))
-        : (rawMaterial?.unitPrice
-          ? (typeof rawMaterial.unitPrice === "string" ? parseFloat(rawMaterial.unitPrice) : Number(rawMaterial.unitPrice))
+        : (rawMaterial?.rate
+          ? (typeof rawMaterial.rate === "string" ? parseFloat(rawMaterial.rate) : Number(rawMaterial.rate))
           : 0);
 
       const defaultTaxRate = 0;
@@ -908,9 +922,10 @@ const PurchaseOrderForm: React.FC = () => {
     ? selectedSupplier.materialPrices.map((mp: any) => String(mp.rawMaterialId))
     : [];
 
+  const safeRawMaterials = Array.isArray(rawMaterials) ? rawMaterials : [];
   const filteredRawMaterials = supplierMaterialIds.length > 0
-    ? rawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)) || formData.items.some((item) => item.productId === rm.rawMaterialId))
-    : rawMaterials;
+    ? safeRawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)) || formData.items.some((item) => item.productId === rm.rawMaterialId))
+    : safeRawMaterials;
 
   const productOptions = filteredRawMaterials.map((rm) => ({
     value: String(rm.rawMaterialId || ""),
@@ -1031,6 +1046,7 @@ const PurchaseOrderForm: React.FC = () => {
                 onPincodeChange={(val) => setFormData(prev => ({ ...prev, shippingPincode: val }))}
                 pincodeError={errors.shippingPincode}
                 disabled={isLocked}
+                resetKey={shippingResetKey}
               />
             </div>
           </div>

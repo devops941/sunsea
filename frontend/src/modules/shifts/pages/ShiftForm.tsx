@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaEraser, FaClock } from "react-icons/fa";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { FaSave, FaEraser } from "react-icons/fa";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -8,35 +8,9 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
-import { updateShift, fetchShifts } from "../../../features/shifts/shiftSlice";
+import { createShift, updateShift, fetchShifts } from "../../../features/shifts/shiftSlice";
 import { shiftService } from "../../../services/shiftService";
 import type { RootState, AppDispatch } from "../../../app/store";
-
-// ---- Time / overlap helpers (BUG-SHF-001 fix: same logic as ShiftCreate) ----
-const timeToMinutes = (time: string): number => {
-    const [h, m] = time.split(":").map(Number);
-    return h * 60 + m;
-};
-
-const getShiftRange = (start: string, end: string) => {
-    const s = timeToMinutes(start);
-    let e = timeToMinutes(end);
-    if (e <= s) e += 1440; // crosses midnight
-    return { start: s, end: e };
-};
-
-const doRangesOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number): boolean => {
-    return aStart < bEnd && bStart < aEnd;
-};
-
-const shiftsOverlap = (start1: string, end1: string, start2: string, end2: string): boolean => {
-    const a = getShiftRange(start1, end1);
-    const b = getShiftRange(start2, end2);
-    if (doRangesOverlap(a.start, a.end, b.start, b.end)) return true;
-    if (doRangesOverlap(a.start, a.end, b.start + 1440, b.end + 1440)) return true;
-    if (doRangesOverlap(a.start + 1440, a.end + 1440, b.start, b.end)) return true;
-    return false;
-};
 
 const initialFormState = {
     id: 0,
@@ -57,51 +31,27 @@ interface FormErrors {
     gracePeriod?: string;
 }
 
-const ShiftEdit: React.FC = () => {
+const ShiftForm: React.FC = () => {
     const navigate = useNavigate();
-    const location = useLocation();
-    // BUG-SHF-002 fix: read id from URL params so we can fetch via API if location.state is missing
-    const { id: idParam } = useParams<{ id: string }>();
+    const { id } = useParams<{ id: string }>();
+    const isEdit = Boolean(id);
     const dispatch = useDispatch<AppDispatch>();
-    const { loading, data: existingShifts } = useSelector((state: RootState) => state.shifts);
+    const { loading } = useSelector((state: RootState) => state.shifts);
 
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<FormErrors>({});
-    const [isAssigned, setIsAssigned] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    // BUG-SHF-002 fix: track whether we are still loading shift data from API
-    const [fetchingData, setFetchingData] = useState(false);
+    const [fetchingData, setFetchingData] = useState(isEdit);
 
-    // BUG-SHF-001 fix: load all shifts so we can check for time overlaps (excluding current shift)
     useEffect(() => {
         dispatch(fetchShifts());
     }, [dispatch]);
 
+    // Fetch next ID (create) or load existing shift (edit)
     useEffect(() => {
-        if (location.state) {
-            // Happy path: data was passed via navigation state
-            setFormData({
-                id: location.state.id || 0,
-                shiftCode: location.state.shiftCode || "",
-                shiftName: location.state.shiftName || "",
-                startTime: location.state.startTime || "",
-                endTime: location.state.endTime || "",
-                breakDuration:
-                    location.state.breakDuration !== null && location.state.breakDuration !== undefined
-                        ? String(location.state.breakDuration)
-                        : "",
-                gracePeriod:
-                    location.state.gracePeriod !== null && location.state.gracePeriod !== undefined
-                        ? String(location.state.gracePeriod)
-                        : "",
-                isActive: location.state.isActive ?? true,
-            });
-            setIsAssigned(location.state.isAssigned || false);
-        } else if (idParam) {
-            // BUG-SHF-002 fix: no state (direct URL / page refresh) — fetch from API
+        if (isEdit && id) {
             setFetchingData(true);
-            shiftService
-                .fetchById(Number(idParam))
+            shiftService.fetchById(Number(id))
                 .then((shift) => {
                     setFormData({
                         id: shift.id,
@@ -109,17 +59,10 @@ const ShiftEdit: React.FC = () => {
                         shiftName: shift.shiftName || "",
                         startTime: shift.startTime || "",
                         endTime: shift.endTime || "",
-                        breakDuration:
-                            shift.breakDuration !== null && shift.breakDuration !== undefined
-                                ? String(shift.breakDuration)
-                                : "",
-                        gracePeriod:
-                            shift.gracePeriod !== null && shift.gracePeriod !== undefined
-                                ? String(shift.gracePeriod)
-                                : "",
+                        breakDuration: shift.breakDuration !== null && shift.breakDuration !== undefined ? String(shift.breakDuration) : "",
+                        gracePeriod: shift.gracePeriod !== null && shift.gracePeriod !== undefined ? String(shift.gracePeriod) : "",
                         isActive: shift.isActive ?? true,
                     });
-                    setIsAssigned((shift as any).isAssigned || false);
                 })
                 .catch(() => {
                     toast.error("Failed to load shift data.");
@@ -127,49 +70,30 @@ const ShiftEdit: React.FC = () => {
                 })
                 .finally(() => setFetchingData(false));
         } else {
-            toast.error("No shift data provided.");
-            navigate("/shifts");
+            shiftService.fetchNextId()
+                .then((nextId) => { if (nextId) setFormData(prev => ({ ...prev, shiftCode: nextId })); })
+                .catch(() => {});
         }
-    }, [location.state, idParam, navigate]);
+    }, [isEdit, id, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData(prev => ({ ...prev, [name]: value }));
         if (errors[name as keyof FormErrors]) {
-            setErrors((prev) => ({ ...prev, [name]: undefined }));
+            setErrors(prev => ({ ...prev, [name]: undefined }));
         }
     };
 
     const validate = (): boolean => {
         const newErrors: FormErrors = {};
-
-        if (!formData.shiftName.trim()) {
-            newErrors.shiftName = "Shift name is required";
+        if (!formData.shiftName.trim()) newErrors.shiftName = "Shift name is required";
+        if (!formData.startTime) newErrors.startTime = "Start time is required";
+        if (!formData.endTime) newErrors.endTime = "End time is required";
+        if (formData.startTime && formData.endTime && formData.startTime === formData.endTime) {
+            newErrors.endTime = "Start time and end time cannot be the same";
         }
-
-        if (!formData.startTime) {
-            newErrors.startTime = "Start time is required";
-        }
-
-        if (!formData.endTime) {
-            newErrors.endTime = "End time is required";
-        }
-
-        if (formData.startTime && formData.endTime) {
-            if (formData.startTime === formData.endTime) {
-                newErrors.endTime = "Start time and end time cannot be the same";
-            }
-        }
-
-        // BUG-SHF-003 fix: breakDuration negative check (min=0 on input prevents it in UI but validate defensively)
-        if (formData.breakDuration && Number(formData.breakDuration) < 0) {
-            newErrors.breakDuration = "Break duration cannot be negative";
-        }
-
-        if (formData.gracePeriod && Number(formData.gracePeriod) < 0) {
-            newErrors.gracePeriod = "Grace period cannot be negative";
-        }
-
+        if (formData.breakDuration && Number(formData.breakDuration) < 0) newErrors.breakDuration = "Break duration cannot be negative";
+        if (formData.gracePeriod && Number(formData.gracePeriod) < 0) newErrors.gracePeriod = "Grace period cannot be negative";
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -179,6 +103,7 @@ const ShiftEdit: React.FC = () => {
         if (isSubmitting) return;
         if (!validate()) return;
         setIsSubmitting(true);
+
         const payload = {
             shiftCode: formData.shiftCode,
             shiftName: formData.shiftName,
@@ -188,12 +113,18 @@ const ShiftEdit: React.FC = () => {
             gracePeriod: formData.gracePeriod ? Number(formData.gracePeriod) : null,
             isActive: formData.isActive,
         };
+
         try {
-            await dispatch(updateShift({ id: formData.id, data: payload })).unwrap();
-            toast.success("Shift updated successfully!");
+            if (isEdit) {
+                await dispatch(updateShift({ id: formData.id, data: payload })).unwrap();
+                toast.success("Shift updated successfully!");
+            } else {
+                await dispatch(createShift(payload)).unwrap();
+                toast.success("Shift created successfully!");
+            }
             navigate("/shifts");
         } catch (err: any) {
-            toast.error(err || "Failed to update shift");
+            toast.error(err || `Failed to ${isEdit ? "update" : "create"} shift`);
         } finally {
             setIsSubmitting(false);
         }
@@ -202,26 +133,25 @@ const ShiftEdit: React.FC = () => {
     if (fetchingData) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
-                <div className="px-6 py-5 border-b border-slate-200">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
+                <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-slate-800">Edit Shift</h2>
+                        <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Shift" : "Create Shift"}</h2>
                         <BackButton text="Back to List" to="/shifts" />
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
-                    {/* General Info */}
                     <div>
-                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
-                            <h3 className="text-lg font-semibold text-gray-700">Shift Details</h3>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
+                            <h3 className="text-lg font-bold text-ink">Shift Details</h3>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -234,7 +164,6 @@ const ShiftEdit: React.FC = () => {
                                 onChange={handleChange}
                                 disabled
                             />
-
                             <TextInput
                                 label="Shift Name"
                                 name="shiftName"
@@ -244,36 +173,28 @@ const ShiftEdit: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.shiftName}
                             />
-
                             <TimePickerInput
                                 label="Start Time"
                                 name="startTime"
                                 value={formData.startTime}
                                 required
                                 onChange={(val) => {
-                                    setFormData((prev) => ({ ...prev, startTime: val }));
-                                    if (errors.startTime) {
-                                        setErrors((prev) => ({ ...prev, startTime: undefined }));
-                                    }
+                                    setFormData(prev => ({ ...prev, startTime: val }));
+                                    if (errors.startTime) setErrors(prev => ({ ...prev, startTime: undefined }));
                                 }}
                                 error={errors.startTime}
                             />
-
                             <TimePickerInput
                                 label="End Time"
                                 name="endTime"
                                 value={formData.endTime}
                                 required
                                 onChange={(val) => {
-                                    setFormData((prev) => ({ ...prev, endTime: val }));
-                                    if (errors.endTime) {
-                                        setErrors((prev) => ({ ...prev, endTime: undefined }));
-                                    }
+                                    setFormData(prev => ({ ...prev, endTime: val }));
+                                    if (errors.endTime) setErrors(prev => ({ ...prev, endTime: undefined }));
                                 }}
                                 error={errors.endTime}
                             />
-
-                            {/* BUG-SHF-003 fix: min={0} prevents negative values via browser number spinner */}
                             <TextInput
                                 label="Break Duration (mins)"
                                 name="breakDuration"
@@ -284,8 +205,6 @@ const ShiftEdit: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.breakDuration}
                             />
-
-                            {/* BUG-SHF-003 fix: min={0} prevents negative values via browser number spinner */}
                             <TextInput
                                 label="Grace Period (mins)"
                                 name="gracePeriod"
@@ -296,20 +215,21 @@ const ShiftEdit: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.gracePeriod}
                             />
-
-
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
+                        {!isEdit && (
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                variant="secondary"
+                                onClick={() => { setFormData({ ...initialFormState, shiftCode: formData.shiftCode }); setErrors({}); }}
+                                disabled={loading}
+                            />
+                        )}
                         <CustomButton
-                            text="Cancel"
-                            icon={FaEraser}
-                            onClick={() => navigate("/shifts")}
-                            disabled={loading}
-                        />
-                        <CustomButton
-                            text={isSubmitting || loading ? "Saving..." : "Update Shift"}
+                            text={isSubmitting || loading ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update Shift" : "Save Shift")}
                             icon={FaSave}
                             type="submit"
                             disabled={isSubmitting || loading}
@@ -321,4 +241,4 @@ const ShiftEdit: React.FC = () => {
     );
 };
 
-export default ShiftEdit;
+export default ShiftForm;

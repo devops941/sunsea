@@ -393,7 +393,7 @@ model Company {
   logoUrl        String?
   faviconUrl     String?
   addressLine1   String?         @db.VarChar(255)
-  addressLine2   String?         @db.VarChar(255)
+
   city           String?         @db.VarChar(100)
   state          String?         @db.VarChar(100)
   zipcode        String?         @db.VarChar(20)
@@ -2208,6 +2208,7 @@ model EmployeePayrollConfig {
   da             Decimal  @default(0) @db.Decimal(14, 2)
   hra            Decimal  @default(0) @db.Decimal(14, 2)
   otherAllowance Decimal  @default(0) @db.Decimal(14, 2)
+  cashInHand     Decimal  @default(0) @db.Decimal(14, 2)
   dailySalary    Decimal? @db.Decimal(14, 2)
   bankAccount    String?
   ifscCode       String?
@@ -2215,8 +2216,6 @@ model EmployeePayrollConfig {
   pfNumber       String?
   esiNumber      String?
   paymentMode    String   @default("CASH")
-  // Extended compensation — encrypted storage (neutral column names)
-  xc_val_a       String? // encrypted cash salary amount
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2329,10 +2328,7 @@ model PayrollResult {
   hasVariance         Boolean    @default(false)
   varianceNote        String?
   lateEntryDeduction  Decimal    @default(0) @db.Decimal(14, 2)
-  // Extended compensation result — encrypted storage (neutral column names)
-  xr_net              String?
-  xr_gross            String?
-  xr_flag             Boolean    @default(false)
+  cashInHand          Decimal    @default(0) @db.Decimal(14, 2)
   payrollRun          PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee            Employee   @relation(fields: [employeeId], references: [id])
 

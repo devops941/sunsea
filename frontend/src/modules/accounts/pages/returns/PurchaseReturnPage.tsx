@@ -71,7 +71,7 @@ export const PurchaseReturnPage: React.FC = () => {
       setReturns(rData || []);
       const sList = Array.isArray(sRes) ? sRes : sRes?.suppliers || [];
       setSuppliers(sList);
-      const mList = Array.isArray(mRes) ? mRes : [];
+      const mList = Array.isArray(mRes) ? mRes : (mRes?.rawMaterials ?? []);
       setMaterials(mList);
       const stList = Array.isArray(stRes) ? stRes : stRes?.stores || stRes?.data || [];
       setStores(stList);

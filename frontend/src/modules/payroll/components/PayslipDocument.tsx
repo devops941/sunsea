@@ -124,9 +124,11 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
       if (pc.da > 0)             earnRows.push({ label: 'Dearness Allowance (DA)',    amount: Math.round(pc.da     * proration) });
       if (pc.otherAllowance > 0) earnRows.push({ label: 'Other Allowance',    amount: Math.round(pc.otherAllowance * proration) });
       if (result.otPay > 0)      earnRows.push({ label: 'Overtime Pay',       amount: result.otPay });
+      if (result.cashInHand > 0) earnRows.push({ label: 'Cash in Hand',      amount: result.cashInHand });
     } else {
       earnRows.push({ label: 'Daily Wages Earned', amount: result.earnedSalary });
       if (result.otPay > 0) earnRows.push({ label: 'Overtime Pay', amount: result.otPay });
+      if (result.cashInHand > 0) earnRows.push({ label: 'Cash in Hand', amount: result.cashInHand });
     }
 
     // Deduction rows
@@ -146,7 +148,7 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
     const totalDeductions = dedRows.reduce((s, r) => s + r.amount, 0);
 
     // Address for company
-    const addr1 = [company?.addressLine1, company?.addressLine2].filter(Boolean).join(', ');
+    const addr1 = [company?.addressLine1].filter(Boolean).join(', ');
     const addr2 = [company?.city, company?.state, company?.zipcode ? `- ${company.zipcode}` : ''].filter(Boolean).join(', ');
 
     const doj = employee.dateOfJoining

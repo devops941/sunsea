@@ -83,6 +83,7 @@ const AddressForm: React.FC<AddressFormProps> = ({
 
             {/* Country, State & City */}
             <CityStateSelect
+                key={resetKey}
                 countryLabel={countryLabel}
                 stateLabel={stateLabel}
                 cityLabel={cityLabel}
@@ -97,7 +98,6 @@ const AddressForm: React.FC<AddressFormProps> = ({
                 cityError={cityError}
                 required={required}
                 disabled={disabled}
-                resetKey={resetKey}
             />
 
             {/* Pincode */}

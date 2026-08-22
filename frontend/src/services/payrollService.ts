@@ -117,11 +117,7 @@ export interface ApiPayrollResult {
   paymentMode: string;
   hasVariance: boolean;
   varianceNote?: string;
-  additionalComp?: {
-    additionalAmount: number;
-    combinedGross: number;
-    combinedNet: number;
-  };
+  cashInHand: number;
 }
 
 export interface ApiPayrollRun {
@@ -151,10 +147,6 @@ export interface ApiPayrollRun {
   results: ApiPayrollResult[];
 }
 
-export interface ApiExtendedComp {
-  offRecordAmount: number;
-}
-
 export interface ApiSalaryAdvance {
   id: number;
   employeeId: string;
@@ -172,7 +164,6 @@ export interface ApiPayslipData {
     companyName:  string;
     legalName:    string | null;
     addressLine1: string | null;
-    addressLine2: string | null;
     city:         string | null;
     state:        string | null;
     zipcode:      string | null;
@@ -247,6 +238,7 @@ export interface ApiPayslipData {
     otherDeductions:     number;
     totalDeductions:     number;
     netSalary:           number;
+    cashInHand:          number;
     paymentMode:         string;
   };
 }
@@ -355,19 +347,4 @@ export const payrollService = {
   },
 
   // Extended Compensation (Super Admin only)
-  getExtendedConfig: async (employeeId: number): Promise<ApiExtendedComp | null> => {
-    const { data } = await apiClient.get(`${BASE}/employees/${employeeId}/config/extended`);
-    return data.data ?? null;
-  },
-
-  upsertExtendedConfig: async (
-    employeeId: number,
-    payload: { offRecordAmount: number }
-  ): Promise<void> => {
-    await apiClient.put(`${BASE}/employees/${employeeId}/config/extended`, payload);
-  },
-
-  clearExtendedConfig: async (employeeId: number): Promise<void> => {
-    await apiClient.delete(`${BASE}/employees/${employeeId}/config/extended`);
-  },
 };

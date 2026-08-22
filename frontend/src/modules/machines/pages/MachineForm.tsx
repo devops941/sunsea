@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { FaSave, FaEraser } from "react-icons/fa";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-// BUG-MAC fix: removed duplicate Button import (was imported as both CustomButton and Button)
 import CustomButton from "../../../components/ui/Button/Button";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
-import { updateMachine } from "../../../features/machines/machineSlice";
-import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
+import { createMachine, updateMachine } from "../../../features/machines/machineSlice";
 import { machineService } from "../../../services/machineService";
+import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
@@ -34,27 +33,25 @@ const initialFormState = {
     isActive: true,
 };
 
-const MachineEdit: React.FC = () => {
+const MachineForm: React.FC = () => {
     const navigate = useNavigate();
-    const locationState = useLocation();
-    // BUG-MAC fix: read machineId from URL params to support direct URL access / page refresh
-    const { machineId: idParam } = useParams<{ machineId: string }>();
+    const { id } = useParams<{ id: string }>();
+    const isEdit = Boolean(id);
     const dispatch = useAppDispatch();
-    
+
     const [roles, setRoles] = useState<any[]>([]);
     const [inchargeRoleId, setInchargeRoleId] = useState("");
     const [employees, setEmployees] = useState<any[]>([]);
-    
+
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-    // BUG-MAC fix: track API fetch loading state
-    const [fetchingData, setFetchingData] = useState(false);
+    const [loading, setLoading] = useState(isEdit);
 
     const fetchRoles = useCallback(() => {
         machineOperationAssignmentService.getRoles().then(res => {
             const raw = res.data || [];
-            setRoles(raw.filter((r: any) => 
+            setRoles(raw.filter((r: any) =>
                 !r.name?.toLowerCase().includes("super admin") &&
                 !r.name?.toLowerCase().includes("superadmin") &&
                 !r.code?.toLowerCase().includes("super_admin") &&
@@ -71,39 +68,20 @@ const MachineEdit: React.FC = () => {
         }
         machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId))
             .then(res => setEmployees(res.data || []))
-            .catch(err => console.error(err));
+            .catch(() => {});
     }, [inchargeRoleId]);
 
-    // Real-time socket sync for dropdowns
     useSocketSync("role", undefined, fetchRoles);
     useSocketSync("employee", undefined, fetchEmployees);
 
-    useEffect(() => {
-        fetchRoles();
-    }, [fetchRoles]);
+    useEffect(() => { fetchRoles(); }, [fetchRoles]);
+    useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
 
+    // Fetch next ID (create) or load existing machine (edit)
     useEffect(() => {
-        fetchEmployees();
-    }, [fetchEmployees]);
-
-    useEffect(() => {
-        if (locationState.state) {
-            // Happy path: data passed via navigation state
-            const s = locationState.state;
-            setFormData({
-                machineId: s.machineId || "",
-                machineName: s.machineName || "",
-                technologyType: s.technologyType || "",
-                machineType: s.machineType || "",
-                targetTemperature: s.targetTemperature ? String(s.targetTemperature) : "",
-                operatorId: s.operatorId || "",
-                isActive: s.isActive ?? true,
-            });
-        } else if (idParam) {
-            // BUG-MAC fix: no state (direct URL / page refresh) — fetch from API
-            setFetchingData(true);
-            machineService
-                .getById(idParam)
+        if (isEdit && id) {
+            setLoading(true);
+            machineService.getById(id)
                 .then((res: any) => {
                     const s = res?.data || res;
                     setFormData({
@@ -120,28 +98,24 @@ const MachineEdit: React.FC = () => {
                     toast.error("Failed to load machine data.");
                     navigate("/machines");
                 })
-                .finally(() => setFetchingData(false));
+                .finally(() => setLoading(false));
         } else {
-            toast.error("No machine data provided.");
-            navigate("/machines");
+            machineService.fetchNextId()
+                .then((nextId) => setFormData(prev => ({ ...prev, machineId: nextId })))
+                .catch(() => {});
         }
-    }, [locationState.state, idParam, navigate]);
+    }, [isEdit, id, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
-        
         let finalValue: any = value;
         if (type === "checkbox") {
             finalValue = (e.target as HTMLInputElement).checked;
         } else if (name === "isActive") {
             finalValue = value === "true";
         }
-        
         setFormData(prev => ({ ...prev, [name]: finalValue }));
-        
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: "" }));
-        }
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -154,56 +128,74 @@ const MachineEdit: React.FC = () => {
             operatorId: formData.operatorId,
         };
 
+        let hasError = false;
+        let formattedErrors: Record<string, string> = {};
+
+        if (!inchargeRoleId) {
+            formattedErrors["inchargeRoleId"] = "Incharge Role is required";
+            hasError = true;
+        }
+
         try {
             machineSchema.parse(payload);
-            setErrors({});
         } catch (error) {
             if (error instanceof z.ZodError) {
                 const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
-                const formattedErrors: Record<string, string> = {};
                 Object.keys(fieldErrors).forEach((key) => {
                     const message = fieldErrors[key]?.[0];
                     if (message) formattedErrors[key] = message;
                 });
-                setErrors(formattedErrors);
-                return;
+                hasError = true;
             }
         }
 
+        if (hasError) {
+            setErrors(formattedErrors);
+            return;
+        }
+
+        setErrors({});
         setIsSubmitting(true);
         try {
-            await dispatch(updateMachine({
-                id: payload.machineId,
-                data: {
-                    machineName: payload.machineName,
-                    technologyType: payload.technologyType,
-                    machineType: payload.machineType,
-                    targetTemperature: payload.targetTemperature,
-                    operatorId: payload.operatorId,
-                    isActive: payload.isActive
-                }
-            })).unwrap();
-            toast.success("Machine updated successfully!");
+            if (isEdit) {
+                await dispatch(updateMachine({
+                    id: payload.machineId,
+                    data: {
+                        machineName: payload.machineName,
+                        technologyType: payload.technologyType,
+                        machineType: payload.machineType,
+                        targetTemperature: payload.targetTemperature,
+                        operatorId: payload.operatorId,
+                        isActive: payload.isActive,
+                    },
+                })).unwrap();
+                toast.success("Machine updated successfully!");
+            } else {
+                await dispatch(createMachine(payload as any)).unwrap();
+                toast.success("Machine created successfully!");
+            }
             navigate("/machines");
         } catch (err: any) {
-            toast.error(err || "Failed to update machine");
+            toast.error(err || `Failed to ${isEdit ? "update" : "create"} machine`);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    return (
-        // BUG-MAC fix: show spinner while fetching data via API fallback
-        fetchingData ? (
+    if (loading) {
+        return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
             </div>
-        ) : (
+        );
+    }
+
+    return (
         <div className="w-full mx-auto">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
                 <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-ink">Edit Machine</h2>
+                        <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
                         <BackButton text="Back to List" to="/machines" />
                     </div>
                 </div>
@@ -217,6 +209,7 @@ const MachineEdit: React.FC = () => {
                                 value={formData.machineId}
                                 placeholder="e.g. MAC-01"
                                 required
+                                disabled={isEdit}
                                 error={errors.machineId}
                                 onChange={handleChange}
                             />
@@ -263,14 +256,13 @@ const MachineEdit: React.FC = () => {
                                 defaultOptionLabel="Select Type"
                                 options={[
                                     { label: 'Production', value: 'PRODUCTION' },
-                                    { label: 'Utility', value: 'UTILITY' }
+                                    { label: 'Utility', value: 'UTILITY' },
                                 ]}
                                 required
                                 error={errors.machineType}
                                 onChange={handleChange}
                             />
                         </div>
-                        
                         <div>
                             <SelectInput
                                 label="Incharge Role"
@@ -281,7 +273,10 @@ const MachineEdit: React.FC = () => {
                                 onChange={(e) => {
                                     setInchargeRoleId(e.target.value);
                                     setFormData(prev => ({ ...prev, operatorId: "" }));
+                                    if (errors.inchargeRoleId) setErrors(prev => ({ ...prev, inchargeRoleId: "" }));
                                 }}
+                                required
+                                error={errors.inchargeRoleId}
                             />
                         </div>
                         <div>
@@ -289,21 +284,20 @@ const MachineEdit: React.FC = () => {
                                 label="Machine Incharge"
                                 name="operatorId"
                                 value={formData.operatorId}
-                                defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Machine Incharge -- "}
+                                defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Machine Incharge --"}
                                 required
                                 disabled={!inchargeRoleId}
                                 options={employees.map(emp => {
                                     const roleName = emp.user?.role?.name || emp.role?.name;
                                     return {
                                         label: `${emp.fullName} (${emp.empCode})${roleName ? ` - ${roleName}` : ""}`,
-                                        value: emp.id
+                                        value: emp.id,
                                     };
                                 })}
                                 error={errors.operatorId}
                                 onChange={handleChange}
                             />
                         </div>
-                        
                         <div>
                             <TextInput
                                 label="Target Temperature (°C)"
@@ -315,7 +309,6 @@ const MachineEdit: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </div>
-                        
                         <div>
                             <SelectInput
                                 label="Active Status"
@@ -324,9 +317,8 @@ const MachineEdit: React.FC = () => {
                                 defaultOptionLabel="Select Status"
                                 options={[
                                     { label: 'Active', value: 'true' },
-                                    { label: 'Inactive', value: 'false' }
+                                    { label: 'Inactive', value: 'false' },
                                 ]}
-                                required
                                 error={errors.isActive}
                                 onChange={handleChange}
                             />
@@ -334,14 +326,17 @@ const MachineEdit: React.FC = () => {
                     </div>
 
                     <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-line-soft">
+                        {!isEdit && (
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                variant="secondary"
+                                onClick={() => { setFormData(initialFormState); setErrors({}); }}
+                                disabled={isSubmitting}
+                            />
+                        )}
                         <CustomButton
-                            text="Cancel"
-                            icon={FaEraser}
-                            onClick={() => navigate("/machines")}
-                            disabled={isSubmitting}
-                        />
-                        <CustomButton
-                            text={isSubmitting ? "Updating..." : "Update Machine"}
+                            text={isSubmitting ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update Machine" : "Save Machine")}
                             icon={FaSave}
                             type="submit"
                             disabled={isSubmitting}
@@ -350,8 +345,7 @@ const MachineEdit: React.FC = () => {
                 </form>
             </div>
         </div>
-        ) // end ternary: fetchingData ? spinner : form
     );
 };
 
-export default MachineEdit;
+export default MachineForm;

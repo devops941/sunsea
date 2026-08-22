@@ -146,6 +146,7 @@ const InvoiceDetailPage: React.FC = () => {
     // ── Fetch on mount ────────────────────────────────────────────────────────────
     useEffect(() => {
         dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
+        loadSuppliers();
         loadActiveUOMs();
         purchaseOrderService
             .fetchAll({ status: "APPROVED,OPEN,PARTIALLY_RECEIVED" as any })
@@ -272,8 +273,8 @@ const InvoiceDetailPage: React.FC = () => {
     useEffect(() => {
         const fetchRawMaterials = async () => {
             try {
-                const materials = await rawMaterialService.fetchAll();
-                setRawMaterials(materials);
+                const res = await rawMaterialService.fetchAll();
+                setRawMaterials(Array.isArray(res) ? res : (res?.rawMaterials ?? []));
             } catch {
                 toast.error("Failed to load raw materials");
             }
@@ -348,12 +349,14 @@ const InvoiceDetailPage: React.FC = () => {
                     ...prev,
                     supplierId: String(po.supplierId || sup?.id || ""),
                     storeId: String(po.storeId || matchedStore?.storeId || ""),
-                    billingAddressLine1: po.billingAddressLine1 || "",
-                    billingCountry: po.billingCountry || "India",
-                    billingCity: po.billingCity || "",
-                    billingState: po.billingState || "",
-                    billingPincode: po.billingPincode || "",
-                    sameAsBilling: po.sameAsBilling ?? false,
+                    // Billing = Supplier address
+                    billingAddressLine1: fullSupplier?.billingAddressLine1 || sup?.billingAddressLine1 || "",
+                    billingCountry: fullSupplier?.billingCountry || sup?.billingCountry || "India",
+                    billingCity: fullSupplier?.billingCity || sup?.billingCity || "",
+                    billingState: fullSupplier?.billingState || sup?.billingState || "",
+                    billingPincode: fullSupplier?.billingPincode || sup?.billingPincode || "",
+                    sameAsBilling: false,
+                    // Shipping = PO shipping address (your store/delivery address)
                     shippingAddressLine1: po.shippingAddressLine1 || "",
                     shippingCountry: po.shippingCountry || "India",
                     shippingCity: po.shippingCity || "",
@@ -456,18 +459,23 @@ const InvoiceDetailPage: React.FC = () => {
         }
     }, [form.supplierId, form.poId, suppliers]);
 
-    // ── When store selected manually → clear shipping fields ──────────────────────
+    // ── When store selected manually → auto-fill shipping from store address ──────
     useEffect(() => {
-        if (form.poId) return;
+        if (form.poId || !form.storeId) return;
+        const selectedStore = (stores || []).find((s: any) => s.storeId === form.storeId);
+        let addr: any = null;
+        if (selectedStore?.locationDesc) {
+            try { addr = JSON.parse(selectedStore.locationDesc); } catch { /* not JSON */ }
+        }
         setForm((prev) => ({
             ...prev,
-            shippingAddressLine1: "",
-            shippingCity: "",
-            shippingState: "",
-            shippingPincode: "",
-            shippingCountry: "India",
+            shippingAddressLine1: addr?.addressLine || company?.addressLine1 || "",
+            shippingCity: addr?.city || company?.city || "",
+            shippingState: addr?.state || company?.state || "",
+            shippingPincode: addr?.zipcode || company?.zipcode || "",
+            shippingCountry: addr?.country || company?.country || "India",
         }));
-    }, [form.storeId, form.poId, stores]);
+    }, [form.storeId, form.poId, stores, company]);
 
     // ── Same as billing sync effect ──────────────────────────────────────────────
     useEffect(() => {
@@ -960,7 +968,6 @@ const InvoiceDetailPage: React.FC = () => {
                                 pincodeValue={form.billingPincode}
                                 onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))}
                                 pincodeError={errors.billingPincode}
-                                disabled={isPOSelected || isEditMode}
                                 required
                             />
                         </div>
@@ -987,7 +994,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))}
                                 pincodeError={errors.shippingPincode}
                                 required={!form.sameAsBilling}
-                                disabled={isPOSelected || form.sameAsBilling || isEditMode}
+                                disabled={form.sameAsBilling}
                             />
                         </div>
                     </div>

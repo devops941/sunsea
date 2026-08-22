@@ -39,7 +39,6 @@ const PayrollDashboard: React.FC = () => {
   const canEditRun        = can("payroll-run.edit");
   const canDeleteRun      = can("payroll-run.delete");
   const canViewRun        = can("payroll-run.view");
-  const canViewCashInHand = can("payroll-extended-comp.view");
 
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth);
   const [runs,          setRuns]          = useState<ApiPayrollRun[]>([]);
@@ -131,24 +130,6 @@ const PayrollDashboard: React.FC = () => {
       align: 'right' as const,
       render: (r: ApiPayrollRun) => {
         const netSal = Number(r.totalNetSalary || 0);
-        const addlComp = Number(r.totalAdditionalComp || 0);
-        const combNet = Number(r.totalCombinedNet || (netSal + addlComp));
-
-        if (canViewCashInHand && addlComp > 0) {
-          return (
-            <div className="flex flex-col items-end">
-              <span className="font-mono font-bold text-ink">
-                {fmtRs(combNet)}
-              </span>
-              <span className="text-[10px] font-semibold text-accent bg-accent/15 border border-accent/20 px-1.5 py-0.5 rounded flex items-center gap-1">
-                <span>Net: {fmtRs(netSal)}</span>
-                <span>+</span>
-                <span>Cash: {fmtRs(addlComp)}</span>
-              </span>
-            </div>
-          );
-        }
-
         return (
           <span className="font-mono font-semibold text-ink">
             {netSal > 0 ? fmtRs(netSal) : '—'}

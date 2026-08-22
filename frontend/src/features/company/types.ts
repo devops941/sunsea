@@ -33,7 +33,6 @@ export interface Company {
   logoUrl?: string | null;
   faviconUrl?: string | null;
   addressLine1?: string | null;
-  addressLine2?: string | null;
   city?: string | null;
   state?: string | null;
   zipcode?: string | null;
@@ -59,7 +58,6 @@ export interface UpdateCompanyDto {
   logoUrl?: string | null;
   faviconUrl?: string | null;
   addressLine1?: string | null;
-  addressLine2?: string | null;
   city?: string | null;
   state?: string | null;
   zipcode?: string | null;

@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.middleware';
-import { requirePermission } from '../../middleware/permission.middleware';
 import { validateMiddleware } from '../../middleware/validate.middleware';
 import { payrollController } from './payroll.controller';
 import {
   updatePayrollConfigSchema,
   upsertEmployeePayrollSchema,
-  upsertExtendedCompSchema,
   bulkUpsertAttendanceSchema,
   getAttendanceSchema,
   createPayrollRunSchema,
@@ -28,12 +26,6 @@ router.put  ('/config',         validateMiddleware(updatePayrollConfigSchema),  
 router.get  ('/employees',                                                       payrollController.listEmployees);
 router.get  ('/employees/:employeeId/config',                                    payrollController.getEmployeeConfig);
 router.put  ('/employees/:employeeId/config', validateMiddleware(upsertEmployeePayrollSchema), payrollController.upsertEmployeeConfig);
-
-// ─── Extended Compensation (Super Admin or Extended Comp permission) ──────────
-// These routes must be registered before any wildcard :employeeId/config routes.
-router.get   ('/employees/:employeeId/config/extended', requirePermission('payroll-extended-comp.view'), payrollController.getExtendedConfig);
-router.put   ('/employees/:employeeId/config/extended', requirePermission('payroll-extended-comp.view'), validateMiddleware(upsertExtendedCompSchema), payrollController.upsertExtendedConfig);
-router.delete('/employees/:employeeId/config/extended', requirePermission('payroll-extended-comp.view'), payrollController.clearExtendedConfig);
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
 router.get  ('/attendance',     validateMiddleware(getAttendanceSchema),          payrollController.getAttendance);
