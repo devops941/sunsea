@@ -41,7 +41,7 @@ const PoInvoicePage: React.FC = () => {
         ])
             .then(([poData, materials]) => {
                 setPo(poData);
-                setRawMaterials(materials || []);
+                setRawMaterials(Array.isArray(materials) ? materials : (materials?.rawMaterials ?? []));
             })
             .catch(() => {
                 toast.error("Failed to load Purchase Order details");
@@ -205,7 +205,6 @@ const PoInvoicePage: React.FC = () => {
                         </h2>
                     </div>
                     <div className="flex items-center gap-3">
-                        <CustomButton text="Send WhatsApp" icon={FaWhatsapp} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none" onClick={handleSendWhatsapp} />
                         <CustomButton text="Print" icon={FaPrint} variant="primary" onClick={() => window.print()} />
                         <CustomButton text="Download PDF" icon={FaDownload} variant="secondary" onClick={handleDownloadPdf} />
                     </div>

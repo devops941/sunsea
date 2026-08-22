@@ -52,7 +52,7 @@ const ProductionOrderList: React.FC = () => {
     const fetchRawMaterials = useCallback(async () => {
         try {
             const data = await rawMaterialService.fetchAll();
-            const arr = Array.isArray(data) ? data : (data as any)?.data || [];
+            const arr = Array.isArray(data) ? data : ((data as any)?.rawMaterials ?? []);
             const map = new Map<string, any>();
             arr.forEach((rm: any) => map.set(rm.rawMaterialId?.toString(), rm));
             setRawMaterialsMap(map);

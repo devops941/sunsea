@@ -58,13 +58,11 @@ const WastageStoreForm = lazy(() => import("../modules/wastage-store/pages/Wasta
 // HR & ORGANIZATION
 // ===========================================================================
 const EmployeeList = lazy(() => import("../modules/employee/pages/EmployeeList"));
-const EmployeeCreatePage = lazy(() => import("../modules/employee/pages/EmployeeCreate"));
-const EmployeeEdit = lazy(() => import("../modules/employee/pages/EmployeeEdit"));
+const EmployeeForm = lazy(() => import("../modules/employee/pages/EmployeeForm"));
 const EmployeeViewPage = lazy(() => import("../modules/employee/pages/EmployeeViewPage"));
 
 const ShiftList = lazy(() => import("../modules/shifts/pages/ShiftList"));
-const ShiftCreate = lazy(() => import("../modules/shifts/pages/ShiftCreate"));
-const ShiftEdit = lazy(() => import("../modules/shifts/pages/ShiftEdit"));
+const ShiftForm = lazy(() => import("../modules/shifts/pages/ShiftForm"));
 
 const MachineList = lazy(() => import("../modules/machines/pages/MachineList"));
 const SupplierFormPage = lazy(() => import("../modules/supplier/pages/SupplierForm"));
@@ -90,8 +88,7 @@ const ProductForm = lazy(() => import("../modules/product/pages/ProductForm"));
 
 
 // New modules
-const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
-const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
+const MachineForm = lazy(() => import("../modules/machines/pages/MachineForm"));
 const MachineAssignmentList = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentList"));
 const MachineAssignmentForm = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentForm"));
 
@@ -484,13 +481,13 @@ const AppRoutes = () => {
 
             {/* ---------- Employees ---------- */}
             <Route element={<ProtectedRoute permission="employees.create" />}>
-              <Route path="/employees/create" element={<EmployeeCreatePage />} />
+              <Route path="/employees/create" element={<EmployeeForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="employees.view" />}>
               <Route path="/employees/view/:id" element={<EmployeeViewPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="employees.edit" />}>
-              <Route path="/employees/edit/:id" element={<EmployeeEdit />} />
+              <Route path="/employees/edit/:id" element={<EmployeeForm />} />
             </Route>
 
             {/* ---------- Products ---------- */}
@@ -517,18 +514,18 @@ const AppRoutes = () => {
 
             {/* ---------- Machines & Shifts ---------- */}
             <Route element={<ProtectedRoute permission="machines.create" />}>
-              <Route path="/machines/create" element={<MachineCreate />} />
+              <Route path="/machines/create" element={<MachineForm />} />
               <Route path="/machines/assignments/create" element={<MachineAssignmentForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="machines.edit" />}>
-              <Route path="/machines/edit/:id" element={<MachineEdit />} />
+              <Route path="/machines/edit/:id" element={<MachineForm />} />
               <Route path="/machines/assignments/edit/:id" element={<MachineAssignmentForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="shifts.create" />}>
-              <Route path="/shifts/create" element={<ShiftCreate />} />
+              <Route path="/shifts/create" element={<ShiftForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="shifts.edit" />}>
-              <Route path="/shifts/edit/:id" element={<ShiftEdit />} />
+              <Route path="/shifts/edit/:id" element={<ShiftForm />} />
             </Route>
 
             {/* ---------- Inventory ---------- */}

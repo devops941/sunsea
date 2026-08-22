@@ -62,7 +62,6 @@ const STATUS_COLOR: Record<string, string> = {
 const WeeklyPayrollReport: React.FC = () => {
   const { can } = usePermission();
   const canViewRun        = can("payroll-run.view");
-  const canViewCashInHand = can("payroll-extended-comp.view");
   const { socket }              = useSocket();
   const [selectedYear, setSelectedYear]   = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
@@ -230,8 +229,7 @@ const WeeklyPayrollReport: React.FC = () => {
     { earnedSalary: 0, otPay: 0, salaryAdvance: 0, permissionDeduction: 0, netSalary: 0, presentDays: 0, absentDays: 0, halfDays: 0 }
   );
 
-  const totalAdditionalComp = run?.totalAdditionalComp || allResults.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
-  const totalCombinedNet = run?.totalCombinedNet || (totals.netSalary + totalAdditionalComp);
+  const totalCashInHand = allResults.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
   const varianceCount = filtered.filter((r) => r.hasVariance).length;
 
@@ -342,10 +340,7 @@ const WeeklyPayrollReport: React.FC = () => {
     { header: 'Advance (₹)',         accessor: (r: typeof csvData[0]) => r.salaryAdvance },
     { header: 'Perm. Deduction (₹)', accessor: (r: typeof csvData[0]) => r.permissionDeduction },
     { header: 'Net Salary (₹)',      accessor: (r: typeof csvData[0]) => r.netSalary },
-    ...(canViewCashInHand ? [
-      { header: 'Cash in Hand (₹)',  accessor: (r: typeof csvData[0]) => r.additionalComp?.additionalAmount || 0 },
-      { header: 'Combined Net (₹)',  accessor: (r: typeof csvData[0]) => r.additionalComp?.combinedNet || r.netSalary },
-    ] : []),
+    { header: 'Cash in Hand (₹)',   accessor: (r: typeof csvData[0]) => r.cashInHand || 0 },
     { header: 'Payment Mode',        accessor: (r: typeof csvData[0]) => r.paymentMode },
   ];
 
@@ -436,17 +431,16 @@ const WeeklyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: canViewCashInHand ? 'COMBINED NET (₹)' : 'NET SALARY (₹)',
+      header: 'NET SALARY (₹)',
       align: 'right',
       render: (r) => {
-        const hasAddl = canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0;
-        const combNet = hasAddl ? r.additionalComp!.combinedNet : r.netSalary;
+        const cashAmt = Number(r.cashInHand || 0);
         return (
           <div className="flex flex-col items-end">
-            <span className="font-mono font-bold text-text-primary">₹{fmt(Number(combNet))}</span>
-            {hasAddl && (
+            <span className="font-mono font-bold text-text-primary">₹{fmt(Number(r.netSalary))}</span>
+            {cashAmt > 0 && (
               <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
-                Net ₹{fmt(Number(r.netSalary))} + Cash ₹{fmt(Number(r.additionalComp!.additionalAmount))}
+                Cash in Hand ₹{fmt(cashAmt)}
               </span>
             )}
           </div>
@@ -690,11 +684,11 @@ const WeeklyPayrollReport: React.FC = () => {
                 </span>
               </div>
 
-              {canViewCashInHand && (
+              {totalCashInHand > 0 && (
                 <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50/70 flex-1 xl:flex-none">
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
                   <span className="font-mono text-lg font-black text-indigo-700">
-                    ₹{fmt(totalAdditionalComp)}
+                    ₹{fmt(totalCashInHand)}
                   </span>
                 </div>
               )}
@@ -722,10 +716,10 @@ const WeeklyPayrollReport: React.FC = () => {
             value: `₹${fmt(totals.netSalary)}`,
             color: 'text-primary font-bold',
           },
-          ...(canViewCashInHand && totalAdditionalComp > 0 ? [
+          ...(totalCashInHand > 0 ? [
             {
-              label: 'Cash in Hand (Confidential)',
-              value: `₹${fmt(totalAdditionalComp)}`,
+              label: 'Cash in Hand',
+              value: `₹${fmt(totalCashInHand)}`,
               color: 'text-indigo-700 font-bold',
             }
           ] : []),

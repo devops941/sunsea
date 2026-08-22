@@ -124,7 +124,8 @@ const UpComingOrderDetailPage: React.FC = () => {
             try {
                 const materials = await rawMaterialService.fetchAll();
                 if (!mounted) return;
-                setRawMaterials(materials ?? []);
+                const materialsList = Array.isArray(materials) ? materials : (materials?.rawMaterials ?? []);
+                setRawMaterials(materialsList);
                 if (location.state) {
                     setFormData(mapPOToFormData(location.state));
                 } else if (id) {

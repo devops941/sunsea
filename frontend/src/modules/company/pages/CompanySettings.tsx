@@ -59,7 +59,6 @@ const CompanySettings: React.FC = () => {
         logoUrl: company.logoUrl || "",
         faviconUrl: company.faviconUrl || "",
         addressLine1: company.addressLine1 || "",
-        addressLine2: company.addressLine2 || "",
         city: company.city || "",
         state: company.state || "",
         zipcode: company.zipcode || "",
@@ -225,9 +224,6 @@ const CompanySettings: React.FC = () => {
                   <div>
                     <TextInput label="Address Line 1" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Enter Address Line 1" required error={errors.addressLine1} />
                   </div>
-                  <div>
-                    <TextInput label="Address Line 2" name="addressLine2" value={formData.addressLine2 || ""} onChange={handleChange} placeholder="Enter Address Line 2" error={errors.addressLine2} />
-                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                   <div className="lg:col-span-3">
@@ -346,9 +342,6 @@ const CompanySettings: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <TextInput label="Address Line 1" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Enter Address Line 1" required error={errors.addressLine1} />
-              </div>
-              <div>
-                <TextInput label="Address Line 2" name="addressLine2" value={formData.addressLine2 || ""} onChange={handleChange} placeholder="Enter Address Line 2" error={errors.addressLine2} />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">

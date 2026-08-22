@@ -164,8 +164,7 @@ const DailyProductionPlanningPage: React.FC = () => {
     rawMaterialService.fetchAll()
       .then((res) => {
         const map = new Map();
-        const list = Array.isArray(res) ? res : (res as any).data || [];
-        const dataList = Array.isArray(list) ? list : ((list as any).data || []);
+        const dataList = Array.isArray(res) ? res : ((res as any)?.rawMaterials ?? []);
         dataList.forEach((rm: any) => { map.set(rm.rawMaterialId?.toString(), rm); });
         setRawMaterialsMap(map);
       })

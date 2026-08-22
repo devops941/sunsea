@@ -7,7 +7,6 @@ import {
   FaLock, FaClipboardList, FaArrowLeft, FaEdit,
 } from "react-icons/fa";
 import { employeeService } from "../../../services/employeeService";
-import { payrollService, type ApiExtendedComp } from "../../../services/payrollService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import { usePermission } from "../../../hooks/usePermission";
 import { usePayrollConfig } from "../../../hooks/usePayrollConfig";
@@ -334,18 +333,16 @@ function PayrollSection({ employee, payrollConfig }: { employee: any; payrollCon
   );
 }
 
-// ─── Total Compensation Summary (Super Admin only) ────────────────────────────
+// ─── Total Compensation Summary ──────────────────────────────────────────────
 
 function TotalCompSummarySection({
   employee,
-  extComp,
 }: {
   employee: any;
-  extComp: ApiExtendedComp;
 }) {
   const onRecordGross  = Number(employee.grossSalary || employee.monthlySalary || 0);
-  const additionalComp = Number(extComp.offRecordAmount || 0);
-  const totalCTC       = onRecordGross + additionalComp;
+  const cashInHand     = Number(employee.payrollConfig?.cashInHand || 0);
+  const totalCTC       = onRecordGross + cashInHand;
 
   return (
     <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-white to-blue-50/60 shadow-sm overflow-hidden mt-6">
@@ -353,12 +350,9 @@ function TotalCompSummarySection({
       <div className="flex items-center gap-2 px-5 py-3.5 bg-indigo-600 text-white">
         <FaMoneyBillWave size={15} />
         <span className="text-xs font-bold uppercase tracking-wider">Total Compensation Summary</span>
-        <FaLock className="text-indigo-200 ml-auto" size={12} />
-        <span className="text-[10px] font-semibold bg-indigo-800/40 text-indigo-100 px-2.5 py-0.5 rounded-full">Super Admin</span>
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Summary cards: On-Record, Additional, Total CTC */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col gap-1">
             <span className="text-xs font-medium text-slate-500">Net Pay (Monthly)</span>
@@ -366,7 +360,7 @@ function TotalCompSummarySection({
           </div>
           <div className="p-4 rounded-xl bg-white border border-indigo-200 shadow-xs flex flex-col gap-1">
             <span className="text-xs font-medium text-indigo-600">Cash in Hand</span>
-            <span className="text-lg font-bold text-indigo-700 tabular-nums">{formatINR(additionalComp)}</span>
+            <span className="text-lg font-bold text-indigo-700 tabular-nums">{formatINR(cashInHand)}</span>
           </div>
           <div className="p-4 rounded-xl bg-indigo-600 text-white shadow-xs flex flex-col gap-1">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">Total Monthly CTC</span>
@@ -374,9 +368,8 @@ function TotalCompSummarySection({
           </div>
         </div>
 
-        {/* Formula note */}
         <p className="text-xs text-slate-400 text-center italic">
-          Net Pay ({formatINR(onRecordGross)}) + Cash ({formatINR(additionalComp)}) = {formatINR(totalCTC)}
+          Net Pay ({formatINR(onRecordGross)}) + Cash in Hand ({formatINR(cashInHand)}) = {formatINR(totalCTC)}
         </p>
       </div>
     </div>
@@ -390,12 +383,9 @@ export default function EmployeeViewPage() {
   const navigate = useNavigate();
   const { can } = usePermission();
   const canEdit           = can("employees.edit");
-  const canViewCashInHand = can("payroll-extended-comp.view");
-
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
-  const [extComp, setExtComp] = useState<ApiExtendedComp | null>(null);
 
   // Company payroll settings — drives all salary derivations
   const { config: payrollConfig } = usePayrollConfig();
@@ -411,14 +401,6 @@ export default function EmployeeViewPage() {
       })
       .finally(() => setLoading(false));
   }, [id]);
-
-  // Fetch extended comp — cash-in-hand permission, silent on error
-  useEffect(() => {
-    if (!canViewCashInHand || !id) return;
-    payrollService.getExtendedConfig(Number(id))
-      .then(setExtComp)
-      .catch(() => setExtComp(null));
-  }, [canViewCashInHand, id]);
 
   if (loading) {
     return (
@@ -587,9 +569,9 @@ export default function EmployeeViewPage() {
       {/* 9. Payroll */}
       <PayrollSection employee={employee} payrollConfig={payrollConfig} />
 
-      {/* 9b. Total Compensation — Cash-in-Hand permission required */}
-      {canViewCashInHand && extComp && (
-        <TotalCompSummarySection employee={employee} extComp={extComp} />
+      {/* 9b. Total Compensation Summary */}
+      {Number(employee.payrollConfig?.cashInHand || 0) > 0 && (
+        <TotalCompSummarySection employee={employee} />
       )}
 
       {/* 10. Login Account */}

@@ -1,8 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
 import { getIO } from '../../socket/socket';
-import { encryptField, decryptField } from '../../utils/fieldEncryption';
-import { ENC_FIELDS } from '../../constants/encryptedFields';
 
 /** Convert a period string (YYYY-MM or YYYY-Www) to a date range { start, end } in YYYY-MM-DD */
 function periodToDateRange(period: string): { start: string; end: string } {
@@ -85,12 +83,10 @@ interface PayrollSettings {
   employeePfPercent: number;
   employerPfPercent: number;
   maxPfWage: number;
-  pfRoundingRule: string;
   esiEnabled: boolean;
   employeeEsiPercent: number;
   employerEsiPercent: number;
   maxEsiSalary: number;
-  esiRoundingRule: string;
   paidLeavePerYear: number;
   lateEntryGraceMinutes: number;
   lateEntrySlabs: Array<{ fromMinutes: number; toMinutes: number; amount: number }>;
@@ -103,8 +99,6 @@ interface PayrollSettings {
   }>;
   professionalTaxEnabled: boolean;
   professionalTaxAmount: number;
-  roundingRule: string;
-  decimalPrecision: number;
 }
 
 interface EmployeePayrollData {
@@ -131,12 +125,8 @@ interface EmployeePayrollData {
 
 // ─── Payroll Engine (server-side) ─────────────────────────────────────────────
 
-function applyRounding(value: number, rule: string): number {
-  switch (rule) {
-    case 'FLOOR': return Math.floor(value);
-    case 'CEILING': return Math.ceil(value);
-    default: return Math.round(value);
-  }
+function applyRounding(value: number): number {
+  return Math.ceil(value / 10) * 10;
 }
 
 // toMinutes = 0 means "and above" (open-ended upper bound)
@@ -147,33 +137,18 @@ function lookupSlab(minutes: number, slabs: Array<{ fromMinutes: number; toMinut
   return 0;
 }
 
-/**
- * Apply a permission slab rule for the given permission minutes.
- * Returns an object describing what adjustments to make:
- *  - deductionAmount: fixed ₹ deduction (for DEDUCT_AMOUNT action)
- *  - addHalfDay: true = add 0.5 to halfDays, subtract 0.5 from presentDays
- *  - addOtHours: number of OT hours to add (for HALF_DAY_PLUS_OT)
- */
+/** Apply a permission slab rule — returns the fixed ₹ deduction amount. */
 function applyPermissionSlab(
   permissionMinutes: number,
-  slabs: Array<{ fromMinutes: number; toMinutes: number; amount: number; action?: string; otHours?: number }>
-): { deductionAmount: number; addHalfDay: boolean; addOtHours: number } {
-  if (permissionMinutes <= 0) return { deductionAmount: 0, addHalfDay: false, addOtHours: 0 };
-
+  slabs: Array<{ fromMinutes: number; toMinutes: number; amount: number }>
+): number {
+  if (permissionMinutes <= 0) return 0;
   for (const slab of slabs) {
     if (permissionMinutes >= slab.fromMinutes && (slab.toMinutes === 0 || permissionMinutes <= slab.toMinutes)) {
-      const action = slab.action ?? 'DEDUCT_AMOUNT';
-      if (action === 'HALF_DAY') {
-        return { deductionAmount: 0, addHalfDay: true, addOtHours: 0 };
-      } else if (action === 'HALF_DAY_PLUS_OT') {
-        return { deductionAmount: 0, addHalfDay: true, addOtHours: Number(slab.otHours ?? 0) };
-      } else {
-        // DEDUCT_AMOUNT (default)
-        return { deductionAmount: slab.amount, addHalfDay: false, addOtHours: 0 };
-      }
+      return slab.amount;
     }
   }
-  return { deductionAmount: 0, addHalfDay: false, addOtHours: 0 };
+  return 0;
 }
 
 function getFirstNonEmptyString(...values: Array<string | null | undefined>): string | null {
@@ -262,82 +237,45 @@ function computeResult(
   const dailySalaryStored = pc.dailySalary ? Number(pc.dailySalary) : 0; // stored per-day field (fallback only)
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 1 — Daily Rate
-  //
-  // Business rule: daily rate is ALWAYS derived from Monthly Gross ÷ Working Days
-  // (configured in settings as fixedDays, default 26).
-  //
-  // For DAILY_WEEKLY employees:
-  //   • Primary: monthlySalary / fixedDays  (e.g. ₹20,000 / 26 = ₹769.23)
-  //   • Fallback: dailySalaryStored (pure per-diem workers with no monthly equivalent)
-  //
-  // For monthly salary types (MONTHLY_BY_CALENDAR): use calendar days of that month.
+  // STEP 1 — Daily Rate  (always Monthly ÷ Calendar Days)
   // ─────────────────────────────────────────────────────────────────────────────
-  const workingDaysPerMonth = settings.fixedDays > 0 ? settings.fixedDays : 26;
-  // For MONTHLY_BY_CALENDAR formula we need the actual month's days (Aug=31, Sep=30).
-  // In weekly runs calendarDays=7, so we use the separately computed monthCalendarDays.
   const calDaysForFormula = monthCalendarDays > 0 ? monthCalendarDays : calendarDays;
   let dailyRate = 0;
-
-  let formulaDivisor = 1;
+  let formulaDivisor = calDaysForFormula > 0 ? calDaysForFormula : 30;
 
   const st = String(salaryType).toUpperCase();
   if (st === 'DAILY_WEEKLY' || st === 'DAILY') {
-    if (settings.dailySalaryFormula === 'FIXED_DAILY' || monthlySalary === 0) {
-      // Pure per-diem: use the stored per-day rate directly
-      dailyRate = dailySalaryStored || monthlySalary;
+    if (monthlySalary === 0) {
+      dailyRate = dailySalaryStored || 0;
       formulaDivisor = 1;
     } else if (runType === 'WEEKLY') {
-      // Weekly run: divide weekly base salary by 6 working days
       formulaDivisor = 6;
       dailyRate = monthlySalary / formulaDivisor;
-    } else if (settings.dailySalaryFormula === 'MONTHLY_BY_CALENDAR') {
-      // Monthly ÷ Calendar Days: Aug=31, Sep=30, etc.
-      formulaDivisor = calDaysForFormula > 0 ? calDaysForFormula : 30;
-      dailyRate = monthlySalary / formulaDivisor;
     } else {
-      // MONTHLY_BY_WORKING (default): Monthly ÷ Fixed Working Days (e.g. 26)
-      formulaDivisor = workingDaysPerMonth;
       dailyRate = monthlySalary / formulaDivisor;
     }
   } else if (st === 'WEEKLY') {
-    // For weekly salary, monthlySalary field stores the weekly gross salary (e.g. 5000)
-    // The daily rate is the weekly amount ÷ 6 working days.
     formulaDivisor = 6;
     dailyRate = monthlySalary / formulaDivisor;
   } else {
     // Fixed / PF / Cash monthly employees
-    if (settings.dailySalaryFormula === 'MONTHLY_BY_CALENDAR') {
-      formulaDivisor = calDaysForFormula > 0 ? calDaysForFormula : 30;
-      dailyRate = monthlySalary / formulaDivisor;
-    } else {
-      formulaDivisor = workingDaysPerMonth;
-      dailyRate = monthlySalary / formulaDivisor;
-    }
+    dailyRate = monthlySalary / formulaDivisor;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 1b — Permission Slab Pre-evaluation
   // Evaluate the permission slab BEFORE computing payable days so that
-  // HALF_DAY and HALF_DAY_PLUS_OT actions can adjust presentDays/halfDays.
   // ─────────────────────────────────────────────────────────────────────────────
   let permSlabDeduction = 0;
-  let permSlabAddHalfDay = false;
-  let permSlabAddOtHours = 0;
   if (att.permissionMinutes > 0 && settings.permissionSlabs?.length > 0) {
-    const ps = applyPermissionSlab(att.permissionMinutes, settings.permissionSlabs);
-    permSlabDeduction = ps.deductionAmount;
-    permSlabAddHalfDay = ps.addHalfDay;
-    permSlabAddOtHours = ps.addOtHours;
+    permSlabDeduction = applyPermissionSlab(att.permissionMinutes, settings.permissionSlabs);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 2 — Payable Days & LOP
-  // If a permission slab fires addHalfDay, convert one present day → half day.
   // ─────────────────────────────────────────────────────────────────────────────
-  const extraHalfDays = permSlabAddHalfDay ? 1 : 0;  // slab-triggered half days
-  const presentDays = att.presentDays - extraHalfDays * 0.5 + att.halfDays * 0.5; // adjusted
-  const lopDays = att.absentDays + att.halfDays * 0.5 + extraHalfDays * 0.5; // adjusted
+  const presentDays = att.presentDays + att.halfDays * 0.5;
+  const lopDays = att.absentDays + att.halfDays * 0.5;
   const totalDays = calendarDays;
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -368,44 +306,15 @@ function computeResult(
   earnedSalary = Math.max(0, earnedSalary);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 4 — OT Pay
-  //
-  // Use the OT method configured in Payroll Settings — no special override per
-  // salary type.  The user configures what is correct for their business:
-  //   HOURLY_RATE      → otHours × otRatePerHour          (e.g. 1.5 × ₹40 = ₹60)
-  //   PERCENTAGE_DAILY → (dailyRate / workingHrs) × otHrs × multiplier
-  //   SLAB             → lookup fixed amounts by OT minutes
+  // STEP 4 — OT Pay  (otHours × ratePerHour)
   // ─────────────────────────────────────────────────────────────────────────────
-  const otEnabled = settings.otEnabled !== false; // treat null/undefined as enabled
+  const otEnabled = settings.otEnabled !== false;
   let otPay = 0;
   let otH = 0;
-  // Total OT hours = recorded OT hours + auto-added OT from permission slab (HALF_DAY_PLUS_OT)
-  const effectiveOtHours = att.otHours + permSlabAddOtHours;
-  if (otEnabled && effectiveOtHours > 0) {
-    const maxOtPerDay = settings.maxOtHoursPerDay > 0 ? settings.maxOtHoursPerDay : 99;
-    const maxOtPerWeek = settings.maxOtHoursPerWeek > 0 ? settings.maxOtHoursPerWeek : 99;
-    // Cap at per-day limit × paid days, then further cap at the weekly ceiling
-    otH = Math.min(
-      effectiveOtHours,
-      maxOtPerDay * (att.presentDays || 1),
-      maxOtPerWeek * Math.ceil((att.presentDays || 1) / 5),  // weeks in period
-    );
-    const workingHours = settings.defaultWorkingHoursPerDay > 0 ? settings.defaultWorkingHoursPerDay : 8;
-    const otMultiplier = settings.weekdayOtMultiplier > 0 ? settings.weekdayOtMultiplier : 1.5;
-
-    if (settings.otMethod === 'HOURLY_RATE' && settings.otRatePerHour > 0) {
-      // Flat rate per OT hour × actual capped OT hours (e.g. ₹40/hr × 20hr = ₹800)
-      otPay = otH * settings.otRatePerHour;
-    } else if (settings.otMethod === 'FIXED_AMOUNT' && settings.otRatePerHour > 0) {
-      // Single fixed allowance paid whenever any OT is recorded in the period (e.g. ₹500 flat)
-      otPay = settings.otRatePerHour;
-    } else if (settings.otMethod === 'SLAB' && settings.otSlabs?.length > 0) {
-      otPay = lookupSlab(Math.round(otH * 60), settings.otSlabs);
-    } else {
-      // PERCENTAGE_DAILY (default): derive hourly rate from daily salary, apply OT multiplier
-      // e.g. dailyRate=1000, 8hr/day → ₹125/hr × 1.5 × 3hr = ₹562.50
-      otPay = (dailyRate / workingHours) * otH * otMultiplier;
-    }
+  const effectiveOtHours = att.otHours;
+  if (otEnabled && effectiveOtHours > 0 && settings.otRatePerHour > 0) {
+    otH = effectiveOtHours;
+    otPay = otH * settings.otRatePerHour;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -427,8 +336,8 @@ function computeResult(
     pfWage = Math.min(baseWage, maxPfCap);
     const empPfRate = Number(settings.employeePfPercent) > 0 ? Number(settings.employeePfPercent) : 12;
     const emrPfRate = Number(settings.employerPfPercent) > 0 ? Number(settings.employerPfPercent) : 12;
-    employeePf = applyRounding(pfWage * empPfRate / 100, settings.pfRoundingRule);
-    employerPf = applyRounding(pfWage * emrPfRate / 100, settings.pfRoundingRule);
+    employeePf = Math.round(pfWage * empPfRate / 100);
+    employerPf = Math.round(pfWage * emrPfRate / 100);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -442,8 +351,8 @@ function computeResult(
   if (hasEsi) {
     const empEsiRate = Number(settings.employeeEsiPercent) > 0 ? Number(settings.employeeEsiPercent) : 0.75;
     const emrEsiRate = Number(settings.employerEsiPercent) > 0 ? Number(settings.employerEsiPercent) : 3.25;
-    employeeEsi = applyRounding(grossSalary * empEsiRate / 100, settings.esiRoundingRule);
-    employerEsi = applyRounding(grossSalary * emrEsiRate / 100, settings.esiRoundingRule);
+    employeeEsi = Math.round(grossSalary * empEsiRate / 100);
+    employerEsi = Math.round(grossSalary * emrEsiRate / 100);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -518,8 +427,7 @@ function computeResult(
   // For MONTHLY runs: clamp at 0 (excess advance carries forward to next period).
   const rawNet = grossSalary - totalDeductions;
   const netSalary = applyRounding(
-    runType === 'WEEKLY' ? rawNet : Math.max(0, rawNet),
-    settings.roundingRule
+    runType === 'WEEKLY' ? rawNet : Math.max(0, rawNet)
   );
 
   // ─ Variance detection (>20% deviation vs monthly salary for cash workers) ─
@@ -535,31 +443,10 @@ function computeResult(
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 10 — Extended / Additional Compensation (Super Admin Confidential)
+  // STEP 10 — Cash in Hand (added directly without LOP deductions)
   // ─────────────────────────────────────────────────────────────────────────────
-  let xr_net: string | null = null;
-  let xr_gross: string | null = null;
-  let xr_flag = false;
-
-  const encCompAmount: string | undefined | null = (pc as any)[ENC_FIELDS.CONFIG_AMOUNT];
-  if (encCompAmount && typeof encCompAmount === 'string') {
-    try {
-      const offRecordMonthly = Number(decryptField(encCompAmount));
-      if (!isNaN(offRecordMonthly) && offRecordMonthly > 0) {
-        // As requested: Additional Compensation should be added directly without LOP deductions
-        let earnedAdditional: number = offRecordMonthly;
-
-        const combinedGross = grossSalary + earnedAdditional;
-        const combinedNet = netSalary + earnedAdditional;
-
-        xr_gross = encryptField(combinedGross.toFixed(2));
-        xr_net = encryptField(combinedNet.toFixed(2));
-        xr_flag = true;
-      }
-    } catch {
-      // If decryption fails, keep xr_flag as false
-    }
-  }
+  const cashInHand = Number(pc.cashInHand) || 0;
+  const finalNetSalary = cashInHand > 0 ? netSalary + cashInHand : netSalary;
 
   return {
     employeeId: emp.id,
@@ -595,13 +482,11 @@ function computeResult(
     loanRecovery: loanRecoveryAmount,
     otherDeductions: otherDeductionAmount,
     totalDeductions,
-    netSalary,
+    netSalary: finalNetSalary,
     paymentMode: pc.paymentMode,
     hasVariance,
     varianceNote,
-    xr_net,
-    xr_gross,
-    xr_flag,
+    cashInHand,
   };
 }
 
@@ -636,13 +521,10 @@ class PayrollService {
   }
 
   async upsertEmployeePayrollConfig(employeeId: bigint, data: Record<string, unknown>) {
-    // Explicitly pick only the allowed fields.
-    // This prevents any caller from writing encrypted column names (xc_val_*, xr_*)
-    // through this endpoint, whether accidentally or intentionally.
     const safe: Record<string, unknown> = {};
     const allowed = [
       'salaryType', 'monthlySalary', 'basicSalary', 'da', 'hra',
-      'otherAllowance', 'dailySalary', 'bankAccount', 'ifscCode',
+      'otherAllowance', 'cashInHand', 'dailySalary', 'bankAccount', 'ifscCode',
       'bankName', 'pfNumber', 'esiNumber', 'paymentMode',
     ];
     for (const key of allowed) {
@@ -920,20 +802,16 @@ class PayrollService {
       employeePfPercent: Number(config.employeePfPercent),
       employerPfPercent: Number(config.employerPfPercent),
       maxPfWage: Number(config.maxPfWage),
-      pfRoundingRule: config.pfRoundingRule,
       esiEnabled: config.esiEnabled,
       employeeEsiPercent: Number(config.employeeEsiPercent),
       employerEsiPercent: Number(config.employerEsiPercent),
       maxEsiSalary: Number(config.maxEsiSalary),
-      esiRoundingRule: config.esiRoundingRule,
       paidLeavePerYear: config.paidLeavePerYear,
       lateEntryGraceMinutes: config.lateEntryGraceMinutes,
       lateEntrySlabs: (config.lateEntrySlabs as any[]) ?? [],
       permissionSlabs: (config.permissionSlabs as any[]) ?? [],
       professionalTaxEnabled: config.professionalTaxEnabled,
       professionalTaxAmount: Number(config.professionalTaxAmount),
-      roundingRule: config.roundingRule,
-      decimalPrecision: config.decimalPrecision,
     };
 
     // 2. Load employees
@@ -1156,9 +1034,7 @@ class PayrollService {
           paymentMode: r!.paymentMode,
           hasVariance: r!.hasVariance,
           varianceNote: r!.varianceNote ?? null,
-          xr_net: r!.xr_net,
-          xr_gross: r!.xr_gross,
-          xr_flag: r!.xr_flag ?? false,
+          cashInHand: r!.cashInHand,
         })),
       });
 
@@ -1346,7 +1222,6 @@ class PayrollService {
         companyName: true,
         legalName: true,
         addressLine1: true,
-        addressLine2: true,
         city: true,
         state: true,
         zipcode: true,
@@ -1439,66 +1314,12 @@ class PayrollService {
         otherDeductions: Number(result.otherDeductions),
         totalDeductions: Number(result.totalDeductions),
         netSalary: Number(result.netSalary),
+        cashInHand: Number(result.cashInHand),
         paymentMode: result.paymentMode,
       },
     };
   }
 
-  // ── Sanitization & Super Admin Decryption Helpers ──────────────────────────
-
-  sanitizeResultForUser(res: any, isSuperAdmin: boolean) {
-    if (!res) return res;
-    const resCopy = { ...res };
-    if (isSuperAdmin && resCopy.xr_flag && resCopy.xr_net) {
-      try {
-        const decryptedNet = Number(decryptField(resCopy.xr_net));
-        const decryptedGross = resCopy.xr_gross ? Number(decryptField(resCopy.xr_gross)) : decryptedNet;
-        const netSal = Number(resCopy.netSalary || 0);
-        const additionalAmount = Math.max(0, decryptedNet - netSal);
-
-        resCopy.additionalComp = {
-          additionalAmount,
-          combinedGross: decryptedGross,
-          combinedNet: decryptedNet,
-        };
-      } catch {
-        // Decryption failed or invalid key
-      }
-    }
-    delete resCopy.xr_net;
-    delete resCopy.xr_gross;
-    delete resCopy.xr_flag;
-    return resCopy;
-  }
-
-  sanitizeRunForUser(run: any, isSuperAdmin: boolean) {
-    if (!run) return run;
-    const runCopy = { ...run };
-    if (Array.isArray(runCopy.results)) {
-      runCopy.results = runCopy.results.map((r: any) => this.sanitizeResultForUser(r, isSuperAdmin));
-    }
-
-    if (isSuperAdmin && Array.isArray(runCopy.results)) {
-      const totalAdditionalComp = runCopy.results.reduce(
-        (sum: number, r: any) => sum + (r.additionalComp?.additionalAmount || 0),
-        0
-      );
-      const totalCombinedGross = runCopy.results.reduce(
-        (sum: number, r: any) => sum + (r.additionalComp?.combinedGross || Number(r.grossSalary || 0)),
-        0
-      );
-      const totalCombinedNet = runCopy.results.reduce(
-        (sum: number, r: any) => sum + (r.additionalComp?.combinedNet || Number(r.netSalary || 0)),
-        0
-      );
-
-      runCopy.totalAdditionalComp = totalAdditionalComp;
-      runCopy.totalCombinedGross = totalCombinedGross;
-      runCopy.totalCombinedNet = totalCombinedNet;
-    }
-
-    return runCopy;
-  }
 }
 
 export const payrollService = new PayrollService();

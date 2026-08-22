@@ -946,14 +946,11 @@ const Step3: React.FC<{
   onNext: () => void;
   onAdvanceChange?: (empId: number, amount: number) => void;
 }> = ({ run, onBack, onNext, onAdvanceChange }) => {
-  const { can } = usePermission();
-  const canViewCashInHand = can("payroll-extended-comp.view");
   const results = run.results || [];
   const variances = results.filter(r => r.hasVariance);
 
   const totalOnRecordNet = run.totalNetSalary || results.reduce((s, r) => s + Number(r.netSalary || 0), 0);
-  const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
-  const totalCombinedNet = run.totalCombinedNet || (totalOnRecordNet + totalAdditionalComp);
+  const totalCashInHand = results.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
   const handleExportCSV = () => {
     const headers = [
@@ -961,9 +958,7 @@ const Step3: React.FC<{
       'Daily Rate', 'Earned Salary', 'OT Pay', 'Gross Salary', 'Emp PF', 'Emp ESI',
       'PT', 'Late Ded', 'Perm Ded', 'Advance', 'On-Record Net'
     ];
-    if (canViewCashInHand) {
-      headers.push('Additional Comp', 'Combined Net');
-    }
+    headers.push('Cash in Hand');
 
     const rows = results.map(r => {
       const row = [
@@ -984,11 +979,7 @@ const Step3: React.FC<{
         Number(r.salaryAdvance).toFixed(2),
         Number(r.netSalary).toFixed(2),
       ];
-      if (canViewCashInHand) {
-        const addl = r.additionalComp ? Number(r.additionalComp.additionalAmount).toFixed(2) : '0.00';
-        const comb = r.additionalComp ? Number(r.additionalComp.combinedNet).toFixed(2) : Number(r.netSalary).toFixed(2);
-        row.push(addl, comb);
-      }
+      row.push(Number(r.cashInHand || 0).toFixed(2));
       return row.join(',');
     });
 
@@ -1160,19 +1151,19 @@ const Step3: React.FC<{
         />
       ),
     },
-    ...(canViewCashInHand ? [{
+    {
       header: "Cash in Hand",
       align: "right" as const,
       render: (r: ApiPayrollResult) => (
         <span className="font-mono text-xs text-indigo-600 font-semibold">
-          {r.additionalComp && r.additionalComp.additionalAmount > 0
-            ? fmtRs(r.additionalComp.additionalAmount)
+          {Number(r.cashInHand || 0) > 0
+            ? fmtRs(Number(r.cashInHand || 0))
             : '—'}
         </span>
       ),
-    }] : []),
+    },
     {
-      header: canViewCashInHand ? "Combined Net" : "Net",
+      header: "Net Salary",
       align: "right",
       render: (r) => (
         <div className="text-right">
@@ -1180,11 +1171,11 @@ const Step3: React.FC<{
             className="font-mono font-bold text-xs text-text-primary cursor-help block"
             title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
           >
-            {fmtRs(canViewCashInHand && r.additionalComp ? r.additionalComp.combinedNet : Number(r.netSalary))}
+            {fmtRs(Number(r.netSalary))}
           </span>
-          {canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0 && (
+          {Number(r.cashInHand || 0) > 0 && (
             <span className="text-[10px] font-mono text-indigo-600 block">
-              (Net Pay: {fmtRs(Number(r.netSalary))})
+              (incl. Cash: {fmtRs(Number(r.cashInHand || 0))})
             </span>
           )}
         </div>
@@ -1211,41 +1202,29 @@ const Step3: React.FC<{
         */}
       </div>
 
-      {/* Super Admin Confidential Total Compensation Summary Card 
-      {canViewCashInHand && (
+      {/* Cash in Hand Summary - shown when there is cash in hand */}
+      {totalCashInHand > 0 && (
         <div className="rounded-2xl border border-indigo-200 bg-white shadow-sm overflow-hidden my-2">
           <div className="flex items-center justify-between px-5 py-3 bg-indigo-600 text-white">
             <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <Wallet size={15} /> Total Compensation Summary
+              <Wallet size={15} /> Cash in Hand Summary
             </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-700 text-indigo-100 border border-indigo-400">
-              <Lock size={10} /> Super Admin
-            </span>
           </div>
 
           <div className="p-5 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-500">Net Pay (Account)</span>
+                <span className="text-xs font-semibold text-slate-500">Net Pay (Total)</span>
                 <span className="text-xl font-extrabold text-slate-800 font-mono">{fmtRs(totalOnRecordNet)}</span>
               </div>
               <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 flex flex-col gap-1">
-                <span className="text-xs font-semibold text-indigo-600">Cash in Hand</span>
-                <span className="text-xl font-extrabold text-indigo-700 font-mono">{fmtRs(totalAdditionalComp)}</span>
-              </div>
-              <div className="p-4 rounded-xl bg-indigo-600 text-white flex flex-col gap-1 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">Total Monthly Net (Combined)</span>
-                <span className="text-2xl font-black text-white font-mono">{fmtRs(totalCombinedNet)}</span>
+                <span className="text-xs font-semibold text-indigo-600">Cash in Hand (included in Net)</span>
+                <span className="text-xl font-extrabold text-indigo-700 font-mono">{fmtRs(totalCashInHand)}</span>
               </div>
             </div>
-
-            <p className="text-xs text-slate-400 text-center italic pt-1">
-              Net Pay ({fmtRs(totalOnRecordNet)}) + Cash ({fmtRs(totalAdditionalComp)}) = {fmtRs(totalCombinedNet)}
-            </p>
           </div>
         </div>
       )}
-      */}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1337,10 +1316,10 @@ const Step3: React.FC<{
                 <span className="font-mono text-xl font-black text-emerald-700">{fmtRs(run.totalNetSalary)}</span>
               </div>
 
-              {canViewCashInHand && (
+              {totalCashInHand > 0 && (
                 <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50 flex-1 xl:flex-none">
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Cash in Hand</span>
-                  <span className="font-mono text-xl font-black text-indigo-700">{fmtRs(totalAdditionalComp)}</span>
+                  <span className="font-mono text-xl font-black text-indigo-700">{fmtRs(totalCashInHand)}</span>
                 </div>
               )}
             </div>
@@ -1370,7 +1349,6 @@ const Step4: React.FC<{
   const { can } = usePermission();
   const canEditRun = can("payroll-run.edit");
   const canViewCash = can("payroll-cash-in-hand");
-  const canViewCashInHand = can("payroll-extended-comp.view") || canViewCash;
   const [declared, setDeclared] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1378,8 +1356,7 @@ const Step4: React.FC<{
   const results = run.results || [];
   const bankRows = results.filter(r => r.paymentMode === 'BANK');
   const cashRows = results.filter(r => r.paymentMode === 'CASH');
-  const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
-  const totalCombinedNet = run.totalCombinedNet || (run.totalNetSalary + totalAdditionalComp);
+  const totalCashInHand = results.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
   const periodLabel = run.period.startsWith('20') && run.period.length === 7
     ? `${MONTHS[parseInt(run.period.split('-')[1], 10) - 1]} ${run.period.split('-')[0]}`
@@ -1415,8 +1392,7 @@ const Step4: React.FC<{
           {([
             { label: 'Total Employees', value: `${results.length}` },
             { label: 'Net Payroll', value: fmtRs(run.totalNetSalary), bold: true },
-            canViewCashInHand ? { label: 'Cash In Hand', value: fmtRs(totalAdditionalComp) } : null,
-            canViewCashInHand ? { label: 'Combined Net', value: fmtRs(totalCombinedNet), bold: true } : null,
+            totalCashInHand > 0 ? { label: 'Cash In Hand', value: fmtRs(totalCashInHand) } : null,
             { label: 'Bank Transfer', value: fmtRs(bankRows.reduce((s, r) => s + Number(r.netSalary), 0)) },
             canViewCash ? { label: 'Cash Payment', value: fmtRs(cashRows.reduce((s, r) => s + Number(r.netSalary), 0)) } : null,
             { label: 'Employee PF', value: fmtRs(run.totalPfEmployee) },
@@ -1450,13 +1426,9 @@ const Step4: React.FC<{
                   {r.paymentMode === 'BANK' ? <Building2 size={10} /> : <Wallet size={10} />} {r.paymentMode}
                 </span>
                 <div className="flex flex-col items-end text-right">
-                  {canViewCashInHand && Number(r.additionalComp?.additionalAmount) > 0 ? (
-                    <>
-                      <div className="text-[10px] text-text-muted font-mono leading-tight">Net: {fmtRs(Number(r.netSalary))} | Addl: {fmtRs(Number(r.additionalComp?.additionalAmount))}</div>
-                      <span className="font-mono font-bold text-sm text-text-primary mt-0.5">Total: {fmtRs(Number(r.additionalComp?.combinedNet))}</span>
-                    </>
-                  ) : (
-                    <span className="font-mono font-semibold text-sm text-text-primary">{fmtRs(Number(r.netSalary))}</span>
+                  <span className="font-mono font-semibold text-sm text-text-primary">{fmtRs(Number(r.netSalary))}</span>
+                  {Number(r.cashInHand || 0) > 0 && (
+                    <div className="text-[10px] text-text-muted font-mono leading-tight">(incl. Cash: {fmtRs(Number(r.cashInHand || 0))})</div>
                   )}
                 </div>
               </div>
@@ -1507,7 +1479,6 @@ const Step5: React.FC<{
   const { can } = usePermission();
   const canEditRun = can("payroll-run.edit");
   const canViewCash = can("payroll-cash-in-hand");
-  const canViewCashInHand = can("payroll-extended-comp.view") || canViewCash;
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -1519,8 +1490,7 @@ const Step5: React.FC<{
   const cashRows = results.filter(r => r.paymentMode === 'CASH');
   const bankTotal = bankRows.reduce((s, r) => s + Number(r.netSalary), 0);
   const cashTotal = cashRows.reduce((s, r) => s + Number(r.netSalary), 0);
-  const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
-  const totalCombinedNet = run.totalCombinedNet || (run.totalNetSalary + totalAdditionalComp);
+  const totalCashInHand = results.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
   const bankColumns: DataTableColumn<ApiPayrollResult>[] = [
     {
@@ -1552,13 +1522,9 @@ const Step5: React.FC<{
       align: "right",
       render: (r) => (
         <div className="flex flex-col items-end text-right">
-          {canViewCashInHand && Number(r.additionalComp?.additionalAmount) > 0 ? (
-            <>
-              <div className="text-[9px] text-text-muted font-mono leading-tight">Net: {fmtRs(Number(r.netSalary))} | Addl: {fmtRs(Number(r.additionalComp?.additionalAmount))}</div>
-              <span className="font-mono font-bold text-xs text-text-primary mt-0.5">{fmtRs(Number(r.additionalComp?.combinedNet))}</span>
-            </>
-          ) : (
-            <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
+          <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
+          {Number(r.cashInHand || 0) > 0 && (
+            <div className="text-[9px] text-text-muted font-mono leading-tight">(incl. Cash: {fmtRs(Number(r.cashInHand || 0))})</div>
           )}
         </div>
       ),
@@ -1590,13 +1556,9 @@ const Step5: React.FC<{
       align: "right",
       render: (r) => (
         <div className="flex flex-col items-end text-right">
-          {canViewCashInHand && Number(r.additionalComp?.additionalAmount) > 0 ? (
-            <>
-              <div className="text-[9px] text-text-muted font-mono leading-tight">Net: {fmtRs(Number(r.netSalary))} | Addl: {fmtRs(Number(r.additionalComp?.additionalAmount))}</div>
-              <span className="font-mono font-bold text-xs text-text-primary mt-0.5">{fmtRs(Number(r.additionalComp?.combinedNet))}</span>
-            </>
-          ) : (
-            <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
+          <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
+          {Number(r.cashInHand || 0) > 0 && (
+            <div className="text-[9px] text-text-muted font-mono leading-tight">(incl. Cash: {fmtRs(Number(r.cashInHand || 0))})</div>
           )}
         </div>
       ),
@@ -1683,9 +1645,8 @@ const Step5: React.FC<{
         <div className="bg-slate-50 rounded-xl border border-border p-5 text-left space-y-2">
           <div className="flex justify-between text-sm"><span className="text-text-secondary">Bank Transfers</span><span className="font-semibold text-text-primary">{fmtRs(bankTotal)}</span></div>
           {canViewCash && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash Payments</span><span className="font-semibold text-text-primary">{fmtRs(cashTotal)}</span></div>}
-          {canViewCashInHand && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash In Hand</span><span className="font-semibold text-text-primary">{fmtRs(totalAdditionalComp)}</span></div>}
-          <div className="flex justify-between text-sm font-bold border-t border-border pt-2"><span>Total Disbursed (On-Record)</span><span className="text-primary">{fmtRs(run.totalNetSalary)}</span></div>
-          {canViewCashInHand && <div className="flex justify-between text-sm font-bold border-t border-border pt-2"><span>Total Combined Net</span><span className="text-primary">{fmtRs(totalCombinedNet)}</span></div>}
+          {totalCashInHand > 0 && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash In Hand (incl. in Net)</span><span className="font-semibold text-text-primary">{fmtRs(totalCashInHand)}</span></div>}
+          <div className="flex justify-between text-sm font-bold border-t border-border pt-2"><span>Total Disbursed</span><span className="text-primary">{fmtRs(run.totalNetSalary)}</span></div>
         </div>
         <div className="flex gap-3 justify-center">
           <button onClick={() => navigate('/payroll/monthly-report')}
@@ -1714,7 +1675,7 @@ const Step5: React.FC<{
           { label: 'Total Net Payroll', value: fmtRs(run.totalNetSalary), icon: IndianRupee, cls: 'text-text-primary bg-slate-100' },
           { label: 'Bank Transfer', value: fmtRs(bankTotal), icon: Building2, cls: 'text-blue-700 bg-blue-50' },
           canViewCash ? { label: 'Cash Payment', value: fmtRs(cashTotal), icon: Wallet, cls: 'text-emerald-700 bg-emerald-50' } : null,
-          canViewCashInHand ? { label: 'Cash In Hand', value: fmtRs(totalAdditionalComp), icon: Wallet, cls: 'text-amber-700 bg-amber-50' } : null,
+          totalCashInHand > 0 ? { label: 'Cash In Hand', value: fmtRs(totalCashInHand), icon: Wallet, cls: 'text-amber-700 bg-amber-50' } : null,
         ].filter(Boolean) as { label: string; value: string; icon: any; cls: string }[]).map(c => (
           <div key={c.label} className="bg-white rounded-xl border border-border p-5 shadow-sm flex items-center gap-4">
             <div className={`p-3 rounded-xl ${c.cls}`}><c.icon size={20} /></div>

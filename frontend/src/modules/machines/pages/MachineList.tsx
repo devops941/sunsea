@@ -121,7 +121,6 @@ const MachineList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search machines..."
                         />
-                        {/* BUG-MAC fix: only show Add Machine button to users with create permission */}
                         {canCreateMachine && (
                             <CustomButton
                                 text="Add Machine"
@@ -172,7 +171,6 @@ const MachineList: React.FC = () => {
                                         setSelectedMachine(item);
                                         setShowViewModal(true);
                                     }} />
-                                    {/* BUG-MAC fix: guard edit/delete buttons with permissions */}
                                     {canEditMachine && <EditButton onClick={() => handleOpenEdit(item)} />}
                                     {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}
                                 </div>
@@ -187,9 +185,10 @@ const MachineList: React.FC = () => {
                     onHide={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
-                    message="Are you sure you want to delete this machine?"
+                    message="Are you sure you want to delete this machine? This action cannot be undone."
                     confirmText={isDeleting ? "Deleting..." : "Delete"}
                     confirmVariant="danger"
+                    isDangerous={true}
                 />
 
                 <MachineViewModal 

@@ -24,7 +24,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
     useEffect(() => {
         rawMaterialService.fetchAll()
             .then(data => {
-                const arr = Array.isArray(data) ? data : (data as any)?.data || [];
+                const arr = Array.isArray(data) ? data : ((data as any)?.rawMaterials ?? []);
                 const map = new Map<string, any>();
                 arr.forEach((rm: any) => map.set(rm.rawMaterialId?.toString(), rm));
                 setRawMaterialsMap(map);

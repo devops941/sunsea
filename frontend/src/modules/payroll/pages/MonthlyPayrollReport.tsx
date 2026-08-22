@@ -62,7 +62,6 @@ type ViewMode = 'ALL' | 'PF' | 'CASH';
 const MonthlyPayrollReport: React.FC = () => {
   const { can } = usePermission();
   const canViewRun        = can("payroll-run.view");
-  const canViewCashInHand = can("payroll-extended-comp.view");
   const { socket }    = useSocket();
   const [selectedYear, setSelectedYear]   = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
@@ -259,8 +258,7 @@ const MonthlyPayrollReport: React.FC = () => {
   const totalNet          = pfTotals.netSalary + cashTotals.netSalary;
   const totalPfLiability  = pfTotals.employeePf + pfTotals.employerPf;
   const totalEsiLiability = pfTotals.employeeEsi + pfTotals.employerEsi;
-  const totalAdditionalComp = run?.totalAdditionalComp || allResults.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
-  const totalCombinedNet = run?.totalCombinedNet || (totalNet + totalAdditionalComp);
+  const totalCashInHand = allResults.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
   // ── CSV columns ──
   const allCsvCols = [
@@ -277,10 +275,7 @@ const MonthlyPayrollReport: React.FC = () => {
     { header: 'Gross (₹)',             accessor: (r: ApiPayrollResult) => r.grossSalary },
     { header: 'Total Deductions (₹)',  accessor: (r: ApiPayrollResult) => r.totalDeductions },
     { header: 'Net Salary (₹)',        accessor: (r: ApiPayrollResult) => r.netSalary },
-    ...(canViewCashInHand ? [
-      { header: 'Cash in Hand (₹)',    accessor: (r: ApiPayrollResult) => r.additionalComp?.additionalAmount || 0 },
-      { header: 'Combined Net (₹)',    accessor: (r: ApiPayrollResult) => r.additionalComp?.combinedNet || r.netSalary },
-    ] : []),
+    { header: 'Cash in Hand (₹)',     accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
     { header: 'Payment Mode',          accessor: (r: ApiPayrollResult) => r.paymentMode },
   ];
 
@@ -297,10 +292,7 @@ const MonthlyPayrollReport: React.FC = () => {
     { header: 'ESI Emp (₹)',    accessor: (r: ApiPayrollResult) => r.employeeEsi },
     { header: 'ESI Er (₹)',     accessor: (r: ApiPayrollResult) => r.employerEsi },
     { header: 'Net Salary (₹)', accessor: (r: ApiPayrollResult) => r.netSalary },
-    ...(canViewCashInHand ? [
-      { header: 'Cash in Hand (₹)', accessor: (r: ApiPayrollResult) => r.additionalComp?.additionalAmount || 0 },
-      { header: 'Combined Net (₹)', accessor: (r: ApiPayrollResult) => r.additionalComp?.combinedNet || r.netSalary },
-    ] : []),
+    { header: 'Cash in Hand (₹)', accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
   ];
 
   const cashCsvCols = [
@@ -313,10 +305,7 @@ const MonthlyPayrollReport: React.FC = () => {
     { header: 'Advance (₹)',          accessor: (r: ApiPayrollResult) => r.salaryAdvance },
     { header: 'Perm. Deduction (₹)',  accessor: (r: ApiPayrollResult) => r.permissionDeduction },
     { header: 'Net Salary (₹)',       accessor: (r: ApiPayrollResult) => r.netSalary },
-    ...(canViewCashInHand ? [
-      { header: 'Cash in Hand (₹)',   accessor: (r: ApiPayrollResult) => r.additionalComp?.additionalAmount || 0 },
-      { header: 'Combined Net (₹)',   accessor: (r: ApiPayrollResult) => r.additionalComp?.combinedNet || r.netSalary },
-    ] : []),
+    { header: 'Cash in Hand (₹)',    accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
     { header: 'Payment Mode',         accessor: (r: ApiPayrollResult) => r.paymentMode },
   ];
 
@@ -457,22 +446,18 @@ const MonthlyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: canViewCashInHand ? 'COMBINED NET (₹)' : 'NET (₹)',
+      header: 'NET (₹)',
       align: 'right',
-      render: (r) => {
-        const hasAddl = canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0;
-        const combNet = hasAddl ? r.additionalComp!.combinedNet : r.netSalary;
-        return (
-          <div className="flex flex-col items-end">
-            <span className="font-mono font-bold text-text-primary text-base">₹{fmt(combNet)}</span>
-            {hasAddl && (
-              <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
-                Net ₹{fmt(r.netSalary)} + Cash ₹{fmt(r.additionalComp!.additionalAmount)}
-              </span>
-            )}
-          </div>
-        );
-      },
+      render: (r) => (
+        <div className="flex flex-col items-end">
+          <span className="font-mono font-bold text-text-primary text-base">₹{fmt(r.netSalary)}</span>
+          {Number(r.cashInHand || 0) > 0 && (
+            <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
+              Cash in Hand ₹{fmt(r.cashInHand)}
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       header: 'MODE',
@@ -562,22 +547,18 @@ const MonthlyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: canViewCashInHand ? 'COMBINED NET (₹)' : 'NET SALARY (₹)',
+      header: 'NET SALARY (₹)',
       align: 'right',
-      render: (r) => {
-        const hasAddl = canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0;
-        const combNet = hasAddl ? r.additionalComp!.combinedNet : r.netSalary;
-        return (
-          <div className="flex flex-col items-end">
-            <span className="font-mono font-bold text-text-primary text-base">₹{fmt(combNet)}</span>
-            {hasAddl && (
-              <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
-                Net ₹{fmt(r.netSalary)} + Cash ₹{fmt(r.additionalComp!.additionalAmount)}
-              </span>
-            )}
-          </div>
-        );
-      },
+      render: (r) => (
+        <div className="flex flex-col items-end">
+          <span className="font-mono font-bold text-text-primary text-base">₹{fmt(r.netSalary)}</span>
+          {Number(r.cashInHand || 0) > 0 && (
+            <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
+              Cash in Hand ₹{fmt(r.cashInHand)}
+            </span>
+          )}
+        </div>
+      ),
     },
     actionsColumn,
   ];
@@ -641,22 +622,18 @@ const MonthlyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: canViewCashInHand ? 'COMBINED NET (₹)' : 'NET SALARY (₹)',
+      header: 'NET SALARY (₹)',
       align: 'right',
-      render: (r) => {
-        const hasAddl = canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0;
-        const combNet = hasAddl ? r.additionalComp!.combinedNet : r.netSalary;
-        return (
-          <div className="flex flex-col items-end">
-            <span className="font-mono font-bold text-text-primary">₹{fmt(combNet)}</span>
-            {hasAddl && (
-              <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
-                Net ₹{fmt(r.netSalary)} + Cash ₹{fmt(r.additionalComp!.additionalAmount)}
-              </span>
-            )}
-          </div>
-        );
-      },
+      render: (r) => (
+        <div className="flex flex-col items-end">
+          <span className="font-mono font-bold text-text-primary">₹{fmt(r.netSalary)}</span>
+          {Number(r.cashInHand || 0) > 0 && (
+            <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
+              Cash in Hand ₹{fmt(r.cashInHand)}
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       header: 'MODE',
@@ -951,11 +928,11 @@ const MonthlyPayrollReport: React.FC = () => {
                 </span>
               </div>
 
-              {canViewCashInHand && (
+              {activeData.reduce((s, r) => s + Number(r.cashInHand || 0), 0) > 0 && (
                 <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50/70 flex-1 xl:flex-none">
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
                   <span className="font-mono text-lg font-black text-indigo-700">
-                    ₹{fmt(activeData.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0))}
+                    ₹{fmt(activeData.reduce((s, r) => s + Number(r.cashInHand || 0), 0))}
                   </span>
                 </div>
               )}
@@ -1014,19 +991,16 @@ const MonthlyPayrollReport: React.FC = () => {
             />
           </div>
 
-          {canViewCashInHand && totalAdditionalComp > 0 && (
+          {totalCashInHand > 0 && (
             <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-200 shadow-sm p-4 flex flex-col gap-2">
               <div className="flex items-center gap-2 text-indigo-800">
                 <Shield size={15} className="text-indigo-600" />
                 <span className="text-[11px] font-bold uppercase tracking-wide">Cash In Hand</span>
               </div>
               <DetailBox
-                label="Confidential Cash"
-                value={<span className="text-base font-bold text-indigo-700 font-mono">₹{fmt(totalAdditionalComp)}</span>}
+                label="Total Cash in Hand"
+                value={<span className="text-base font-bold text-indigo-700 font-mono">₹{fmt(totalCashInHand)}</span>}
               />
-              <div className="text-[10px] font-bold text-indigo-900 mt-1 border-t border-indigo-200/60 pt-1">
-                Combined Total: <span className="font-mono font-black text-indigo-800">₹{fmt(totalCombinedNet)}</span>
-              </div>
             </div>
           )}
 
