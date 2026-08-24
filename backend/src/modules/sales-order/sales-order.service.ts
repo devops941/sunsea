@@ -182,7 +182,7 @@ class SalesOrderService {
         const createTotalIgst = itemsWithGst.reduce((s, l) => s.add(l.igstAmount),  ZERO);
         const createTotalTax  = createTotalCgst.add(createTotalSgst).add(createTotalIgst);
 
-        const discountValue = new Prisma.Decimal((data as any).orderDiscountValue ?? 0);
+        const discountValue = new Prisma.Decimal((data as any).orderDiscountValue || 0);
         const createDiscount = discountValue.lte(0)
             ? ZERO
             : ((data as any).orderDiscountType === "FLAT"
@@ -219,7 +219,7 @@ class SalesOrderService {
                 netAmount: createNetAmount,
                 totalDiscount: createDiscount,
                 orderDiscountType:  (data as any).orderDiscountType ?? null,
-                orderDiscountValue: (data as any).orderDiscountValue ?? null,
+                orderDiscountValue: (data as any).orderDiscountValue || null,
                 // @ts-ignore
                 sourceSalesOrderId: (data as any).sourceSalesOrderId ? Number((data as any).sourceSalesOrderId) : null,
                 totalTax:  createTotalTax,
@@ -385,7 +385,7 @@ class SalesOrderService {
             const updTotalTax  = updTotalCgst.add(updTotalSgst).add(updTotalIgst);
 
             const updDiscType  = (data as any).orderDiscountType  ?? (existing as any).orderDiscountType ?? "PERCENT";
-            const updDiscValue = new Prisma.Decimal((data as any).orderDiscountValue ?? (existing as any).orderDiscountValue ?? 0);
+            const updDiscValue = new Prisma.Decimal((data as any).orderDiscountValue || (existing as any).orderDiscountValue || 0);
             const updDiscount  = updDiscValue.lte(0)
                 ? ZERO
                 : (updDiscType === "FLAT" ? updDiscValue : updSubtotal.mul(updDiscValue).div(100));
@@ -399,7 +399,7 @@ class SalesOrderService {
             updateData.netAmount = updTaxable.add(updAdjustedTax);
             updateData.totalDiscount = updDiscount;
             if ((data as any).orderDiscountType  !== undefined) updateData.orderDiscountType  = (data as any).orderDiscountType;
-            if ((data as any).orderDiscountValue !== undefined) updateData.orderDiscountValue = (data as any).orderDiscountValue;
+            if ((data as any).orderDiscountValue !== undefined) updateData.orderDiscountValue = (data as any).orderDiscountValue || null;
             updateData.totalCgst = updTotalCgst;
             updateData.totalSgst = updTotalSgst;
             updateData.totalIgst = updTotalIgst;
