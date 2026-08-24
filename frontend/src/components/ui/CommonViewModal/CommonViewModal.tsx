@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { FiX } from "react-icons/fi";
+import { X } from "lucide-react";
 import type { CommonViewModalProps } from "./commonViewModal.types";
 
 const CommonViewModal: React.FC<CommonViewModalProps> = ({
@@ -17,7 +17,6 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Close on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && show) onHide();
@@ -26,7 +25,6 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [show, onHide]);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
     if (show) {
       document.body.style.overflow = "hidden";
@@ -43,89 +41,80 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
   const sizeClasses = {
     sm: "max-w-md",
     md: "max-w-xl",
-    lg: "max-w-3xl",
-    xl: "max-w-5xl",
+    lg: "max-w-2xl",
+    xl: "max-w-4xl",
   };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
-        onClick={onHide} 
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+        onClick={onHide}
       />
 
-      {/* Modal Content */}
-      <div 
+      <div
         ref={modalRef}
-        className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-card rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200`}
+        className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-card border border-line-soft rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300`}
+        role="dialog"
+        aria-modal="true"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-line-soft bg-card-2/50">
-          <h3 className="text-lg font-semibold text-ink">{modalTitle}</h3>
-          <button
-            onClick={onHide}
-            className="p-2 text-ink-subtle hover:text-ink-muted hover:bg-card-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <FiX size={20} />
-          </button>
+        {/* Header with title info */}
+        <div className="px-6 py-5 border-b border-line-soft">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {avatarText && (
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-emerald-500 flex items-center justify-center text-white font-bold text-sm shadow-lg shrink-0">
+                  {avatarText}
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-base font-bold text-ink">{headerTitle || modalTitle}</h3>
+                  {statusNode && <div className="shrink-0">{statusNode}</div>}
+                </div>
+                {headerSubtitle && (
+                  <p className="text-xs text-ink-muted mt-0.5">{headerSubtitle}</p>
+                )}
+                {modalTitle && headerTitle && (
+                  <p className="text-[10px] text-ink-subtle uppercase tracking-widest font-bold mt-0.5">{modalTitle}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onHide}
+              className="w-8 h-8 flex items-center justify-center text-ink-subtle hover:text-ink transition-all rounded-lg hover:bg-card-2 border border-transparent hover:border-line-soft cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-          {/* Main Info Header */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8 bg-primary/5 rounded-xl p-5 border border-primary/10">
-            <div className="flex items-center gap-4">
-              {/* {avatarText && (
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md shrink-0">
-                  {avatarText}
+        <div className="flex-1 overflow-y-auto">
+          {sections.map((section, sIdx) => (
+            <div key={sIdx}>
+              {section.title && (
+                <div className="px-6 py-2.5 bg-card-2/50 border-b border-line-soft/50">
+                  <span className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-[2px]">{section.title}</span>
                 </div>
-              )} */}
-              <div>
-                <h4 className="text-xl font-bold text-ink mb-1">{headerTitle}</h4>
-                {headerSubtitle && (
-                  <p className="text-sm font-medium text-ink-subtle">{headerSubtitle}</p>
-                )}
-              </div>
-            </div>
-            {statusNode && (
-              <div className="flex-shrink-0">
-                {statusNode}
-              </div>
-            )}
-          </div>
-
-          {/* Sections */}
-          <div className="space-y-6">
-            {sections.map((section, sIdx) => (
-              <div key={sIdx} className="bg-card rounded-xl border border-line-soft shadow-sm overflow-hidden">
-                {section.title && (
-                  <div className="px-5 py-3 bg-card-2 border-b border-line-soft">
-                    <h6 className="text-sm font-semibold text-ink-muted uppercase tracking-wider">{section.title}</h6>
+              )}
+              <div className="divide-y divide-line-soft/40">
+                {section.fields.map((field, fIdx) => (
+                  <div key={fIdx} className={`flex items-center px-6 py-3 hover:bg-card-2/30 transition-colors ${field.xs === 12 ? 'col-span-full' : ''}`}>
+                    <span className="text-xs text-ink-subtle w-[160px] shrink-0">{field.label}</span>
+                    <span className="text-sm font-semibold text-ink">{field.value || "-"}</span>
                   </div>
-                )}
-                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-5 gap-x-8">
-                  {section.fields.map((field, fIdx) => (
-                    <div key={fIdx} className={`flex flex-col gap-1.5 ${field.xs === 12 ? 'col-span-full' : ''}`}>
-                      <span className="text-xs font-medium text-ink-subtle uppercase tracking-wide">{field.label}</span>
-                      <span className="text-sm font-medium text-ink break-words">{field.value || "-"}</span>
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          {customContent && (
-            <div className="mt-6">
-              {customContent}
             </div>
-          )}
+          ))}
+
+          {customContent && <div className="px-6 py-4">{customContent}</div>}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-end gap-3 rounded-b-2xl">
+          <div className="px-6 py-3.5 border-t border-line-soft bg-card-2/50 flex items-center justify-end gap-2.5 rounded-b-2xl">
             {footer}
           </div>
         )}

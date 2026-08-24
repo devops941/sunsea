@@ -140,7 +140,7 @@ function DataTable<T>({
   const fullSpanStyle: React.CSSProperties = { gridColumn: "1 / -1" };
 
   return (
-    <div className={`w-full bg-card border border-line overflow-hidden ${className}`}>
+    <div className={`w-full border border-line-soft rounded-xl overflow-hidden ${className}`}>
       {/*
         Flex column holding the scroll area and — when paginating — the pager
         beneath it. The minimum height applies in every state, so a table
@@ -164,7 +164,7 @@ function DataTable<T>({
                 <div
                   key={i}
                   role="columnheader"
-                  className={`sticky top-0 z-10 bg-head flex items-center ${headerPaddingClass} font-semibold text-[11px] sm:text-xs tracking-wide uppercase text-ink whitespace-nowrap ${alignClass[col.align ?? "left"]}`}
+                  className={`sticky top-0 z-10 bg-head flex items-center ${headerPaddingClass} font-bold text-[10px] sm:text-[11px] tracking-[1.5px] uppercase text-ink-muted whitespace-nowrap border-b border-line-soft ${alignClass[col.align ?? "left"]}`}
                 >
                   {col.headerNode ?? col.header}
                 </div>
@@ -182,14 +182,14 @@ function DataTable<T>({
                     <div
                       role="row"
                       style={{ ...rowStyle, ...extraStyle }}
-                      className={`${rowMinHeightClass} border-b border-line-soft hover:bg-card-2 transition-colors ${onRowClick ? "cursor-pointer" : ""} ${extraClassName}`}
+                      className={`${rowMinHeightClass} border-b border-line-soft/50 hover:bg-card-2/70 transition-all duration-200 ${onRowClick ? "cursor-pointer" : ""} ${extraClassName}`}
                       onClick={() => onRowClick && onRowClick(row, index)}
                     >
                       {columns.map((col, ci) => (
                         <div
                           key={ci}
                           role="cell"
-                          className={`flex items-center ${cellPaddingClass} text-ink min-w-0 ${alignClass[col.align ?? "left"]}`}
+                          className={`flex items-center ${cellPaddingClass} text-ink text-[13px] font-medium min-w-0 ${alignClass[col.align ?? "left"]}`}
                         >
                           {col.render
                             ? col.render(row, index)
@@ -234,31 +234,31 @@ function DataTable<T>({
             the foot of the rows and rides along if the scroll area is capped
             by the max-height. */}
         {hasPager && pagination && (
-          <div className="shrink-0 flex items-center justify-center gap-3 sm:gap-4 py-3 sm:py-4 border-t border-line-soft bg-card">
+          <div className="shrink-0 flex items-center justify-center gap-3 sm:gap-4 py-3 sm:py-4 border-t border-line-soft bg-head/50">
             <button
               type="button"
               disabled={pagination.currentPage === 1}
               onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
-              className="flex items-center justify-center h-8 w-8 rounded-md border border-line
-                            text-ink-subtle hover:text-primary hover:border-primary/40 hover:bg-primary/10
-                            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent
-                            transition-colors cursor-pointer"
+              className="flex items-center justify-center h-8 w-8 rounded-lg border border-line-soft
+                            text-ink-subtle hover:text-accent hover:border-accent/30 hover:bg-accent/10
+                            disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent
+                            transition-all duration-200"
             >
-              <FaChevronLeft size={12} />
+              <FaChevronLeft size={11} />
             </button>
-            <div className="text-xs sm:text-sm text-ink-muted font-medium">
-              Page {pagination.currentPage} of {pagination.totalPages}
+            <div className="text-xs sm:text-sm text-ink-muted font-semibold">
+              Page <span className="text-ink">{pagination.currentPage}</span> of <span className="text-ink">{pagination.totalPages}</span>
             </div>
             <button
               type="button"
               disabled={pagination.currentPage === pagination.totalPages}
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
-              className="flex items-center justify-center h-8 w-8 rounded-md border border-line
-                            text-ink-subtle hover:text-primary hover:border-primary/40 hover:bg-primary/10
-                            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent
-                            transition-colors cursor-pointer"
+              className="flex items-center justify-center h-8 w-8 rounded-lg border border-line-soft
+                            text-ink-subtle hover:text-accent hover:border-accent/30 hover:bg-accent/10
+                            disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent
+                            transition-all duration-200"
             >
-              <FaChevronRight size={12} />
+              <FaChevronRight size={11} />
             </button>
           </div>
         )}

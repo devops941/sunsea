@@ -3,7 +3,6 @@ import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
-
 import TextInput from "../../../components/form/TextInput/TextInput";
 import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -11,7 +10,6 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import { createShift, updateShift, fetchShifts } from "../../../features/shifts/shiftSlice";
 import { shiftService } from "../../../services/shiftService";
 import type { RootState, AppDispatch } from "../../../app/store";
-
 const initialFormState = {
     id: 0,
     shiftCode: "",
@@ -22,7 +20,6 @@ const initialFormState = {
     gracePeriod: "",
     isActive: true,
 };
-
 interface FormErrors {
     shiftName?: string;
     startTime?: string;
@@ -30,23 +27,19 @@ interface FormErrors {
     breakDuration?: string;
     gracePeriod?: string;
 }
-
 const ShiftForm: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const isEdit = Boolean(id);
     const dispatch = useDispatch<AppDispatch>();
     const { loading } = useSelector((state: RootState) => state.shifts);
-
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [fetchingData, setFetchingData] = useState(isEdit);
-
     useEffect(() => {
         dispatch(fetchShifts());
     }, [dispatch]);
-
     // Fetch next ID (create) or load existing shift (edit)
     useEffect(() => {
         if (isEdit && id) {
@@ -72,10 +65,9 @@ const ShiftForm: React.FC = () => {
         } else {
             shiftService.fetchNextId()
                 .then((nextId) => { if (nextId) setFormData(prev => ({ ...prev, shiftCode: nextId })); })
-                .catch(() => {});
+                .catch(() => { });
         }
     }, [isEdit, id, navigate]);
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -83,7 +75,6 @@ const ShiftForm: React.FC = () => {
             setErrors(prev => ({ ...prev, [name]: undefined }));
         }
     };
-
     const validate = (): boolean => {
         const newErrors: FormErrors = {};
         if (!formData.shiftName.trim()) newErrors.shiftName = "Shift name is required";
@@ -97,13 +88,11 @@ const ShiftForm: React.FC = () => {
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isSubmitting) return;
         if (!validate()) return;
         setIsSubmitting(true);
-
         const payload = {
             shiftCode: formData.shiftCode,
             shiftName: formData.shiftName,
@@ -113,7 +102,6 @@ const ShiftForm: React.FC = () => {
             gracePeriod: formData.gracePeriod ? Number(formData.gracePeriod) : null,
             isActive: formData.isActive,
         };
-
         try {
             if (isEdit) {
                 await dispatch(updateShift({ id: formData.id, data: payload })).unwrap();
@@ -129,7 +117,6 @@ const ShiftForm: React.FC = () => {
             setIsSubmitting(false);
         }
     };
-
     if (fetchingData) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -137,7 +124,6 @@ const ShiftForm: React.FC = () => {
             </div>
         );
     }
-
     return (
         <div className="w-full mx-auto">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
@@ -147,13 +133,11 @@ const ShiftForm: React.FC = () => {
                         <BackButton text="Back to List" to="/shifts" />
                     </div>
                 </div>
-
                 <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
                     <div>
                         <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
                             <h3 className="text-lg font-bold text-ink">Shift Details</h3>
                         </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <TextInput
                                 label="Shift Code"
@@ -217,7 +201,6 @@ const ShiftForm: React.FC = () => {
                             />
                         </div>
                     </div>
-
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
                         {!isEdit && (
                             <CustomButton
@@ -240,5 +223,4 @@ const ShiftForm: React.FC = () => {
         </div>
     );
 };
-
 export default ShiftForm;

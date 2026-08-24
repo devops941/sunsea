@@ -22,6 +22,8 @@ interface SelectInputProps {
   disabled?: boolean;
   noMargin?: boolean;
   searchable?: boolean;
+  /** Place label and input side by side in one row */
+  horizontal?: boolean;
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
@@ -38,6 +40,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
   disabled,
   noMargin = false,
   searchable = true,
+  horizontal = false,
   onChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -152,15 +155,16 @@ const SelectInput: React.FC<SelectInputProps> = ({
     : options;
 
   return (
-    <div className={`${noMargin ? "" : "mb-0.5 "}group flex flex-col w-full`} ref={wrapperRef}>
+    <div className={`${noMargin ? "" : "mb-0.5 "}group ${horizontal ? "flex items-center gap-3" : "flex flex-col"} w-full`} ref={wrapperRef}>
       {!hideLabel && (
         <label className={`
-          flex items-center gap-1.5 mb-2
+          flex items-center gap-1.5
           text-xs font-extrabold uppercase
           tracking-[0.5px]
           transition-colors duration-250
           ${error ? "text-red-400" : "text-ink"}
           group-focus-within:text-primary
+          ${horizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}
         `}>
           {icon && (
             <span className={`
@@ -179,7 +183,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
         </label>
       )}
 
-      <div className="relative">
+      <div className={`relative ${horizontal ? "flex-1" : ""}`}>
         {/* Hidden native select for form serialization if needed */}
         <select name={name} value={value} className="hidden" onChange={() => { }}>
           {defaultOptionLabel && <option value="">{defaultOptionLabel}</option>}
@@ -208,9 +212,9 @@ const SelectInput: React.FC<SelectInputProps> = ({
               }
             }}
             className={`
-              w-full h-10 pl-4 pr-10
+              w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
               border rounded-md outline-none
-              text-[15px] font-semibold flex items-center justify-between
+              text-xs sm:text-[15px] font-semibold flex items-center justify-between
               transition-all duration-250 text-left
               [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-ink)]
               ${value ? "text-ink" : "text-ink-subtle font-normal"}
@@ -234,9 +238,9 @@ const SelectInput: React.FC<SelectInputProps> = ({
               }
             }}
             className={`
-              w-full h-10 pl-4 pr-10
+              w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
               border rounded-md outline-none
-              text-[15px] font-semibold flex items-center justify-between
+              text-xs sm:text-[15px] font-semibold flex items-center justify-between
               transition-all duration-250 text-left
               ${value ? "text-ink" : "text-ink-subtle font-normal"}
               ${error
@@ -251,8 +255,8 @@ const SelectInput: React.FC<SelectInputProps> = ({
           </button>
         )}
 
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none">
-          <FaChevronDown className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <span className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none">
+          <FaChevronDown className={`text-[10px] sm:text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
         </span>
 
         {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}

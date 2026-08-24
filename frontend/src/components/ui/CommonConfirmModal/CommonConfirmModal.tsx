@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import CustomButton from "../Button/Button";
-import { FaExclamationTriangle, FaTimes, FaTrash } from "react-icons/fa";
+import { FaTrash } from "react-icons/fa";
+import { AlertTriangle, X } from "lucide-react";
 import type { CommonConfirmModalProps } from "./common-confirm-modal.types";
 
 const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
@@ -21,12 +22,10 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   loadingText = "Processing...",
   confirmIcon = FaTrash,
 }) => {
-  // Support both prop naming conventions
   const isVisible = show ?? isOpen ?? false;
   const handleClose = onHide ?? onClose ?? (() => {});
   const dangerMode = isDangerous ?? confirmVariant === "danger";
 
-  // Handle escape key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isVisible) handleClose();
@@ -37,28 +36,28 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
 
   if (!isVisible) return null;
 
-  // Determine colors based on variant
-  const iconBgClass = dangerMode ? "bg-red-100" : "bg-primary/10";
-  const iconColorClass = dangerMode ? "text-red-500" : "text-primary";
-  const titleColorClass = dangerMode ? "text-red-600" : "text-ink";
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      onClick={handleClose}
+    >
       <div
-        className="bg-card rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 relative"
+        className="bg-card border border-line-soft rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 relative"
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-8 text-center">
-          <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${iconBgClass} mb-4`}>
-            <FaExclamationTriangle className={`${iconColorClass}`} size={28} />
+        <div className="p-6 text-center">
+          {/* Icon */}
+          <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full mb-4 ${dangerMode ? "bg-red-500/15 border border-red-500/20" : "bg-accent/15 border border-accent/20"}`}>
+            <AlertTriangle className={dangerMode ? "text-red-400" : "text-accent"} size={24} />
           </div>
 
-          <h5 className={`text-xl font-bold mb-2 ${titleColorClass}`}>
+          <h5 className={`text-lg font-bold mb-2 ${dangerMode ? "text-red-400" : "text-ink"}`}>
             {title}
           </h5>
 
-          <p className="text-ink-muted mb-2">
+          <p className="text-sm text-ink-muted mb-1.5">
             {message}
           </p>
 
@@ -68,20 +67,21 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
             </p>
           )}
 
-          <div className="flex justify-center gap-3 mt-8">
+          <div className="flex justify-center gap-2.5 mt-6">
             <CustomButton
               text={cancelText}
-              icon={FaTimes}
+              variant="secondary"
               onClick={handleClose}
               disabled={isLoading}
-              className="!bg-card-2 !text-ink-muted hover:!bg-line !border-transparent px-6"
+              className="px-5"
             />
             <CustomButton
               text={isLoading ? loadingText : confirmText}
               icon={confirmIcon}
+              variant={dangerMode ? "danger" : "primary"}
               onClick={onConfirm}
               disabled={confirmDisabled || isLoading}
-              className={dangerMode ? "!bg-red-500 hover:!bg-red-600 !text-white !border-red-500 px-6" : "px-6"}
+              className="px-5"
             />
           </div>
         </div>

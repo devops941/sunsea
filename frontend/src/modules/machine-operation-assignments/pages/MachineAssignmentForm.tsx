@@ -24,7 +24,6 @@ export const MachineAssignmentForm: React.FC = () => {
     const monday = new Date(d.setDate(diff));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-
     return {
       start: monday.toISOString().split("T")[0],
       end: sunday.toISOString().split("T")[0],
@@ -38,10 +37,8 @@ export const MachineAssignmentForm: React.FC = () => {
     const diffToMonday = day === 0 ? -6 : 1 - day;
     const monday = new Date(d);
     monday.setDate(d.getDate() + diffToMonday);
-    
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-
     return {
       start: monday.toISOString().split("T")[0],
       end: sunday.toISOString().split("T")[0],
@@ -55,9 +52,7 @@ export const MachineAssignmentForm: React.FC = () => {
     shiftId: "",
     weekStartDate: currentWeek.start,
     weekEndDate: currentWeek.end,
-    operators: [
-      { roleId: "", employeeId: "" }
-    ],
+    operators: [{ roleId: "", employeeId: "" }],
     remarks: "",
     isActive: true,
   };
@@ -72,7 +67,6 @@ export const MachineAssignmentForm: React.FC = () => {
   const [assignedShifts, setAssignedShifts] = useState<string[]>([]);
   const [employeesByRole, setEmployeesByRole] = useState<Record<string, any[]>>({});
 
-  // 1. Fetch reference data (Machines & Roles & Shifts)
   const fetchRefData = useCallback(async () => {
     try {
       const [mRes, rRes, sRes] = await Promise.all([
@@ -80,19 +74,16 @@ export const MachineAssignmentForm: React.FC = () => {
         machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
         shiftService.fetchAll().catch(() => []),
       ]);
-
       const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
       setMachines(machineList.filter((m: any) => m.isActive !== false));
-
-        const roleList = (rRes.data || []).filter((r: any) => 
-          !r.name?.toLowerCase().includes("super admin") &&
-          !r.name?.toLowerCase().includes("superadmin") &&
-          !r.code?.toLowerCase().includes("super_admin") &&
-          !r.code?.toLowerCase().includes("superadmin") &&
-          r.code?.toLowerCase() !== "role_admin"
-        );
-        setRoles(roleList);
-
+      const roleList = (rRes.data || []).filter((r: any) =>
+        !r.name?.toLowerCase().includes("super admin") &&
+        !r.name?.toLowerCase().includes("superadmin") &&
+        !r.code?.toLowerCase().includes("super_admin") &&
+        !r.code?.toLowerCase().includes("superadmin") &&
+        r.code?.toLowerCase() !== "role_admin"
+      );
+      setRoles(roleList);
       const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
       setShifts(shiftList.filter((s: any) => s.isActive !== false));
     } catch (err: any) {
@@ -102,7 +93,6 @@ export const MachineAssignmentForm: React.FC = () => {
   }, []);
 
   const refreshEmployees = useCallback(() => {
-    // Re-fetch employees for all currently selected roles
     const roleIds = new Set<string>();
     formData.operators.forEach(op => { if (op.roleId) roleIds.add(op.roleId); });
     roleIds.forEach(roleId => {
@@ -112,23 +102,15 @@ export const MachineAssignmentForm: React.FC = () => {
     });
   }, [formData.operators]);
 
-  // Real-time socket sync for dropdowns
   useSocketSync("machine", undefined, fetchRefData);
   useSocketSync("role", undefined, fetchRefData);
   useSocketSync("shift", undefined, fetchRefData);
   useSocketSync("employee", undefined, refreshEmployees);
 
-  useEffect(() => {
-    fetchRefData();
-  }, [fetchRefData]);
+  useEffect(() => { fetchRefData(); }, [fetchRefData]);
 
-  // 2. Fetch single assignment data if editing
   useEffect(() => {
-    if (!id) {
-      setFormData(initialFormState);
-      return;
-    }
-
+    if (!id) { setFormData(initialFormState); return; }
     const fetchAssignment = async () => {
       setInitialLoading(true);
       try {
@@ -147,8 +129,6 @@ export const MachineAssignmentForm: React.FC = () => {
             remarks: data.remarks || "",
             isActive: data.isActive !== false,
           });
-
-          // Fetch employees for loaded roles
           if (data.operators) {
             data.operators.forEach((op: any) => {
               if (op.roleId) fetchEmployeesForRole(String(op.roleId));
@@ -163,11 +143,9 @@ export const MachineAssignmentForm: React.FC = () => {
         setInitialLoading(false);
       }
     };
-
     fetchAssignment();
   }, [id]);
 
-  // 3. Fetch assigned shifts for selected machine/week
   useEffect(() => {
     if (formData.machineId && formData.weekStartDate) {
       fetchAssignedShifts();
@@ -221,9 +199,7 @@ export const MachineAssignmentForm: React.FC = () => {
   };
 
   const handleOperatorChange = (index: number, field: "roleId" | "employeeId", value: string) => {
-    if (field === "roleId" && value) {
-      fetchEmployeesForRole(value);
-    }
+    if (field === "roleId" && value) fetchEmployeesForRole(value);
     setFormData(prev => {
       const newOps = [...prev.operators];
       newOps[index] = { ...newOps[index], [field]: value };
@@ -238,7 +214,6 @@ export const MachineAssignmentForm: React.FC = () => {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.machineId) newErrors.machineId = "Machine is required";
     if (!formData.shiftId) newErrors.shiftId = "Shift is required";
     if (!formData.weekStartDate) newErrors.weekStartDate = "Start date is required";
@@ -257,14 +232,11 @@ export const MachineAssignmentForm: React.FC = () => {
         if (!op.employeeId) {
           newErrors[`operatorEmp_${idx}`] = "Employee is required";
         } else {
-          if (empIds.has(op.employeeId)) {
-            newErrors[`operatorEmp_${idx}`] = "Duplicate employee";
-          }
+          if (empIds.has(op.employeeId)) newErrors[`operatorEmp_${idx}`] = "Duplicate employee";
           empIds.add(op.employeeId);
         }
       });
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -278,7 +250,6 @@ export const MachineAssignmentForm: React.FC = () => {
     e.preventDefault();
     if (loading) return;
     if (!validate()) return;
-
     setLoading(true);
     try {
       const payload = {
@@ -293,7 +264,6 @@ export const MachineAssignmentForm: React.FC = () => {
         remarks: formData.remarks || null,
         isActive: formData.isActive,
       };
-
       if (isEdit && id) {
         await machineOperationAssignmentService.updateAssignment(id, payload);
         toast.success("Machine Operation Assignment updated successfully!");
@@ -301,7 +271,6 @@ export const MachineAssignmentForm: React.FC = () => {
         await machineOperationAssignmentService.createAssignment(payload);
         toast.success("Machine Operation Assignment created successfully!");
       }
-
       navigate("/machines/assignments");
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || "Failed to save assignment";
@@ -314,7 +283,7 @@ export const MachineAssignmentForm: React.FC = () => {
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-slate-500 font-medium">Loading details...</div>
+        <div className="text-ink-subtle font-medium">Loading details...</div>
       </div>
     );
   }
@@ -322,166 +291,165 @@ export const MachineAssignmentForm: React.FC = () => {
   const selectedEmpIds = new Set(formData.operators.map(op => op.employeeId).filter(Boolean));
 
   return (
-    <div className="w-full mx-auto">
-      <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
-        <div className="px-6 py-5 border-b border-line-soft">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-ink">
-              {isEdit ? "Edit Machine Assignment" : "Assign Machine Operation"}
-            </h2>
-            <BackButton text="Back to List" to="/machines/assignments" />
-          </div>
-        </div>
+    <div className="w-full">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-ink">
+          {isEdit ? "Edit Machine Assignment" : "Assign Machine Operation"}
+        </h2>
+        <BackButton text="Back to List" to="/machines/assignments" />
+      </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6" noValidate>
-          {/* Section 1: Week, Machine & Shift Selection */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">
-              1. Week, Machine & Shift Selection
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              <DatePickerCalendar
-                label="Week Start Date"
-                name="weekStartDate"
-                required
-                value={formData.weekStartDate}
-                onChange={(e: any) => {
-                  const range = getWeekRangeForDate(e.target.value);
-                  if (range) {
-                    setFormData({ ...formData, weekStartDate: range.start, weekEndDate: range.end });
-                  } else {
-                    setFormData({ ...formData, weekStartDate: e.target.value });
-                  }
-                }}
-                error={errors.weekStartDate}
-              />
-              <DatePickerCalendar
-                label="Week End Date"
-                name="weekEndDate"
-                required
-                value={formData.weekEndDate}
-                onChange={(e: any) => {
-                  const range = getWeekRangeForDate(e.target.value);
-                  if (range) {
-                    setFormData({ ...formData, weekStartDate: range.start, weekEndDate: range.end });
-                  } else {
-                    setFormData({ ...formData, weekEndDate: e.target.value });
-                  }
-                }}
-                error={errors.weekEndDate}
-              />
-              <SelectInput
-                label="Machine"
-                name="machineId"
-                required
-                value={formData.machineId}
-                onChange={(e) => handleMachineSelect(e.target.value)}
-                error={errors.machineId}
-                options={[
-                  { label: "-- Select Machine --", value: "" },
-                  ...machines.map((m) => ({
-                    label: `${m.machineName} (${m.machineId})`,
-                    value: m.machineId,
-                  })),
-                ]}
-              />
-              <SelectInput
-                label="Shift"
-                name="shiftId"
-                required
-                value={formData.shiftId}
-                onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
-                error={errors.shiftId}
-                options={[
-                  { label: "-- Select Shift --", value: "" },
-                  ...shifts.map((s) => ({
-                    label: `${s.shiftName} (${s.startTime} - ${s.endTime})`,
-                    value: s.shiftCode,
-                    disabled: assignedShifts.includes(s.shiftCode)
-                  })),
-                ]}
-              />
-            </div>
-          </div>
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-180px)] flex flex-col">
+          <div className="flex-1 p-5 lg:p-6 space-y-6">
 
-          {/* Section 2: Machine Operator Assignment */}
-          <div className="space-y-4 pt-5 border-t border-line-soft">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">
-                2. Machine Operator Assignment (Weekly)
-              </h3>
-              <CustomButton
-                type="button"
-                onClick={handleAddOperator}
-                variant="primary"
-                text="Add Operator"
-                icon={FaPlus}
-              />
+            {/* Section 1: Week, Machine & Shift */}
+            <div className="space-y-4">
+              <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Week, Machine & Shift Selection</h6>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <DatePickerCalendar
+                  label="Week Start Date"
+                  name="weekStartDate"
+                  required
+                  value={formData.weekStartDate}
+                  onChange={(e: any) => {
+                    const range = getWeekRangeForDate(e.target.value);
+                    if (range) {
+                      setFormData({ ...formData, weekStartDate: range.start, weekEndDate: range.end });
+                    } else {
+                      setFormData({ ...formData, weekStartDate: e.target.value });
+                    }
+                  }}
+                  error={errors.weekStartDate}
+                />
+                <DatePickerCalendar
+                  label="Week End Date"
+                  name="weekEndDate"
+                  required
+                  value={formData.weekEndDate}
+                  onChange={(e: any) => {
+                    const range = getWeekRangeForDate(e.target.value);
+                    if (range) {
+                      setFormData({ ...formData, weekStartDate: range.start, weekEndDate: range.end });
+                    } else {
+                      setFormData({ ...formData, weekEndDate: e.target.value });
+                    }
+                  }}
+                  error={errors.weekEndDate}
+                />
+                <SelectInput
+                  label="Machine"
+                  name="machineId"
+                  required
+                  value={formData.machineId}
+                  onChange={(e) => handleMachineSelect(e.target.value)}
+                  error={errors.machineId}
+                  options={[
+                    { label: "-- Select Machine --", value: "" },
+                    ...machines.map((m) => ({
+                      label: `${m.machineName} (${m.machineId})`,
+                      value: m.machineId,
+                    })),
+                  ]}
+                />
+                <SelectInput
+                  label="Shift"
+                  name="shiftId"
+                  required
+                  value={formData.shiftId}
+                  onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
+                  error={errors.shiftId}
+                  options={[
+                    { label: "-- Select Shift --", value: "" },
+                    ...shifts.map((s) => ({
+                      label: `${s.shiftName} (${s.startTime} - ${s.endTime})`,
+                      value: s.shiftCode,
+                      disabled: assignedShifts.includes(s.shiftCode)
+                    })),
+                  ]}
+                />
+              </div>
             </div>
-            {errors.operators && <p className="text-red-500 text-xs font-medium">{errors.operators}</p>}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {formData.operators.map((operator, index) => (
-                <div key={index} className="bg-card-2 p-4 rounded-xl border border-line-soft space-y-4 relative group">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-ink">Operator {index + 1}</span>
-                    {formData.operators.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveOperator(index)}
-                        className="text-red-400 hover:text-red-300 p-1 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors"
-                        title="Remove Operator"
-                      >
-                        <FaTimes size={13} />
-                      </button>
-                    )}
+
+            <div className="border-t border-line-soft/50" />
+
+            {/* Section 2: Operators */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Machine Operator Assignment</h6>
+                <CustomButton
+                  type="button"
+                  onClick={handleAddOperator}
+                  variant="primary"
+                  text="Add Operator"
+                  icon={FaPlus}
+                />
+              </div>
+              {errors.operators && <p className="text-red-500 text-xs font-medium">{errors.operators}</p>}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formData.operators.map((operator, index) => (
+                  <div key={index} className="bg-card-2 p-4 rounded-xl border border-line-soft space-y-4 relative">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-semibold text-ink">Operator {index + 1}</span>
+                      {formData.operators.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveOperator(index)}
+                          className="text-red-400 hover:text-red-300 p-1 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors"
+                          title="Remove Operator"
+                        >
+                          <FaTimes size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <SelectInput
+                        label="Select Role First"
+                        name={`operatorRole_${index}`}
+                        value={operator.roleId}
+                        onChange={(e) => handleOperatorChange(index, "roleId", e.target.value)}
+                        error={errors[`operatorRole_${index}`]}
+                        options={[
+                          { label: "-- Select Role --", value: "" },
+                          ...roles.map((r) => ({
+                            label: r.name,
+                            value: String(r.id),
+                          })),
+                        ]}
+                        required
+                      />
+                      <SelectInput
+                        label="Select Operator"
+                        name={`operatorEmp_${index}`}
+                        required
+                        value={operator.employeeId}
+                        onChange={(e) => handleOperatorChange(index, "employeeId", e.target.value)}
+                        error={errors[`operatorEmp_${index}`]}
+                        disabled={!operator.roleId}
+                        options={[
+                          { label: "-- Select Operator --", value: "" },
+                          ...(employeesByRole[operator.roleId] || []).map((e: any) => {
+                            const roleName = e.user?.role?.name || e.role?.name;
+                            return {
+                              label: `${e.fullName} (${e.empCode})${roleName ? ` - ${roleName}` : ""}`,
+                              value: String(e.id),
+                              disabled: selectedEmpIds.has(String(e.id)) && operator.employeeId !== String(e.id)
+                            };
+                          }),
+                        ]}
+                      />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <SelectInput
-                      label="Select Role First"
-                      name={`operatorRole_${index}`}
-                      value={operator.roleId}
-                      onChange={(e) => handleOperatorChange(index, "roleId", e.target.value)}
-                      error={errors[`operatorRole_${index}`]}
-                      options={[
-                        { label: "-- Select Role --", value: "" },
-                        ...roles.map((r) => ({
-                          label: r.name,
-                          value: String(r.id),
-                        })),
-                      ]}
-                      required
-                    />
-
-                    <SelectInput
-                      label="Select Operator"
-                      name={`operatorEmp_${index}`}
-                      required
-                      value={operator.employeeId}
-                      onChange={(e) => handleOperatorChange(index, "employeeId", e.target.value)}
-                      error={errors[`operatorEmp_${index}`]}
-                      disabled={!operator.roleId}
-                      options={[
-                        { label: "-- Select Operator --", value: "" },
-                        ...(employeesByRole[operator.roleId] || []).map((e: any) => {
-                          const roleName = e.user?.role?.name || e.role?.name;
-                          return {
-                            label: `${e.fullName} (${e.empCode})${roleName ? ` - ${roleName}` : ""}`,
-                            value: String(e.id),
-                            disabled: selectedEmpIds.has(String(e.id)) && operator.employeeId !== String(e.id)
-                          };
-                        }),
-                      ]}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Section 3: Remarks */}
-          <div className="space-y-4 pt-5 border-t border-line-soft">
-            <div className="grid grid-cols-1 gap-5">
+            <div className="border-t border-line-soft/50" />
+
+            {/* Section 3: Remarks */}
+            <div className="space-y-4">
+              <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Remarks</h6>
               <TextInput
                 label="Remarks / Notes (Optional)"
                 name="remarks"
@@ -492,8 +460,7 @@ export const MachineAssignmentForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-line-soft">
+          <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end gap-3 mt-auto">
             <CustomButton
               text="Clear"
               icon={FaEraser}
@@ -508,8 +475,8 @@ export const MachineAssignmentForm: React.FC = () => {
               disabled={loading}
             />
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 };

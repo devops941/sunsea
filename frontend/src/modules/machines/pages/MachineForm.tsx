@@ -68,7 +68,7 @@ const MachineForm: React.FC = () => {
         }
         machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId))
             .then(res => setEmployees(res.data || []))
-            .catch(() => {});
+            .catch(() => { });
     }, [inchargeRoleId]);
 
     useSocketSync("role", undefined, fetchRoles);
@@ -102,7 +102,7 @@ const MachineForm: React.FC = () => {
         } else {
             machineService.fetchNextId()
                 .then((nextId) => setFormData(prev => ({ ...prev, machineId: nextId })))
-                .catch(() => {});
+                .catch(() => { });
         }
     }, [isEdit, id, navigate]);
 

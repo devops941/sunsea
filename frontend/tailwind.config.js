@@ -5,32 +5,32 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand — red primary, charcoal secondary (replaces --color-primary / --color-secondary)
+        // Brand
         primary: {
           DEFAULT: "#DC2626",
           light: "#EF4444",
         },
         secondary: {
-          DEFAULT: "#2C2C2A", // charcoal, replacing the old gold (#CB7A21)
-          light: "#4A4A47",
+          DEFAULT: "#CBD5E1",
+          light: "#1C273C",
         },
-        // Text
-        "text-primary": "#282B32",
-        "text-secondary": "#6B7280",
-        "text-muted": "#9CA3AF",
-        // Surfaces
-        page: "#FEFEF2",
-        surface: "#FDFDFC",
-        border: "#E5E7EB",
-        // Status (unchanged from original)
+        // Text (dark)
+        "text-primary": "#F8FAFC",
+        "text-secondary": "#CBD5E1",
+        "text-muted": "#94A3B8",
+        // Surfaces (dark)
+        page: "#0B1120",
+        surface: "#131B2E",
+        border: "#28354A",
+        // Status
         success: "#22C55E",
         warning: "#FDB702",
         danger: "#EF4444",
         info: "#3B82F6",
-        // Sidebar
-        "sidebar-bg": "#FFFFFF",
-        "sidebar-hover": "#F3F4F6",
-        "sidebar-text": "#374151",
+        // Sidebar (dark)
+        "sidebar-bg": "#0F172A",
+        "sidebar-hover": "#1E293B",
+        "sidebar-text": "#94A3B8",
       },
       fontFamily: {
         head: ["head-font", "sans-serif"],
@@ -42,8 +42,8 @@ export default {
         lg: "16px",
       },
       boxShadow: {
-        sm: "0 2px 6px rgba(0,0,0,0.08)",
-        md: "0 4px 12px rgba(0,0,0,0.12)",
+        sm: "0 2px 6px rgba(0,0,0,0.3)",
+        md: "0 4px 12px rgba(0,0,0,0.4)",
       },
       transitionDuration: {
         fast: "200ms",

@@ -346,11 +346,10 @@ export const SalesReturnPage: React.FC = () => {
               {
                 label: "Customer",
                 value: selectedViewReturn?.customer?.firmName
-                  ? `${selectedViewReturn.customer.firmName}${
-                      selectedViewReturn.customer.customerGrade?.name
-                        ? ` (${selectedViewReturn.customer.customerGrade.name})`
-                        : ""
-                    }`
+                  ? `${selectedViewReturn.customer.firmName}${selectedViewReturn.customer.customerGrade?.name
+                    ? ` (${selectedViewReturn.customer.customerGrade.name})`
+                    : ""
+                  }`
                   : "-",
               },
               { label: "Sales Invoice", value: selectedViewReturn?.salesInvoiceId ? `INV #${selectedViewReturn.salesInvoiceId}` : "Direct Return" },

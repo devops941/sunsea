@@ -41,99 +41,99 @@ const SECTION_STYLE: Record<string, {
   hex: string;
 }> = {
   dashboard: {
-    activeBg: "bg-slate-700",
-    activeShadow: "shadow-slate-300",
+    activeBg: "bg-slate-600",
+    activeShadow: "shadow-slate-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-slate-100 text-slate-700",
-    iconClass: "text-slate-500",
+    badgeInactive: "bg-slate-500/15 text-slate-400",
+    iconClass: "text-slate-400",
     hex: "#334155",
   },
   administration: {
     activeBg: "bg-violet-600",
-    activeShadow: "shadow-violet-200",
+    activeShadow: "shadow-violet-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-violet-100 text-violet-700",
+    badgeInactive: "bg-violet-500/15 text-violet-400",
     iconClass: "text-violet-400",
     hex: "#7c3aed",
   },
   hr: {
     activeBg: "bg-blue-600",
-    activeShadow: "shadow-blue-200",
+    activeShadow: "shadow-blue-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-blue-100 text-blue-700",
+    badgeInactive: "bg-blue-500/15 text-blue-400",
     iconClass: "text-blue-400",
     hex: "#2563eb",
   },
   products: {
     activeBg: "bg-emerald-600",
-    activeShadow: "shadow-emerald-200",
+    activeShadow: "shadow-emerald-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-emerald-100 text-emerald-700",
+    badgeInactive: "bg-emerald-500/15 text-emerald-400",
     iconClass: "text-emerald-400",
     hex: "#059669",
   },
   purchase: {
     activeBg: "bg-orange-500",
-    activeShadow: "shadow-orange-200",
+    activeShadow: "shadow-orange-500/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-orange-100 text-orange-700",
+    badgeInactive: "bg-orange-500/15 text-orange-400",
     iconClass: "text-orange-400",
     hex: "#f97316",
   },
   sales: {
     activeBg: "bg-sky-600",
-    activeShadow: "shadow-sky-200",
+    activeShadow: "shadow-sky-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-sky-100 text-sky-700",
+    badgeInactive: "bg-sky-500/15 text-sky-400",
     iconClass: "text-sky-400",
     hex: "#0284c7",
   },
   production: {
     activeBg: "bg-rose-600",
-    activeShadow: "shadow-rose-200",
+    activeShadow: "shadow-rose-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-rose-100 text-rose-700",
+    badgeInactive: "bg-rose-500/15 text-rose-400",
     iconClass: "text-rose-400",
     hex: "#e11d48",
   },
   inventory: {
     activeBg: "bg-teal-600",
-    activeShadow: "shadow-teal-200",
+    activeShadow: "shadow-teal-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-teal-100 text-teal-700",
+    badgeInactive: "bg-teal-500/15 text-teal-400",
     iconClass: "text-teal-400",
     hex: "#0d9488",
   },
   stores: {
     activeBg: "bg-indigo-600",
-    activeShadow: "shadow-indigo-200",
+    activeShadow: "shadow-indigo-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-indigo-100 text-indigo-700",
+    badgeInactive: "bg-indigo-500/15 text-indigo-400",
     iconClass: "text-indigo-400",
     hex: "#4338ca",
   },
   reports: {
     activeBg: "bg-pink-600",
-    activeShadow: "shadow-pink-200",
+    activeShadow: "shadow-pink-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-pink-100 text-pink-700",
+    badgeInactive: "bg-pink-500/15 text-pink-400",
     iconClass: "text-pink-400",
     hex: "#db2777",
   },
   accounts: {
     activeBg: "bg-green-700",
-    activeShadow: "shadow-green-200",
+    activeShadow: "shadow-green-700/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-green-100 text-green-700",
-    iconClass: "text-green-500",
+    badgeInactive: "bg-green-500/15 text-green-400",
+    iconClass: "text-green-400",
     hex: "#15803d",
   },
   payroll: {
     activeBg: "bg-cyan-600",
-    activeShadow: "shadow-cyan-200",
+    activeShadow: "shadow-cyan-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-cyan-100 text-cyan-700",
-    iconClass: "text-cyan-500",
+    badgeInactive: "bg-cyan-500/15 text-cyan-400",
+    iconClass: "text-cyan-400",
     hex: "#0891b2",
   },
 };
@@ -642,7 +642,7 @@ const RolePermissionMapping: React.FC = () => {
       {/* PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-ink tracking-tight mb-1">
+          <h2 className="text-xl font-extrabold text-ink tracking-tight mb-1">
             Role Permissions Matrix
           </h2>
           <p className="text-sm text-ink-muted">
@@ -764,8 +764,8 @@ const RolePermissionMapping: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[580px]">
                     <thead>
-                      <tr className="border-b border-line-soft">
-                        <th className="text-left py-3 px-5 text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider w-[240px]">
+                      <tr className="border-b border-line-soft bg-card-2/50">
+                        <th className="text-left py-3 px-5 text-[10px] font-extrabold text-ink-muted uppercase tracking-[1.5px] w-[240px]">
                           Page / Module
                         </th>
                         {ACTIONS.map(action => {
@@ -809,8 +809,8 @@ const RolePermissionMapping: React.FC = () => {
                             <tr className={`transition-colors hover:bg-card-2 ${rowBg} ${extraPerms.length > 0 ? "border-b-0" : ""}`}>
                               {/* Entity name */}
                               <td className="py-3 px-5">
-                                <div className="font-semibold text-ink text-sm">{mod.label}</div>
-                                <div className="text-[10px] text-ink-subtle font-mono mt-0.5">{mod.key}</div>
+                                <div className="font-semibold text-ink text-[13px]">{mod.label}</div>
+                                <div className="text-[9px] text-ink-subtle/60 font-mono mt-0.5">{mod.key}</div>
                               </td>
 
                               {/* View / Add / Edit / Delete checkboxes */}
@@ -940,18 +940,18 @@ const RolePermissionMapping: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Cb checked={false} indeterminate onChange={() => { }} hex="#6b7280" size={13} disabled />
-                    <span className="text-[11px] text-gray-400">Partially assigned</span>
+                    <span className="text-[11px] text-ink-subtle">Partially assigned</span>
                   </div>
                   {isSuperAdmin && (
                     <div className="flex items-center gap-1.5">
                       <FaKey className="text-violet-400" size={10} />
-                      <span className="text-[11px] text-violet-500 font-medium">Special Access</span>
-                      <span className="text-[11px] text-gray-400">— Super Admin only · mutually exclusive pairs are auto-locked</span>
+                      <span className="text-[11px] text-violet-400 font-medium">Special Access</span>
+                      <span className="text-[11px] text-ink-subtle">— Super Admin only · mutually exclusive pairs are auto-locked</span>
                     </div>
                   )}
                   {busy && (
-                    <div className="ml-auto flex items-center gap-1.5 text-xs text-gray-500">
-                      <svg className="animate-spin w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none">
+                    <div className="ml-auto flex items-center gap-1.5 text-xs text-ink-subtle">
+                      <svg className="animate-spin w-3.5 h-3.5 text-ink-subtle" viewBox="0 0 24 24" fill="none">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                       </svg>

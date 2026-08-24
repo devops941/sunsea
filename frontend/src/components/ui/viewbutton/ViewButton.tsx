@@ -19,12 +19,10 @@ const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled, onMouseEnter
         flex items-center justify-center
         border border-blue-500/20 rounded-xl
         cursor-pointer
-        bg-blue-500/10 text-blue-600
-        dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30
+        bg-blue-500/20 text-blue-400 border-blue-500/30
         transition-all duration-[250ms] ease-in-out
         hover:-translate-y-[3px]
         hover:bg-blue-500 hover:text-white
-        dark:hover:bg-blue-500 dark:hover:text-white
         hover:shadow-[0_8px_18px_rgba(59,130,246,0.25)]
         active:scale-95
         disabled:opacity-50

@@ -424,6 +424,7 @@ export const PurchaseReturnPage: React.FC = () => {
             <CustomButton
               text="Clear"
               icon={FaEraser}
+              variant="secondary"
               onClick={resetForm}
               disabled={submitting}
               type="button"

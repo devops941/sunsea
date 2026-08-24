@@ -59,7 +59,7 @@ const BaseLayout = () => {
 
         {/* Main Content */}
         <main className="flex-1 w-full min-w-0 overflow-y-auto bg-page">
-          <div className="w-full px-4 sm:px-6 py-4">
+          <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-4">
             <Outlet />
           </div>
         </main>

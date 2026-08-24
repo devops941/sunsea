@@ -335,6 +335,7 @@ export const PettyCashPage: React.FC = () => {
             <CustomButton
               text="Clear"
               icon={FaEraser}
+              variant="secondary"
               onClick={resetForm}
               disabled={submitting}
               type="button"

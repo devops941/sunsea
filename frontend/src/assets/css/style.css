@@ -4,60 +4,7 @@
 @theme {
     --color-primary: var(--color-red-600);
 
-    /* ── Nav / sidebar chrome ─────────────────────────────────────────────
-       Nav tokens adapt seamlessly between Light theme (rich deep teal)
-       and Dark theme (sleek dark surface with teal active pills).
-    ------------------------------------------------------------------- */
-    --color-nav: #0F172A;
-    --color-nav-fg: #F8FAFC;
-    --color-nav-active: #0D9488;
-    --color-nav-active-fg: #FFFFFF;
-    --color-nav-hover: #1E293B;
-    --color-accent: #0D9488;
-
-    /* ── Semantic theme tokens ────────────────────────────────────────────
-       Tailwind emits these as var() references (e.g. .bg-card resolves to
-       `background-color: var(--color-card)`), so redefining the variables
-       under :root[data-theme="dark"] below re-themes the whole app at
-       runtime with no rebuild and no `dark:` variants in the markup.
-
-       Deliberately named apart from the legacy --color-surface/-bg/-border
-       set further down this file, which is plain CSS and generates no
-       utilities; overriding those here would collide.
-
-         page       app background behind the cards
-         card       raised surface (cards, modals, dropdowns)
-         card-2     subtle inset / hover fill on top of `card`
-         ink        primary text
-         ink-muted  secondary text
-         ink-subtle labels, placeholders, disabled
-         line       default border
-         line-soft  low-contrast divider (table rows)
-         head       table header band
-       ------------------------------------------------------------------- */
-    --color-page: #F8FAFC;
-    --color-card: #FFFFFF;
-    --color-card-2: #F8FAFC;
-    --color-ink: #1E293B;
-    --color-ink-muted: #475569;
-    --color-ink-subtle: #94A3B8;
-    --color-line: #E2E8F0;
-    --color-line-soft: #F1F5F9;
-    --color-head: #E5EAEF;
-
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
-}
-
-/* ── Dark palette ─────────────────────────────────────────────────────────
-   `:root[data-theme="dark"]` is specificity (0,2,0), so it reliably beats
-   both the `@theme` output and the legacy `:root` block regardless of source
-   order. ThemeProvider sets the attribute on <html>.
-   The legacy --color-surface/-bg/-border/-text-* vars are re-pointed too, so
-   the handful of components still using them inline follow the theme.
-   ------------------------------------------------------------------------- */
-:root[data-theme="dark"] {
+    /* ── Nav / sidebar chrome (dark) ──────────────────────────────────── */
     --color-nav: #0F172A;
     --color-nav-fg: #94A3B8;
     --color-nav-active: #0D9488;
@@ -65,6 +12,7 @@
     --color-nav-hover: #1E293B;
     --color-accent: #2DD4BF;
 
+    /* ── Semantic theme tokens (dark only) ────────────────────────────── */
     --color-page: #0B1120;
     --color-card: #131B2E;
     --color-card-2: #1C273C;
@@ -75,17 +23,9 @@
     --color-line-soft: #1E2A3E;
     --color-head: #1A2438;
 
-    /* legacy vars, kept in sync */
-    --color-bg: #0B1120;
-    --color-surface: #131B2E;
-    --color-border: #28354A;
-    --color-text-primary: #F8FAFC;
-    --color-text-secondary: #CBD5E1;
-    --color-text-muted: #94A3B8;
-    --color-neutral-light: #1C273C;
-    --color-secondary-light: #1C273C;
-
-    color-scheme: dark;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
 }
 
 /* Override Bootstrap !important utility classes with our Tailwind Theme Color */
@@ -121,23 +61,23 @@
 :root {
     /* Brand Colors */
     --color-primary: #5D87FF;
-    --color-primary-light: #FEE2E2;
+    --color-primary-light: #1E3A5F;
 
-    --color-secondary: #1A1C1E;
-    --color-secondary-light: #F3F4F6;
+    --color-secondary: #CBD5E1;
+    --color-secondary-light: #1C273C;
 
-    --color-neutral: #64748B;
-    --color-neutral-light: #F1F5F9;
+    --color-neutral: #94A3B8;
+    --color-neutral-light: #1C273C;
 
-    /* Text */
-    --color-text-primary: #282B32;
-    --color-text-secondary: #6B7280;
-    --color-text-muted: #9CA3AF;
+    /* Text (dark) */
+    --color-text-primary: #F8FAFC;
+    --color-text-secondary: #CBD5E1;
+    --color-text-muted: #94A3B8;
 
-    /* Background */
-    --color-bg: #FEFEF2;
-    --color-surface: #FDFDFC;
-    --color-border: #E5E7EB;
+    /* Background (dark) */
+    --color-bg: #0B1120;
+    --color-surface: #131B2E;
+    --color-border: #28354A;
 
     /* Status */
     --color-success: #22C55E;
@@ -146,8 +86,6 @@
     --color-info: #3B82F6;
     --color-black: #000000;
     --color-white: #FFFFFF;
-
-
 
     /* Fonts */
     --font-head: 'Plus Jakarta Sans', sans-serif;
@@ -159,12 +97,14 @@
     --radius-lg: 16px;
 
     /* Shadow */
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.08);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
 
     /* Transition */
     --transition-fast: 0.2s ease;
     --transition-base: 0.3s ease;
+
+    color-scheme: dark;
 }
 
 /* ===============================

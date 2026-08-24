@@ -207,6 +207,8 @@ interface IndiaPhoneInputMultiProps {
     /** returns updated array */
     onChange: (e: { target: { name: string; value: PhoneEntry[] } }) => void;
     maxNumbers?: number;
+    /** Place label and input side by side in one row */
+    horizontal?: boolean;
 }
 
 type IndiaPhoneInputProps = IndiaPhoneInputSingleProps | IndiaPhoneInputMultiProps;
@@ -260,7 +262,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
 
     /* ============ MULTI MODE — dropdown multiselect pattern ============ */
     if (props.multi) {
-        const { value, onChange, error, maxNumbers } = props;
+        const { value, onChange, error, maxNumbers, horizontal: multiHorizontal = false } = props;
         const entries = value || [];
         const atMax = !!maxNumbers && entries.length >= maxNumbers;
         const usedTypes = entries.map((e) => e.label);
@@ -346,15 +348,15 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
         const displayError = error || draftError || (isOpen ? null : requiredError);
 
         return (
-            <div className="group w-full" ref={wrapperRef}>
+            <div className={`group w-full ${multiHorizontal ? "flex items-center gap-3" : ""}`} ref={wrapperRef}>
                 {label && (
-                    <label className={`flex items-center gap-1.5 mb-2 text-xs font-extrabold uppercase tracking-[0.5px] transition-colors duration-250 ${displayError ? 'text-red-500' : 'text-ink'} group-focus-within:text-primary`}>
+                    <label className={`flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.5px] transition-colors duration-250 ${displayError ? 'text-red-500' : 'text-ink'} group-focus-within:text-primary ${multiHorizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}`}>
                         <span>{label}</span>
                         {required && <span className="text-[#e53935] ml-0.5">*</span>}
                     </label>
                 )}
 
-                <div className="relative">
+                <div className={`relative ${multiHorizontal ? "flex-1" : ""}`}>
                     {/* ---- Closed field / trigger ---- */}
                     <button
                         type="button"

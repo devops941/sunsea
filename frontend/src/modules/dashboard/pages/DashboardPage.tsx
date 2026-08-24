@@ -334,16 +334,16 @@ const DashboardPage: React.FC = () => {
     <div className="bg-page min-h-screen">
       {loading && <CommonLoader text="Loading ..." />}
 
-      <div className="w-full px-4 py-6 sm:px-6 lg:px-8 mx-auto max-w-[1440px]">
+      <div className="w-full px-2 py-3 sm:px-6 sm:py-6 lg:px-8">
 
         {/* ── HEADER ──────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-2 sm:gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-ink">Dashboard</h1>
-            <p className="text-ink-muted text-sm mt-1 font-medium">Complete overview of all ERP modules</p>
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black tracking-tight text-ink">Dashboard</h1>
+            <p className="text-ink-muted text-xs sm:text-sm mt-0.5 sm:mt-1 font-medium">Complete overview of all ERP modules</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="bg-card border border-line-soft text-ink text-sm font-semibold px-4 py-2 rounded-xl shadow-xs hover:bg-card-2 transition-colors flex items-center gap-2">
+            <button className="bg-card border border-line-soft text-ink text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl shadow-xs hover:bg-card-2 transition-colors flex items-center gap-1.5 sm:gap-2">
               Overview
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
@@ -357,7 +357,7 @@ const DashboardPage: React.FC = () => {
 
         {/* ══ ROW 1 – Top Stat Cards ══ */}
         {showOverview && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
             <SparklineCard title="Last Month Income" value={`₹${topStats.lastMonthRevenue.toLocaleString()}`} icon={FaCalendarAlt} iconBg="" gradient="bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700" />
             <SparklineCard title="Total Income" value={`₹${topStats.totalRevenue.toLocaleString()}`} icon={FaMoneyBillWave} iconBg="" gradient="bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600" />
             <SparklineCard title="Customers" value={topStats.uniqueCustomers} icon={FaUserFriends} iconBg="" gradient="bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
@@ -370,7 +370,7 @@ const DashboardPage: React.FC = () => {
            ROW 2.5  –  Trend Chart (Full Width)
            ══════════════════════════════════════════════════════ */}
         {showTrend && (
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <SalesPurchaseTrendChart
               salesOrders={salesOrders}
               purchaseOrders={purchaseOrders}
@@ -383,9 +383,9 @@ const DashboardPage: React.FC = () => {
            ROW 2b  –  Today's Tasks | Inventory Doughnut
            ══════════════════════════════════════════════════════ */}
         {(showTasks || showInventory) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5 mb-4 sm:mb-6">
           {/* Today's Tasks List */}
-          {showTasks && <Card title="Today's Tasks" badge="Live" className="min-h-[340px]">
+          {showTasks && <Card title="Today's Tasks" badge="Live" className="min-h-[240px] sm:min-h-[340px]">
             <div className="flex flex-col gap-4 h-full">
               {todayStats.tasksList.length > 0 ? (
                 todayStats.tasksList.map((task: any, i: number) => {
@@ -395,22 +395,22 @@ const DashboardPage: React.FC = () => {
                   const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "No Shift";
 
                   return (
-                    <div key={i} className="flex items-center justify-between p-3.5 rounded-xl bg-card-2 border border-line-soft hover:bg-card hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm bg-gradient-to-br from-indigo-500 to-purple-600 text-white group-hover:scale-110 transition-transform duration-300">
-                          <FaCalendarCheck size={16} />
+                    <div key={i} className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-card-2 border border-line-soft hover:bg-card hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                      <div className="flex items-center gap-2.5 sm:gap-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shadow-sm bg-gradient-to-br from-indigo-500 to-purple-600 text-white group-hover:scale-110 transition-transform duration-300">
+                          <FaCalendarCheck className="text-xs sm:text-base" />
                         </div>
                         <div>
-                          <span className="block text-[13px] font-bold text-ink group-hover:text-accent transition-colors">
+                          <span className="block text-[11px] sm:text-[13px] font-bold text-ink group-hover:text-accent transition-colors">
                             {machineName}
                           </span>
-                          <span className="text-[11px] font-medium text-ink-muted">
+                          <span className="text-[9px] sm:text-[11px] font-medium text-ink-muted">
                             {productName} • {shiftName}
                           </span>
                         </div>
                       </div>
                       <div>
-                        <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                        <span className="text-[9px] sm:text-[11px] font-black px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                           {task.status || "SCHEDULED"}
                         </span>
                       </div>
@@ -429,10 +429,10 @@ const DashboardPage: React.FC = () => {
 
           {/* Inventory Doughnut */}
           {showInventory && <Card title="Stock by Store" badge="Raw Materials">
-            <div className="flex flex-col items-center justify-center h-[200px] relative">
+            <div className="flex flex-col items-center justify-center h-[160px] sm:h-[200px] relative">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-widest">Items</span>
-                <span className="text-[28px] font-black text-ink leading-none">
+                <span className="text-[9px] sm:text-[11px] font-bold text-ink-subtle uppercase tracking-widest">Items</span>
+                <span className="text-xl sm:text-[28px] font-black text-ink leading-none">
                   {inventoryData.length === 1 && inventoryData[0].name === "No Stock" ? 0 : inventoryData.length}
                 </span>
               </div>
@@ -469,12 +469,12 @@ const DashboardPage: React.FC = () => {
                 </PieChart>
               </ChartContainer>
             </div>
-            <div className="flex flex-row flex-wrap justify-center gap-x-4 gap-y-2 px-2 mt-2">
+            <div className="flex flex-row flex-wrap justify-center gap-x-3 sm:gap-x-4 gap-y-1.5 sm:gap-y-2 px-2 mt-2">
               {inventoryData.map((item, i) => (
-                <div key={i} className="flex items-center p-2 rounded-lg hover:bg-card-2 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></div>
-                    <span className="text-[13px] font-bold text-ink">{item.name}</span>
+                <div key={i} className="flex items-center p-1.5 sm:p-2 rounded-lg hover:bg-card-2 transition-colors">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></div>
+                    <span className="text-[10px] sm:text-[13px] font-bold text-ink">{item.name}</span>
                   </div>
                 </div>
               ))}
@@ -487,25 +487,25 @@ const DashboardPage: React.FC = () => {
            ROW 3  –  Machine Utilization | Top Products | Recent Sales
            ══════════════════════════════════════════════════════ */}
         {(showMachines || showTopProducts || showRecentSales) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-5 mb-4 sm:mb-6">
 
           {/* Machine Utilization */}
           {showMachines && <Card title="Machine Overview" badge="Live">
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:gap-3">
               {machineList.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-slate-400 text-sm font-medium">No Machines</div>
+                <div className="flex items-center justify-center py-6 sm:py-8 text-slate-400 text-xs sm:text-sm font-medium">No Machines</div>
               ) : (
                 machineList.map((mac, i) => (
-                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-xl px-4 py-3 border border-line-soft transition-all duration-200">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${mac.status === "Active" ? "bg-emerald-400 shadow-emerald-200" : "bg-slate-300"}`}></div>
-                      <span className="text-[12px] font-bold text-ink">{mac.name}</span>
+                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 border border-line-soft transition-all duration-200">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shadow-sm ${mac.status === "Active" ? "bg-emerald-400 shadow-emerald-200" : "bg-slate-300"}`}></div>
+                      <span className="text-[10px] sm:text-[12px] font-bold text-ink">{mac.name}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                      <span className={`text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border ${
                         mac.status === "Active"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
-                          : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                          : "bg-slate-800 text-slate-400 border-slate-700"
                       }`}>{mac.status}</span>
                     </div>
                   </div>
@@ -515,8 +515,8 @@ const DashboardPage: React.FC = () => {
           </Card>}
 
           {/* Top Products List */}
-          {showTopProducts && <Card title="Top Products" badge="By stock level" className="min-h-[370px]">
-            <div className="flex flex-col gap-3">
+          {showTopProducts && <Card title="Top Products" badge="By stock level" className="min-h-[260px] sm:min-h-[370px]">
+            <div className="flex flex-col gap-2 sm:gap-3">
               {topProducts.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-ink-muted text-sm font-medium">No Products</div>
               ) : (
@@ -535,8 +535,8 @@ const DashboardPage: React.FC = () => {
                   return (
                     <div key={i} className="flex flex-col gap-1.5">
                       <div className="flex justify-between items-end">
-                        <span className="text-[12px] font-semibold text-ink-muted truncate max-w-[140px]">{prod.name}</span>
-                        <span className="text-[12px] font-bold text-ink">{prod.value.toLocaleString()}</span>
+                        <span className="text-[10px] sm:text-[12px] font-semibold text-ink-muted truncate max-w-[100px] sm:max-w-[140px]">{prod.name}</span>
+                        <span className="text-[10px] sm:text-[12px] font-bold text-ink">{prod.value.toLocaleString()}</span>
                       </div>
                       <div className="w-full bg-line-soft rounded-full h-1.5">
                         <div
@@ -553,22 +553,22 @@ const DashboardPage: React.FC = () => {
 
           {/* Recent Sales Orders */}
           {showRecentSales && <Card title="Recent Sales Orders" badge="Latest 5">
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:gap-3">
               {recentSales.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-ink-muted text-sm font-medium">No Sales Orders</div>
+                <div className="flex items-center justify-center py-6 sm:py-8 text-ink-muted text-xs sm:text-sm font-medium">No Sales Orders</div>
               ) : (
                 recentSales.map((so: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-xl px-4 py-3 border border-line-soft transition-all duration-200">
+                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 border border-line-soft transition-all duration-200">
                     <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-ink">{so.orderNo || `SO-${so.id}`}</span>
-                      <span className="text-[10px] font-medium text-ink-muted">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
+                      <span className="text-[10px] sm:text-[12px] font-bold text-ink">{so.orderNo || `SO-${so.id}`}</span>
+                      <span className="text-[8px] sm:text-[10px] font-medium text-ink-muted">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-[13px] font-black text-ink">₹{Number(so.netAmount || 0).toLocaleString()}</span>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                        so.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30" :
-                        so.status === "CANCELLED" ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30" :
-                        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30"
+                    <div className="flex flex-col items-end gap-0.5 sm:gap-1">
+                      <span className="text-[11px] sm:text-[13px] font-black text-ink">₹{Number(so.netAmount || 0).toLocaleString()}</span>
+                      <span className={`text-[7px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border ${
+                        so.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                        so.status === "CANCELLED" ? "bg-rose-500/20 text-rose-300 border-rose-500/30" :
+                        "bg-amber-500/20 text-amber-300 border-amber-500/30"
                       }`}>{(so.status || "DRAFT").replace(/_/g, " ")}</span>
                     </div>
                   </div>

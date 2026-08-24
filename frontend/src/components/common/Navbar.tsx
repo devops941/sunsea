@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaBars, FaUser, FaSignOutAlt, FaSun, FaMoon, FaCheckCircle } from 'react-icons/fa';
+import { FaBars, FaUser, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logoutUser } from '../../features/auth/authSlice';
@@ -29,18 +29,9 @@ const TopNavbar: React.FC<NavbarProps> = ({
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    return localStorage.getItem('sunsea-theme') === 'dark';
-  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch<any>();
   const navigate = useNavigate();
-
-  // Apply theme on mount and whenever isDark changes
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    localStorage.setItem('sunsea-theme', isDark ? 'dark' : 'light');
-  }, [isDark]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -86,13 +77,13 @@ const TopNavbar: React.FC<NavbarProps> = ({
     (user as any)?.profileImage;
 
   return (
-    <header className="flex items-center justify-between h-[72px] bg-[#ffffff] border-b border-black/10 px-4 md:px-6 shadow-sm shrink-0">
+    <header className="flex items-center justify-between h-[72px] bg-nav border-b border-line-soft px-4 md:px-6 shadow-sm shrink-0">
       {/* Left Section */}
       <div className="flex items-center gap-4">
         {/* Mobile Menu */}
         <button
           type="button"
-          className="p-2 text-gray-500 hover:text-primary transition-colors lg:hidden rounded-md hover:bg-gray-100"
+          className="p-2 text-ink-subtle hover:text-primary transition-colors lg:hidden rounded-md hover:bg-card-2"
           onClick={onMenuClick}
         >
           <FaBars size={20} />
@@ -103,7 +94,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
       <div className="flex items-center gap-3 relative" ref={dropdownRef}>
         {/* Profile */}
         <div
-          className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all hover:bg-gray-50"
+          className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all hover:bg-card-2"
           role="button"
           tabIndex={0}
           onClick={() => setShowDropdown(!showDropdown)}
@@ -119,10 +110,10 @@ const TopNavbar: React.FC<NavbarProps> = ({
             )}
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-gray-800 leading-tight">
+            <span className="text-sm font-semibold text-ink leading-tight">
               {user ? user.fullName : "Guest"}
             </span>
-            <span className="text-xs text-gray-500 leading-tight">
+            <span className="text-xs text-ink-muted leading-tight">
               {formatRole(user)}
             </span>
           </div>
@@ -133,32 +124,17 @@ const TopNavbar: React.FC<NavbarProps> = ({
           type="button"
           onClick={() => navigate('/pending-quotations')}
           title="MD Approvals"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-500 hover:text-white transition-all font-semibold text-xs border border-teal-200 cursor-pointer shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 hover:bg-teal-500 hover:text-white transition-all font-semibold text-xs border border-teal-500/30 cursor-pointer shadow-xs"
         >
           <FaCheckCircle size={13} />
           <span className="hidden sm:inline">MD Approvals</span>
-        </button>
-
-        {/* Theme Toggle Button */}
-        <button
-          type="button"
-          onClick={() => setIsDark((prev) => !prev)}
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          className="w-9 h-9 flex items-center justify-center rounded-full border transition-all cursor-pointer"
-          style={{
-            background: isDark ? '#1C2536' : '#F1F5F9',
-            borderColor: isDark ? '#2A3548' : '#E2E8F0',
-            color: isDark ? '#FACC15' : '#475569',
-          }}
-        >
-          {isDark ? <FaSun size={15} /> : <FaMoon size={15} />}
         </button>
 
         {/* Direct Logout Button */}
         <button
           type="button"
           onClick={() => setShowLogoutModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-500 hover:text-white transition-all font-semibold text-xs border border-red-200 cursor-pointer shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white transition-all font-semibold text-xs border border-red-500/30 cursor-pointer shadow-xs"
           title="Logout"
         >
           <FaSignOutAlt className="text-sm" />
@@ -167,7 +143,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
 
         {/* Dropdown Menu */}
         {showDropdown && (
-          <div className="absolute right-0 top-16 w-40 bg-white border border-slate-100 rounded-xl shadow-[0px_8px_30px_rgba(0,0,0,0.08)] py-2.5 z-50">
+          <div className="absolute right-0 top-16 w-40 bg-card border border-line rounded-xl shadow-[0px_8px_30px_rgba(0,0,0,0.3)] py-2.5 z-50">
             {/* User Header Block */}
 
 
@@ -178,9 +154,9 @@ const TopNavbar: React.FC<NavbarProps> = ({
                   setShowDropdown(false);
                   onProfileClick?.();
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors text-left border-none outline-none cursor-pointer"
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-card-2 hover:text-ink rounded-lg transition-colors text-left border-none outline-none cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                   <FaUser size={13} />
                 </div>
                 <span className="font-semibold">My Profile</span>
@@ -191,9 +167,9 @@ const TopNavbar: React.FC<NavbarProps> = ({
                   setShowDropdown(false);
                   setShowLogoutModal(true);
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left border-t border-slate-50 border-none outline-none cursor-pointer pt-2"
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 rounded-lg transition-colors text-left border-none outline-none cursor-pointer pt-2"
               >
-                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
                   <FaSignOutAlt size={13} />
                 </div>
                 <span className="font-bold">Logout</span>

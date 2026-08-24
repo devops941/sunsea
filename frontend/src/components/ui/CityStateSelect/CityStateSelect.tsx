@@ -28,6 +28,9 @@ interface CityStateSelectProps {
     required?: boolean;
     disabled?: boolean;
     resetKey?: number;
+    horizontal?: boolean;
+    /** Render only specific fields: "city", "state-country", or undefined for all */
+    renderOnly?: "city" | "state-country";
 }
 
 const CityStateSelect: React.FC<CityStateSelectProps> = ({
@@ -45,6 +48,8 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
     cityError,
     required = false,
     disabled = false,
+    horizontal = false,
+    renderOnly,
 }) => {
     const [states, setStates] = useState<StateCityOption[]>([]);
     const [cities, setCities] = useState<StateCityOption[]>([]);
@@ -109,65 +114,79 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
         onCityChange(matched || { id: 0, name: "" });
     };
 
+    const showCity = !renderOnly || renderOnly === "city";
+    const showStateCountry = !renderOnly || renderOnly === "state-country";
+
     if (disabled) {
         return (
             <>
-
-                <div className="w-full">
-                    <TextInput label={cityLabel} name="cityDisplay" value={cityValue} onChange={() => { }} disabled />
-                </div>
-                <div className="w-full">
-                    <TextInput label={stateLabel} name="stateDisplay" value={stateValue} onChange={() => { }} disabled />
-                </div>
-                <div className="w-full">
-                    <TextInput label={countryLabel} name="countryDisplay" value={countryValue || "India"} onChange={() => { }} disabled />
-                </div>
+                {showCity && (
+                    <div className="w-full">
+                        <TextInput label={cityLabel} name="cityDisplay" value={cityValue} onChange={() => { }} disabled horizontal={horizontal} />
+                    </div>
+                )}
+                {showStateCountry && (
+                    <>
+                        <div className="w-full">
+                            <TextInput label={stateLabel} name="stateDisplay" value={stateValue} onChange={() => { }} disabled horizontal={horizontal} />
+                        </div>
+                        <div className="w-full">
+                            <TextInput label={countryLabel} name="countryDisplay" value={countryValue || "India"} onChange={() => { }} disabled horizontal={horizontal} />
+                        </div>
+                    </>
+                )}
             </>
         );
     }
 
     return (
         <>
+            {showCity && (
+                <div className="w-full">
+                    <SelectInput
+                        label={cityLabel}
+                        name="city"
+                        value={cityValue}
+                        options={cityOptions}
+                        onChange={handleCitySelect}
+                        disabled={!stateValue}
+                        required={required}
+                        searchable={true}
+                        horizontal={horizontal}
+                        error={cityError}
+                    />
+                </div>
+            )}
 
+            {showStateCountry && (
+                <>
+                    <div className="w-full">
+                        <SelectInput
+                            label={stateLabel}
+                            name="state"
+                            value={stateValue}
+                            options={stateOptions}
+                            onChange={handleStateSelect}
+                            required={required}
+                            searchable={true}
+                            horizontal={horizontal}
+                            error={stateError}
+                        />
+                    </div>
 
-            <div className="w-full">
-                <SelectInput
-                    label={cityLabel}
-                    name="city"
-                    value={cityValue}
-                    options={cityOptions}
-                    onChange={handleCitySelect}
-                    disabled={!stateValue}
-                    required={required}
-                    searchable={true}
-                    error={cityError}
-                />
-            </div>
-
-            <div className="w-full">
-                <SelectInput
-                    label={stateLabel}
-                    name="state"
-                    value={stateValue}
-                    options={stateOptions}
-                    onChange={handleStateSelect}
-                    required={required}
-                    searchable={true}
-                    error={stateError}
-                />
-            </div>
-
-            {/* Country field defaulting to India after City */}
-            <div className="w-full">
-                <TextInput
-                    label={countryLabel}
-                    name="country"
-                    value={countryValue || "India"}
-                    onChange={() => { }}
-                    disabled={true}
-                />
-                {countryError && <div className="text-red-500 text-sm mt-1">{countryError}</div>}
-            </div>
+                    <div className="w-full">
+                        <TextInput
+                            label={countryLabel}
+                            name="country"
+                            value={countryValue || "India"}
+                            onChange={() => { }}
+                            disabled={true}
+                            horizontal={horizontal}
+                        />
+                        {countryError && <div className="text-red-500 text-sm mt-1">{countryError}</div>}
+                    </div>
+                </>
+            )}
         </>
     );
 };
