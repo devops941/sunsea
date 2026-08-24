@@ -609,7 +609,7 @@ const ProductionOrderCreate: React.FC = () => {
         const fetchPromise = (async () => {
             try {
                 const res = await rawMaterialService.fetchAll({ storeId } as any);
-                const all: any[] = Array.isArray(res) ? res : (res as any)?.data ?? [];
+                const all: any[] = Array.isArray(res) ? res : (res as any)?.rawMaterials ?? [];
                 const filtered = all.filter(
                     (rm) => String(rm.storeId) === String(storeId)
                 );
