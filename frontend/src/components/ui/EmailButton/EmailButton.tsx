@@ -17,12 +17,10 @@ const EmailButton: React.FC<EmailButtonProps> = ({ onClick, disabled }) => {
         flex items-center justify-center
         border border-orange-500/20 rounded-xl
         cursor-pointer
-        bg-orange-500/10 text-orange-600
-        dark:bg-orange-500/20 dark:text-orange-400 dark:border-orange-500/30
+        bg-orange-500/20 text-orange-400 border-orange-500/30
         transition-all duration-[250ms] ease-in-out
         hover:-translate-y-[3px]
         hover:bg-orange-500 hover:text-white
-        dark:hover:bg-orange-500 dark:hover:text-white
         hover:shadow-[0_8px_18px_rgba(249,115,22,0.25)]
         active:scale-95
         disabled:opacity-50

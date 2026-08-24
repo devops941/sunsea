@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
-import { FaSave, FaHashtag, FaCalendarAlt, FaFileInvoice } from "react-icons/fa";
+import { FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import TextInput from "../../components/form/TextInput/TextInput";
@@ -32,20 +32,16 @@ const SalesInvoiceCreate: React.FC = () => {
 
     // ---- Financial Year helpers ----
 
-    // Calculates FY start date based on today's date and FY_START_MONTH
     const getAutoFinancialYearStart = (): string => {
         const today = new Date();
         const currentYear = today.getFullYear();
-
         const fyStart =
             today.getMonth() >= FY_START_MONTH
                 ? new Date(currentYear, FY_START_MONTH, 1)
                 : new Date(currentYear - 1, FY_START_MONTH, 1);
-
         return fyStart.toISOString().split("T")[0];
     };
 
-    // Given a start date string, calculates end date (1 day before next year's start)
     const calculateEndDate = (startStr: string): string => {
         const start = new Date(startStr);
         if (isNaN(start.getTime())) return "";
@@ -77,15 +73,11 @@ const SalesInvoiceCreate: React.FC = () => {
             .then((data) => {
                 if (data) {
                     const isAuto = data.autoFinancialYear !== undefined ? data.autoFinancialYear : true;
-
-                    // If Auto is ON, always recompute start date fresh (don't trust stale saved value,
-                    // in case a year has rolled over since it was last saved)
                     const start = isAuto
                         ? getAutoFinancialYearStart()
                         : data.financialYearStart
                             ? new Date(data.financialYearStart).toISOString().split("T")[0]
                             : "";
-
                     const end = start ? calculateEndDate(start) : "";
 
                     setFormData({
@@ -110,7 +102,6 @@ const SalesInvoiceCreate: React.FC = () => {
             .finally(() => setLoading(false));
     }, []);
 
-    // Recalculate End Date whenever Start Date changes
     useEffect(() => {
         if (formData.financialYearStart) {
             const endStr = calculateEndDate(formData.financialYearStart);
@@ -218,163 +209,163 @@ const SalesInvoiceCreate: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-xl shadow-xs border border-line-soft">
-                {/* Page Header */}
-                <div className="px-6 py-4 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-xl font-bold text-ink">
-                                Invoice Configuration
-                            </h2>
-                        </div>
-                    </div>
-                </div>
+        <div className="w-full">
+            {/* Page Header */}
+            <div className="mb-4">
+                <h2 className="text-lg font-bold text-ink">Invoice Configuration</h2>
+            </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
-                    {/* 1. Invoice Numbering */}
-                    <div>
-                        <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
-                            Invoice Numbering
-                        </h6>
-                        <p className="text-sm text-ink-muted mb-4 -mt-2.5">Configure how invoice numbers are generated</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
-                                <TextInput
-                                    label="Invoice Prefix"
-                                    name="invoicePrefix"
-                                    value={formData.invoicePrefix}
-                                    onChange={handleChange as any}
-                                    required
-                                    error={errors.invoicePrefix}
-                                    maxLength={3}
-                                />
-                                <small className="text-ink-subtle">2–3 letter prefix for invoice numbers (e.g., IN, INV)</small>
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Sequence Length"
-                                    name="sequenceLength"
-                                    type="number"
-                                    min={1}
-                                    value={String(formData.sequenceLength)}
-                                    onChange={handleChange as any}
-                                    required
-                                    error={errors.sequenceLength}
-                                />
-                                <small className="text-ink-subtle">Number of digits in sequence (e.g., 4 = 0001)</small>
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Current Sequence Number"
-                                    name="currentSequenceNumber"
-                                    type="number"
-                                    value={String(formData.currentSequenceNumber)}
-                                    onChange={handleChange as any}
-                                    disabled
-                                />
-                                <small className="text-ink-subtle">Auto-incremented with each invoice.</small>
-                            </div>
-                        </div>
-                    </div>
+            <form onSubmit={handleSubmit} noValidate>
+                <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-180px)] flex flex-col">
+                    <div className="flex-1 p-5 lg:p-6 space-y-6">
 
-                    {/* 2. Financial Year */}
-                    <div>
-                        <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
-                            Financial Year
-                        </h6>
-                        <p className="text-sm text-ink-muted mb-4 -mt-2.5">Configure financial year for invoice numbering</p>
-
-                        <div className="mb-4 flex items-center justify-between bg-card-2 p-3.5 rounded-xl border border-line-soft">
+                        {/* Section 1: Invoice Numbering */}
+                        <div className="space-y-4">
                             <div>
-                                <div className="font-semibold text-sm text-ink">Auto Financial Year</div>
-                                <div className="text-xs text-ink-muted">
-                                    {formData.autoFinancialYear
-                                        ? "System automatically determines the financial year based on today's date"
-                                        : "Manually set your financial year start date"}
+                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Invoice Numbering</h6>
+                                <p className="text-[11px] text-ink-subtle mt-1">Configure how invoice numbers are generated</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <TextInput
+                                        label="Invoice Prefix"
+                                        name="invoicePrefix"
+                                        value={formData.invoicePrefix}
+                                        onChange={handleChange as any}
+                                        required
+                                        error={errors.invoicePrefix}
+                                        maxLength={3}
+                                    />
+                                    <p className="text-[11px] text-ink-subtle mt-1">2-3 letter prefix (e.g., IN, INV)</p>
+                                </div>
+                                <div>
+                                    <TextInput
+                                        label="Sequence Length"
+                                        name="sequenceLength"
+                                        type="number"
+                                        min={1}
+                                        value={String(formData.sequenceLength)}
+                                        onChange={handleChange as any}
+                                        required
+                                        error={errors.sequenceLength}
+                                    />
+                                    <p className="text-[11px] text-ink-subtle mt-1">Number of digits (e.g., 4 = 0001)</p>
+                                </div>
+                                <div>
+                                    <TextInput
+                                        label="Current Sequence"
+                                        name="currentSequenceNumber"
+                                        type="number"
+                                        value={String(formData.currentSequenceNumber)}
+                                        onChange={handleChange as any}
+                                        disabled
+                                    />
+                                    <p className="text-[11px] text-ink-subtle mt-1">Auto-incremented with each invoice</p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-line-soft/50" />
+
+                        {/* Section 2: Financial Year */}
+                        <div className="space-y-4">
                             <div>
+                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Financial Year</h6>
+                                <p className="text-[11px] text-ink-subtle mt-1">Configure financial year for invoice numbering</p>
+                            </div>
+
+                            {/* Auto Toggle */}
+                            <div className="flex items-center justify-between bg-card-2 p-3.5 rounded-xl border border-line-soft">
+                                <div>
+                                    <div className="font-semibold text-sm text-ink">Auto Financial Year</div>
+                                    <div className="text-[11px] text-ink-subtle">
+                                        {formData.autoFinancialYear
+                                            ? "System automatically determines the financial year based on today's date"
+                                            : "Manually set your financial year start date"}
+                                    </div>
+                                </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" name="autoFinancialYear" className="sr-only peer" checked={formData.autoFinancialYear} onChange={handleChange as any} />
-                                    <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    <div className="w-11 h-6 bg-ink-subtle/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-line-soft after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                                 </label>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <TextInput
-                                    label="Financial Year Start"
-                                    name="financialYearStart"
-                                    type="date"
-                                    value={formData.financialYearStart}
-                                    onChange={handleChange as any}
-                                    required
-                                    error={errors.financialYearStart}
-                                    disabled={formData.autoFinancialYear}
-                                />
-                                <small className="text-ink-subtle">
-                                    {formData.autoFinancialYear
-                                        ? "Auto-calculated — disabled while Auto Financial Year is on"
-                                        : "Start date of your financial year"}
-                                </small>
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Financial Year End"
-                                    name="financialYearEnd"
-                                    type="date"
-                                    value={formData.financialYearEnd}
-                                    onChange={handleChange as any}
-                                    disabled
-                                />
-                                <small className="text-ink-subtle">Auto-calculated as one day before start date (next year)</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. Invoice Format */}
-                    <div>
-                        <h6 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
-                            Invoice Format
-                        </h6>
-                        <p className="text-sm text-ink-muted mb-4 -mt-2.5">Auto-generated invoice number format based on your settings</p>
-
-                        <div className="grid grid-cols-1 gap-4">
-                            <div>
-                                <TextInput
-                                    label="Format Template"
-                                    name="formatTemplate"
-                                    value={formData.formatTemplate}
-                                    onChange={handleChange as any}
-                                    required
-                                    error={errors.formatTemplate}
-                                />
-                                <small className="text-ink-subtle">
-                                    Variables: {"{PREFIX}"} - Invoice Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence Number
-                                </small>
-                            </div>
-
-                            <div className="mt-2">
-                                <label className="block text-sm font-semibold text-ink mb-1">Preview</label>
-                                <div
-                                    className="p-3.5 mb-1 rounded-xl text-center text-xl font-mono font-bold tracking-widest border border-line-soft bg-card-2 text-ink"
-                                >
-                                    {livePreview}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <TextInput
+                                        label="Financial Year Start"
+                                        name="financialYearStart"
+                                        type="date"
+                                        value={formData.financialYearStart}
+                                        onChange={handleChange as any}
+                                        required
+                                        error={errors.financialYearStart}
+                                        disabled={formData.autoFinancialYear}
+                                    />
+                                    <p className="text-[11px] text-ink-subtle mt-1">
+                                        {formData.autoFinancialYear
+                                            ? "Auto-calculated — disabled while Auto Financial Year is on"
+                                            : "Start date of your financial year"}
+                                    </p>
                                 </div>
-                                <small className="text-ink-subtle">This is how your next invoice number will look</small>
+                                <div>
+                                    <TextInput
+                                        label="Financial Year End"
+                                        name="financialYearEnd"
+                                        type="date"
+                                        value={formData.financialYearEnd}
+                                        onChange={handleChange as any}
+                                        disabled
+                                    />
+                                    <p className="text-[11px] text-ink-subtle mt-1">Auto-calculated as one day before start date (next year)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-line-soft/50" />
+
+                        {/* Section 3: Invoice Format */}
+                        <div className="space-y-4">
+                            <div>
+                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Invoice Format</h6>
+                                <p className="text-[11px] text-ink-subtle mt-1">Auto-generated invoice number format based on your settings</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                <div>
+                                    <TextInput
+                                        label="Format Template"
+                                        name="formatTemplate"
+                                        value={formData.formatTemplate}
+                                        onChange={handleChange as any}
+                                        required
+                                        error={errors.formatTemplate}
+                                    />
+                                    <p className="text-[11px] text-ink-subtle mt-1">
+                                        Variables: {"{PREFIX}"} - Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="flex items-center gap-1.5 mb-2 text-xs font-extrabold uppercase tracking-[0.5px] text-ink">Preview</label>
+                                    <div className="h-10 px-4 rounded-md border border-primary/30 bg-primary/5 flex items-center justify-center text-lg font-mono font-bold tracking-widest text-ink">
+                                        {livePreview}
+                                    </div>
+                                    <p className="text-[11px] text-ink-subtle mt-1">This is how your next invoice number will look</p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
-                        {canEditInvoice && (
+                    {canEditInvoice && (
+                        <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end mt-auto">
                             <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
-                        )}
-                    </div>
-                </form>
-            </div>
+                        </div>
+                    )}
+                </div>
+            </form>
         </div>
     );
 };

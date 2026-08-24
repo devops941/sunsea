@@ -1,64 +1,66 @@
 .image-upload-wrapper {
-  margin-bottom: 18px;
-}
-
-.image-upload-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-ink, #1E293B);
-  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  margin-bottom: 0;
 }
 
 .image-upload-box {
-  width: 100%;
-  min-height: 140px;
+  width: 110px;
+  height: 110px;
+  min-width: 110px;
   border: 2px dashed var(--color-line-soft, #d7ddd9);
-  border-radius: 12px;
+  border-radius: 50%;
   background: var(--color-card-2, #f8faf9);
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   overflow: hidden;
   position: relative;
   transition: all 0.25s ease;
 }
 
-.image-upload-box:hover {
+.image-upload-wrapper:hover .image-upload-box {
   border-color: var(--color-primary);
-  background: var(--color-card, #f0fdf4);
+}
+
+.image-upload-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.image-upload-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink, #1E293B);
+  margin-bottom: 0;
+}
+
+.image-upload-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-ink-subtle, #94a3b8);
 }
 
 .image-upload-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   color: var(--color-ink-subtle, #94a3b8);
-  font-size: 14px;
-  font-weight: 500;
 }
 
 .image-upload-icon {
-  font-size: 36px;
+  font-size: 22px;
   color: var(--color-primary);
   opacity: 0.8;
-}
-
-.image-upload-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  max-height: 140px;
 }
 
 /* Dark Theme Overrides */
 :root[data-theme="dark"] .image-upload-label {
   color: var(--color-ink, #E2E8F0);
-  font-weight: 800;
 }
 
 :root[data-theme="dark"] .image-upload-box {
@@ -66,9 +68,12 @@
   background: var(--color-card-2, #1C2536);
 }
 
-:root[data-theme="dark"] .image-upload-box:hover {
+:root[data-theme="dark"] .image-upload-wrapper:hover .image-upload-box {
   border-color: var(--color-primary);
-  background: var(--color-card, #151D2C);
+}
+
+:root[data-theme="dark"] .image-upload-hint {
+  color: var(--color-ink-subtle, #64748B);
 }
 
 :root[data-theme="dark"] .image-upload-placeholder {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
+import { Search } from "lucide-react";
+import { FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -204,9 +205,21 @@ const RoleList: React.FC = () => {
     };
 
     const columns: DataTableColumn<any>[] = [
-        { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        { header: "Role Code", accessor: "code" },
+        {
+            header: "#",
+            render: (_, index) => <span className="text-ink-subtle font-mono text-xs">{String(startIndex + index + 1).padStart(2, '0')}</span>,
+            width: "60px",
+            align: "center"
+        },
         { header: "Role Name", accessor: "name" },
+        {
+            header: "Code",
+            render: (role) => (
+                <span className="font-mono text-xs font-bold text-accent bg-accent/10 border border-accent/20 px-2.5 py-1 rounded-md">
+                    {role.code}
+                </span>
+            ),
+        },
         { header: "Description", accessor: "description" },
         { header: "Status", render: (role) => <StatusBadge status={role.status} />, align: "center" },
         {
@@ -227,16 +240,16 @@ const RoleList: React.FC = () => {
             <div className="">
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 border-b border-line">
                         <div>
-                            <h2 className="text-2xl font-bold text-ink">Role Management</h2>
+                            <h2 className="text-xl font-bold text-ink">Role Management</h2>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
                                 <input
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
                                     placeholder="Search roles..."
                                     value={searchTerm}
                                     onChange={handleSearch}
@@ -280,6 +293,7 @@ const RoleList: React.FC = () => {
                             <CustomButton
                                 text="Clear"
                                 icon={FaEraser}
+                                variant="secondary"
                                 onClick={() => setFormData({
                                     id: formData.id,
                                     code: "",

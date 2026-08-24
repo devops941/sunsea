@@ -1,12 +1,9 @@
 import React, { useEffect } from "react";
-import { FaArrowLeft, FaUser, FaBriefcase, FaIdBadge, FaPhoneAlt } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { Briefcase, Mail, Phone, CalendarDays, BadgeCheck, ShieldCheck, Shield } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 
-import CustomButton from "../../components/ui/Button/Button";
 import type { RootState, AppDispatch } from "../../app/store";
 import { fetchProfile } from "../../features/profiles/profileSlice";
-import { StatusBadge } from "../../components/ui/StatusBadge/Badge";
 
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
 
@@ -15,16 +12,10 @@ const formatDate = (date?: string | null) =>
 
 const getInitials = (name?: string | null) => {
     if (!name) return "—";
-    return name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
+    return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 };
 
 const ProfilePage: React.FC = () => {
-    const navigate = useNavigate();
     const dispatch = useDispatch<AppDispatch>();
     const { employee, loading } = useSelector((state: RootState) => state.profile);
 
@@ -37,118 +28,79 @@ const ProfilePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-full bg-page p-4 md:p-8 flex justify-center">
-            <div className="w-full max-w-5xl bg-card rounded-3xl shadow-md border border-line-soft overflow-hidden">
-                {/* HEADER */}
-                <div className="bg-card-2 p-6 md:p-10 border-b border-line-soft">
-                    <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-                        <div className="flex flex-col md:flex-row items-center gap-6">
-                            <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-bold shadow-lg ring-4 ring-card shrink-0">
-                                {getInitials(employee.fullName)}
-                            </div>
-                            <div className="text-center md:text-left">
-                                <h2 className="text-2xl md:text-3xl font-bold text-ink tracking-tight">
-                                    {employee.fullName || "N/A"}
-                                </h2>
-                                <span className="flex items-center justify-center md:justify-start gap-2 mt-2 text-ink-muted font-medium bg-card px-3 py-1 rounded-full border border-line-soft shadow-xs w-fit mx-auto md:mx-0">
-                                    <FaIdBadge className="text-primary/70" />
-                                    {employee.department?.name || "Employee Profile"}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex flex-col items-center md:items-end gap-3 mt-4 md:mt-0">
-                            <StatusBadge status={employee.status || "UNKNOWN"} />
-                            <div className="flex items-center gap-2 text-sm font-semibold text-ink-muted bg-card px-3 py-1.5 rounded-lg border border-line-soft">
-                                <FaBriefcase className="text-ink-subtle" />
-                                Code: <span className="text-ink font-mono">{employee.empCode || "-"}</span>
-                            </div>
+        <div>
+            <div className="flex flex-col lg:flex-row rounded-2xl overflow-hidden border border-line-soft min-h-[calc(100vh-140px)]">
+
+                {/* ── LEFT 30% ── */}
+                <div className="w-full lg:w-[30%] shrink-0 bg-card p-6 flex flex-col items-center text-center border-r border-line-soft">
+
+                    {/* Avatar */}
+                    <div className="w-20 h-20 rounded-full border-[3px] border-indigo-400/40 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-violet-700 shadow-[0_0_30px_rgba(99,102,241,0.35)] mb-4">
+                        <span className="text-2xl font-black text-white drop-shadow-lg">{getInitials(employee.fullName)}</span>
+                    </div>
+
+                    <h2 className="text-base font-bold text-ink mb-0.5">{employee.fullName || "N/A"}</h2>
+                    <p className="text-xs text-ink-muted mb-3">{employee.department?.name || "Employee"}</p>
+
+                    {/* Status */}
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-300 bg-emerald-500/10 border border-emerald-400/20 px-3 py-1.5 rounded-full uppercase tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {(employee.status || "ACTIVE").toUpperCase()}
+                    </span>
+
+                    {/* Access Level */}
+                    <div className="w-full border-t border-line-soft pt-4 mt-4">
+                        <p className="text-[9px] font-extrabold text-ink-subtle uppercase tracking-[3px] mb-3 text-left">Access Level</p>
+                        <div className="flex items-center gap-2.5 bg-card-2 rounded-lg px-3 py-2.5 border border-line-soft">
+                            <Shield className="text-emerald-400" size={14} />
+                            <span className="text-sm font-bold text-ink font-mono tracking-wider">
+                                {employee.empCode || "USER"}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                {/* BODY */}
-                <div className="p-6 md:p-10 space-y-10">
-                    {/* Professional Info */}
-                    <section>
-                        <h3 className="text-lg font-bold text-ink flex items-center gap-2.5 pb-3 border-b border-line-soft mb-6">
-                            <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                                <FaBriefcase size={16} />
-                            </div>
-                            Professional Info
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-primary/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Employee Code</span>
-                                <span className="text-sm font-semibold text-ink font-mono">{employee.empCode || "N/A"}</span>
-                            </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-primary/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Department</span>
-                                <span className="text-sm font-semibold text-ink">{employee.department?.name || "N/A"}</span>
-                            </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-primary/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Date of Joining</span>
-                                <span className="text-sm font-semibold text-ink">{formatDate(employee.dateOfJoining)}</span>
-                            </div>
-                        </div>
-                    </section>
+                {/* ── RIGHT 70% ── */}
+                <div className="flex-1 min-w-0 bg-card-2 flex flex-col">
 
-                    {/* Personal Info */}
-                    <section>
-                        <h3 className="text-lg font-bold text-ink flex items-center gap-2.5 pb-3 border-b border-line-soft mb-6">
-                            <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
-                                <FaUser size={16} />
-                            </div>
-                            Personal Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Full Name</span>
-                                <span className="text-sm font-semibold text-ink">{employee.fullName || "N/A"}</span>
-                            </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">System Role</span>
-                                <span className="text-sm font-semibold text-ink">{employee.designation?.name || "Standard User"}</span>
-                            </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Account Created</span>
-                                <span className="text-sm font-semibold text-ink">{formatDate(employee.createdAt)}</span>
-                            </div>
-                        </div>
-                    </section>
+                    {/* Header */}
+                    <div className="px-6 py-3.5 border-b border-line-soft">
+                        <h3 className="text-sm font-bold text-ink tracking-tight">Record Details</h3>
+                    </div>
 
-                    {/* Contact Details */}
-                    <section>
-                        <h3 className="text-lg font-bold text-ink flex items-center gap-2.5 pb-3 border-b border-line-soft mb-6">
-                            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
-                                <FaPhoneAlt size={16} />
-                            </div>
-                            Contact Details
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-emerald-500/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Mobile Number</span>
-                                <span className="text-sm font-semibold text-ink">{employee.mobile || "N/A"}</span>
-                            </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-emerald-500/30 transition-all">
-                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Email Address</span>
-                                <span className="text-sm font-semibold text-ink break-all">{employee.email || "N/A"}</span>
-                            </div>
-                        </div>
-                    </section>
+                    {/* Rows */}
+                    <div className="flex-1 divide-y divide-line-soft">
+                        <RecordRow icon={<BadgeCheck size={16} />} color="text-violet-400 bg-violet-500/10 border-violet-500/15" label="Employee Code" value={employee.empCode || "N/A"} mono />
+                        <RecordRow icon={<Briefcase size={16} />} color="text-sky-400 bg-sky-500/10 border-sky-500/15" label="Department" value={employee.department?.name || "N/A"} />
+                        <RecordRow icon={<CalendarDays size={16} />} color="text-amber-400 bg-amber-500/10 border-amber-500/15" label="Date of Joining" value={formatDate(employee.dateOfJoining)} />
+                        <RecordRow icon={<ShieldCheck size={16} />} color="text-indigo-400 bg-indigo-500/10 border-indigo-500/15" label="System Role" value={employee.designation?.name || "N/A"} />
+                        <RecordRow icon={<Phone size={16} />} color="text-emerald-400 bg-emerald-500/10 border-emerald-500/15" label="Mobile Number" value={employee.mobile || "N/A"} />
+                        <RecordRow icon={<Mail size={16} />} color="text-rose-400 bg-rose-500/10 border-rose-500/15" label="Email Address" value={employee.email || "N/A"} />
+                        <RecordRow icon={<CalendarDays size={16} />} color="text-teal-400 bg-teal-500/10 border-teal-500/15" label="Account Created" value={formatDate(employee.createdAt)} />
+                    </div>
                 </div>
 
-                {/* FOOTER */}
-                <div className="p-6 bg-card-2 border-t border-line-soft flex justify-end">
-                    <CustomButton 
-                        text="Go Back" 
-                        icon={FaArrowLeft} 
-                        onClick={() => navigate(-1)} 
-                        variant="secondary"
-                    />
-                </div>
             </div>
         </div>
     );
 };
+
+const RecordRow: React.FC<{
+    icon: React.ReactNode;
+    color: string;
+    label: string;
+    value: string;
+    mono?: boolean;
+}> = ({ icon, color, label, value, mono }) => (
+    <div className="flex items-center gap-4 px-6 py-3.5 hover:bg-card/50 transition-colors">
+        <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs shrink-0 ${color}`}>
+            {icon}
+        </div>
+        <div className="min-w-0">
+            <p className="text-[9px] font-extrabold text-ink-subtle uppercase tracking-[2px] mb-0.5">{label}</p>
+            <p className={`text-[13px] font-semibold text-ink ${mono ? "font-mono tracking-wider" : ""}`}>{value}</p>
+        </div>
+    </div>
+);
 
 export default ProfilePage;

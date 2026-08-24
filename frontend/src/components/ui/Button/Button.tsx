@@ -20,9 +20,9 @@ const sizeClasses: Record<NonNullable<CustomButtonProps["size"]>, { container: s
 };
 
 const variantClasses: Record<NonNullable<CustomButtonProps["variant"]>, string> = {
-  primary: "bg-[#5D87FF] hover:bg-[#4570F5] text-white shadow-sm border-none",
+  primary: "bg-gradient-to-r from-accent to-emerald-500 hover:from-accent/90 hover:to-emerald-500/90 text-white shadow-md shadow-accent/20 border-none",
   secondary: "bg-card-2 text-ink border border-line-soft hover:bg-card hover:border-line shadow-xs",
-  danger: "bg-red-500 hover:bg-red-600 text-white shadow-sm border-none",
+  danger: "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white shadow-md shadow-red-500/20 border-none",
 };
 
 const Button = ({
@@ -48,7 +48,7 @@ const Button = ({
         inline-flex items-center justify-center gap-2
         border-none outline-none font-semibold
         transition-all duration-250 ease-in-out
-        rounded-[6px]
+        rounded-lg
         ${container}
         ${variantClasses[variant]}
         ${disabled

@@ -41,15 +41,15 @@ const CategoryBadge: React.FC<{ category: EodCategory }> = ({ category }) => {
   const map: Record<EodCategory, { label: string; cls: string }> = {
     RAW_MATERIAL: {
       label: "Raw Material",
-      cls: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60",
+      cls: "bg-emerald-950/60 text-emerald-300 border-emerald-800/60",
     },
     FINISHED_PRODUCT: {
       label: "Finished Product",
-      cls: "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60",
+      cls: "bg-purple-950/60 text-purple-300 border-purple-800/60",
     },
     WASTAGE: {
       label: "Wastage",
-      cls: "bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/60",
+      cls: "bg-red-950/60 text-red-300 border-red-800/60",
     },
   };
   const { label, cls } = map[category] ?? { label: category, cls: "" };
@@ -213,20 +213,20 @@ const EodStockList: React.FC = () => {
   const renderBanner = () => {
     if (isTodaySelected && isLive) {
       return (
-        <div className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/50 text-sm text-blue-700 dark:text-blue-300">
-          <FaBroadcastTower size={13} className="flex-shrink-0 text-blue-500 dark:text-blue-400" />
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-blue-950/40 border-b border-blue-900/50 text-sm text-blue-300">
+          <FaBroadcastTower size={13} className="flex-shrink-0 text-blue-400" />
           <span>
             <span className="font-semibold">Live view</span> —
             {" "}START QTY = day opening balance · EOD QTY = current live stock
-            <span className="ml-2 text-blue-500 dark:text-blue-400 text-xs">(auto-refreshes every 30 s)</span>
+            <span className="ml-2 text-blue-400 text-xs">(auto-refreshes every 30 s)</span>
           </span>
         </div>
       );
     }
     if (isTodaySelected && isLocked) {
       return (
-        <div className="flex items-center gap-2 px-5 py-2.5 bg-green-50 dark:bg-emerald-950/40 border-b border-green-100 dark:border-emerald-900/50 text-sm text-green-700 dark:text-emerald-300">
-          <FaLock size={12} className="flex-shrink-0 text-green-500 dark:text-emerald-400" />
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-emerald-950/40 border-b border-emerald-900/50 text-sm text-emerald-300">
+          <FaLock size={12} className="flex-shrink-0 text-emerald-400" />
           <span>
             Today's stock locked as of{" "}
             <span className="font-semibold">{formatDateTime(lastLockedAt!)}</span>
@@ -247,8 +247,8 @@ const EodStockList: React.FC = () => {
     }
     if (!isTodaySelected && !isLocked && data.length === 0 && !loading) {
       return (
-        <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/50 text-sm text-amber-700 dark:text-amber-300">
-          <FaInfoCircle size={13} className="flex-shrink-0 text-amber-500 dark:text-amber-400" />
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-950/40 border-b border-amber-900/50 text-sm text-amber-300">
+          <FaInfoCircle size={13} className="flex-shrink-0 text-amber-400" />
           <span>
             No EOD snapshot recorded for{" "}
             <span className="font-semibold">{formatDate(selectedDate)}</span>.
@@ -266,7 +266,7 @@ const EodStockList: React.FC = () => {
     }
     return (
       <div className="flex items-center gap-2 px-5 py-2.5 bg-card-2 border-b border-line text-sm text-ink-muted">
-        <FaInfoCircle size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0" />
+        <FaInfoCircle size={14} className="text-blue-400 flex-shrink-0" />
         <span>
           Showing stock for{" "}
           <span className="font-semibold text-ink">

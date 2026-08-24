@@ -402,7 +402,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                         <CustomButton
                             text="Clear"
                             icon={FaEraser}
-
+                            variant="secondary"
                         />
                         <div className="ms-2">
                             <CustomButton

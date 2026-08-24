@@ -343,6 +343,7 @@ const PermissionList: React.FC = () => {
                                 <CustomButton
                                     text="Clear"
                                     icon={FaEraser}
+                                    variant="secondary"
                                     onClick={() => setFormData({
                                         id: "",
                                         key: "",

@@ -58,10 +58,23 @@ type PeriodKey = keyof typeof PERIODS;
 /* ════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════════ */
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isMobile;
+};
+
 const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
   salesOrders, purchaseOrders, productionOrders,
 }) => {
   const [period, setPeriod] = useState<PeriodKey>("7d");
+  const isMobile = useIsMobile();
 
   // Process real data into time buckets based on the selected period
   const chartData = useMemo(() => {
@@ -144,17 +157,18 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
   };
 
   return (
-    <div className="bg-card rounded-2xl shadow-md border border-line-soft overflow-hidden">
-      <div className="p-6 lg:p-8 flex flex-col min-w-0">
+    <div className="bg-card rounded-xl sm:rounded-2xl shadow-md border border-line-soft overflow-hidden">
+      <div className="p-3 sm:p-6 lg:p-8 flex flex-col min-w-0">
 
         {/* Header row (Tabs + Legend) */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-8 gap-2 sm:gap-4">
 
           {/* Dropdown */}
-          <div className="flex items-center gap-6 w-32">
+          <div className="flex items-center w-24 sm:w-32">
             <SelectInput
               hideLabel
               noMargin
+              searchable={false}
               value={period}
               onChange={(e) => setPeriod(e.target.value as PeriodKey)}
               options={Object.entries(PERIODS).map(([k, v]) => ({ label: v, value: k }))}
@@ -162,21 +176,22 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-[#0ea5e9] to-[#0284c7] shadow-sm" />
-              <span className="text-[12px] font-bold text-ink-muted">Sales</span>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-b from-[#0ea5e9] to-[#0284c7] shadow-sm" />
+              <span className="text-[10px] sm:text-[12px] font-bold text-ink-muted">Sales</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-[#f43f5e] to-[#e11d48] shadow-sm" />
-              <span className="text-[12px] font-bold text-ink-muted">Purchase</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-b from-[#f43f5e] to-[#e11d48] shadow-sm" />
+              <span className="text-[10px] sm:text-[12px] font-bold text-ink-muted">Purchase</span>
             </div>
           </div>
         </div>
 
         {/* Bar Chart */}
-        <ChartContainer config={trendChartConfig} className="w-full h-[300px] !aspect-auto">
-          <BarChart data={chartData} margin={{ top: 10, right: 0, left: 15, bottom: 0 }} barGap={6} style={{ outline: 'none' }}>
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <ChartContainer config={trendChartConfig} className="min-w-[480px] w-full h-[200px] sm:h-[300px] !aspect-auto">
+          <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }} barGap={4} style={{ outline: 'none' }}>
             <defs>
               <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#0ea5e9" stopOpacity={1} />
@@ -194,8 +209,8 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tickMargin={15}
-              tick={{ fontSize: 11, fill: "var(--color-ink-subtle)", fontWeight: 600 }}
+              tickMargin={isMobile ? 8 : 15}
+              tick={{ fontSize: isMobile ? 9 : 11, fill: "var(--color-ink-subtle)", fontWeight: 600 }}
             />
             <YAxis
               axisLine={false}
@@ -247,6 +262,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
             />
           </BarChart>
         </ChartContainer>
+        </div>
       </div>
     </div>
   );

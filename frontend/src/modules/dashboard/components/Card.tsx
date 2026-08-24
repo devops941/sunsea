@@ -8,13 +8,13 @@ export const Card: React.FC<{
   className?: string;
 }> = ({ title, badge, extra, children, className = "" }) => (
   <div
-    className={`bg-card rounded-2xl p-6 shadow-md border border-line-soft flex flex-col transition-all duration-300 ${className}`}
+    className={`bg-card rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-md border border-line-soft flex flex-col transition-all duration-300 ${className}`}
   >
-    <div className="flex justify-between items-center mb-5">
-      <h3 className="text-[15px] font-extrabold text-ink tracking-tight">{title}</h3>
-      <div className="flex items-center gap-2">
+    <div className="flex justify-between items-center mb-3 sm:mb-5">
+      <h3 className="text-xs sm:text-[15px] font-extrabold text-ink tracking-tight">{title}</h3>
+      <div className="flex items-center gap-1.5 sm:gap-2">
         {badge && (
-          <span className="text-[11px] font-bold text-accent bg-accent/15 border border-accent/20 px-2.5 py-1 rounded-full">
+          <span className="text-[9px] sm:text-[11px] font-bold text-accent bg-accent/15 border border-accent/20 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
             {badge}
           </span>
         )}

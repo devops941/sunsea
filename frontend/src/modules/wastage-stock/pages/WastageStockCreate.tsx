@@ -189,6 +189,7 @@ const WastageStockCreate: React.FC = () => {
                         <CustomButton
                             text="Clear"
                             icon={FaEraser}
+                            variant="secondary"
                             onClick={handleClear}
                         />
                         <div className="ms-2">

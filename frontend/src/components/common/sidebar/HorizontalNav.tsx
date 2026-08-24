@@ -7,7 +7,6 @@ import { logoutUser } from "../../../features/auth/authSlice";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa";
 import { FiLogOut } from "react-icons/fi";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import ThemeToggle from "../ThemeToggle";
 
 const HorizontalNav = () => {
   const { can } = usePermission();
@@ -134,7 +133,7 @@ const HorizontalNav = () => {
   };
 
   return (
-    <div className="w-full bg-nav text-nav-fg shadow-xs border-b border-black/10 dark:border-line-soft relative z-40 hidden lg:flex items-center justify-between px-4 py-2">
+    <div className="w-full bg-nav text-nav-fg shadow-xs border-b border-line-soft relative z-40 hidden lg:flex items-center justify-between px-3 py-1.5">
       
       {/* ── BACKGROUND OVERLAY TO CLOSE MENUS ── */}
       {activeMenuId && (
@@ -161,7 +160,7 @@ const HorizontalNav = () => {
                     className={`cursor-pointer px-2 py-1.5 xl:px-3 xl:py-2 rounded-md flex items-center gap-1.5 xl:gap-2 transition-all duration-300 ${menuActive ? "bg-nav-active font-bold shadow-sm" : (isOpen ? "bg-nav-hover" : "bg-transparent hover:bg-nav-hover")}`}
                   >
                     <span className={`text-[12px] xl:text-[14px] font-bold whitespace-nowrap select-none ${menuActive ? "text-nav-active-fg" : "text-nav-fg"}`}>{menu.title}</span>
-                    <FaChevronDown className={`min-w-[10px] text-[10px] xl:min-w-[12px] xl:text-[12px] transition-transform ${isOpen ? "rotate-180" : ""} ${menuActive ? "text-nav-active-fg" : "text-nav-fg"}`} />
+                    <FaChevronDown className={`min-w-[10px] text-[10px] xl:min-w-[10px] xl:text-[10px] transition-transform ${isOpen ? "rotate-180" : ""} ${menuActive ? "text-nav-active-fg" : "text-nav-fg"}`} />
                   </div>
                 ) : (
                   <NavLink
@@ -206,8 +205,6 @@ const HorizontalNav = () => {
           );
         })()}
 
-        <ThemeToggle />
-
         {/* Direct Logout Button */}
         <button
           type="button"
@@ -226,7 +223,7 @@ const HorizontalNav = () => {
           className="fixed z-50 pt-2 animate-in fade-in slide-in-from-top-2"
           style={{ top: `${menuRect.bottom}px`, left: `${menuRect.left}px` }}
         >
-          <div className="w-64 bg-card rounded-xl shadow-xl border border-line-soft py-2">
+          <div className="w-56 bg-card rounded-xl shadow-xl border border-line-soft py-1.5">
             {activeMenuData.children.map((child) => {
               const hasSubChildren = !!child.children && child.children.length > 0;
               const isChildActive = child.path ? location.pathname.startsWith(child.path) : false;
@@ -237,17 +234,17 @@ const HorizontalNav = () => {
                   {hasSubChildren ? (
                     <div 
                       onClick={(e) => handleSubMenuClick(e, child.title)}
-                      className={`w-full cursor-pointer px-4 py-2.5 rounded-lg flex items-center justify-between transition-all duration-300 ${isSubOpen || isChildActive ? 'bg-accent/15 text-accent font-bold' : 'bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent'}`}
+                      className={`w-full cursor-pointer px-3 py-2 rounded-lg flex items-center justify-between transition-all duration-300 ${isSubOpen || isChildActive ? 'bg-accent/15 text-accent font-bold' : 'bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent'}`}
                     >
                       <span className={`text-[14px] font-semibold transition-colors ${isSubOpen || isChildActive ? 'text-accent font-bold' : 'text-ink-muted'}`}>{child.title}</span>
-                      <FaChevronRight className={`text-[12px] transition-transform ${isSubOpen ? 'rotate-90 text-accent' : 'text-ink-subtle'}`} />
+                      <FaChevronRight className={`text-[10px] transition-transform ${isSubOpen ? 'rotate-90 text-accent' : 'text-ink-subtle'}`} />
                     </div>
                   ) : (
                     child.path && (
                       <NavLink
                         to={child.path}
                         onClick={() => setActiveMenuId(null)}
-                        className={`px-4 py-2.5 group/link rounded-lg flex items-center gap-3 no-underline transition-all duration-300 ${isChildActive ? "bg-accent/15 text-accent font-bold" : "bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent"}`}
+                        className={`px-3 py-2 group/link rounded-lg flex items-center gap-2.5 no-underline transition-all duration-300 ${isChildActive ? "bg-accent/15 text-accent font-bold" : "bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent"}`}
                       >
                         <span className={`text-[14px] font-semibold ${isChildActive ? "text-accent font-bold" : "text-ink-muted group-hover/link:text-accent"}`}>{child.title}</span>
                       </NavLink>
@@ -257,7 +254,7 @@ const HorizontalNav = () => {
                   {/* Second Level Dropdown (nested) */}
                   {hasSubChildren && isSubOpen && (
                     <div className="absolute top-0 left-full ml-1 z-50">
-                      <div className="w-56 bg-card rounded-xl shadow-xl border border-line-soft py-2 animate-in fade-in slide-in-from-left-2">
+                      <div className="w-48 bg-card rounded-xl shadow-xl border border-line-soft py-1.5 animate-in fade-in slide-in-from-left-2">
                         {child.children?.map((subChild) => {
                           const isSubChildActive = subChild.path ? (location.pathname === subChild.path || location.pathname + location.search === subChild.path) : false;
                           return subChild.path ? (
@@ -265,7 +262,7 @@ const HorizontalNav = () => {
                               <NavLink
                                 to={subChild.path}
                                 onClick={() => setActiveMenuId(null)}
-                                className={`px-4 py-2.5 group/sublink rounded-lg flex items-center gap-3 no-underline transition-all duration-300 ${isSubChildActive ? "bg-accent/15 text-accent font-bold" : "bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent"}`}
+                                className={`px-3 py-2 group/sublink rounded-lg flex items-center gap-2.5 no-underline transition-all duration-300 ${isSubChildActive ? "bg-accent/15 text-accent font-bold" : "bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent"}`}
                               >
                                 <span className={`text-[14px] font-semibold ${isSubChildActive ? "text-accent font-bold" : "text-ink-muted group-hover/sublink:text-accent"}`}>{subChild.title}</span>
                               </NavLink>

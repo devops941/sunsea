@@ -267,6 +267,7 @@ const DepartmentList: React.FC = () => {
                             <CustomButton
                                 text="Clear"
                                 icon={FaEraser}
+                                variant="secondary"
                                 onClick={() => setFormData({
                                     id: formData.id,
                                     name: "",

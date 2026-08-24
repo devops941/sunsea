@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaWhatsapp, FaSave, FaEraser, FaKey } from "react-icons/fa";
+import { FaWhatsapp, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../api/apiClient";
 import TextInput from "../../components/form/TextInput/TextInput";
@@ -158,7 +158,7 @@ const WhatsappCreatePage: React.FC = () => {
 
         setSending(true);
         try {
-            const formattedPhone = testPhone.replace(/\D/g, ""); // Keep only digits
+            const formattedPhone = testPhone.replace(/\D/g, "");
             const response = await apiClient.post("/whatsapp/send", {
                 to: formattedPhone,
                 message: testMessage,
@@ -181,29 +181,22 @@ const WhatsappCreatePage: React.FC = () => {
     if (loading) return <CommonLoader text="Loading ..." fullScreen={false} />;
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                {/* Page Header */}
-                <div className="px-6 py-4 border-b border-gray-100">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="w-full">
+            {/* Page Header */}
+            <div className="mb-4">
+                <h2 className="text-lg font-bold text-ink">
+                    WhatsApp Business Configuration
+                </h2>
+            </div>
+
+            <form onSubmit={handleSubmit} noValidate>
+                <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-180px)] flex flex-col">
+
+                    <div className="flex-1 p-5 lg:p-6 space-y-6">
+                        {/* Section: API Setup Credentials */}
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800">
-                                {isEditing ? "Edit WhatsApp Configuration" : "WhatsApp Business Configuration"}
-                            </h2>
-                        </div>
-
-                    </div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
-                    {/* API Setup Credentials */}
-                    <div>
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            {/* <FaWhatsapp className="text-green-500" />  */}
-                            API Setup Credentials
-                        </h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
+                            <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-4">API Setup Credentials</h6>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <TextInput
                                     label="Phone Number ID"
                                     name="phoneNumberId"
@@ -213,8 +206,6 @@ const WhatsappCreatePage: React.FC = () => {
                                     onChange={handleChange as any}
                                     error={errors.phoneNumberId}
                                 />
-                            </div>
-                            <div>
                                 <TextInput
                                     label="WABA ID"
                                     name="wabaId"
@@ -224,8 +215,6 @@ const WhatsappCreatePage: React.FC = () => {
                                     onChange={handleChange as any}
                                     error={errors.wabaId}
                                 />
-                            </div>
-                            <div>
                                 <IndiaPhoneInput
                                     label="Business Phone Number"
                                     name="businessPhone"
@@ -237,16 +226,11 @@ const WhatsappCreatePage: React.FC = () => {
                                 />
                             </div>
                         </div>
-                    </div>
 
-                    {/* Security & Credentials */}
-                    <div>
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            {/* <FaKey className="text-gray-500 text-sm" />  */}
-                            Security & Credentials
-                        </h6>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <div className="lg:col-span-2 xl:col-span-1">
+                        {/* Section: Security & Credentials */}
+                        <div>
+                            <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-4">Security & Credentials</h6>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <TextInput
                                     label="Access Token"
                                     name="accessToken"
@@ -257,8 +241,6 @@ const WhatsappCreatePage: React.FC = () => {
                                     onFocus={handleTokenFocus}
                                     error={errors.accessToken}
                                 />
-                            </div>
-                            <div className="lg:col-span-2 xl:col-span-1">
                                 <TextInput
                                     label="Webhook Verify Token"
                                     name="webhookVerifyToken"
@@ -269,58 +251,54 @@ const WhatsappCreatePage: React.FC = () => {
                                 />
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-                        {canEditWhatsapp && (
-                            <>
-                                <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} type="button" />
-                                <CustomButton
-                                    text={saving ? "Saving..." : isEditing ? "Update Configuration" : "Save Configuration"}
-                                    icon={FaSave}
-                                    type="submit"
-                                    disabled={saving}
-                                />
-                            </>
+                        {/* Section: Test Message (only when config exists) */}
+                        {isEditing && (
+                            <div>
+                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-4">Send a Test Message</h6>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <IndiaPhoneInput
+                                        label="Recipient Phone Number"
+                                        name="testPhone"
+                                        value={testPhone}
+                                        placeholder="e.g. 919876543210"
+                                        onChange={(e) => setTestPhone(e.target.value)}
+                                    />
+                                    <TextInput
+                                        label="Test Message"
+                                        name="testMessage"
+                                        value={testMessage}
+                                        placeholder="Enter your test message here..."
+                                        onChange={(e) => setTestMessage(e.target.value)}
+                                    />
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <CustomButton
+                                        text={sending ? "Sending..." : "Send Test Message"}
+                                        icon={FaWhatsapp}
+                                        onClick={handleSendTestMessage}
+                                        disabled={sending || !testPhone.trim() || !testMessage.trim()}
+                                    />
+                                </div>
+                            </div>
                         )}
                     </div>
-                </form>
 
-                {/* Test Message Section (Only show if config is saved/editing) */}
-                {isEditing && (
-                    <div className="px-6 py-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4">Send a Test Message</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <IndiaPhoneInput
-                                    label="Recipient Phone Number (with Country Code)"
-                                    name="testPhone"
-                                    value={testPhone}
-                                    placeholder="e.g. 919876543210"
-                                    onChange={(e) => setTestPhone(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Test Message"
-                                    name="testMessage"
-                                    value={testMessage}
-                                    placeholder="Enter your test message here..."
-                                    onChange={(e) => setTestMessage(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-4 flex justify-end">
+                    {/* Footer */}
+                    {canEditWhatsapp && (
+                        <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end gap-3 mt-auto">
+                            <CustomButton text="Clear" icon={FaEraser} variant="secondary" onClick={handleClear} type="button" />
                             <CustomButton
-                                text={sending ? "Sending..." : "Send Test Message"}
-                                icon={FaWhatsapp}
-                                onClick={handleSendTestMessage}
-                                disabled={sending || !testPhone.trim() || !testMessage.trim()}
+                                text={saving ? "Saving..." : "Save Configuration"}
+                                icon={FaSave}
+                                type="submit"
+                                disabled={saving}
                             />
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
+
+                </div>
+            </form>
         </div>
     );
 };
