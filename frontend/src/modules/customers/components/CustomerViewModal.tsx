@@ -41,7 +41,9 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
 
     useEffect(() => {
         setFullCustomer(initialCustomer);
-        if (show && initialCustomer?.id) {
+        // Only fetch if list data doesn't already contain addresses (avoid redundant call)
+        const hasFullData = initialCustomer?.addresses !== undefined;
+        if (show && initialCustomer?.id && !hasFullData) {
             customerService.fetchById(String(initialCustomer.id))
                 .then(data => {
                     if (data) setFullCustomer(data);
@@ -161,6 +163,25 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                             ) : "N/A"
                         },
                         { label: "Credit Limit", value: customer.creditLimit !== undefined && customer.creditLimit !== null ? `₹ ${Number(customer.creditLimit).toLocaleString('en-IN')}` : "N/A" },
+                        {
+                            label: "Current Balance",
+                            value: (() => {
+                                const netBal = Number(
+                                    customer.netBalance ??
+                                        (customer.openingBalanceType === "CREDIT"
+                                            ? -Math.abs(customer.openingBalance || 0)
+                                            : Math.abs(customer.openingBalance || 0))
+                                );
+                                const amt = Math.abs(netBal);
+                                const formattedAmt = amt.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                });
+                                if (netBal > 0) return `₹ ${formattedAmt} Dr`;
+                                if (netBal < 0) return `₹ ${formattedAmt} Cr`;
+                                return "₹ 0.00";
+                            })()
+                        },
                     ]
                 }
             ]}

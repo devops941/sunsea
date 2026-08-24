@@ -37,11 +37,10 @@ class ReportsController {
     );
   });
   getSalesOrderReport = asyncHandler(async (req: Request, res: Response) => {
-    const { 
-      startDate, endDate, orderNo, customerId, status, 
-      mdApprovalStatus, customerApprovalStatus, salesPersonName, 
-      dispatchType, orderType, productionStatus,
-      page, limit 
+    const {
+      startDate, endDate, orderNo, customerId, status,
+      salesPersonName, orderType, productionStatus,
+      page, limit
     } = req.query;
 
     const report = await reportsService.getSalesOrderReport(
@@ -50,10 +49,7 @@ class ReportsController {
       orderNo ? String(orderNo) : undefined,
       customerId ? String(customerId) : undefined,
       status ? String(status) : undefined,
-      mdApprovalStatus ? String(mdApprovalStatus) : undefined,
-      customerApprovalStatus ? String(customerApprovalStatus) : undefined,
       salesPersonName ? String(salesPersonName) : undefined,
-      dispatchType ? String(dispatchType) : undefined,
       orderType ? String(orderType) : undefined,
       productionStatus ? String(productionStatus) : undefined,
       page ? parseInt(String(page)) : 1,

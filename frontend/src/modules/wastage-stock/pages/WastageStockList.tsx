@@ -78,6 +78,7 @@ const WastageStockList: React.FC = () => {
         dispatch(fetchRawMaterialStocks({
             search: debouncedSearch || undefined,
             storeCategory: "WASTAGE",
+            itemType: "WASTAGE",
             categoryId: appliedCategory || undefined,
             status: appliedStatus || undefined,
             page: currentPage,

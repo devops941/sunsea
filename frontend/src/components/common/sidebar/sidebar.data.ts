@@ -155,7 +155,7 @@ export const sidebarItems: SidebarItem[] = [
         ],
       },
       {
-        title: "Store & Locations",
+        title: "Store",
         permission: "stores.view",
         children: [
           { title: "Storage Store List", path: "/storage-stores", permission: "stores.view" },
@@ -296,6 +296,10 @@ export const sidebarItems: SidebarItem[] = [
       "/quatation-order",
       "/sales-invoices",
       "/sales-returns",
+      "/sales-returns/create",
+      "/sales-returns/edit",
+      "/accounts/sales-returns/create",
+      "/accounts/sales-returns/edit",
     ],
     permissionAny: [
       "customers.view",

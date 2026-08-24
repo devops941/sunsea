@@ -1,6 +1,6 @@
 // src/pages/sales/QuotationForm/QuotationForm.tsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { FaSave, FaPaperPlane, FaCircleNotch, FaExclamationTriangle, FaUser, FaCalendarAlt, FaTruck, FaGlobe, FaMapMarkerAlt, FaFileAlt, FaPhone } from "react-icons/fa";
+import { FaExclamationTriangle } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -11,17 +11,28 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
-import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { useProducts } from "../../../hooks/useProducts";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { customerService } from "../../../services/customerService";
-import { DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { useSelector } from "react-redux";
+import {
+    DISPATCH_TYPE_OPTIONS,
+    ORDER_TYPE_OPTIONS,
+    ORDER_SOURCE_OPTIONS,
+    ORDER_SOURCE_NEEDS_EMPLOYEE,
+    ORDER_SOURCE_NEEDS_REFERRAL,
+    ORDER_SOURCE_NEEDS_DEALER,
+} from "../../../constants/selectOption";
+import { useAppSelector } from "../../../hooks/reduxHooks";
 import { usePermission } from "../../../hooks/usePermission";
+import AdditionalChargesTable, {
+    type ChargeRow,
+    DEFAULT_CHARGE_OPTIONS as CHARGE_OPTIONS,
+    serializeChargeRowsToNarration,
+    computeChargeTotals,
+} from "../../../components/sales/AdditionalChargesTable";
 
 
 
@@ -49,6 +60,11 @@ const quotationSchema = z.object({
     quotationDate: z.string().min(1, "Quotation Date is required"),
     validUntil: z.string().optional(),
     customerId: z.string().min(1, "Customer is required"),
+    mobile: z.string().optional().nullable(),
+    orderSource: z.string().optional().nullable(),
+    sourceEmployeeId: z.string().optional().nullable(),
+    referredByCustomerId: z.string().optional().nullable(),
+    referredByName: z.string().optional().nullable(),
     paymentTermId: z.string().optional(),
     billingAddressLine1: z.string().optional(),
     billingCity: z.string().optional(),
@@ -79,6 +95,11 @@ const defaultValues: QuotationFormValues = {
     quotationDate: today,
     validUntil: undefined,
     customerId: "",
+    mobile: "",
+    orderSource: "",
+    sourceEmployeeId: null,
+    referredByCustomerId: null,
+    referredByName: null,
     paymentTermId: "",
     billingAddressLine1: "",
     billingCity: "",
@@ -143,7 +164,7 @@ const QuotationForm: React.FC = () => {
 
     const docNoLabel = "Quotation No";
     const docNoPrefix = "QT";
-    const gstEnabled = true;
+    const [gstEnabled, setGstEnabled] = useState<boolean>(true);
 
     // ─── State ──────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -151,7 +172,7 @@ const QuotationForm: React.FC = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [quotationId, setQuotationId] = useState<number | null>(null);
     const [rejectionReason, setRejectionReason] = useState<string | null>(null);
-    const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
+
     const [mobile, setMobile] = useState<string | null>(null);
     const [customerOrders, setCustomerOrders] = useState<SalesOrder[]>([]);
     const [loadingCustomerOrders, setLoadingCustomerOrders] = useState(false);
@@ -163,12 +184,13 @@ const QuotationForm: React.FC = () => {
     const [salesPersonId, setSalesPersonId] = useState<string | null>(null);
     const [transportName, setTransportName] = useState<string | null>(null);
 
+    // ── Additional charges / deductions (dynamic rows) ──
+    const [chargeRows, setChargeRows] = useState<ChargeRow[]>([]);
+
     // ── Draft orders dropdown ──
     const [draftOrders, setDraftOrders] = useState<SalesOrder[]>([]);
     const [loadingDraftOrders, setLoadingDraftOrders] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState<number | null>(null);
-    const dispatch = useAppDispatch();
-
     const {
         control,
         handleSubmit,
@@ -215,7 +237,7 @@ const QuotationForm: React.FC = () => {
     const orderDiscountValue = watch("orderDiscountValue");
     const isInterState = watch("isInterState");
     const billingState = watch("billingState");
-    const { data: company } = useSelector((state: any) => state.company);
+    const company = useAppSelector((state: any) => state.company.data);
     const companyState = company?.state;
 
     const customerName = useMemo(() => {
@@ -236,6 +258,14 @@ const QuotationForm: React.FC = () => {
     const dispatchTypeLabel = useMemo(
         () => DISPATCH_TYPE_OPTIONS.find(o => o.value === dispatchType)?.label || dispatchType,
         [dispatchType]
+    );
+
+    const employeeOptions = useMemo(() =>
+        employees.map((e: any) => ({
+            value: String(e.id),
+            label: `${e.fullName || e.name || 'Employee'} (${e.empCode || `EMP #${e.id}`})`,
+        })),
+        [employees]
     );
 
     const productsOptions = useMemo(() => [
@@ -266,15 +296,23 @@ const QuotationForm: React.FC = () => {
         {
             value: "",
             label: loadingCustomerOrders
-                ? "Loading previous orders..."
+                ? "Loading sales orders..."
                 : customerOrders.length > 0
-                ? "-- Select a previous order --"
-                : "-- No previous orders found --"
+                ? "-- Select Sales Order --"
+                : "-- No pending sales orders --"
         },
-        ...customerOrders.map((o: any) => ({
-            value: String(o.id),
-            label: `${o.orderNo} — ${o.status}`,
-        })),
+        ...customerOrders.map((o: any) => {
+            const dateStr = o.orderDate
+                ? new Date(o.orderDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                : null;
+            const itemCount = Array.isArray(o.items) ? o.items.length : null;
+            const itemsStr = itemCount != null ? ` (${itemCount} ${itemCount === 1 ? "Item" : "Items"})` : "";
+            const formattedDate = dateStr ? ` · ${dateStr}` : "";
+            return {
+                value: String(o.id),
+                label: `${o.orderNo}${formattedDate}${itemsStr}`,
+            };
+        }),
     ], [customerOrders, loadingCustomerOrders]);
 
     const formatDate = (val?: string | null) => {
@@ -335,6 +373,11 @@ const QuotationForm: React.FC = () => {
                 const sgst = Number(item.sgstRate ?? 0);
                 const igst = Number(item.igstRate ?? 0);
                 const combinedGstRate = igst > 0 ? igst : cgst + sgst;
+                const finalGst = combinedGstRate > 0
+                    ? combinedGstRate
+                    : (item.gstRate != null && Number(item.gstRate) > 0
+                        ? Number(item.gstRate)
+                        : (product?.gstRate && Number(product.gstRate) > 0 ? Number(product.gstRate) : 18));
                 return {
                     productId: String(item.productId || ""),
                     quantity: String(item.quantity || ""),
@@ -343,9 +386,7 @@ const QuotationForm: React.FC = () => {
                     b2b: item.b2b != null ? String(item.b2b) : "",
                     b2c: item.b2c != null ? String(item.b2c) : "",
                     exportPrice: item.exportPrice != null ? String(item.exportPrice) : "",
-                    gstRate: combinedGstRate > 0
-                        ? String(combinedGstRate)
-                        : (item.gstRate != null ? String(item.gstRate) : "0"),
+                    gstRate: String(finalGst),
                     cessRate: item.cessRate != null ? String(item.cessRate) : "0",
                 };
             })
@@ -359,14 +400,19 @@ const QuotationForm: React.FC = () => {
             id: order.id,
             quotationNo: order.orderNo,
             quotationDate: order.orderDate?.split("T")[0] || today,
-            validUntil: order.expectedCompletionDate?.split("T")[0] || "",
+            validUntil: (order as any).expectedCompletionDate?.split("T")[0] || "",
             customerId: String(order.customerId || ""),
-            paymentTermId: order.paymentTermId?.toString() || "",
+            mobile: order.mobile || "",
+            orderSource: (order as any).orderSource || "",
+            sourceEmployeeId: (order as any).sourceEmployeeId ? String((order as any).sourceEmployeeId) : null,
+            referredByCustomerId: (order as any).referredByCustomerId ? String((order as any).referredByCustomerId) : null,
+            referredByName: (order as any).referredByName || "",
+            paymentTermId: (order as any).paymentTermId?.toString() || "",
             billingAddressLine1: billing.line1,
             billingCity: billing.city,
             billingState: billing.state,
             billingPincode: billing.pincode,
-            sameAsBilling: order.sameAsBilling || false,
+            sameAsBilling: (order as any).sameAsBilling || false,
             isInterState: (order as any).isInterState ?? false,
             shippingAddressLine1: shipping?.addressLine1 || "",
             shippingCity: shipping?.city || "",
@@ -382,14 +428,47 @@ const QuotationForm: React.FC = () => {
                 : "",
         });
 
-        setRejectionReason(order.mdRejectionReason || null);
+        // Restore additional charges stored in narration JSON
+        try {
+            const raw = (order as any).narration || "";
+            const parsed = raw.startsWith("{") ? JSON.parse(raw) : null;
+            if (parsed?.__chargeRows__) {
+                setChargeRows(
+                    (parsed.__chargeRows__ as { type: string; amount: number }[]).map(r => ({
+                        id: `${Date.now()}-${Math.random()}`,
+                        type: r.type,
+                        amount: String(r.amount),
+                    }))
+                );
+            } else if (parsed?.__charges__) {
+                const ch = parsed.__charges__ as Record<string, number>;
+                const MAP: { key: string; type: string }[] = [
+                    { key: 'lorryFreight',  type: 'LORRY_FREIGHT'   },
+                    { key: 'othersPlus',    type: 'OTHERS_PLUS'     },
+                    { key: 'othersMinus',   type: 'OTHERS_MINUS'    },
+                    { key: 'roundOffPlus',  type: 'ROUND_OFF_PLUS'  },
+                    { key: 'roundOffMinus', type: 'ROUND_OFF_MINUS' },
+                    { key: 'tds',           type: 'TDS'             },
+                ];
+                const rows: ChargeRow[] = MAP.filter(m => Number(ch[m.key]) > 0).map(m => ({
+                    id: `${Date.now()}-${Math.random()}`,
+                    type: m.type,
+                    amount: String(ch[m.key]),
+                }));
+                setChargeRows(rows);
+            } else {
+                setChargeRows([]);
+            }
+        } catch { /* ignore parse errors */ }
+
+        setRejectionReason((order as any).mdRejectionReason || null);
         setIsEditMode(true);
         setQuotationId(order.id);
 
         setDispatchType((order as any).dispatchType || null);
         setOrderType((order as any).orderType || null);
         setSalesPersonId((order as any).salesPersonId != null ? String((order as any).salesPersonId) : null);
-        setTransportName(order.transportName || null);
+        setTransportName((order as any).transportName || null);
         setMobile(order.mobile || null);
     };
 
@@ -398,6 +477,40 @@ const QuotationForm: React.FC = () => {
         const state = location.state as any;
         // Edit target: prefer the URL param (survives refresh), fall back to nav state
         const editId = idParam ? Number(idParam) : (state?.id ? Number(state.id) : null);
+        const reuseId = !idParam && state?.reuseOrderId ? Number(state.reuseOrderId) : null;
+
+        if (reuseId) {
+            setIsEditMode(false);
+            setQuotationId(null);
+            setRejectionReason(null);
+            setDispatchType(null);
+            setOrderType(null);
+            setSalesPersonId(null);
+            setMobile(null);
+            setSelectedDraftId(null);
+
+            const loadReuseOrder = async () => {
+                setLoadingOrder(true);
+                try {
+                    const order = await salesOrderService.fetchById(reuseId);
+                    populateFormFromOrder(order);
+                    // Reset to create mode with fresh quotation number
+                    setIsEditMode(false);
+                    setQuotationId(null);
+                    const orderNo = await salesOrderService.getNextOrderNo();
+                    const qtNo = orderNo.replace('SO', docNoPrefix);
+                    setValue("quotationNo", qtNo);
+                    setValue("quotationDate", new Date().toISOString().split("T")[0]);
+                    toast.info(`Quotation details reused from ${order.orderNo}`);
+                } catch (error) {
+                    toast.error("Failed to load quotation for reuse");
+                } finally {
+                    setLoadingOrder(false);
+                }
+            };
+            loadReuseOrder();
+            return;
+        }
 
         if (!editId) {
             setIsEditMode(false);
@@ -428,7 +541,7 @@ const QuotationForm: React.FC = () => {
         };
 
         loadOrder();
-    }, [location, idParam, reset, navigate, dispatch]);
+    }, [location, idParam, reset, navigate]);
 
     // ─── Load draft orders (only in create mode) ──────────────
     useEffect(() => {
@@ -455,8 +568,37 @@ const QuotationForm: React.FC = () => {
     useEffect(() => {
         loadCustomers();
         loadProducts();
-        if (can("employees.view")) loadEmployees({});
+        if (can("employees.view")) loadEmployees({ limit: 500 });
     }, [loadCustomers, loadProducts, loadEmployees, can]);
+
+    // ─── Clear source sub-fields when orderSource changes ───
+    const orderSource = watch("orderSource");
+    useEffect(() => {
+        if (!ORDER_SOURCE_NEEDS_EMPLOYEE.includes(orderSource ?? "")) {
+            setValue("sourceEmployeeId", null);
+        }
+        if (!ORDER_SOURCE_NEEDS_REFERRAL.includes(orderSource ?? "")) {
+            setValue("referredByCustomerId", null);
+        }
+        if (!ORDER_SOURCE_NEEDS_REFERRAL.includes(orderSource ?? "") && !ORDER_SOURCE_NEEDS_DEALER.includes(orderSource ?? "")) {
+            setValue("referredByName", null);
+        }
+    }, [orderSource, setValue]);
+
+    // Auto-fill mobile from selected customer if empty
+    useEffect(() => {
+        if (customerId) {
+            const cust = customers.find(c => String(c.id) === customerId);
+            if (cust) {
+                const mob = Array.isArray(cust.mobile) && cust.mobile.length > 0
+                    ? cust.mobile[0].number
+                    : typeof cust.mobile === "string" ? cust.mobile : "";
+                if (mob && !getValues("mobile")) {
+                    setValue("mobile", mob);
+                }
+            }
+        }
+    }, [customerId, customers, getValues, setValue]);
 
     // ─── Fetch customer's previous orders on customer change (create mode only) ──
     useEffect(() => {
@@ -617,7 +759,7 @@ const QuotationForm: React.FC = () => {
                 exportPrice = Number(product.exportPrice) || 0;
 
                 if (isNaN(Number(item.gstRate)) || item.gstRate === "" || item.gstRate === undefined) {
-                    gstRate = Number(product.gstRate) || 0;
+                    gstRate = Number(product.gstRate) > 0 ? Number(product.gstRate) : 18;
                 }
                 if (isNaN(Number(item.cessRate)) || item.cessRate === "" || item.cessRate === undefined) {
                     cessRate = Number(product.cess) || 0;
@@ -629,7 +771,7 @@ const QuotationForm: React.FC = () => {
         if (isNaN(b2b)) b2b = 0;
         if (isNaN(b2c)) b2c = 0;
         if (isNaN(exportPrice)) exportPrice = 0;
-        if (isNaN(gstRate)) gstRate = 0;
+        if (isNaN(gstRate)) gstRate = 18;
         if (isNaN(cessRate)) cessRate = 0;
 
         // Custom entered unit price takes priority; falls back to grade price / rate
@@ -652,9 +794,10 @@ const QuotationForm: React.FC = () => {
     // distributed server-side).
     const calculateItemDisplay = (item: any) => {
         const base = calculateItemBase(item);
-        const gstAmount = (base.subtotal * base.gstRate) / 100;
-        const cessAmount = (base.subtotal * base.cessRate) / 100;
-        return { ...base, gstAmount, cessAmount, discountAmount: 0 };
+        const gstAmount = gstEnabled ? (base.subtotal * base.gstRate) / 100 : 0;
+        const cessAmount = gstEnabled ? (base.subtotal * base.cessRate) / 100 : 0;
+        const totalWithGst = base.subtotal + gstAmount + cessAmount;
+        return { ...base, gstAmount, cessAmount, totalWithGst, discountAmount: 0 };
     };
 
     // Order-level totals — the ONE discount is applied here, proportionally
@@ -676,7 +819,6 @@ const QuotationForm: React.FC = () => {
         let totalGst = 0;
         let totalCess = 0;
 
-        // Estimated mode without the "Include GST" checkbox → amount-only calculation
         if (gstEnabled && subtotal > 0) {
             for (const b of bases) {
                 const share = b.subtotal / subtotal;
@@ -687,9 +829,10 @@ const QuotationForm: React.FC = () => {
             }
         }
 
-        const netAmount = subtotal - totalDiscount + totalGst + totalCess;
+        const { additions, deductions } = computeChargeTotals(chargeRows);
+        const netAmount = subtotal - totalDiscount + totalGst + totalCess + additions - deductions;
 
-        return { subtotal, totalDiscount, totalGst, totalCess, netAmount };
+        return { subtotal, totalDiscount, totalGst, totalCess, netAmount, additions, deductions };
     };
 
     const totals = calculateOrderTotals();
@@ -737,6 +880,12 @@ const QuotationForm: React.FC = () => {
             if (billing.state) setValue("billingState", billing.state, { shouldValidate: true });
             if (billing.pincode) setValue("billingPincode", billing.pincode, { shouldValidate: true });
 
+            if ((order as any).orderSource) setValue("orderSource", (order as any).orderSource);
+            if ((order as any).sourceEmployeeId) setValue("sourceEmployeeId", String((order as any).sourceEmployeeId));
+            if ((order as any).referredByCustomerId) setValue("referredByCustomerId", String((order as any).referredByCustomerId));
+            if ((order as any).referredByName) setValue("referredByName", (order as any).referredByName);
+            if (order.mobile) setValue("mobile", order.mobile);
+
             if (!order.items || order.items.length === 0) {
                 toast.info("Selected order has no items.");
                 return;
@@ -747,6 +896,9 @@ const QuotationForm: React.FC = () => {
                 const itemRate = gradedPrice > 0
                     ? gradedPrice
                     : (item.unitPrice ?? item.rate ?? item.estimatedRate ?? (Number(item.quantity) > 0 && Number(item.lineTotal) > 0 ? Number(item.lineTotal) / Number(item.quantity) : 0));
+                const itemGst = item.gstRate != null && Number(item.gstRate) > 0
+                    ? Number(item.gstRate)
+                    : (product?.gstRate && Number(product.gstRate) > 0 ? Number(product.gstRate) : 18);
                 return {
                     productId: String(item.productId || ""),
                     quantity: String(item.quantity || "1"),
@@ -755,11 +907,53 @@ const QuotationForm: React.FC = () => {
                     b2b: product ? String(product.b2b ?? gradedPrice) : "",
                     b2c: product ? String(product.b2c ?? "") : "",
                     exportPrice: product ? String(product.exportPrice ?? "") : "",
-                    gstRate: item.gstRate != null ? String(item.gstRate) : (product ? String(product.gstRate ?? "") : ""),
+                    gstRate: String(itemGst),
                     cessRate: item.cessRate != null ? String(item.cessRate) : (product ? String(product.cess ?? "") : ""),
                 };
             });
             setValue("items", newItems);
+
+            // ── Carry over order-level discount from the selected order ──
+            if ((order as any).orderDiscountType) {
+                setValue("orderDiscountType", (order as any).orderDiscountType);
+            }
+            if ((order as any).orderDiscountValue != null) {
+                setValue("orderDiscountValue", String((order as any).orderDiscountValue));
+            }
+
+            // ── Carry over additional charges stored in narration ──
+            try {
+                const raw = (order as any).narration || "";
+                const parsed = raw.startsWith("{") ? JSON.parse(raw) : null;
+                if (parsed?.__chargeRows__) {
+                    setChargeRows(
+                        (parsed.__chargeRows__ as { type: string; amount: number }[]).map(r => ({
+                            id: `${Date.now()}-${Math.random()}`,
+                            type: r.type,
+                            amount: String(r.amount),
+                        }))
+                    );
+                } else if (parsed?.__charges__) {
+                    const ch = parsed.__charges__;
+                    const MAP: { key: string; type: string }[] = [
+                        { key: 'lorryFreight',  type: 'LORRY_FREIGHT'   },
+                        { key: 'othersPlus',    type: 'OTHERS_PLUS'     },
+                        { key: 'othersMinus',   type: 'OTHERS_MINUS'    },
+                        { key: 'roundOffPlus',  type: 'ROUND_OFF_PLUS'  },
+                        { key: 'roundOffMinus', type: 'ROUND_OFF_MINUS' },
+                        { key: 'tds',           type: 'TDS'             },
+                    ];
+                    const rows: ChargeRow[] = MAP.filter(m => Number(ch[m.key]) > 0).map(m => ({
+                        id: `${Date.now()}-${Math.random()}`,
+                        type: m.type,
+                        amount: String(ch[m.key]),
+                    }));
+                    setChargeRows(rows);
+                } else {
+                    setChargeRows([]);
+                }
+            } catch { /* ignore parse errors */ }
+
             toast.success(`Loaded ${newItems.length} item(s) from order ${order.orderNo}`);
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to load order items");
@@ -767,12 +961,11 @@ const QuotationForm: React.FC = () => {
     };
 
     // ─── Submit Handler ────────────────────────────────────────
-    const onSubmit = async (data: QuotationFormValues, submitForApproval: boolean = false) => {
-        if (submitForApproval) {
-            setIsSubmittingForApproval(true);
-        } else {
-            setIsSubmitting(true);
-        }
+    const [isConfirming, setIsConfirming] = useState(false);
+
+    const onSubmit = async (data: QuotationFormValues, confirm: boolean = false) => {
+        if (confirm) setIsConfirming(true);
+        else setIsSubmitting(true);
 
         try {
 
@@ -803,6 +996,17 @@ const QuotationForm: React.FC = () => {
                 sourceSalesOrderId: (!currentIsEditMode && selectedPrevOrderId) ? selectedPrevOrderId : undefined,
                 expectedCompletionDate: data.validUntil ? new Date(data.validUntil).toISOString() : undefined,
                 customerId: data.customerId,
+                mobile: data.mobile || null,
+                orderSource: data.orderSource || null,
+                sourceEmployeeId: (ORDER_SOURCE_NEEDS_EMPLOYEE.includes(data.orderSource ?? "") && data.sourceEmployeeId)
+                    ? String(data.sourceEmployeeId)
+                    : null,
+                referredByCustomerId: (ORDER_SOURCE_NEEDS_REFERRAL.includes(data.orderSource ?? "") && data.referredByCustomerId)
+                    ? String(data.referredByCustomerId)
+                    : null,
+                referredByName: (ORDER_SOURCE_NEEDS_REFERRAL.includes(data.orderSource ?? "") || ORDER_SOURCE_NEEDS_DEALER.includes(data.orderSource ?? ""))
+                    ? (data.referredByName?.trim() || null)
+                    : null,
                 paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,
                 billingAddressLine1: data.billingAddressLine1 ?? "",
                 billingCity: data.billingCity ?? "",
@@ -816,12 +1020,11 @@ const QuotationForm: React.FC = () => {
                 isInterState: data.isInterState,
                 remarks: data.remarks,
                 internalNotes: data.internalNotes,
+                narration: serializeChargeRowsToNarration(chargeRows),
                 items: transformedItems,
                 orderDiscountType: data.orderDiscountType,
                 orderDiscountValue: data.orderDiscountValue,
-                // Quotations always start in QUOTATION_IN_PROGRESS so they appear
-                // in the Quotation List and not in the Sales Order list.
-                status: currentIsEditMode ? undefined : "QUOTATION_IN_PROGRESS",
+                status: confirm ? "CONFIRMED" : "DRAFT",
             };
 
             let response;
@@ -834,30 +1037,18 @@ const QuotationForm: React.FC = () => {
 
             const orderId = currentIsEditMode ? currentQuotationId! : response.id;
 
-            // Apply the single order-level discount (if any) — this replaces
-            // the old per-item updateDiscounts call entirely.
-            const discountValueNum = Number(data.orderDiscountValue) || 0;
-            // if (discountValueNum > 0) {
-            //     await salesOrderService.updateOrderDiscount(orderId, {
-            //         discountType: data.orderDiscountType,
-            //         discountValue: discountValueNum,
-            //     });
-            // }
-
-            if (submitForApproval) {
-                await salesOrderService.submitForApproval(orderId);
-                toast.success("Quotation submitted for MD approval!");
+            if (confirm) {
+                toast.success("Quotation confirmed successfully!");
+                navigate("/quatation-order");
             } else {
-                toast.success(currentIsEditMode ? "Quotation updated successfully!" : "Quotation created successfully as DRAFT!");
+                toast.success(currentIsEditMode ? "Quotation updated as draft!" : "Quotation saved as draft!");
+                navigate("/quatation-order");
             }
-
-            navigate("/quatation-order");
         } catch (error: any) {
-            console.error("❌ Submit Error:", error);
             toast.error(error?.response?.data?.message || "Failed to save quotation");
         } finally {
             setIsSubmitting(false);
-            setIsSubmittingForApproval(false);
+            setIsConfirming(false);
         }
     };
 
@@ -915,7 +1106,7 @@ const QuotationForm: React.FC = () => {
                         {(
                             <>
                                 {/* ── Order Info ── */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className={`grid grid-cols-1 sm:grid-cols-2 ${!isEditMode ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
                                     <Controller
                                         name="quotationNo"
                                         control={control}
@@ -930,10 +1121,6 @@ const QuotationForm: React.FC = () => {
                                             <CtrlText field={f} label="Quotation Date" type="date" disabled error={errors.quotationDate?.message} />
                                         )}
                                     />
-                                </div>
-
-                                {/* ── Customer & Load from Previous Order (Same Row) ── */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Controller
                                         name="customerId"
                                         control={control}
@@ -951,10 +1138,9 @@ const QuotationForm: React.FC = () => {
                                             />
                                         )}
                                     />
-
                                     {!isEditMode && (
                                         <SelectInput
-                                            label="Load from previous order"
+                                            label="Select Sales Order"
                                             name="selectedPrevOrderId"
                                             value={selectedPrevOrderId ? String(selectedPrevOrderId) : ""}
                                             options={prevOrderOptions}
@@ -986,16 +1172,18 @@ const QuotationForm: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* ── Items Table Header with Top-Right Add Product Button ── */}
+                                {/* ── Items Table Header with Include GST Checkbox ── */}
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-base font-semibold text-ink">Quotation Items</h3>
-                                    <div className="flex items-center gap-4">
-                                        <CustomButton
-                                            text="Add Product"
-                                            variant="secondary"
-                                            onClick={() => append({ productId: "", quantity: "1", unitPrice: "", mrp: "", b2b: "", b2c: "", exportPrice: "", gstRate: "18", cessRate: "" })}
+                                    <label className="inline-flex items-center gap-2 cursor-pointer select-none px-3 py-1.5 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={gstEnabled}
+                                            onChange={(e) => setGstEnabled(e.target.checked)}
+                                            className="w-4 h-4 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-transparent border-line cursor-pointer"
                                         />
-                                    </div>
+                                        <span className="text-sm font-medium text-ink">Include GST</span>
+                                    </label>
                                 </div>
                                 {errors.items?.root && (
                                     <div className="text-red-500 text-sm mb-3">{errors.items.root.message}</div>
@@ -1005,14 +1193,17 @@ const QuotationForm: React.FC = () => {
                                         <thead>
                                             <tr className="bg-card-2 border-b border-line-soft">
                                                 <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[4%]">#</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[28%]">Product</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[24%]">Product</th>
                                                 <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[10%]">Qty</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[12%]">Unit Price</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[13%]">Subtotal</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[11%]">Unit Price</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[11%]">Subtotal</th>
                                                 {gstEnabled && (
-                                                    <th className="py-3 px-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[23%]">GST Rate</th>
+                                                    <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[11%]">GST (%)</th>
                                                 )}
-                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[10%]">Remove</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[15%]">
+                                                    {gstEnabled ? "Total (Inc. GST)" : "Total"}
+                                                </th>
+                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[8%]">Remove</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1023,11 +1214,13 @@ const QuotationForm: React.FC = () => {
                                                 const rowUnitPrice = rowCalc.unitPrice;
                                                 const rowQty = Number(itemValue?.quantity) || 0;
                                                 const rowSubtotal = rowCalc.subtotal;
+                                                const rowGstAmount = rowCalc.gstAmount;
+                                                const rowTotalWithGst = rowCalc.totalWithGst;
                                                 return (
                                                     <tr key={field.id} className="border-b border-line-soft last:border-b-0 bg-card hover:bg-card-2/40">
                                                         <td className="py-3 pl-4 pr-2 text-ink font-medium">{index + 1}</td>
                                                         <td className="py-2 px-2 min-w-[12rem]">
-                                                            <Controller
+                                                             <Controller
                                                                 name={`items.${index}.productId`}
                                                                 control={control}
                                                                 render={({ field: f }) => (
@@ -1049,13 +1242,9 @@ const QuotationForm: React.FC = () => {
                                                                                 setValue(`items.${index}.b2b`, String(product.b2b ?? gradedPrice));
                                                                                 setValue(`items.${index}.b2c`, String(product.b2c ?? ""));
                                                                                 setValue(`items.${index}.exportPrice`, String(product.exportPrice ?? ""));
-                                                                                setValue(`items.${index}.gstRate`, String(product.gstRate ?? ""));
+                                                                                const prodGst = product.gstRate != null && Number(product.gstRate) > 0 ? String(product.gstRate) : "18";
+                                                                                setValue(`items.${index}.gstRate`, prodGst);
                                                                                 setValue(`items.${index}.cessRate`, String(product.cess ?? ""));
-                                                                                // Default GST to 18% if not already set
-                                                                                const currentGstRate = (items?.[index] as any)?.gstRate;
-                                                                                if (!currentGstRate) {
-                                                                                    setValue(`items.${index}.gstRate`, "18");
-                                                                                }
                                                                             }
                                                                         }}
                                                                         searchable
@@ -1081,7 +1270,6 @@ const QuotationForm: React.FC = () => {
                                                                 )}
                                                             />
                                                         </td>
-                                                        {/* Unit price — editable input with full text contrast & grade fallback */}
                                                         <td className="py-2 px-2 w-32">
                                                             <Controller
                                                                 name={`items.${index}.unitPrice`}
@@ -1105,7 +1293,7 @@ const QuotationForm: React.FC = () => {
                                                             {rowSubtotal > 0 ? `₹${rowSubtotal.toFixed(2)}` : "—"}
                                                         </td>
                                                         {gstEnabled && (
-                                                            <td className="py-2 px-2 min-w-[8rem]">
+                                                            <td className="py-2 px-2 min-w-[7rem]">
                                                                 <Controller
                                                                     name={`items.${index}.gstRate`}
                                                                     control={control}
@@ -1113,7 +1301,7 @@ const QuotationForm: React.FC = () => {
                                                                         <TextInput
                                                                             name={f.name}
                                                                             type="number"
-                                                                            value={f.value ?? ""}
+                                                                            value={f.value !== undefined && f.value !== "" ? f.value : "18"}
                                                                             onChange={f.onChange}
                                                                             min={0}
                                                                             max={100}
@@ -1124,6 +1312,22 @@ const QuotationForm: React.FC = () => {
                                                                 />
                                                             </td>
                                                         )}
+                                                        <td className="py-3 px-2 text-right font-bold text-ink whitespace-nowrap">
+                                                            {rowSubtotal > 0 ? (
+                                                                <div>
+                                                                    <span className="text-emerald-500 font-semibold">
+                                                                        ₹{rowTotalWithGst.toFixed(2)}
+                                                                    </span>
+                                                                    {gstEnabled && rowGstAmount > 0 && (
+                                                                        <span className="block text-[10px] text-ink-subtle font-normal">
+                                                                            (+₹{rowGstAmount.toFixed(2)} GST)
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                "—"
+                                                            )}
+                                                        </td>
                                                         <td className="py-2 px-2 text-center">
                                                             <DeleteButton
                                                                 onClick={() => remove(index)}
@@ -1137,23 +1341,35 @@ const QuotationForm: React.FC = () => {
                                         </tbody>
                                     </table>
                                 </div>
-
-                                {/* ── Discount + Totals ── */}
+                                {/* ── Additional Charges + Discount + Totals ── */}
                                 {fields.length > 0 && (
-                                    <div className="flex justify-end mb-4">
-                                        <div className="w-full max-w-sm border border-line rounded-xl p-4 bg-card-2">
-                                            <div className="flex items-end gap-2 mb-3 justify-end">
-                                                <div className="w-36">
+                                    <div className="flex flex-row gap-4 mb-4 items-start">
+                                        {/* ── Left: Additional Charges Table ── */}
+                                        <AdditionalChargesTable
+                                            rows={chargeRows}
+                                            onChange={setChargeRows}
+                                        />
+
+                                        {/* ── Right: Discount + Totals Summary ── */}
+                                        <div className="w-80 shrink-0 border border-line rounded-xl p-4 bg-card-2 self-start">
+                                            <div className="flex items-center justify-between gap-4 mb-3">
+                                                <span className="text-xs font-bold text-ink uppercase tracking-wide">Discount (%)</span>
+                                                <div className="w-32">
                                                     <Controller
                                                         name="orderDiscountValue"
                                                         control={control}
                                                         render={({ field: f }) => (
-                                                            <CtrlText
-                                                                field={{ ...f, value: String(f.value ?? "") }}
-                                                                label="Discount (%)"
+                                                            <TextInput
+                                                                name={f.name}
                                                                 type="number"
+                                                                value={String(f.value ?? "")}
+                                                                onChange={f.onChange}
+                                                                onBlur={f.onBlur}
                                                                 placeholder="0"
-                                                                bottom={true}
+                                                                min={0}
+                                                                max={100}
+                                                                step={1}
+                                                                inputClassName="!bg-card !border !border-line hover:!border-primary/60 focus:!border-primary text-ink font-bold text-right px-3 py-1.5 shadow-sm rounded-lg"
                                                                 error={errors.orderDiscountValue?.message}
                                                             />
                                                         )}
@@ -1197,6 +1413,18 @@ const QuotationForm: React.FC = () => {
                                                     </>
                                                 ))}
 
+                                                {/* ── Active charge row summaries ── */}
+                                                {chargeRows.filter(r => Number(r.amount) > 0).map(row => {
+                                                    const opt = CHARGE_OPTIONS.find(o => o.value === row.type);
+                                                    const isAdd = opt?.sign === 1;
+                                                    return (
+                                                        <div key={row.id} className={`flex justify-between text-xs ${isAdd ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                            <span>{opt?.label ?? row.type}</span>
+                                                            <span>{isAdd ? '+ ' : '- '}₹{Number(row.amount).toFixed(2)}</span>
+                                                        </div>
+                                                    );
+                                                })}
+
                                                 <div className="flex justify-between pt-2 border-t border-line mt-2 text-ink">
                                                     <span className="text-base font-bold">Net Amount</span>
                                                     <span className="text-base font-bold text-blue-600">₹{totals.netAmount.toFixed(2)}</span>
@@ -1209,17 +1437,17 @@ const QuotationForm: React.FC = () => {
                                 {/* ── Form Actions ── */}
                                 <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
                                     <CustomButton
-                                        text={isSubmitting ? (isEditMode ? "Updating..." : "Saving...") : (isEditMode ? "Update Draft" : "Save as Draft")}
+                                        text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
                                         variant="secondary"
                                         type="submit"
-                                        disabled={isSubmitting || isSubmittingForApproval}
+                                        disabled={isSubmitting || isConfirming}
                                     />
                                     <CustomButton
-                                        text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"}
+                                        text={isConfirming ? "Confirming..." : "Confirm Order"}
                                         variant="primary"
                                         type="button"
                                         onClick={handleSubmit((data) => onSubmit(data, true))}
-                                        disabled={isSubmitting || isSubmittingForApproval}
+                                        disabled={isSubmitting || isConfirming}
                                     />
                                 </div>
                             </>

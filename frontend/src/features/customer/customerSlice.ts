@@ -6,7 +6,7 @@ import type { Customer, CustomerState, CreateCustomerDto, UpdateCustomerDto } fr
 // BUG-CUST-004 fix: thunk now accepts page and limit for server-side pagination
 export const fetchCustomers = createAsyncThunk(
   "customers/fetchAll",
-  async (params: { search?: string; page?: number; limit?: number } | string | undefined, { rejectWithValue }) => {
+  async (params: { search?: string; page?: number; limit?: number; status?: string; customerTypeId?: number; customerGradeId?: number } | string | undefined, { rejectWithValue }) => {
     try {
       // Support both legacy string call (search only) and new paginated params object
       const normalized = typeof params === "string" ? { search: params } : (params ?? {});

@@ -48,7 +48,36 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
         return str.trim() + ' Only';
     };
 
-    const isInterState = invoice.customer?.billingState && company?.state && invoice.customer.billingState !== company.state;
+    const customerState: string = invoice.customer?.addresses?.[0]?.address?.state || '';
+    const isInterState = customerState && company?.state && customerState !== company.state;
+
+    // ── Parse additional charges from narration ───────────────────────────────
+    const CHARGE_META: Record<string, { label: string; sign: 1 | -1 }> = {
+        LORRY_FREIGHT:       { label: 'Lorry Freight',               sign:  1 },
+        LORRY_FREIGHT_MINUS: { label: 'Lorry Freight',               sign: -1 },
+        OTHERS_PLUS:         { label: 'Others',                      sign:  1 },
+        OTHERS_MINUS:        { label: 'Others',                      sign: -1 },
+        ROUND_OFF_PLUS:      { label: 'Round Off',                   sign:  1 },
+        ROUND_OFF_MINUS:     { label: 'Round Off',                   sign: -1 },
+        TDS:                 { label: 'TDS on Pymt./Purc. of Goods', sign: -1 },
+    };
+
+    let chargeRows: { label: string; sign: 1 | -1; amount: number }[] = [];
+    try {
+        const raw = invoice.narration || '';
+        if (raw.startsWith('{')) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.__chargeRows__) {
+                chargeRows = (parsed.__chargeRows__ as { type: string; amount: number }[])
+                    .filter(r => Number(r.amount) > 0)
+                    .map(r => ({
+                        label: CHARGE_META[r.type]?.label || r.type,
+                        sign:  CHARGE_META[r.type]?.sign  ?? 1,
+                        amount: Number(r.amount),
+                    }));
+            }
+        }
+    } catch { /* ignore bad JSON */ }
 
     const itemsWithTax = (invoice.items || []).map((item: any) => {
         const qty = item.dispatchedQuantity || item.quantity || 0;
@@ -85,7 +114,8 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
     const totalSgst = itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0);
     const totalIgst = itemsWithTax.reduce((s: number, i: any) => s + i.igstAmount, 0);
     const totalTaxable = itemsWithTax.reduce((s: number, i: any) => s + i.amount, 0);
-    const grandTotal = Number(invoice.grandTotal ?? (totalTaxable + totalCgst + totalSgst + totalIgst));
+    const itemsSubTotal = totalTaxable + totalCgst + totalSgst + totalIgst;
+    const grandTotal = Number(invoice.grandTotal ?? itemsSubTotal);
 
     const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; igstAmt: number; totalTax: number }>();
     itemsWithTax.forEach((item: any) => {
@@ -126,7 +156,7 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
         itemsHtml += `
             <tr>
                 <td class="border border-black px-2 py-1 align-middle text-center">${idx + 1}.</td>
-                <td class="border border-black px-2 py-1 align-middle text-left">${item.product?.productName || "N/A"}</td>
+                <td class="border border-black px-2 py-1 align-middle text-left">${item.description || item.product?.productName || "N/A"}</td>
                 <td class="border border-black px-2 py-1 align-middle text-center">${item.hsnCode}</td>
                 <td class="border border-black px-2 py-1 align-middle text-right">${item.qty}</td>
                 <td class="border border-black px-2 py-1 align-middle text-center">${item.unit}</td>
@@ -224,7 +254,7 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                 <div class="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
                     <div class="flex text-[13px]"><span class="w-[110px] font-bold">Invoice No.</span><span>: ${invoice.invoiceNo}</span></div>
                     <div class="flex text-[13px]"><span class="w-[110px] font-bold">Dated</span><span>: ${formatDate(invoice.invoiceDate)}</span></div>
-                    <div class="flex text-[13px]"><span class="w-[110px] font-bold">Place of Supply</span><span>: ${invoice.customer?.billingState || "-"}</span></div>
+                    <div class="flex text-[13px]"><span class="w-[110px] font-bold">Place of Supply</span><span>: ${customerState || "-"}</span></div>
                     <div class="flex text-[13px]"><span class="w-[110px] font-bold">Due Date</span><span>: ${formatDate(invoice.dueDate)}</span></div>
                     <div class="flex text-[13px]"><span class="w-[110px] font-bold">Reverse Charge</span><span>: N</span></div>
                     <div class="flex text-[13px]"><span class="w-[110px] font-bold">GR/RR No</span><span>: </span></div>
@@ -284,8 +314,23 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     ${itemsHtml}
                 </tbody>
                 <tfoot>
+                    ${chargeRows.length > 0 ? `
                     <tr>
-                        <td colspan="${isInterState ? 7 : 10}" class="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right font-bold">Sub Total</td>
+                        <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(itemsSubTotal)}</td>
+                    </tr>
+                    ${chargeRows.map(cr => `
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">
+                            ${cr.label} ${cr.sign === 1 ? '(+)' : '(-)'}
+                        </td>
+                        <td class="border border-black px-2 py-1 text-right text-[13px]">
+                            ${cr.sign === 1 ? '+' : '-'}&nbsp;${formatMoney(cr.amount)}
+                        </td>
+                    </tr>`).join('')}
+                    ` : ''}
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
                         <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(grandTotal)}</td>
                     </tr>
                 </tfoot>

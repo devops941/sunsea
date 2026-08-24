@@ -19,7 +19,15 @@ class ReturnsService {
     return prisma.salesReturn.findMany({
       where: companyId ? { companyId } : undefined,
       include: {
-        customer: { select: { id: true, firmName: true, customerCode: true } },
+        customer: {
+          select: {
+            id: true,
+            firmName: true,
+            customerCode: true,
+            customerGradeId: true,
+            customerGrade: { select: { id: true, name: true } },
+          },
+        },
         salesInvoice: { select: { id: true, invoiceNo: true } },
         items: { include: { product: { select: { id: true, productName: true } } } },
       },
@@ -125,7 +133,7 @@ class ReturnsService {
             subTotal: new Prisma.Decimal(subTotal),
             taxAmount: new Prisma.Decimal(taxAmount),
             grandTotal: new Prisma.Decimal(grandTotal),
-            status: "APPROVED",
+            status: data.status || "APPROVED",
             narration: data.narration || null,
             companyId: data.companyId,
             createdBy: createdBy || null,
@@ -142,14 +150,140 @@ class ReturnsService {
         return salesReturn;
       }, { maxWait: 10000, timeout: 30000 });
 
-      // 4. Post Double-Entry Accounting Voucher(s) after return transaction has committed
-      try {
-        await voucherPostingService.postSalesReturnVoucher(salesReturn.id);
-      } catch (vErr) {
-        console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher:", vErr);
+      // 4. Post Double-Entry Accounting Voucher(s) after return transaction has committed (skip for DRAFT)
+      if (salesReturn.status !== "DRAFT") {
+        try {
+          await voucherPostingService.postSalesReturnVoucher(salesReturn.id);
+        } catch (vErr) {
+          console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher:", vErr);
+        }
       }
 
       return salesReturn;
+  }
+
+  async getSalesReturnById(id: string) {
+    const returnRecord = await prisma.salesReturn.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { id: true, firmName: true, customerCode: true, customerGrade: true } },
+        salesInvoice: { select: { id: true, invoiceNo: true } },
+        items: {
+          include: {
+            product: { select: { id: true, productName: true, productCode: true, category: true } },
+          },
+        },
+      },
+    });
+    if (!returnRecord) throw new ApiError(404, "Sales return not found");
+    return returnRecord;
+  }
+
+  async updateSalesReturn(id: string, data: CreateSalesReturnInput, _updatedBy?: string) {
+    const existing = await prisma.salesReturn.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!existing) throw new ApiError(404, "Sales return not found");
+    if (existing.status !== "DRAFT") {
+      throw new ApiError(400, "Only draft returns can be modified");
+    }
+
+    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
+    if (!customer) throw new ApiError(404, "Customer not found");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. Delete previous items
+      await tx.salesReturnItem.deleteMany({ where: { salesReturnId: id } });
+
+      // 2. Compute totals
+      let subTotal = 0;
+      let taxAmount = 0;
+
+      const itemsData = data.items.map((item) => {
+        const lineSubtotal = item.quantity * item.unitPrice;
+        const lineTax = (lineSubtotal * (item.taxRate || 0)) / 100;
+        const lineTotal = lineSubtotal + lineTax;
+
+        subTotal += lineSubtotal;
+        taxAmount += lineTax;
+
+        return {
+          productId: BigInt(item.productId),
+          salesInvoiceItemId: item.salesInvoiceItemId || null,
+          quantity: new Prisma.Decimal(item.quantity),
+          weight: item.weight ? new Prisma.Decimal(item.weight) : null,
+          uom: item.uom || null,
+          unitPrice: new Prisma.Decimal(item.unitPrice),
+          taxRate: new Prisma.Decimal(item.taxRate || 0),
+          lineTotal: new Prisma.Decimal(lineTotal),
+          reason: item.reason || data.reason || null,
+        };
+      });
+
+      const grandTotal = subTotal + taxAmount;
+      const targetStatus = data.status || "DRAFT";
+
+      const record = await tx.salesReturn.update({
+        where: { id },
+        data: {
+          customerId: data.customerId,
+          salesInvoiceId: data.salesInvoiceId || null,
+          reason: data.reason || null,
+          refundMode: data.refundMode || "CREDIT_NOTE",
+          subTotal: new Prisma.Decimal(subTotal),
+          taxAmount: new Prisma.Decimal(taxAmount),
+          grandTotal: new Prisma.Decimal(grandTotal),
+          status: targetStatus,
+          narration: data.narration || null,
+          companyId: data.companyId,
+          items: {
+            create: itemsData,
+          },
+        },
+        include: {
+          items: true,
+          customer: true,
+        },
+      });
+
+      return record;
+    });
+
+    if (updated.status !== "DRAFT") {
+      try {
+        await voucherPostingService.postSalesReturnVoucher(updated.id);
+      } catch (vErr) {
+        console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher on update confirmation:", vErr);
+      }
+    }
+
+    return updated;
+  }
+
+  async confirmSalesReturn(id: string) {
+    const salesReturn = await prisma.salesReturn.findUnique({
+      where: { id },
+      include: { customer: true, items: true },
+    });
+    if (!salesReturn) throw new ApiError(404, "Sales Return not found");
+    if (salesReturn.status !== "DRAFT") {
+      throw new ApiError(400, "Only draft returns can be confirmed");
+    }
+
+    const updated = await prisma.salesReturn.update({
+      where: { id },
+      data: { status: "APPROVED" },
+      include: { customer: true, items: true },
+    });
+
+    try {
+      await voucherPostingService.postSalesReturnVoucher(updated.id);
+    } catch (vErr) {
+      console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher on confirmation:", vErr);
+    }
+
+    return updated;
   }
 
   // --- PURCHASE RETURN ---

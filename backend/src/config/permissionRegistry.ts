@@ -92,7 +92,7 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   { module: "stock-adjustments",     actions: ["view","create","edit","delete"], description: "Stock Adjustments" },
   { module: "eod-stock",             actions: ["view","create","edit"],          description: "EOD Stock" },
 
-  // ── Store & Locations ────────────────────────────────────────────────────────
+  // ── Store ──────────────────────────────────────────────────────────────────
   { module: "stores",         actions: ["view","create","edit","delete"], description: "Storage Stores" },
   { module: "store-types",    actions: ["view","create","edit","delete"], description: "Store Types" },
   { module: "locations",      actions: ["view","create","edit","delete"], description: "Locations" },

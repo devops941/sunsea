@@ -137,12 +137,12 @@ export const PettyCashPage: React.FC = () => {
   );
 
   return (
-    <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 space-y-4">
+    <div className="bg-card rounded-2xl shadow-sm border border-line p-6 space-y-4">
       {/* Header & Controls */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-2">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Petty Cash Register</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-xl font-bold text-ink">Petty Cash Register</h1>
+          <p className="text-sm text-ink-muted mt-1">
             Manage daily cash disbursements, replenishments, and petty expenses audit log.
           </p>
         </div>
@@ -168,45 +168,45 @@ export const PettyCashPage: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex items-center justify-between">
+        <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Total Cash IN</span>
-            <div className="text-2xl font-extrabold text-emerald-600 font-mono mt-1">
+            <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider">Total Cash IN</span>
+            <div className="text-2xl font-extrabold text-emerald-500 font-mono mt-1">
               ₹{summary.totalIn.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-3 bg-emerald-100 text-emerald-700 rounded-xl shadow-xs">
+          <div className="p-3 bg-emerald-500/20 text-emerald-500 rounded-xl shadow-xs">
             <FaArrowDown className="text-lg" />
           </div>
         </div>
 
-        <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-100 flex items-center justify-between">
+        <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/20 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider">Total Cash OUT</span>
-            <div className="text-2xl font-extrabold text-rose-600 font-mono mt-1">
+            <span className="text-xs font-semibold text-rose-500 uppercase tracking-wider">Total Cash OUT</span>
+            <div className="text-2xl font-extrabold text-rose-500 font-mono mt-1">
               ₹{summary.totalOut.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-3 bg-rose-100 text-rose-700 rounded-xl shadow-xs">
+          <div className="p-3 bg-rose-500/20 text-rose-500 rounded-xl shadow-xs">
             <FaArrowUp className="text-lg" />
           </div>
         </div>
 
-        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+        <div className="bg-primary/10 p-4 rounded-xl border border-primary/20 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Cash Balance on Hand</span>
-            <div className="text-2xl font-extrabold text-blue-600 font-mono mt-1">
+            <span className="text-xs font-semibold text-primary uppercase tracking-wider">Cash Balance on Hand</span>
+            <div className="text-2xl font-extrabold text-primary font-mono mt-1">
               ₹{summary.currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-3 bg-blue-100 text-blue-700 rounded-xl shadow-xs">
+          <div className="p-3 bg-primary/20 text-primary rounded-xl shadow-xs">
             <FaWallet className="text-lg" />
           </div>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-card-2 p-3 rounded-xl border border-line flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="w-full md:w-64">
           <SelectInput
             label=""
@@ -226,8 +226,8 @@ export const PettyCashPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-            <FaCalendarAlt className="text-slate-400" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+            <FaCalendarAlt className="text-ink-subtle" />
             <span>Date Range:</span>
           </div>
           <input
@@ -237,9 +237,9 @@ export const PettyCashPage: React.FC = () => {
               setStartDate(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:border-blue-500"
+            className="px-3 py-1.5 border border-line rounded-lg text-xs bg-card text-ink focus:outline-none focus:border-primary"
           />
-          <span className="text-xs text-slate-400">to</span>
+          <span className="text-xs text-ink-subtle">to</span>
           <input
             type="date"
             value={endDate}
@@ -247,7 +247,7 @@ export const PettyCashPage: React.FC = () => {
               setEndDate(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:border-blue-500"
+            className="px-3 py-1.5 border border-line rounded-lg text-xs bg-card text-ink focus:outline-none focus:border-primary"
           />
         </div>
       </div>
@@ -272,7 +272,7 @@ export const PettyCashPage: React.FC = () => {
           {
             header: "ENTRY NO",
             render: (item) => (
-              <span className="font-mono font-bold text-slate-800">
+              <span className="font-mono font-bold text-ink">
                 {item.entryNo}
               </span>
             ),
@@ -287,8 +287,8 @@ export const PettyCashPage: React.FC = () => {
               <span
                 className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                   item.type === "IN"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-rose-100 text-rose-800"
+                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                    : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
                 }`}
               >
                 {item.type === "IN" ? "CASH IN" : "CASH OUT"}
@@ -297,15 +297,15 @@ export const PettyCashPage: React.FC = () => {
           },
           {
             header: "CATEGORY",
-            render: (item) => <span className="font-medium text-slate-900">{item.category}</span>,
+            render: (item) => <span className="font-medium text-ink">{item.category}</span>,
           },
           {
             header: "DESCRIPTION",
-            render: (item) => <span className="text-slate-600 max-w-xs truncate block">{item.description}</span>,
+            render: (item) => <span className="text-ink-muted max-w-xs truncate block">{item.description}</span>,
           },
           {
             header: "PAID TO / FROM",
-            render: (item) => <span className="text-slate-500">{item.paidTo || "-"}</span>,
+            render: (item) => <span className="text-ink-subtle">{item.paidTo || "-"}</span>,
           },
           {
             header: "AMOUNT",
@@ -313,7 +313,7 @@ export const PettyCashPage: React.FC = () => {
             render: (item) => (
               <span
                 className={`font-mono font-bold ${
-                  item.type === "IN" ? "text-emerald-600" : "text-rose-600"
+                  item.type === "IN" ? "text-emerald-500" : "text-rose-500"
                 }`}
               >
                 {item.type === "IN" ? "+" : "-"}₹
@@ -432,3 +432,5 @@ export const PettyCashPage: React.FC = () => {
     </div>
   );
 };
+
+export default PettyCashPage;

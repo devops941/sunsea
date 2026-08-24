@@ -21,7 +21,9 @@ const INCLUDE_GST = {
             product: { select: { id: true, productCode: true, productName: true } },
         },
     },
-    customer: { select: { id: true, firmName: true, displayName: true, addresses: true, openingBalance: true, openingBalanceType: true } },
+    customer: { select: { id: true, customerCode: true, firmName: true, displayName: true, addresses: true, openingBalance: true, openingBalanceType: true } },
+    sourceEmployee: { select: { id: true, empCode: true, fullName: true } },
+    referredByCustomer: { select: { id: true, firmName: true, displayName: true } },
     createdByUser: { select: { userId: true, fullName: true } },
 } as const;
 
@@ -174,19 +176,24 @@ class SalesOrderService {
             return { ...l, ...gst };
         });
 
-        const isDraft = data.status === "DRAFT";
-        const createSubtotal  = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.lineTotal),   ZERO);
-        const createTotalCgst = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.cgstAmount),  ZERO);
-        const createTotalSgst = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.sgstAmount),  ZERO);
-        const createTotalIgst = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.igstAmount),  ZERO);
+        const createSubtotal  = itemsWithGst.reduce((s, l) => s.add(l.lineTotal),   ZERO);
+        const createTotalCgst = itemsWithGst.reduce((s, l) => s.add(l.cgstAmount),  ZERO);
+        const createTotalSgst = itemsWithGst.reduce((s, l) => s.add(l.sgstAmount),  ZERO);
+        const createTotalIgst = itemsWithGst.reduce((s, l) => s.add(l.igstAmount),  ZERO);
         const createTotalTax  = createTotalCgst.add(createTotalSgst).add(createTotalIgst);
 
         const discountValue = new Prisma.Decimal((data as any).orderDiscountValue ?? 0);
-        const createDiscount = isDraft || discountValue.lte(0)
+        const createDiscount = discountValue.lte(0)
             ? ZERO
             : ((data as any).orderDiscountType === "FLAT"
                 ? discountValue
                 : createSubtotal.mul(discountValue).div(100));
+
+        // GST must be applied on taxable amount (subtotal after discount), not on gross subtotal
+        const createTaxable      = createSubtotal.sub(createDiscount);
+        const createDiscRatio    = createSubtotal.gt(ZERO) ? createTaxable.div(createSubtotal) : new Prisma.Decimal(1);
+        const createAdjustedTax  = createTotalTax.mul(createDiscRatio);
+        const createNetAmount    = createTaxable.add(createAdjustedTax);
 
         const gstOrder = await prisma.salesOrder.create({
             data: {
@@ -202,8 +209,14 @@ class SalesOrderService {
                 narration:    data.narration,
                 createdBy:    data.createdBy,
                 status:       data.status,
+                // Order Source fields
+                // @ts-ignore
+                orderSource:          (data as any).orderSource ?? null,
+                sourceEmployeeId:     (data as any).sourceEmployeeId ? BigInt((data as any).sourceEmployeeId) : null,
+                referredByCustomerId: (data as any).referredByCustomerId || null,
+                referredByName:       (data as any).referredByName || null,
                 subtotal:  createSubtotal,
-                netAmount: createSubtotal.add(createTotalTax).sub(createDiscount),
+                netAmount: createNetAmount,
                 totalDiscount: createDiscount,
                 orderDiscountType:  (data as any).orderDiscountType ?? null,
                 orderDiscountValue: (data as any).orderDiscountValue ?? null,
@@ -239,7 +252,7 @@ class SalesOrderService {
 
     async findAll(query: SalesOrderQueryInput, _permissions: string[] = []) {
         const page     = Math.max(1, query.page);
-        const pageSize = Math.min(100, Math.max(1, query.pageSize));
+        const pageSize = Math.min(500, Math.max(1, query.pageSize));
         const skip     = (page - 1) * pageSize;
 
         const searchFilter = query.search
@@ -256,10 +269,24 @@ class SalesOrderService {
             } }
             : {};
 
+        const docTypeFilter = (query as any).docType === "SO"
+            ? { orderNo: { startsWith: "SO-" } }
+            : (query as any).docType === "QT"
+            ? { orderNo: { startsWith: "QT-" } }
+            : {};
+
+        const customerFilter: any = {};
+        if (query.customerId) customerFilter.id = query.customerId;
+        if (query.customerGradeId) customerFilter.customerGradeId = Number(query.customerGradeId);
+        if ((query as any).customerTypeId) customerFilter.customerTypeId = Number((query as any).customerTypeId);
+
         const gstWhere = {
-            ...(query.customerId    && { customerId: query.customerId }),
+            ...(Object.keys(customerFilter).length > 0 && { customer: customerFilter }),
             ...(query.status?.length && { status: { in: query.status as SalesOrderStatus[] } }),
             ...(query.orderType     && { orderType: query.orderType }),
+            ...((query as any).orderSource     && { orderSource: (query as any).orderSource }),
+            ...((query as any).sourceEmployeeId && { sourceEmployeeId: BigInt((query as any).sourceEmployeeId) }),
+            ...docTypeFilter,
             ...searchFilter,
             ...dateFilter,
         };
@@ -279,7 +306,6 @@ class SalesOrderService {
                 totalPages: Math.ceil(total / pageSize),
             };
         } catch (err: any) {
-            console.error("❌ findAll error:", err?.message || err);
             throw err;
         }
     }
@@ -291,10 +317,11 @@ class SalesOrderService {
             where: { id },
             include: {
                 customer: { include: { customerGrade: true, customerType: true, addresses: true } },
+                sourceEmployee: { select: { id: true, empCode: true, fullName: true } },
+                referredByCustomer: { select: { id: true, firmName: true, displayName: true } },
                 items: {
                     include: {
                         product: true,
-                        gstTaxRate: { select: { id: true, taxName: true, taxRate: true, taxType: true } },
                     },
                 },
                 createdByUser: { select: { userId: true, fullName: true } },
@@ -310,7 +337,7 @@ class SalesOrderService {
         const existing = await this.findById(id, permissions);
         const existingStatus = (existing as any).status as string;
 
-        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "MD_REJECTED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
+        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
             throw new ApiError(409, `Cannot edit order in status ${existingStatus}.`);
         }
 
@@ -320,6 +347,11 @@ class SalesOrderService {
         if ((data as any).salesPersonName !== undefined) updateData.salesPersonName = (data as any).salesPersonName;
         if (data.orderType     !== undefined) updateData.orderType      = data.orderType;
         if (data.referenceText !== undefined) updateData.referenceText  = data.referenceText;
+        // Order Source fields
+        if ((data as any).orderSource          !== undefined) (updateData as any).orderSource          = (data as any).orderSource || null;
+        if ((data as any).sourceEmployeeId     !== undefined) (updateData as any).sourceEmployeeId     = (data as any).sourceEmployeeId ? BigInt((data as any).sourceEmployeeId) : null;
+        if ((data as any).referredByCustomerId !== undefined) (updateData as any).referredByCustomerId = (data as any).referredByCustomerId || null;
+        if ((data as any).referredByName       !== undefined) (updateData as any).referredByName       = (data as any).referredByName || null;
         if (data.narration     !== undefined) updateData.narration      = data.narration;
         if (data.status        !== undefined) updateData.status         = data.status;
         if (data.isInterState  !== undefined) updateData.isInterState   = data.isInterState;
@@ -358,8 +390,13 @@ class SalesOrderService {
                 ? ZERO
                 : (updDiscType === "FLAT" ? updDiscValue : updSubtotal.mul(updDiscValue).div(100));
 
+            // GST must be applied on taxable amount (subtotal after discount), not on gross subtotal
+            const updTaxable     = updSubtotal.sub(updDiscount);
+            const updDiscRatio   = updSubtotal.gt(ZERO) ? updTaxable.div(updSubtotal) : new Prisma.Decimal(1);
+            const updAdjustedTax = updTotalTax.mul(updDiscRatio);
+
             updateData.subtotal  = updSubtotal;
-            updateData.netAmount = updSubtotal.add(updTotalTax).sub(updDiscount);
+            updateData.netAmount = updTaxable.add(updAdjustedTax);
             updateData.totalDiscount = updDiscount;
             if ((data as any).orderDiscountType  !== undefined) updateData.orderDiscountType  = (data as any).orderDiscountType;
             if ((data as any).orderDiscountValue !== undefined) updateData.orderDiscountValue = (data as any).orderDiscountValue;
@@ -391,7 +428,27 @@ class SalesOrderService {
     // ─── Delete ──────────────────────────────────────────────────────────────
 
     async delete(id: number, _permissions: string[] = []) {
-        await this.findById(id);
+        const order = await this.findById(id);
+        const status = (order as any).status as string;
+
+        const deletableStatuses = [
+            "DRAFT",
+            "QUOTATION_IN_PROGRESS",
+            "QUOTATION_COMPLETED",
+            "PENDING_CUSTOMER_APPROVAL",
+            "CUSTOMER_REJECTED",
+        ];
+
+        if (!deletableStatuses.includes(status)) {
+            throw new ApiError(400, `Cannot delete an order with status "${status}". Confirmed orders cannot be deleted.`);
+        }
+
+        const invoiceCount = await prisma.salesInvoice.count({ where: { salesOrderId: id } as any });
+        if (invoiceCount > 0) {
+            throw new ApiError(400, `Cannot delete sales order: ${invoiceCount} invoice(s) are linked to this order.`);
+        }
+
+        await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
         return prisma.salesOrder.delete({ where: { id } });
     }
 
@@ -420,71 +477,19 @@ class SalesOrderService {
         return updated;
     }
 
-    async submitForApproval(id: number, permissions: string[] = []) {
+    async confirmOrder(id: number, permissions: string[] = []) {
         const existing = await this.findById(id, permissions);
-        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "MD_REJECTED", "CUSTOMER_REJECTED"].includes((existing as any).status)) {
-            throw new ApiError(409, `Only DRAFT/CONFIRMED/QUOTATION_IN_PROGRESS orders can be submitted. Current: ${(existing as any).status}`);
+        const currentStatus = (existing as any).status as string;
+        if (!["DRAFT", "QUOTATION_IN_PROGRESS"].includes(currentStatus)) {
+            throw new ApiError(409, `Cannot confirm order with status ${currentStatus}`);
         }
-        if ((existing as any).items.length === 0) throw new ApiError(400, "Cannot submit an order with no items");
-
-        const items = await prisma.salesOrderItem.findMany({ where: { salesOrderId: id } });
-        const subtotal  = items.reduce((s, l) => s.add(l.lineTotal),              ZERO);
-        const totalCgst = items.reduce((s, l) => s.add((l as any).cgstAmount ?? ZERO), ZERO);
-        const totalSgst = items.reduce((s, l) => s.add((l as any).sgstAmount ?? ZERO), ZERO);
-        const totalIgst = items.reduce((s, l) => s.add((l as any).igstAmount ?? ZERO), ZERO);
-        const totalTax  = totalCgst.add(totalSgst).add(totalIgst);
-
-        const discType  = (existing as any).orderDiscountType ?? "PERCENT";
-        const discValue = new Prisma.Decimal((existing as any).orderDiscountValue ?? 0);
-        const discount  = discValue.lte(0)
-            ? ZERO
-            : (discType === "FLAT" ? discValue : subtotal.mul(discValue).div(100));
-
-        const updated = await prisma.salesOrder.update({
-            where: { id },
-            data: {
-                status:    "PENDING_MD_APPROVAL" as any,
-                subtotal,
-                netAmount: subtotal.add(totalTax).sub(discount),
-                totalDiscount: discount,
-                totalCgst,
-                totalSgst,
-                totalIgst,
-                totalTax,
-            },
-            include: INCLUDE_GST,
-        });
-        return updated;
-    }
-
-    async approveOrder(id: number, permissions: string[] = []) {
-        const existing = await this.findById(id, permissions);
-        if ((existing as any).status !== "PENDING_MD_APPROVAL") {
-            throw new ApiError(409, `Order must be in PENDING_MD_APPROVAL status. Current: ${(existing as any).status}`);
-        }
-        return this.updateStatus(id, "MD_APPROVED", permissions);
-    }
-
-    async rejectOrder(id: number, permissions: string[] = []) {
-        const existing = await this.findById(id, permissions);
-        if ((existing as any).status !== "PENDING_MD_APPROVAL") {
-            throw new ApiError(409, `Order must be in PENDING_MD_APPROVAL status. Current: ${(existing as any).status}`);
-        }
-        return this.updateStatus(id, "MD_REJECTED", permissions);
-    }
-
-    async reopen(id: number, permissions: string[] = []) {
-        const existing = await this.findById(id, permissions);
-        if (!["MD_REJECTED", "CUSTOMER_REJECTED"].includes((existing as any).status)) {
-            throw new ApiError(409, `Cannot reopen order with status ${(existing as any).status}`);
-        }
-        return this.updateStatus(id, "DRAFT", permissions);
+        return this.updateStatus(id, "CONFIRMED", permissions);
     }
 
     async convertToSalesOrder(id: number, permissions: string[] = []) {
         const existing = await this.findById(id, permissions);
         const currentStatus = (existing as any).status as string;
-        if (!["MD_APPROVED", "CUSTOMER_APPROVED", "PENDING_MD_APPROVAL"].includes(currentStatus)) {
+        if (!["CUSTOMER_APPROVED", "CONFIRMED"].includes(currentStatus)) {
             throw new ApiError(409, `Cannot convert order with status ${currentStatus} to sales order`);
         }
         return this.updateStatus(id, "QUOTATION_COMPLETED", permissions);
@@ -560,16 +565,13 @@ class SalesOrderService {
 
     async getOrderStatus(id: number, permissions: string[] = []) {
         const order = await this.findById(id, permissions);
+        const status = (order as any).status;
         return {
             id:         (order as any).id,
             orderNo:    (order as any).orderNo,
-            status:     (order as any).status,
-            canEdit:               ["DRAFT", "CONFIRMED"].includes((order as any).status),
-            canDelete:             (order as any).status === "DRAFT",
-            canSubmitForApproval:  ["DRAFT", "CONFIRMED"].includes((order as any).status) && (order as any).items.length > 0,
-            canApprove:            (order as any).status === "PENDING_MD_APPROVAL",
-            canReject:             (order as any).status === "PENDING_MD_APPROVAL",
-            canReopen:             ["MD_REJECTED", "CUSTOMER_REJECTED"].includes((order as any).status),
+            status,
+            canEdit:    ["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "PENDING_CUSTOMER_APPROVAL", "CUSTOMER_REJECTED"].includes(status),
+            canDelete:  status !== "CONFIRMED",
         };
     }
 }

@@ -15,8 +15,8 @@ export const useCustomers = () => {
     deleted: customerDeleted,
   });
 
-  // BUG-CUST-004 fix: accept page and limit params for server-side pagination
-  const loadCustomers = useCallback((params?: { search?: string; page?: number; limit?: number } | string) => {
+  // BUG-CUST-004 fix: accept page, limit, and status params for server-side pagination and filtering
+  const loadCustomers = useCallback((params?: { search?: string; page?: number; limit?: number; status?: string; customerTypeId?: number; customerGradeId?: number } | string) => {
     if (typeof params === "string") {
       dispatch(fetchCustomers({ search: params }));
     } else {

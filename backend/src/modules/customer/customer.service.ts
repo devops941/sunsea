@@ -67,19 +67,38 @@ class CustomerService {
   }
 
   // BUG-CUST-004 fix: added server-side pagination (page, limit, skip/take)
-  async getAllCustomers(params: { search?: string; page?: number; limit?: number }) {
-    const { search, page = 1, limit = 10 } = params;
+  async getAllCustomers(params: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    status?: string;
+    customerTypeId?: number;
+    customerGradeId?: number;
+  }) {
+    const { search, page = 1, limit = 10, status, customerTypeId, customerGradeId } = params;
 
-    const whereClause = search
-      ? {
-        OR: [
-          { customerCode: { contains: search, mode: "insensitive" as const } },
-          { firmName: { contains: search, mode: "insensitive" as const } },
-          { email: { contains: search, mode: "insensitive" as const } },
-          { mobile: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-      : {};
+    const whereClause: any = {};
+
+    if (search) {
+      whereClause.OR = [
+        { customerCode: { contains: search, mode: "insensitive" as const } },
+        { firmName: { contains: search, mode: "insensitive" as const } },
+        { email: { contains: search, mode: "insensitive" as const } },
+        { displayName: { contains: search, mode: "insensitive" as const } },
+      ];
+    }
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    if (customerTypeId) {
+      whereClause.customerTypeId = customerTypeId;
+    }
+
+    if (customerGradeId) {
+      whereClause.customerGradeId = customerGradeId;
+    }
 
     const [customers, total] = await Promise.all([
       prisma.customer.findMany({
@@ -107,17 +126,44 @@ class CustomerService {
     const adminMap = new Map(admins.map(a => [`admin_${a.id}`, { name: a.fullName, role: a.role?.name || 'Super Admin' }]));
     const userMap = new Map(users.map(u => [u.userId, { name: u.fullName, role: u.role?.name || 'User' }]));
 
-    const customersWithCreators = customers.map(customer => {
-      const creatorInfo = adminMap.get(customer.createdBy) || userMap.get(customer.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
-      return {
-        ...customer,
-        createdUserName: creatorInfo.name,
-        createdUserRole: creatorInfo.role
-      };
-    });
+    const { receivableService } = require("../accounts/receivable.service");
+
+    const customersWithCreatorsAndBalance = await Promise.all(
+      customers.map(async (customer) => {
+        const creatorInfo = adminMap.get(customer.createdBy) || userMap.get(customer.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
+        
+        let netBalance = 0;
+        try {
+          const summaries = await receivableService.getReceivableSummaries({ customerId: customer.id });
+          if (summaries && summaries.length > 0) {
+            netBalance = summaries[0].netBalance;
+          } else {
+            const opBal = Number(customer.openingBalance || 0);
+            const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+            netBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+          }
+        } catch (e) {
+          const opBal = Number(customer.openingBalance || 0);
+          const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+          netBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+        }
+
+        const balanceAmount = Math.abs(netBalance);
+        const balanceType = netBalance > 0 ? "Dr" : netBalance < 0 ? "Cr" : "";
+
+        return {
+          ...customer,
+          createdUserName: creatorInfo.name,
+          createdUserRole: creatorInfo.role,
+          netBalance,
+          balanceAmount,
+          balanceType,
+        };
+      })
+    );
 
     return {
-      customers: customersWithCreators,
+      customers: customersWithCreatorsAndBalance,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -185,10 +231,33 @@ class CustomerService {
       }
     }
 
+    let netBalance = 0;
+    try {
+      const { receivableService } = require("../accounts/receivable.service");
+      const summaries = await receivableService.getReceivableSummaries({ customerId: customer.id });
+      if (summaries && summaries.length > 0) {
+        netBalance = summaries[0].netBalance;
+      } else {
+        const opBal = Number(customer.openingBalance || 0);
+        const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+        netBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+      }
+    } catch (e) {
+      const opBal = Number(customer.openingBalance || 0);
+      const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+      netBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+    }
+
+    const balanceAmount = Math.abs(netBalance);
+    const balanceType = netBalance > 0 ? "Dr" : netBalance < 0 ? "Cr" : "";
+
     return {
       ...customer,
       createdUserName,
-      createdUserRole
+      createdUserRole,
+      netBalance,
+      balanceAmount,
+      balanceType,
     };
   }
 
@@ -241,9 +310,9 @@ class CustomerService {
             }))
           }
         })
-      }
+      },
+      include: { addresses: true, customerType: true, customerGrade: true },
     });
-
 
     return updated;
   }
@@ -251,19 +320,24 @@ class CustomerService {
   async deleteCustomer(id: string) {
     await this.getCustomerById(id);
 
-    // Block delete if sales orders or invoices are linked
-    const linkedOrders = await prisma.salesOrder.count({
-      where: { customerId: id },
-    });
+    // Block delete if any dependent records are linked
+    const [linkedOrders, linkedInvoices, linkedReturns, linkedLedger] = await Promise.all([
+      prisma.salesOrder.count({ where: { customerId: id } }),
+      prisma.salesInvoice.count({ where: { customerId: id } }),
+      prisma.salesReturn.count({ where: { customerId: id } }),
+      prisma.accountLedger.findUnique({
+        where: { customerId: id },
+        include: { debitItems: true, creditItems: true },
+      }),
+    ]);
 
-    const linkedInvoices = await prisma.salesInvoice.count({
-      where: { customerId: id },
-    });
+    const journalCount =
+      (linkedLedger?.debitItems?.length ?? 0) + (linkedLedger?.creditItems?.length ?? 0);
 
-    if (linkedOrders > 0 || linkedInvoices > 0) {
+    if (linkedOrders > 0 || linkedInvoices > 0 || linkedReturns > 0 || journalCount > 0) {
       throw new ApiError(
         409,
-        `Cannot delete customer — ${linkedOrders} sales order(s) and ${linkedInvoices} sales invoice(s) are linked to this customer`
+        `Cannot delete customer — ${linkedOrders} sales order(s), ${linkedInvoices} sales invoice(s), ${linkedReturns} sales return(s), and ${journalCount} journal entry/entries are linked to this customer`
       );
     }
 

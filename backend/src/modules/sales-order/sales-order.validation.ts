@@ -9,14 +9,22 @@ export type DispatchType = z.infer<typeof DispatchTypeEnum>;
 export const OrderTypeEnum = z.enum(["telephone", "website", "salesperson", "reference"]);
 export type OrderType = z.infer<typeof OrderTypeEnum>;
 
+export const OrderSourceEnum = z.enum([
+    "SALES_PERSON",
+    "TELE_CALLING",
+    "WALK_IN",
+    "WHATSAPP",
+    "REFERRAL",
+    "REPEAT_ORDER",
+    "DEALER_AGENT",
+]);
+export type OrderSource = z.infer<typeof OrderSourceEnum>;
+
 /**
  * Sales Order Workflow Status Enum (mirrors Prisma's SalesOrderStatus)
  */
 export const SalesOrderStatusEnum = z.enum([
     "DRAFT",
-    "PENDING_MD_APPROVAL",
-    "MD_APPROVED",
-    "MD_REJECTED",
     "PENDING_CUSTOMER_APPROVAL",
     "CUSTOMER_APPROVED",
     "CUSTOMER_REJECTED",
@@ -105,6 +113,15 @@ const salesOrderBodyShape = z.object({
     orderType: z.union([OrderTypeEnum, z.literal(""), z.null()]).optional().transform((val) => (val && val.trim() !== "" ? (val as any) : undefined)),
     referenceText: z.string().optional().nullable().transform((val) => (val && val.trim() !== "" ? val : null)),
     salesPersonName: z.string().optional().nullable().transform((val) => (val && val.trim() !== "" ? val : null)),
+    // New Order Source fields
+    orderSource: z.union([OrderSourceEnum, z.literal(""), z.null()]).optional()
+        .transform((val) => (val && val.trim() !== "" ? (val as any) : null)),
+    sourceEmployeeId: z.union([z.number(), z.string(), z.null()]).optional()
+        .transform((val) => (val != null && val !== "" && !isNaN(Number(val)) ? BigInt(Number(val)) : null)),
+    referredByCustomerId: z.string().uuid().optional().nullable()
+        .transform((val) => (val && val.trim() !== "" ? val : null)),
+    referredByName: z.string().optional().nullable()
+        .transform((val) => (val && val.trim() !== "" ? val : null)),
     status: SalesOrderStatusEnum.default("DRAFT"),
     narration: z.string().max(1000, "Narration must be less than 1000 characters").optional().nullable(),
     createdBy: z.string().min(1).max(36).optional().nullable(),
@@ -204,7 +221,7 @@ export const salesOrderQuerySchema = z.object({
             .optional()
             .default("20")
             .transform(Number)
-            .refine((val) => val > 0 && val <= 100, "Page size must be between 1 and 100"),
+            .refine((val) => val > 0 && val <= 500, "Page size must be between 1 and 500"),
 
         // Filters
         customerId: z
@@ -226,6 +243,36 @@ export const salesOrderQuerySchema = z.object({
             .string()
             .optional()
             .transform((val) => (val && val.trim() !== "" ? val : undefined)),
+
+        docType: z
+            .string()
+            .optional()
+            .transform((val) => (val && val.trim() !== "" ? val.toUpperCase() : undefined)),
+
+        customerGradeId: z
+            .string()
+            .optional()
+            .transform((val) => (val && val.trim() !== "" && !isNaN(Number(val)) ? Number(val) : undefined)),
+
+        customerTypeId: z
+            .string()
+            .optional()
+            .transform((val) => (val && val.trim() !== "" && !isNaN(Number(val)) ? Number(val) : undefined)),
+
+        orderSource: z
+            .string()
+            .optional()
+            .transform((val) => (val && val.trim() !== "" ? val : undefined)),
+
+        dispatchType: z
+            .string()
+            .optional()
+            .transform((val) => (val && val.trim() !== "" ? val : undefined)),
+
+        sourceEmployeeId: z
+            .string()
+            .optional()
+            .transform((val) => (val && val.trim() !== "" && !isNaN(Number(val)) ? Number(val) : undefined)),
 
         search: z
             .string()
@@ -313,32 +360,6 @@ export const bulkCreateSalesOrderItemsSchema = z.object({
 });
 
 
-/**
- * Submit For MD Approval Validation
- * No body needed — just moves status DRAFT -> PENDING_MD_APPROVAL
- */
-export const submitForMdApprovalSchema = z.object({
-    params: z.object({
-        id: z
-            .string()
-            .or(z.number())
-            .refine((val) => !isNaN(Number(val)), "Sales order ID must be a valid number"),
-    }),
-});
-
-/**
- * Reopen Sales Order Validation
- * Resets a rejected order back to DRAFT so it can be edited and resubmitted.
- * No body needed — params only.
- */
-export const reopenSalesOrderSchema = z.object({
-    params: z.object({
-        id: z
-            .string()
-            .or(z.number())
-            .refine((val) => !isNaN(Number(val)), "Sales order ID must be a valid number"),
-    }),
-});
 
 // ============================================
 // Type Exports

@@ -48,8 +48,11 @@ class CustomerController {
       const search = req.query.search ? String(req.query.search) : undefined;
       const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
       const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
+      const status = req.query.status ? String(req.query.status) : undefined;
+      const customerTypeId = req.query.customerTypeId ? parseInt(String(req.query.customerTypeId), 10) : undefined;
+      const customerGradeId = req.query.customerGradeId ? parseInt(String(req.query.customerGradeId), 10) : undefined;
 
-      const result = await customerService.getAllCustomers({ search, page, limit });
+      const result = await customerService.getAllCustomers({ search, page, limit, status, customerTypeId, customerGradeId });
 
       return res.status(200).json(
         new ApiResponse("Customers fetched successfully", result)

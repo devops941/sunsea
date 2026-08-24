@@ -79,6 +79,8 @@ class SalesInvoiceService {
 
     const grandTotal = subTotal + taxTotal;
 
+    const isDraft = (data as any).status === "DRAFT";
+
     const rawPayments = (data as any).payments || [];
     const processedPayments = rawPayments.map((p: any) => ({
       id: p.id || crypto.randomUUID(),
@@ -90,11 +92,12 @@ class SalesInvoiceService {
       createdAt: new Date().toISOString()
     }));
     const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
-    const computedStatus = totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID");
+    const computedStatus = isDraft
+      ? "DRAFT"
+      : (totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID"));
 
     const invoice = await prisma.$transaction(async (tx) => {
-      // Check if invoice number matches current year sequence
-      // If it is in the current year, increment the setting's currentSequenceNumber
+      // Increment invoice sequence number
       const settings = await tx.invoiceSetting.findUnique({
         where: { companyId: currentUser.companyId },
       });
@@ -107,11 +110,7 @@ class SalesInvoiceService {
         if (invDate >= settingsStart && invDate <= settingsEnd) {
           await tx.invoiceSetting.update({
             where: { id: settings.id },
-            data: {
-              currentSequenceNumber: {
-                increment: 1,
-              },
-            },
+            data: { currentSequenceNumber: { increment: 1 } },
           });
         }
       }
@@ -125,6 +124,7 @@ class SalesInvoiceService {
           customerId: data.customerId,
           storeId: data.storeId,
           notes: data.notes,
+          narration: (data as any).narration || null,
           salesOrderId: data.salesOrderId || null,
           subTotal,
           taxTotal,
@@ -133,62 +133,41 @@ class SalesInvoiceService {
           createdBy: currentUser.userId,
           status: computedStatus,
           payments: processedPayments as any,
-          items: {
-            create: invoiceItems,
-          },
+          items: { create: invoiceItems },
         },
         include: {
-          customer: {
-            select: {
-              id: true,
-              firmName: true,
-              displayName: true,
-              email: true,
-            },
-          },
+          customer: { select: { id: true, firmName: true, displayName: true, email: true } },
           items: {
             include: {
-              product: {
-                select: {
-                  id: true,
-                  productCode: true,
-                  productName: true,
-                },
-              },
+              product: { select: { id: true, productCode: true, productName: true } },
             },
           },
         },
       });
+
+      // DRAFT invoices: skip accounting, stock and outstanding updates
+      if (isDraft) return invoice;
 
       // Update customer outstandingAmount
       const unpaidPortion = Math.max(0, Math.round((grandTotal - totalPaid) * 100) / 100);
       await tx.customer.update({
         where: { id: data.customerId },
-        data: {
-          outstandingAmount: {
-            increment: unpaidPortion
-          }
-        }
+        data: { outstandingAmount: { increment: unpaidPortion } },
       });
 
-      // Update invoicedQty on SalesOrderItems (like receivedQty on PurchaseOrderItems)
+      // Update invoicedQty on SalesOrderItems
       if (data.salesOrderId) {
         for (const item of data.items) {
           const qty = Number(item.qty);
           if (qty <= 0) continue;
           await tx.salesOrderItem.updateMany({
-            where: {
-              salesOrderId: data.salesOrderId,
-              productId: BigInt(item.productId),
-            },
-            data: {
-              invoicedQty: { increment: qty },
-            },
+            where: { salesOrderId: data.salesOrderId, productId: BigInt(item.productId) },
+            data: { invoicedQty: { increment: qty } },
           });
         }
       }
 
-      // Create an approved stock adjustment for the dispatched items
+      // Create stock adjustment for dispatched items
       const adjustmentPrefix = `ADJ-${new Date().getFullYear()}-`;
       const lastAdj = await tx.stockAdjustment.findFirst({
         where: { adjustmentNumber: { startsWith: adjustmentPrefix } },
@@ -209,13 +188,11 @@ class SalesInvoiceService {
         const qty = Number(item.qty);
         if (qty <= 0) continue;
 
-        // Find existing FG stock for this product to get its storeId
         const fgStocks = await tx.finishedGoodsStock.findMany({
           where: { productItemId: BigInt(item.productId) },
           orderBy: { onHandQty: 'desc' },
         });
-
-        if (fgStocks.length === 0) continue; // No stock found for this product, skip deduction
+        if (fgStocks.length === 0) continue;
 
         const targetStoreId = fgStocks[0].storeId;
         const fgStock = fgStocks[0];
@@ -241,18 +218,11 @@ class SalesInvoiceService {
           stockAdjustmentCreated = true;
         }
 
-        // Decrease stock
         await tx.finishedGoodsStock.update({
-          where: {
-            storeId_productItemId: {
-              storeId: targetStoreId,
-              productItemId: BigInt(item.productId),
-            },
-          },
+          where: { storeId_productItemId: { storeId: targetStoreId, productItemId: BigInt(item.productId) } },
           data: { onHandQty: { decrement: qty } },
         });
 
-        // Create stock adjustment item
         await tx.stockAdjustmentItem.create({
           data: {
             stockAdjustmentId: stockAdjustmentId!,
@@ -266,7 +236,6 @@ class SalesInvoiceService {
           },
         });
 
-        // Create finished goods transaction
         await tx.finishedGoodsTransaction.create({
           data: {
             txnDateTime: new Date(),
@@ -282,17 +251,16 @@ class SalesInvoiceService {
       }
 
       return invoice;
-    }, {
-      maxWait: 10000,
-      timeout: 30000,
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
-    // Auto-post double-entry SALES Voucher after invoice creation transaction has committed
-    try {
-      const { voucherPostingService } = require("../accounts/voucherPosting.service");
-      await voucherPostingService.postSalesVoucher(invoice.id);
-    } catch (vErr) {
-      console.error("[Auto-Post Voucher Error] Failed to post Sales Voucher for invoice:", vErr);
+    // Auto-post SALES Voucher only for confirmed invoices
+    if (!isDraft) {
+      try {
+        const { voucherPostingService } = require("../accounts/voucherPosting.service");
+        await voucherPostingService.postSalesVoucher(invoice.id);
+      } catch (vErr) {
+        console.error("[Auto-Post Voucher Error] Failed to post Sales Voucher for invoice:", vErr);
+      }
     }
 
     return serializeInvoice(invoice);
@@ -406,6 +374,8 @@ class SalesInvoiceService {
                 id: true,
                 productCode: true,
                 productName: true,
+                hsnCode: true,
+                uom: { select: { uomName: true } },
               },
             },
           },
@@ -454,74 +424,56 @@ class SalesInvoiceService {
       });
       if (!existing) throw new ApiError(404, "Sales Invoice not found");
 
-      // Verify that the invoice is not fully paid
       if (existing.status === "PAID") {
         throw new ApiError(400, "Fully paid invoices cannot be edited");
       }
 
-      // 2. Revert old customer outstanding balance
-      const oldPayments = existing.payments ? (typeof existing.payments === "string" ? JSON.parse(existing.payments) : existing.payments) as any[] : [];
-      const oldTotalPaid = oldPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      const oldUnpaidPortion = Math.max(0, Math.round((Number(existing.grandTotal) - oldTotalPaid) * 100) / 100);
+      const isDraft = (data as any).status === "DRAFT";
+      const wasAlreadyDraft = existing.status === "DRAFT";
 
-      await tx.customer.update({
-        where: { id: existing.customerId },
-        data: {
-          outstandingAmount: {
-            decrement: oldUnpaidPortion,
-          },
-        },
-      });
+      // Revert old accounting/stock only if the existing invoice was NOT a draft
+      if (!wasAlreadyDraft) {
+        // 2. Revert old customer outstanding balance
+        const oldPayments = existing.payments ? (typeof existing.payments === "string" ? JSON.parse(existing.payments) : existing.payments) as any[] : [];
+        const oldTotalPaid = oldPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+        const oldUnpaidPortion = Math.max(0, Math.round((Number(existing.grandTotal) - oldTotalPaid) * 100) / 100);
 
-      // 3. Revert old invoicedQty on SalesOrderItems
-      if (existing.salesOrderId) {
-        for (const item of existing.items) {
-          const qty = Number(item.quantity);
-          if (qty <= 0) continue;
-          await tx.salesOrderItem.updateMany({
-            where: {
-              salesOrderId: existing.salesOrderId,
-              productId: item.productId,
-            },
-            data: {
-              invoicedQty: { decrement: qty },
-            },
-          });
+        await tx.customer.update({
+          where: { id: existing.customerId },
+          data: { outstandingAmount: { decrement: oldUnpaidPortion } },
+        });
+
+        // 3. Revert old invoicedQty on SalesOrderItems
+        if (existing.salesOrderId) {
+          for (const item of existing.items) {
+            const qty = Number(item.quantity);
+            if (qty <= 0) continue;
+            await tx.salesOrderItem.updateMany({
+              where: { salesOrderId: existing.salesOrderId, productId: item.productId },
+              data: { invoicedQty: { decrement: qty } },
+            });
+          }
         }
-      }
 
-      // 4. Revert old stock adjustments & finished goods stocks
-      const oldAdj = await tx.stockAdjustment.findFirst({
-        where: {
-          sourceDocument: "SALES_INVOICE",
-          sourceDocId: existing.id,
-        },
-      });
-      if (oldAdj) {
-        const oldAdjItems = await tx.stockAdjustmentItem.findMany({
-          where: { stockAdjustmentId: oldAdj.id },
+        // 4. Revert old stock adjustments & finished goods stocks
+        const oldAdj = await tx.stockAdjustment.findFirst({
+          where: { sourceDocument: "SALES_INVOICE", sourceDocId: existing.id },
         });
-        for (const adjItem of oldAdjItems) {
-          if (adjItem.productItemId === null) continue;
-          const pid: bigint = adjItem.productItemId;
-          await tx.finishedGoodsStock.update({
-            where: {
-              storeId_productItemId: {
-                storeId: adjItem.storeId,
-                productItemId: pid,
-              },
-            },
-            data: {
-              onHandQty: { increment: Number(adjItem.difference) * -1 },
-            },
+        if (oldAdj) {
+          const oldAdjItems = await tx.stockAdjustmentItem.findMany({
+            where: { stockAdjustmentId: oldAdj.id },
           });
+          for (const adjItem of oldAdjItems) {
+            if (adjItem.productItemId === null) continue;
+            const pid: bigint = adjItem.productItemId;
+            await tx.finishedGoodsStock.update({
+              where: { storeId_productItemId: { storeId: adjItem.storeId, productItemId: pid } },
+              data: { onHandQty: { increment: Number(adjItem.difference) * -1 } },
+            });
+          }
+          await tx.stockAdjustmentItem.deleteMany({ where: { stockAdjustmentId: oldAdj.id } });
+          await tx.stockAdjustment.delete({ where: { id: oldAdj.id } });
         }
-        await tx.stockAdjustmentItem.deleteMany({
-          where: { stockAdjustmentId: oldAdj.id },
-        });
-        await tx.stockAdjustment.delete({
-          where: { id: oldAdj.id },
-        });
       }
 
       // 5. Calculate new items and totals
@@ -597,14 +549,13 @@ class SalesInvoiceService {
         createdAt: new Date().toISOString()
       }));
       const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
-      const computedStatus = totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID");
+      const computedStatus = isDraft
+        ? "DRAFT"
+        : (totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID"));
 
-      // 6. Delete old invoice items
-      await tx.salesInvoiceItem.deleteMany({
-        where: { salesInvoiceId: id },
-      });
+      // 6. Delete old invoice items and update record
+      await tx.salesInvoiceItem.deleteMany({ where: { salesInvoiceId: id } });
 
-      // 7. Update SalesInvoice record
       const updatedInvoice = await tx.salesInvoice.update({
         where: { id },
         data: {
@@ -612,147 +563,118 @@ class SalesInvoiceService {
           invoiceDate: new Date(data.invoiceDate),
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
           notes: data.notes,
+          narration: (data as any).narration || null,
           salesOrderId: data.salesOrderId || null,
           subTotal,
           taxTotal,
           grandTotal,
           status: computedStatus,
           payments: processedPayments as any,
-          items: {
-            create: invoiceItems,
-          },
+          items: { create: invoiceItems },
         },
         include: {
-          customer: {
-            select: {
-              id: true,
-              firmName: true,
-              displayName: true,
-              email: true,
-            },
-          },
+          customer: { select: { id: true, firmName: true, displayName: true, email: true } },
           items: {
             include: {
-              product: {
-                select: {
-                  id: true,
-                  productCode: true,
-                  productName: true,
-                },
-              },
+              product: { select: { id: true, productCode: true, productName: true } },
             },
           },
         },
       });
 
-      // 8. Apply new customer outstanding balance
-      const newUnpaidPortion = Math.max(0, Math.round((grandTotal - totalPaid) * 100) / 100);
-      await tx.customer.update({
-        where: { id: data.customerId },
-        data: {
-          outstandingAmount: {
-            increment: newUnpaidPortion,
-          },
-        },
-      });
+      // Apply accounting/stock only for confirmed invoices
+      if (!isDraft) {
+        // 8. Apply new customer outstanding balance
+        const newUnpaidPortion = Math.max(0, Math.round((grandTotal - totalPaid) * 100) / 100);
+        await tx.customer.update({
+          where: { id: data.customerId },
+          data: { outstandingAmount: { increment: newUnpaidPortion } },
+        });
 
-      // 9. Apply new invoicedQty on SalesOrderItems
-      if (data.salesOrderId) {
+        // 9. Apply new invoicedQty on SalesOrderItems
+        if (data.salesOrderId) {
+          for (const item of data.items) {
+            const qty = Number(item.qty);
+            if (qty <= 0) continue;
+            await tx.salesOrderItem.updateMany({
+              where: { salesOrderId: data.salesOrderId, productId: BigInt(item.productId) },
+              data: { invoicedQty: { increment: qty } },
+            });
+          }
+        }
+
+        // 10. Apply new stock adjustments
+        const adjustmentPrefix = `ADJ-${new Date().getFullYear()}-`;
+        const lastAdjNew = await tx.stockAdjustment.findFirst({
+          where: { adjustmentNumber: { startsWith: adjustmentPrefix } },
+          orderBy: { adjustmentNumber: "desc" },
+          select: { adjustmentNumber: true },
+        });
+        let seq = 1;
+        if (lastAdjNew?.adjustmentNumber) {
+          const parts = lastAdjNew.adjustmentNumber.split("-");
+          seq = (parseInt(parts[parts.length - 1]) || 0) + 1;
+        }
+        const newAdjustmentNumber = `${adjustmentPrefix}${String(seq).padStart(4, "0")}`;
+
+        let stockAdjustmentCreated = false;
+        let stockAdjustmentId = BigInt(0);
+
         for (const item of data.items) {
           const qty = Number(item.qty);
           if (qty <= 0) continue;
-          await tx.salesOrderItem.updateMany({
-            where: {
-              salesOrderId: data.salesOrderId,
-              productId: BigInt(item.productId),
-            },
-            data: {
-              invoicedQty: { increment: qty },
-            },
+
+          const fgStocks = await tx.finishedGoodsStock.findMany({
+            where: { productItemId: BigInt(item.productId) },
+            orderBy: { onHandQty: 'desc' },
           });
-        }
-      }
+          if (fgStocks.length === 0) continue;
 
-      // 10. Apply new stock adjustments & finished goods stocks
-      const adjustmentPrefix = `ADJ-${new Date().getFullYear()}-`;
-      const lastAdjNew = await tx.stockAdjustment.findFirst({
-        where: { adjustmentNumber: { startsWith: adjustmentPrefix } },
-        orderBy: { adjustmentNumber: "desc" },
-        select: { adjustmentNumber: true },
-      });
-      let seq = 1;
-      if (lastAdjNew?.adjustmentNumber) {
-        const parts = lastAdjNew.adjustmentNumber.split("-");
-        seq = (parseInt(parts[parts.length - 1]) || 0) + 1;
-      }
-      const newAdjustmentNumber = `${adjustmentPrefix}${String(seq).padStart(4, "0")}`;
+          const targetStoreId = fgStocks[0].storeId;
+          const fgStock = fgStocks[0];
 
-      let stockAdjustmentCreated = false;
-      let stockAdjustmentId = BigInt(0);
+          if (!stockAdjustmentCreated) {
+            const newAdj = await tx.stockAdjustment.create({
+              data: {
+                adjustmentNumber: newAdjustmentNumber,
+                adjustmentDate: new Date(data.invoiceDate),
+                adjustmentType: "SALES_INVOICE_DISPATCH",
+                reason: `Sales Invoice ${updatedInvoice.invoiceNo} (Updated)`,
+                status: "APPROVED",
+                createdBy: currentUser.userId,
+                updatedBy: currentUser.userId,
+                approvedBy: currentUser.userId,
+                approvedAt: new Date(),
+                autoGenerated: true,
+                sourceDocument: "SALES_INVOICE",
+                sourceDocId: updatedInvoice.id,
+              },
+            });
+            stockAdjustmentId = newAdj.id;
+            stockAdjustmentCreated = true;
+          }
 
-      for (const item of data.items) {
-        const qty = Number(item.qty);
-        if (qty <= 0) continue;
-
-        const fgStocks = await tx.finishedGoodsStock.findMany({
-          where: { productItemId: BigInt(item.productId) },
-          orderBy: { onHandQty: 'desc' },
-        });
-
-        if (fgStocks.length === 0) continue;
-
-        const targetStoreId = fgStocks[0].storeId;
-        const fgStock = fgStocks[0];
-
-        if (!stockAdjustmentCreated) {
-          const newAdj = await tx.stockAdjustment.create({
-            data: {
-              adjustmentNumber: newAdjustmentNumber,
-              adjustmentDate: new Date(data.invoiceDate),
-              adjustmentType: "SALES_INVOICE_DISPATCH",
-              reason: `Sales Invoice ${updatedInvoice.invoiceNo} (Updated)`,
-              status: "APPROVED",
-              createdBy: currentUser.userId,
-              updatedBy: currentUser.userId,
-              approvedBy: currentUser.userId,
-              approvedAt: new Date(),
-              autoGenerated: true,
-              sourceDocument: "SALES_INVOICE",
-              sourceDocId: updatedInvoice.id,
-            },
+          await tx.finishedGoodsStock.update({
+            where: { storeId_productItemId: { storeId: targetStoreId, productItemId: BigInt(item.productId) } },
+            data: { onHandQty: { decrement: qty } },
           });
-          stockAdjustmentId = newAdj.id;
-          stockAdjustmentCreated = true;
-        }
 
-        await tx.finishedGoodsStock.update({
-          where: {
-            storeId_productItemId: {
-              storeId: targetStoreId,
+          await tx.stockAdjustmentItem.create({
+            data: {
+              stockAdjustmentId,
+              itemType: "FINISHED_GOODS",
               productItemId: BigInt(item.productId),
+              storeId: targetStoreId,
+              currentQty: fgStock.onHandQty,
+              adjustedQty: fgStock.onHandQty.minus(qty),
+              difference: -qty,
             },
-          },
-          data: { onHandQty: { decrement: qty } },
-        });
-
-        await tx.stockAdjustmentItem.create({
-          data: {
-            stockAdjustmentId,
-            itemType: "FINISHED_GOODS",
-            productItemId: BigInt(item.productId),
-            storeId: targetStoreId,
-            currentQty: fgStock.onHandQty,
-            adjustedQty: fgStock.onHandQty.minus(qty),
-            difference: -qty,
-          },
-        });
+          });
+        }
       }
 
       return serializeInvoice(updatedInvoice);
-    }, {
-      maxWait: 10000,
-      timeout: 30000,
-    });
+    }, { maxWait: 10000, timeout: 30000 });
   }
 }
 

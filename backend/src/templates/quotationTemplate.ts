@@ -1,210 +1,320 @@
-export const generateQuotationHtml = (quotationOrder: any, company: any): string => {
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+export const generateQuotationHtml = (order: any, _company: any): string => {
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    const num = (v: any, decimals = 2): string => {
+        const x = Number(v ?? 0);
+        return x.toLocaleString("en-IN", {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+        });
     };
 
-    const formatCurrency = (amount: number | undefined | null) => {
-        if (amount == null) return "₹0.00";
-        return new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency: "INR",
-        }).format(amount);
+    const fmtDate = (d: any): string => {
+        if (!d) return "—";
+        const dt = new Date(d);
+        const dd = String(dt.getDate()).padStart(2, "0");
+        const mm = String(dt.getMonth() + 1).padStart(2, "0");
+        const yyyy = dt.getFullYear();
+        return `${dd}-${mm}-${yyyy}`;
     };
 
-    const n = (v: any): number => Number(v ?? 0);
+    // ─── Data ─────────────────────────────────────────────────────────────────
 
-    const isInterState = quotationOrder.isInterState;
-    const baseColSpan = isInterState ? 7 : 8;
-    const footerColSpan = baseColSpan;
+    const cust            = order.customer || {};
+    const customerName    = (cust.displayName || cust.firmName || "—").toUpperCase();
+    const customerCode    = cust.customerCode || cust.id || "—";
+    const openingBalance  = Number(cust.openingBalance ?? 0);
+    const opBalType       = (cust.openingBalanceType || "CREDIT").toUpperCase() === "DEBIT" ? "Dr" : "Cr";
 
-    const companyDetailsHtml = company ? `
-        <div class="text-right text-sm text-black leading-tight">
-            <h3 class="text-lg font-bold text-black m-0 mb-1">${company.companyName || ''}</h3>
-            ${company.addressLine1 ? `<p class="m-0">${company.addressLine1}</p>` : ''}
-            ${(company.city || company.state || company.zipcode) ? `<p class="m-0">${[company.city, company.state, company.zipcode].filter(Boolean).join(", ")}</p>` : ''}
-            ${company.phone ? `<p class="m-0 mt-1">Phone: ${company.phone}</p>` : ''}
-            ${company.email ? `<p class="m-0">Email: ${company.email}</p>` : ''}
-            ${company.gstin ? `<p class="m-0 mt-1 font-semibold text-black">GSTIN: ${company.gstin}</p>` : ''}
-        </div>
-    ` : '';
+    const orderNo         = order.orderNo   || "—";
+    const orderDate       = fmtDate(order.orderDate);
 
-    let itemsHtml = '';
-    quotationOrder.items?.forEach((item: any, idx: number) => {
-        const uom      = item.product?.uom?.uomName || "Pcs.";
-        const qty       = n(item.quantity);
-        // taxableAmount = qty × unitPrice (subtotal before tax)
-        const taxable   = n(item.taxableAmount) || (qty * n(item.unitPrice));
-        // Derive unitPrice from taxableAmount/qty for older records where unitPrice was not stored
-        const unitPrice = n(item.unitPrice) || (qty > 0 ? taxable / qty : 0);
-        const lineTotal = n(item.lineTotal);
+    const subtotal        = Number(order.subtotal    ?? 0);
+    const totalDiscount   = Number(order.totalDiscount ?? 0);
+    const discountPct     = Number(order.orderDiscountValue ?? 0);
+    const netAmount       = Number(order.netAmount   ?? 0);
 
-        let taxHtml = '';
+    const items: any[]    = order.items   || [];
+    const bundleCount     = items.length;
+
+    const isInterState    = Boolean(order.isInterState);
+
+    let totalCgst = Number(order.totalCgst ?? 0);
+    let totalSgst = Number(order.totalSgst ?? 0);
+    let totalIgst = Number(order.totalIgst ?? 0);
+
+    if (totalCgst === 0 && totalSgst === 0 && totalIgst === 0) {
+        items.forEach((it: any) => {
+            const itemCgst = Number(it.cgstAmount ?? 0);
+            const itemSgst = Number(it.sgstAmount ?? 0);
+            const itemIgst = Number(it.igstAmount ?? 0);
+            const itemGst = Number(it.gstAmount ?? 0);
+
+            if (itemCgst > 0 || itemSgst > 0 || itemIgst > 0) {
+                totalCgst += itemCgst;
+                totalSgst += itemSgst;
+                totalIgst += itemIgst;
+            } else if (itemGst > 0) {
+                if (isInterState) {
+                    totalIgst += itemGst;
+                } else {
+                    totalCgst += itemGst / 2;
+                    totalSgst += itemGst / 2;
+                }
+            }
+        });
+    }
+
+    const taxDiff = netAmount - (subtotal - totalDiscount);
+    if (totalCgst === 0 && totalSgst === 0 && totalIgst === 0 && taxDiff > 0.009) {
         if (isInterState) {
-            taxHtml = `
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">
-                    ${formatCurrency(n(item.igstAmount) || n(item.gstAmount))}
-                    <div class="text-[10px] text-black">(${n(item.igstRate) || n(item.gstRate)}%)</div>
-                </td>
-            `;
+            totalIgst = taxDiff;
         } else {
-            taxHtml = `
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">
-                    ${formatCurrency(n(item.cgstAmount) || n(item.gstAmount) / 2)}
-                    <div class="text-[10px] text-black">(${n(item.cgstRate) || n(item.gstRate) / 2}%)</div>
-                </td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">
-                    ${formatCurrency(n(item.sgstAmount) || n(item.gstAmount) / 2)}
-                    <div class="text-[10px] text-black">(${n(item.sgstRate) || n(item.gstRate) / 2}%)</div>
-                </td>
-            `;
+            totalCgst = taxDiff / 2;
+            totalSgst = taxDiff / 2;
         }
+    }
 
-        itemsHtml += `
+    const totalTax = totalCgst + totalSgst + totalIgst;
+    const hasTax = totalTax > 0.009;
+
+    const totalCess = Number(order.totalCess ?? items.reduce((acc: number, it: any) => acc + Number(it.cessAmount || 0), 0));
+
+    const taxableBase = Math.max(0, subtotal - totalDiscount);
+
+    const cgstRates = Array.from(new Set(items.map((it: any) => Number(it.cgstRate || (Number(it.gstRate || 0) / 2) || 0)).filter((r: number) => r > 0)));
+    const cgstRateDisplay = cgstRates.length === 1 ? cgstRates[0] : (totalCgst > 0 && taxableBase > 0 ? (totalCgst / taxableBase) * 100 : null);
+
+    const sgstRates = Array.from(new Set(items.map((it: any) => Number(it.sgstRate || (Number(it.gstRate || 0) / 2) || 0)).filter((r: number) => r > 0)));
+    const sgstRateDisplay = sgstRates.length === 1 ? sgstRates[0] : (totalSgst > 0 && taxableBase > 0 ? (totalSgst / taxableBase) * 100 : null);
+
+    const igstRates = Array.from(new Set(items.map((it: any) => Number(it.igstRate || it.gstRate || 0)).filter((r: number) => r > 0)));
+    const igstRateDisplay = igstRates.length === 1 ? igstRates[0] : (totalIgst > 0 && taxableBase > 0 ? (totalIgst / taxableBase) * 100 : null);
+
+    const isOpBalDebit = opBalType === "Dr";
+    const signedOpBalance = isOpBalDebit ? openingBalance : -openingBalance;
+    const signedClosing   = signedOpBalance + netAmount;
+    const closingRaw      = Math.abs(signedClosing);
+    const closingType     = signedClosing >= 0 ? "Dr" : "Cr";
+
+    // ─── Items rows ───────────────────────────────────────────────────────────
+
+    const itemRows = items.map((item: any, idx: number) => {
+        const name   = item.product?.productName || `Product #${item.productId}`;
+        const qty    = Number(item.quantity  ?? 0);
+        const rate   = Number(item.unitPrice ?? 0);
+        const amount = Number(item.lineTotal ?? qty * rate);
+
+        return `
             <tr>
-                <td class="text-center border border-slate-300 px-2.5 py-2 align-middle text-black">${idx + 1}.</td>
-                <td class="border border-slate-300 px-2.5 py-2 align-middle font-medium text-black">${item.product?.productName || "N/A"}</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold text-black">${qty}</td>
-                <td class="text-center border border-slate-300 px-2.5 py-2 align-middle text-black">${uom}</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">${formatCurrency(unitPrice)}</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">${formatCurrency(taxable)}</td>
-                ${taxHtml}
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold text-black">${formatCurrency(lineTotal)}</td>
-            </tr>
-        `;
-    });
+                <td style="vertical-align:top;white-space:nowrap;padding-right:6px">${idx + 1}.</td>
+                <td style="vertical-align:top;padding-right:8px">${name}</td>
+                <td style="text-align:right;vertical-align:top;padding-right:8px">${qty}</td>
+                <td style="text-align:right;vertical-align:top;padding-right:8px">${num(rate)}</td>
+                <td style="text-align:right;vertical-align:top">${num(amount)}</td>
+            </tr>`;
+    }).join("");
 
-    let footerHtml = `
+    // ─── Discount row ─────────────────────────────────────────────────────────
+
+    const discountRow = totalDiscount > 0 ? `
         <tr>
-            <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">Subtotal:</td>
-            <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">${formatCurrency(n(quotationOrder.subtotal))}</td>
-        </tr>
-    `;
+            <td colspan="4" style="text-align:right;padding-right:4px">
+                Less : DISCOUNT (-)&nbsp;&nbsp;@&nbsp;&nbsp;${num(discountPct, 2)}&nbsp;&nbsp;%
+            </td>
+            <td style="text-align:right">${num(totalDiscount)}</td>
+        </tr>` : "";
 
-    if (n(quotationOrder.totalDiscount) > 0) {
-        footerHtml += `
-            <tr>
-                <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">Discount:</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">-${formatCurrency(n(quotationOrder.totalDiscount))}</td>
-            </tr>
-        `;
-    }
+    // ─── GST rows ─────────────────────────────────────────────────────────────
 
-    if (isInterState) {
-        if (n(quotationOrder.totalIgst) || n(quotationOrder.totalGst)) {
-            footerHtml += `
+    let gstRows = "";
+    if (hasTax) {
+        if (isInterState) {
+            if (totalIgst > 0) {
+                const rateText = igstRateDisplay != null && igstRateDisplay > 0
+                    ? `&nbsp;&nbsp;@&nbsp;&nbsp;${num(igstRateDisplay, 2)}&nbsp;&nbsp;%`
+                    : "";
+                gstRows += `
                 <tr>
-                    <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">IGST:</td>
-                    <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">
-                        ${formatCurrency(n(quotationOrder.totalIgst) || n(quotationOrder.totalGst))}
+                    <td colspan="4" style="text-align:right;padding-right:4px">
+                        Add : IGST (+)${rateText}
                     </td>
-                </tr>
-            `;
+                    <td style="text-align:right">${num(totalIgst)}</td>
+                </tr>`;
+            }
+        } else {
+            if (totalCgst > 0) {
+                const cgstRateText = cgstRateDisplay != null && cgstRateDisplay > 0
+                    ? `&nbsp;&nbsp;@&nbsp;&nbsp;${num(cgstRateDisplay, 2)}&nbsp;&nbsp;%`
+                    : "";
+                gstRows += `
+                <tr>
+                    <td colspan="4" style="text-align:right;padding-right:4px">
+                        Add : CGST (+)${cgstRateText}
+                    </td>
+                    <td style="text-align:right">${num(totalCgst)}</td>
+                </tr>`;
+            }
+            if (totalSgst > 0) {
+                const sgstRateText = sgstRateDisplay != null && sgstRateDisplay > 0
+                    ? `&nbsp;&nbsp;@&nbsp;&nbsp;${num(sgstRateDisplay, 2)}&nbsp;&nbsp;%`
+                    : "";
+                gstRows += `
+                <tr>
+                    <td colspan="4" style="text-align:right;padding-right:4px">
+                        Add : SGST (+)${sgstRateText}
+                    </td>
+                    <td style="text-align:right">${num(totalSgst)}</td>
+                </tr>`;
+            }
         }
-    } else {
-        footerHtml += `
-            <tr>
-                <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">CGST:</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">
-                    ${formatCurrency(n(quotationOrder.totalCgst) || n(quotationOrder.totalGst) / 2)}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">SGST:</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">
-                    ${formatCurrency(n(quotationOrder.totalSgst) || n(quotationOrder.totalGst) / 2)}
-                </td>
-            </tr>
-        `;
     }
 
-    footerHtml += `
-        <tr class="bg-[#f7f7f7]">
-            <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-[14px] text-black">Total Net Amount:</td>
-            <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-[14px] text-black">${formatCurrency(n(quotationOrder.netAmount))}</td>
-        </tr>
-    `;
+    if (totalCess > 0) {
+        gstRows += `
+        <tr>
+            <td colspan="4" style="text-align:right;padding-right:4px">
+                Add : CESS (+)
+            </td>
+            <td style="text-align:right">${num(totalCess)}</td>
+        </tr>`;
+    }
 
-    return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-            body { font-family: sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .border-collapse { border-collapse: collapse; }
-        </style>
-    </head>
-    <body class="bg-white text-black p-8">
-        <div class="max-w-[800px] mx-auto">
-            <div class="flex justify-between items-end border-b-2 border-gray-300 pb-4 mb-6">
-                <div>
-                    <h1 class="text-3xl font-bold text-black m-0">QUOTATION</h1>
-                    <p class="text-black text-sm mt-1 mb-0">Original for Recipient</p>
-                </div>
-                ${companyDetailsHtml}
-            </div>
+    // ─── HTML ─────────────────────────────────────────────────────────────────
 
-            <!-- details-box -->
-            <div class="flex border border-b-0 border-slate-300">
-                <!-- party-details -->
-                <div class="flex-[1.2] border-r border-slate-300 p-3 text-[13px] leading-[1.5]">
-                    <div class="font-bold mb-1 text-black">Customer Details :</div>
-                    <div class="font-semibold text-black">
-                        ${quotationOrder.customer?.displayName || quotationOrder.customer?.firmName || "N/A"}
-                    </div>
-                    <div class="text-black mt-1">
-                        ${quotationOrder.billingAddressLine1 || ''}<br />
-                        ${quotationOrder.billingCity || ''}, ${quotationOrder.billingState || ''} - ${quotationOrder.billingPincode || ''}
-                    </div>
-                </div>
-                <!-- order-details -->
-                <div class="flex-[0.8] p-3 text-[13px] leading-[1.6] border-l border-slate-200">
-                    <div class="flex mb-1.5 text-black">
-                        <span class="w-[90px] font-bold">Quotation No.</span>
-                        <span class="flex-1">: ${quotationOrder.orderNo}</span>
-                    </div>
-                    <div class="flex mb-1.5 text-black">
-                        <span class="w-[90px] font-bold">Date</span>
-                        <span class="flex-1">: ${formatDate(quotationOrder.orderDate)}</span>
-                    </div>
-                    <div class="flex text-black">
-                        <span class="w-[90px] font-bold">Valid Until</span>
-                        <span class="flex-1">: ${formatDate(quotationOrder.expectedCompletionDate)}</span>
-                    </div>
-                </div>
-            </div>
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    line-height: 1.75;
+    color: #000;
+    background: #fff;
+    padding: 40px 48px;
+  }
+  .title {
+    text-align: center;
+    letter-spacing: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 16px;
+  }
+  .sep {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 5px 0;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  table.items {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  table.items col.sn         { width: 36px; }
+  table.items col.particulars{ }
+  table.items col.pcs        { width: 60px; }
+  table.items col.rate       { width: 84px; }
+  table.items col.amount     { width: 100px; }
+  table.items th {
+    font-weight: bold;
+    padding-bottom: 2px;
+  }
+  .short-sep {
+    border-top: 1px solid #000;
+  }
+</style>
+</head>
+<body>
 
-            <!-- items-table -->
-            <table class="w-full border-collapse text-[13px]">
-                <thead>
-                    <tr>
-                        <th class="text-center border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 40px;">S.N.</th>
-                        <th class="text-left border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black">Description of Goods</th>
-                        <th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 60px;">Qty.</th>
-                        <th class="text-center border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 60px;">Unit</th>
-                        <th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 80px;">Rate</th>
-                        <th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 90px;">SubTotal</th>
-                        ${isInterState ? 
-                            `<th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 80px;">IGST</th>` :
-                            `<th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 80px;">CGST</th>
-                             <th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 80px;">SGST</th>`
-                        }
-                        <th class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold bg-[#f7f7f7] text-black" style="width: 100px;">Line Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${itemsHtml}
-                </tbody>
-                <tfoot>
-                    ${footerHtml}
-                </tfoot>
-            </table>
-        </div>
-    </body>
-    </html>
-    `;
+  <!-- Title -->
+  <div class="title">E s t i m a t e</div>
+
+  <!-- D.No. / Op.Balance -->
+  <div class="row">
+    <span>D. No.&nbsp;&nbsp;: ${customerCode}</span>
+    <span>Op. Balance :&nbsp;&nbsp;<strong>${num(openingBalance)}</strong>&nbsp;${opBalType}</span>
+  </div>
+  <hr class="sep">
+
+  <!-- To / No. / Date -->
+  <div class="row">
+    <span>To :</span>
+    <span>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${orderNo}</span>
+  </div>
+  <div class="row">
+    <strong>${customerName}</strong>
+    <span>Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${orderDate}</span>
+  </div>
+  <hr class="sep">
+
+  <!-- Items table -->
+  <table class="items">
+    <colgroup>
+      <col class="sn">
+      <col class="particulars">
+      <col class="pcs">
+      <col class="rate">
+      <col class="amount">
+    </colgroup>
+    <thead>
+      <tr>
+        <th style="text-align:left">S.N.</th>
+        <th style="text-align:left">Particulars</th>
+        <th style="text-align:right">Pcs.</th>
+        <th style="text-align:right">Rate</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+      <tr><td colspan="5" style="padding:0"><hr class="sep" style="margin:3px 0"></td></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="5" style="height:8px"></td></tr>
+      ${itemRows}
+      <tr><td colspan="5" style="height:8px"></td></tr>
+    </tbody>
+    <tfoot>
+      <!-- Sub Total -->
+      <tr>
+        <td colspan="4" style="text-align:right;padding-right:4px">Sub Total</td>
+        <td class="short-sep" style="text-align:right;font-weight:bold">${num(subtotal)}</td>
+      </tr>
+
+      <!-- Discount -->
+      ${discountRow}
+
+      <!-- GST / Tax breakdown -->
+      ${gstRows}
+
+      <!-- Grand Total -->
+      <tr>
+        <td colspan="4" style="text-align:right;padding-right:4px;padding-top:2px">
+          <strong>Grand Total</strong>
+        </td>
+        <td style="text-align:right;font-weight:bold;
+                   border-top:1px solid #000;
+                   border-bottom:1px solid #000">
+          ${num(netAmount)}
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <hr class="sep" style="margin-top:10px">
+
+  <!-- Footer -->
+  <div class="row">
+    <span>No. Of Bundles : ${bundleCount}</span>
+    <span>Closing Balance :&nbsp;&nbsp;<strong>${num(closingRaw)}</strong>&nbsp;${closingType}</span>
+  </div>
+
+</body>
+</html>`;
 };

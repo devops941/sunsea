@@ -38,7 +38,7 @@ class CategoryController {
   });
 
   findById = asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const category = await categoryService.findById(id);
 
     return res.status(200).json(
@@ -48,7 +48,7 @@ class CategoryController {
 
   update = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const category = await categoryService.update(id, req.body, userId);
     getIO().emit("category:updated", category);
 
@@ -58,7 +58,7 @@ class CategoryController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     await categoryService.delete(id);
     getIO().emit("category:deleted", { id });
 

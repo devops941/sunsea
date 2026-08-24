@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaArrowLeft, FaUser, FaInfoCircle, FaMapMarkerAlt, FaFileInvoiceDollar, FaPlus } from "react-icons/fa";
+import { FaArrowLeft, FaUser, FaInfoCircle, FaFileInvoiceDollar, FaPlus } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -44,7 +44,7 @@ const customerFormSchema = z.object({
     }
   }),
   email: z.string().min(1, "Email is required").email("Invalid email address"),
-  gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/, "Invalid GSTIN format"),
+  gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/, "Invalid GSTIN format").optional().or(z.literal("")),
   openingBalance: z.string().min(1, "Opening Balance is required"),
   openingBalanceType: z.string().min(1, "Opening Balance Type is required"),
   creditLimit: z.string().min(1, "Credit Limit is required").refine(val => !isNaN(Number(val)) && Number(val) >= 25000, { message: "Credit Limit must be at least ₹25000" }),
@@ -186,8 +186,8 @@ const CustomerFormPage: React.FC = () => {
           if (nextCode) {
             setValue("customerId", nextCode, { shouldValidate: true });
           }
-        } catch (err) {
-          console.error("Error fetching next customer code:", err);
+        } catch {
+          // next-code fetch is non-critical; form remains editable
         }
       };
       fetchCode();
@@ -206,8 +206,8 @@ const CustomerFormPage: React.FC = () => {
         if (nextCode) {
           setValue("customerId", nextCode, { shouldValidate: true });
         }
-      } catch (err) {
-        console.error("Error fetching next customer code:", err);
+      } catch {
+        // next-code fetch is non-critical; form remains editable
       }
     }
   };
@@ -231,8 +231,8 @@ const CustomerFormPage: React.FC = () => {
       };
 
       if (isEditMode && id) {
-        // Exclude openingBalance for updates as per backend validation
-        const { openingBalance, ...updatePayload } = payload;
+        // Exclude openingBalance and openingBalanceType — both are immutable after creation
+        const { openingBalance: _ob, openingBalanceType: _obt, ...updatePayload } = payload;
         await editCustomer(id, updatePayload as any);
         toast.success("Customer updated successfully");
       } else {
@@ -242,20 +242,8 @@ const CustomerFormPage: React.FC = () => {
 
       navigate('/customers');
     } catch (error: any) {
-      const apiErrors = error?.errors || error?.response?.data?.errors;
-      if (Array.isArray(apiErrors) && apiErrors.length > 0) {
-        apiErrors.forEach((item: any) => {
-          let fieldName = (item.path || "").replace(/^body\./, "");
-          if (fieldName === "billingPincode") fieldName = "billingAddressPincode";
-          if (fieldName === "billingCity") fieldName = "billingAddressCity";
-          if (fieldName === "billingState") fieldName = "billingAddressState";
-          // We can map backend errors to our React Hook Form state if needed, though they should be caught by Zod
-        });
-        toast.error(error?.message || "Please fix validation errors on the form.");
-      } else {
-        const msg = typeof error === "string" ? error : error?.message || error?.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} customer`;
-        toast.error(msg);
-      }
+      const msg = typeof error === "string" ? error : error?.message || error?.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} customer`;
+      toast.error(msg);
     }
   };
 

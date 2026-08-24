@@ -140,7 +140,7 @@ function DataTable<T>({
   const fullSpanStyle: React.CSSProperties = { gridColumn: "1 / -1" };
 
   return (
-    <div className={`w-full  border border-line overflow-hidden ${className}`}>
+    <div className={`w-full bg-card border border-line overflow-hidden ${className}`}>
       {/*
         Flex column holding the scroll area and — when paginating — the pager
         beneath it. The minimum height applies in every state, so a table
@@ -234,15 +234,15 @@ function DataTable<T>({
             the foot of the rows and rides along if the scroll area is capped
             by the max-height. */}
         {hasPager && pagination && (
-          <div className="shrink-0 flex items-center justify-center gap-3 sm:gap-4 py-3 sm:py-4 border-t border-line-soft">
+          <div className="shrink-0 flex items-center justify-center gap-3 sm:gap-4 py-3 sm:py-4 border-t border-line-soft bg-card">
             <button
               type="button"
               disabled={pagination.currentPage === 1}
               onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
               className="flex items-center justify-center h-8 w-8 rounded-md border border-line
-                            text-ink-subtle hover:text-red-600 hover:border-red-200 hover:bg-red-50
+                            text-ink-subtle hover:text-primary hover:border-primary/40 hover:bg-primary/10
                             disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent
-                            transition-colors"
+                            transition-colors cursor-pointer"
             >
               <FaChevronLeft size={12} />
             </button>
@@ -254,9 +254,9 @@ function DataTable<T>({
               disabled={pagination.currentPage === pagination.totalPages}
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
               className="flex items-center justify-center h-8 w-8 rounded-md border border-line
-                            text-ink-subtle hover:text-red-600 hover:border-red-200 hover:bg-red-50
+                            text-ink-subtle hover:text-primary hover:border-primary/40 hover:bg-primary/10
                             disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent
-                            transition-colors"
+                            transition-colors cursor-pointer"
             >
               <FaChevronRight size={12} />
             </button>

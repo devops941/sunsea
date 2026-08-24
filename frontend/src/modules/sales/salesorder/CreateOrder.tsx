@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -16,7 +15,7 @@ import { useCustomers } from "../../../hooks/useCustomers";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { salesProductService } from "../../../services/salesProductService";
-import { ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
+import { ORDER_SOURCE_OPTIONS, ORDER_SOURCE_NEEDS_EMPLOYEE, ORDER_SOURCE_NEEDS_REFERRAL, ORDER_SOURCE_NEEDS_DEALER } from "../../../constants/selectOption";
 import { companyService } from "../../../services/companyService";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -43,21 +42,23 @@ const salesOrderSchema = z
         orderDate: z.string().min(1, "Order Date is required"),
         customerId: z.string().min(1, "Customer is required"),
         mobile: z.string().optional().nullable(),
-        orderType: z.string().optional(),
-        referenceText: z.string().optional(),
-        salesPersonName: z.string().optional(),
+        orderSource: z.string().optional(),
+        sourceEmployeeId: z.string().optional().nullable(),   // Employee BigInt as string
+        referredByCustomerId: z.string().optional().nullable(),
+        referredByName: z.string().optional().nullable(),
         isInterState: z.boolean(),
-
         items: z.array(orderItemSchema).min(1, "At least one item is required"),
-
         narration: z.string().optional(),
     })
     .superRefine((data, ctx) => {
-        if (data.orderType === "salesperson" && !data.salesPersonName?.trim()) {
-            ctx.addIssue({ code: "custom", message: "Salesperson name is required", path: ["salesPersonName"] });
+        if (ORDER_SOURCE_NEEDS_EMPLOYEE.includes(data.orderSource ?? "") && !data.sourceEmployeeId) {
+            ctx.addIssue({ code: "custom", message: "Please select the responsible employee", path: ["sourceEmployeeId"] });
         }
-        if (data.orderType === "reference" && !data.referenceText?.trim()) {
-            ctx.addIssue({ code: "custom", message: "Reference text is required", path: ["referenceText"] });
+        if (ORDER_SOURCE_NEEDS_REFERRAL.includes(data.orderSource ?? "") && !data.referredByCustomerId && !data.referredByName?.trim()) {
+            ctx.addIssue({ code: "custom", message: "Please select a customer or enter a referral name", path: ["referredByName"] });
+        }
+        if (ORDER_SOURCE_NEEDS_DEALER.includes(data.orderSource ?? "") && !data.referredByName?.trim()) {
+            ctx.addIssue({ code: "custom", message: "Please enter dealer / agent name", path: ["referredByName"] });
         }
     });
 
@@ -77,9 +78,10 @@ type SalesOrderFormValues = {
     orderDate: string;
     customerId: string;
     mobile?: string | null;
-    orderType?: string;
-    referenceText?: string;
-    salesPersonName?: string;
+    orderSource?: string;
+    sourceEmployeeId?: string | null;
+    referredByCustomerId?: string | null;
+    referredByName?: string | null;
     isInterState: boolean;
     items: Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }>;
     narration?: string;
@@ -93,9 +95,10 @@ const defaultValues: SalesOrderFormValues = {
     orderDate: today,
     customerId: "",
     mobile: "",
-    salesPersonName: "",
-    orderType: "",
-    referenceText: "",
+    orderSource: "",
+    sourceEmployeeId: null,
+    referredByCustomerId: null,
+    referredByName: null,
     isInterState: false,
     items: [{ salesProductId: "", orderQuantity: "1", components: [] }],
     narration: "",
@@ -108,7 +111,7 @@ const Err: React.FC<{ message?: string }> = ({ message }) =>
 
 /** Build components list from a SalesProduct, filtered to SALES_PRODUCTION only */
 function buildComponents(sp: any, orderQty: number = 1): ComponentItem[] {
-    return (sp?.components || [])
+    const list = (sp?.components || [])
         .filter((comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION")
         .map((comp: any) => {
             const perUnit = Number(comp.quantity ?? 1);
@@ -120,6 +123,16 @@ function buildComponents(sp: any, orderQty: number = 1): ComponentItem[] {
                 quantity: String(perUnit * orderQty),
             };
         });
+    if (list.length === 0 && sp?.id) {
+        return [{
+            componentProductId: String(sp.id),
+            productName: sp.salesProductName || sp.salesProductCode || String(sp.id),
+            perUnit: 1,
+            included: true,
+            quantity: String(orderQty),
+        }];
+    }
+    return list;
 }
 
 /** Reconstruct form items from saved SalesOrder items and SalesProducts */
@@ -341,15 +354,13 @@ const ItemRow: React.FC<ItemRowProps> = ({
                                 <span className="text-xs text-ink-subtle text-center w-16">×{comp.perUnit}</span>
 
                                 {/* Per-component Qty input */}
-                                <input
+                                <TextInput
+                                    name={`comp-qty-${compIdx}`}
                                     type="number"
-                                    min="0"
                                     value={comp.quantity}
+                                    min="0"
                                     disabled={!comp.included}
                                     onChange={e => setCompQty(compIdx, e.target.value)}
-                                    className={`w-full text-sm border border-line-soft rounded px-2 py-1 text-center bg-card-2 text-ink focus:outline-none focus:border-primary transition
-                                        ${!comp.included ? "cursor-not-allowed opacity-50" : ""}
-                                    `}
                                 />
                             </div>
                         ))}
@@ -371,7 +382,7 @@ const SalesOrderForm: React.FC = () => {
     const isEditMode = Boolean(targetId);
 
     const { customers, loadCustomers } = useCustomers();
-    const { loadEmployees } = useEmployees();
+    const { employees, loadEmployees } = useEmployees();
 
     const [salesProducts, setSalesProducts] = useState<any[]>([]);
     const [orderId, setOrderId] = useState<number | null>(null);
@@ -379,6 +390,7 @@ const SalesOrderForm: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const justResetRef = React.useRef(false);
+    const editValuesRef = React.useRef<SalesOrderFormValues | null>(null);
 
     const {
         control,
@@ -418,20 +430,23 @@ const SalesOrderForm: React.FC = () => {
 
                     const formItems = reconstructFormItems(orderData.items || [], activeProducts);
 
-                    justResetRef.current = true;
-                    reset({
+                    const editValues: SalesOrderFormValues = {
                         id: orderData.id,
                         orderNo: orderData.orderNo || "",
                         orderDate: orderData.orderDate ? orderData.orderDate.split("T")[0] : today,
-                        orderType: orderData.orderType || "",
                         customerId: orderData.customerId != null ? String(orderData.customerId) : "",
                         mobile: orderData.mobile || "",
-                        referenceText: orderData.referenceText || "",
-                        salesPersonName: orderData.salesPersonName || "",
-                        narration: orderData.remarks || orderData.internalNotes || "",
+                        orderSource: orderData.orderSource || "",
+                        sourceEmployeeId: orderData.sourceEmployeeId != null ? String(orderData.sourceEmployeeId) : null,
+                        referredByCustomerId: orderData.referredByCustomerId || null,
+                        referredByName: orderData.referredByName || null,
+                        narration: orderData.narration || orderData.remarks || orderData.internalNotes || "",
                         items: formItems,
                         isInterState: Boolean(orderData.isInterState),
-                    });
+                    };
+                    editValuesRef.current = editValues;
+                    justResetRef.current = true;
+                    reset(editValues);
                 } else {
                     setOrderId(null);
                     reset(defaultValues);
@@ -440,12 +455,12 @@ const SalesOrderForm: React.FC = () => {
                         if (isMounted && nextCode) {
                             setValue("orderNo", nextCode);
                         }
-                    } catch (err) {
-                        console.error("❌ Failed to fetch next order number:", err);
+                    } catch {
+                        // next order number fetch failed — form will remain with empty orderNo
                     }
                 }
-            } catch (err) {
-                console.error("❌ Failed to load sales order edit data:", err);
+            } catch {
+                // order load failed — navigate back handled by toast in the caller
             }
         };
 
@@ -459,7 +474,7 @@ const SalesOrderForm: React.FC = () => {
     // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {
         loadCustomers();
-        if (can("employees.view")) loadEmployees({});
+        if (can("employees.view")) loadEmployees({ limit: 500 });
     }, [loadCustomers, loadEmployees, can]);
 
     // ─── Options ─────────────────────────────────────────────────────
@@ -487,9 +502,17 @@ const SalesOrderForm: React.FC = () => {
         [salesProducts]
     );
 
+    const employeeOptions = useMemo(() =>
+        employees.map((e: any) => ({
+            value: String(e.id),
+            label: e.fullName || e.name || e.empName || e.empCode || `Employee #${e.id}`,
+        })),
+        [employees]
+    );
+
     // ─── Watched fields ──────────────────────────────────────────────
     const selectedCustomerId = watch("customerId");
-    const orderType = watch("orderType");
+    const orderSource = watch("orderSource");
 
     const selectedCustomer = useMemo(() =>
         customers.find(c => String(c.id) === selectedCustomerId) || null,
@@ -519,12 +542,19 @@ const SalesOrderForm: React.FC = () => {
         }
     }, [mobileOptions, setValue, isEditMode, watch]);
 
-    // ─── Clear salesperson/reference ────────────────────────────────
+    // ─── Clear source sub-fields when orderSource changes ───────────
     useEffect(() => {
         if (justResetRef.current) { justResetRef.current = false; return; }
-        if (orderType !== "salesperson") setValue("salesPersonName", "", { shouldValidate: true });
-        if (orderType !== "reference") setValue("referenceText", "", { shouldValidate: true });
-    }, [orderType, setValue]);
+        if (!ORDER_SOURCE_NEEDS_EMPLOYEE.includes(orderSource ?? "")) {
+            setValue("sourceEmployeeId", null, { shouldValidate: false });
+        }
+        if (!ORDER_SOURCE_NEEDS_REFERRAL.includes(orderSource ?? "")) {
+            setValue("referredByCustomerId", null, { shouldValidate: false });
+        }
+        if (!ORDER_SOURCE_NEEDS_REFERRAL.includes(orderSource ?? "") && !ORDER_SOURCE_NEEDS_DEALER.includes(orderSource ?? "")) {
+            setValue("referredByName", null, { shouldValidate: false });
+        }
+    }, [orderSource, setValue]);
 
     // ─── Inter-state calc ────────────────────────────────────────────
     const computedIsInterState = useMemo(() => {
@@ -566,13 +596,20 @@ const SalesOrderForm: React.FC = () => {
             const payload: any = {
                 orderNo: data.orderNo,
                 orderDate: data.orderDate,
-                customerId: Number(data.customerId),
+                customerId: data.customerId,
                 mobile: data.mobile || null,
-                orderType: data.orderType || null,
-                salesPersonName: data.orderType === "salesperson" ? data.salesPersonName : null,
-                referenceText: data.orderType === "reference" ? data.referenceText : null,
-                remarks: data.narration || null,
-                status: action === "draft" ? "DRAFT" : "SUBMITTED",
+                orderSource: data.orderSource || null,
+                sourceEmployeeId: ORDER_SOURCE_NEEDS_EMPLOYEE.includes(data.orderSource ?? "") && data.sourceEmployeeId
+                    ? Number(data.sourceEmployeeId)
+                    : null,
+                referredByCustomerId: ORDER_SOURCE_NEEDS_REFERRAL.includes(data.orderSource ?? "") && data.referredByCustomerId
+                    ? data.referredByCustomerId
+                    : null,
+                referredByName: (ORDER_SOURCE_NEEDS_REFERRAL.includes(data.orderSource ?? "") || ORDER_SOURCE_NEEDS_DEALER.includes(data.orderSource ?? ""))
+                    ? (data.referredByName || null)
+                    : null,
+                narration: data.narration || null,
+                status: action === "draft" ? "DRAFT" : "CONFIRMED",
                 isInterState: data.isInterState,
                 items: mergedItems,
             };
@@ -587,8 +624,10 @@ const SalesOrderForm: React.FC = () => {
 
             navigate(-1);
         } catch (error: any) {
-            console.error("❌ Submit Error:", error);
-            toast.error(error?.response?.data?.message || "Failed to save sales order");
+            const backendMsg = error?.response?.data?.message
+                || (Array.isArray(error?.response?.data?.errors) ? error.response.data.errors.map((e: any) => e.message).join(", ") : null)
+                || error?.message;
+            toast.error(backendMsg || "Failed to save sales order");
         } finally {
             setIsSubmitting(false);
         }
@@ -619,9 +658,8 @@ const SalesOrderForm: React.FC = () => {
 
                         <div>
                             <Controller name="customerId" control={control} render={({ field }) => (
-                                <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required searchable onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} />
+                                <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required searchable onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} error={errors.customerId?.message} />
                             )} />
-                            <Err message={errors.customerId?.message} />
                         </div>
 
                         <div>
@@ -638,26 +676,62 @@ const SalesOrderForm: React.FC = () => {
                         </div>
 
                         <div>
-                            <Controller name="orderType" control={control} render={({ field }) => (
-                                <SelectInput label="Order Source Platform" name={field.name} value={field.value ?? ""} options={ORDER_TYPE_OPTIONS} defaultOptionLabel="select order type" onChange={field.onChange} />
+                            <Controller name="orderSource" control={control} render={({ field }) => (
+                                <SelectInput label="Order Source" name={field.name} value={field.value ?? ""} options={ORDER_SOURCE_OPTIONS} defaultOptionLabel="Select Order Source" onChange={field.onChange} />
                             )} />
                         </div>
 
-                        {orderType === "salesperson" && (
+                        {/* Employee dropdown — shown for SALES_PERSON, TELE_CALLING, WALK_IN, WHATSAPP */}
+                        {ORDER_SOURCE_NEEDS_EMPLOYEE.includes(orderSource ?? "") && (
                             <div>
-                                <Controller name="salesPersonName" control={control} render={({ field }) => (
-                                    <TextInput label="Salesperson Name" name={field.name} value={field.value ?? ""} placeholder="Enter Salesperson Name" onChange={field.onChange} onBlur={field.onBlur} />
+                                <Controller name="sourceEmployeeId" control={control} render={({ field }) => (
+                                    <SelectInput
+                                        label="Responsible Employee"
+                                        name={field.name}
+                                        value={field.value ?? ""}
+                                        options={employeeOptions}
+                                        defaultOptionLabel="Select Employee"
+                                        onChange={field.onChange}
+                                        searchable
+                                        required
+                                    />
                                 )} />
-                                <Err message={errors.salesPersonName?.message} />
+                                <Err message={errors.sourceEmployeeId?.message} />
                             </div>
                         )}
 
-                        {orderType === "reference" && (
+                        {/* Customer + free-text referral — shown for REFERRAL */}
+                        {ORDER_SOURCE_NEEDS_REFERRAL.includes(orderSource ?? "") && (
+                            <>
+                                <div>
+                                    <Controller name="referredByCustomerId" control={control} render={({ field }) => (
+                                        <SelectInput
+                                            label="Referred By Customer"
+                                            name={field.name}
+                                            value={field.value ?? ""}
+                                            options={customerOptions}
+                                            defaultOptionLabel="Select Customer (optional)"
+                                            onChange={field.onChange}
+                                            searchable
+                                        />
+                                    )} />
+                                </div>
+                                <div>
+                                    <Controller name="referredByName" control={control} render={({ field }) => (
+                                        <TextInput label="Referral Name" name={field.name} value={field.value ?? ""} placeholder="Or enter referral name" onChange={field.onChange} onBlur={field.onBlur} />
+                                    )} />
+                                    <Err message={errors.referredByName?.message} />
+                                </div>
+                            </>
+                        )}
+
+                        {/* Dealer / Agent name — shown for DEALER_AGENT */}
+                        {ORDER_SOURCE_NEEDS_DEALER.includes(orderSource ?? "") && (
                             <div>
-                                <Controller name="referenceText" control={control} render={({ field }) => (
-                                    <TextInput label="Reference Name" name={field.name} value={field.value ?? ""} placeholder="Enter name or reference" onChange={field.onChange} onBlur={field.onBlur} />
+                                <Controller name="referredByName" control={control} render={({ field }) => (
+                                    <TextInput label="Dealer / Agent Name" name={field.name} value={field.value ?? ""} placeholder="Enter dealer or agent name" onChange={field.onChange} onBlur={field.onBlur} required />
                                 )} />
-                                <Err message={errors.referenceText?.message} />
+                                <Err message={errors.referredByName?.message} />
                             </div>
                         )}
                     </div>
@@ -701,7 +775,7 @@ const SalesOrderForm: React.FC = () => {
 
                     {/* ── Actions ── */}
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
-                        <CustomButton text="Clear" variant="danger" onClick={() => reset(defaultValues)} disabled={isSubmitting} />
+                        <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
                         <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
                         <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
                     </div>

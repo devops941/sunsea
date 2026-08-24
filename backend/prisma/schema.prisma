@@ -105,6 +105,7 @@ model Employee {
   payrollResults             PayrollResult[]
   salaryAdvances             SalaryAdvance[]
   permanentDeductions        EmployeePermanentDeduction[]
+  salesOrdersAsSource        SalesOrder[]                 @relation("SalesOrderSourceEmployee")
 
   @@index([departmentId])
   @@index([roleId])
@@ -356,9 +357,10 @@ model Customer {
   addresses            CustomerAddress[]
   company              Company                  @relation(fields: [companyId], references: [id])
   salesInvoices        SalesInvoice[]
-  salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
-  accountLedger        AccountLedger?
-  salesReturns         SalesReturn[]
+  salesOrders           SalesOrder[]             @relation("CustomerSalesOrders")
+  salesOrdersAsReferral SalesOrder[]             @relation("SalesOrderReferredBy")
+  accountLedger         AccountLedger?
+  salesReturns          SalesReturn[]
 
   @@unique([companyId, customerCode])
   @@index([companyId, status], map: "idx_cust_company_status")
@@ -1208,14 +1210,21 @@ model SalesOrder {
   createdBy        String?
   createdAt        DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
-  orderType          String?
-  productionStatus   String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
-  salesPersonName    String?          @db.VarChar(100)
-  sourceSalesOrderId Int?             @map("source_sales_order_id")
-  salesInvoices    SalesInvoice[]
-  items            SalesOrderItem[]
-  createdByUser    User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
-  customer         Customer         @relation("CustomerSalesOrders", fields: [customerId], references: [id])
+  orderType            String?
+  productionStatus     String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
+  salesPersonName      String?          @db.VarChar(100)
+  sourceSalesOrderId   Int?             @map("source_sales_order_id")
+  // Order Source Tracking (7 types)
+  orderSource          String?          @map("order_source") @db.VarChar(30)
+  sourceEmployeeId     BigInt?          @map("source_employee_id")
+  referredByCustomerId String?          @map("referred_by_customer_id") @db.Uuid
+  referredByName       String?          @map("referred_by_name") @db.VarChar(100)
+  salesInvoices        SalesInvoice[]
+  items                SalesOrderItem[]
+  createdByUser        User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
+  customer             Customer         @relation("CustomerSalesOrders", fields: [customerId], references: [id])
+  sourceEmployee       Employee?        @relation("SalesOrderSourceEmployee", fields: [sourceEmployeeId], references: [id])
+  referredByCustomer   Customer?        @relation("SalesOrderReferredBy", fields: [referredByCustomerId], references: [id])
 
   @@index([customerId])
   @@map("sales_orders")
@@ -1599,6 +1608,7 @@ model SalesInvoice {
   salesOrderId   Int?                  @map("sales_order_id")
   storeId        String?               @map("store_id") @db.VarChar(20)
   payments       Json?                 @default("[]") @map("payments")
+  narration      String?               @db.VarChar(2000)
   items          SalesInvoiceItem[]
   paymentRecords SalesInvoicePayment[]
   customer       Customer              @relation(fields: [customerId], references: [id])
@@ -1846,9 +1856,6 @@ enum ApprovalStatus {
 
 enum SalesOrderStatus {
   DRAFT
-  PENDING_MD_APPROVAL
-  MD_APPROVED
-  MD_REJECTED
   PENDING_CUSTOMER_APPROVAL
   CUSTOMER_APPROVED
   CUSTOMER_REJECTED

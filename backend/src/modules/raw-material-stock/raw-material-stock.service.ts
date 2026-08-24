@@ -47,30 +47,48 @@ class RawMaterialStockService {
     search?: string;
     storeId?: string;
     storeCategory?: string;
+    itemType?: string;
     categoryId?: string;
     status?: string;
     page?: number;
     limit?: number;
   }) {
     const whereClause: any = {};
+    const andConditions: any[] = [];
+
     if (query?.storeId) {
-      whereClause.storeId = query.storeId;
+      andConditions.push({ storeId: query.storeId });
     }
     if (query?.storeCategory) {
-      whereClause.store = { storeCategory: query.storeCategory };
+      andConditions.push({ store: { storeCategory: query.storeCategory } });
+    }
+    if (query?.itemType) {
+      if (query.itemType === "RAW_MATERIAL") {
+        andConditions.push({
+          OR: [{ itemType: "RAW_MATERIAL" }, { itemType: null }],
+        });
+      } else {
+        andConditions.push({ itemType: query.itemType });
+      }
     }
     if (query?.categoryId) {
-      whereClause.categoryId = Number(query.categoryId);
+      andConditions.push({ categoryId: Number(query.categoryId) });
     }
     if (query?.status) {
-      whereClause.status = query.status;
+      andConditions.push({ status: query.status });
     }
     if (query?.search) {
-      whereClause.OR = [
-        { materialName: { contains: query.search, mode: 'insensitive' } },
-        { rawMaterialId: { contains: query.search, mode: 'insensitive' } },
-        { batchNo: { contains: query.search, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { materialName: { contains: query.search, mode: 'insensitive' } },
+          { rawMaterialId: { contains: query.search, mode: 'insensitive' } },
+          { batchNo: { contains: query.search, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      whereClause.AND = andConditions;
     }
 
     const page = query?.page ?? 1;

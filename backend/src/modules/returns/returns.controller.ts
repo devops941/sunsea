@@ -36,6 +36,64 @@ class ReturnsController {
     }
   }
 
+  async getSalesReturnById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const data = await returnsService.getSalesReturnById(id);
+      return res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSalesReturn(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = createSalesReturnSchema.parse(req.body);
+      const updatedBy = (req as any).user?.id || (req as any).user?.userId;
+      const data = await returnsService.updateSalesReturn(id, input, updatedBy);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("salesReturn:updated", data);
+        if (data.status !== "DRAFT") {
+          io.emit("voucher:created", { source: "salesReturn" });
+          io.emit("payment:created", { source: "salesReturn" });
+          io.emit("accountLedger:updated", { source: "salesReturn" });
+        }
+      } catch (sErr) {
+        console.error("[Socket Emit Error] salesReturn:updated", sErr);
+      }
+
+      return res.status(200).json({ success: true, message: "Sales return updated", data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirmSalesReturn(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const data = await returnsService.confirmSalesReturn(id);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("salesReturn:updated", data);
+        io.emit("voucher:created", { source: "salesReturn" });
+        io.emit("payment:created", { source: "salesReturn" });
+        io.emit("accountLedger:updated", { source: "salesReturn" });
+      } catch (sErr) {
+        console.error("[Socket Emit Error] salesReturn:updated", sErr);
+      }
+
+      return res.status(200).json({ success: true, message: "Sales return confirmed & posted", data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getPurchaseReturns(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.query.companyId as string | undefined;

@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight, FaFilter, FaTimes, FaFileInvoice, FaPrint, FaDownload, FaEye, FaEdit } from "react-icons/fa";
+import { FaPlus, FaTimes, FaPrint, FaDownload } from "react-icons/fa";
+import { useAppSelector } from "../../../hooks/reduxHooks";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -10,29 +11,103 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import { salesOrderService } from "../../../services/salesOrderService";
+import { salesProductService } from "../../../services/salesProductService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-import { DISPATCH_TYPE_OPTIONS } from "../../../constants/selectOption";
+import { DISPATCH_TYPE_OPTIONS, ORDER_SOURCE_OPTIONS } from "../../../constants/selectOption";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
-import { DocumentPrintLayout } from "../../../components/common/DocumentPrintLayout";
-import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesOrderEstimateContent";
-import { FiClipboard, FiFileText } from "react-icons/fi";
+import { FiClipboard } from "react-icons/fi";
+import { SalesOrderDeliveryEstimate } from "../../../components/salesOrder/SalesOrderDeliveryEstimate";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import IconButton from "../../../components/ui/IconButton/IconButton";
+import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
+import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 
 
 const ITEMS_PER_PAGE = 10;
 
+// ─── Group raw order items by Sales Product (same logic as SalesOrderDetail) ──
+function groupItemsBySalesProduct(orderItems: any[], salesProducts: any[]) {
+    if (!salesProducts || salesProducts.length === 0) {
+        return orderItems.map((oi) => ({
+            id: oi.id || oi.productId,
+            product: {
+                productName: oi.product?.productName || `Product #${oi.productId}`,
+                productCode: oi.product?.productCode,
+            },
+            quantity: Number(oi.quantity || 0),
+            unit: oi.unit || "Pcs.",
+            remarks: oi.remarks || "",
+        }));
+    }
 
+    const result: any[] = [];
+    const processedIds = new Set<any>();
+
+    salesProducts.forEach((sp) => {
+        const spComps = (sp?.components || []).filter(
+            (c: any) => c.componentProduct?.productType === "SALES_PRODUCTION"
+        );
+        if (spComps.length === 0) return;
+
+        const matchingItems = orderItems.filter((oi) =>
+            spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
+        );
+        if (matchingItems.length === 0) return;
+
+        matchingItems.forEach((oi) => processedIds.add(oi.id || oi.productId));
+
+        // Derive the sales-product-level quantity (same formula as SalesOrderDetail)
+        const calcQty = Math.max(
+            ...matchingItems.map((oi) => {
+                const spComp = spComps.find(
+                    (c: any) => String(c.componentProductId) === String(oi.productId)
+                );
+                const perUnit = Number(spComp?.quantity || 1);
+                return Math.round(Number(oi.quantity || 1) / perUnit);
+            }),
+            1
+        );
+
+        result.push({
+            id: `sp-${sp.id}`,
+            product: {
+                productName: sp.salesProductName || sp.salesProductCode,
+                productCode: sp.salesProductCode,
+            },
+            quantity: calcQty,
+            unit: "Pcs.",
+            remarks: "",
+        });
+    });
+
+    // Remaining items not part of any sales product
+    orderItems
+        .filter((oi) => !processedIds.has(oi.id || oi.productId))
+        .forEach((oi) => {
+            result.push({
+                id: oi.id || oi.productId,
+                product: {
+                    productName: oi.product?.productName || `Product #${oi.productId}`,
+                    productCode: oi.product?.productCode,
+                },
+                quantity: Number(oi.quantity || 0),
+                unit: oi.unit || "Pcs.",
+                remarks: oi.remarks || "",
+            });
+        });
+
+    return result;
+}
 
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
     const { can } = usePermission();
-    const isGstUser = true;
+    const company = useAppSelector((state) => state.company.data);
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();
@@ -46,12 +121,21 @@ const AllSalesOrderList: React.FC = () => {
     const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
     const [loadingEstimate, setLoadingEstimate] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
+    // Remarks typed by the user — outer key = orderId, inner key = itemId
+    // Persists across close/reopen of the same order
+    const [remarksMap, setRemarksMap] = useState<Record<number, Record<string | number, string>>>({});
+
+    // Convenience: remarks for the currently open order
+    const itemRemarks: Record<string | number, string> =
+        estimateOrder?.id ? (remarksMap[estimateOrder.id] ?? {}) : {};
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleDeleteConfirm = async () => {
-        if (itemToDelete === null) return;
+        if (itemToDelete === null || isDeleting) return;
+        setIsDeleting(true);
         try {
             await salesOrderService.delete(itemToDelete);
             toast.success("Sales order deleted successfully!");
@@ -59,8 +143,9 @@ const AllSalesOrderList: React.FC = () => {
             setItemToDelete(null);
             fetchOrders();
         } catch (error: any) {
-            console.error("❌ Delete error:", error);
             toast.error(error?.response?.data?.message || "Failed to delete order");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -122,8 +207,7 @@ const AllSalesOrderList: React.FC = () => {
                 const pdfUrl = pdf.output("bloburl");
                 window.open(pdfUrl, "_blank");
             }
-        } catch (err) {
-            console.error(err);
+        } catch {
             toast.error(`Failed to ${action} PDF`);
         } finally {
             setGeneratingPdf(false);
@@ -131,12 +215,24 @@ const AllSalesOrderList: React.FC = () => {
     };
 
     const handleOpenEstimate = async (salesOrderId: number) => {
+        // Do NOT reset remarks — preserve previously typed values for this order
         setLoadingEstimate(true);
         setShowEstimateModal(true);
         setEstimateOrder(null);
         try {
-            const orderData = await salesOrderService.fetchById(salesOrderId);
-            setEstimateOrder(orderData);
+            const [orderData, salesProducts] = await Promise.all([
+                salesOrderService.fetchById(salesOrderId),
+                salesProductService.fetchAll().catch(() => []),
+            ]);
+
+            // Group items by sales product (e.g. "Arasan Bucket") instead of
+            // showing individual components (20L Bucket, Bucket Lid, …)
+            const groupedItems = groupItemsBySalesProduct(
+                orderData.items || [],
+                Array.isArray(salesProducts) ? salesProducts : []
+            );
+
+            setEstimateOrder({ ...orderData, items: groupedItems });
         } catch (error) {
             toast.error("Failed to load sales order estimate");
             setShowEstimateModal(false);
@@ -145,29 +241,38 @@ const AllSalesOrderList: React.FC = () => {
         }
     };
 
-    const handleItemRemarksChange = (itemId: string | number, newRemarks: string) => {
-        if (!estimateOrder) return;
-        setEstimateOrder((prev: any) => ({
-            ...prev,
-            items: prev.items.map((item: any) =>
-                String(item.id) === String(itemId) ? { ...item, remarks: newRemarks } : item
-            ),
-        }));
-    };
-
+    // Merge typed remarks into order items for PDF rendering
+    const estimateOrderForPdf = estimateOrder
+        ? {
+              ...estimateOrder,
+              items: estimateOrder.items?.map((item: any) => ({
+                  ...item,
+                  remarks:
+                      itemRemarks[item.id] !== undefined
+                          ? itemRemarks[item.id]
+                          : item.remarks ?? "",
+              })),
+          }
+        : null;
 
     // ─── Filters ────────────────────────────────────────────────
+    const { customerGrades } = useCustomerGrades();
+    const { customerTypes } = useCustomerTypes();
     const [fromDate, setFromDate] = useState("");
     const [toDate, setToDate] = useState("");
-    const [dispatchType, setDispatchType] = useState("");
+    const [customerGradeId, setCustomerGradeId] = useState("");
+    const [customerTypeId, setCustomerTypeId] = useState("");
+    const [orderSource, setOrderSource] = useState("");
 
     // ── Draft values inside the popover (only applied on "Apply") ──
     const [draftFromDate, setDraftFromDate] = useState("");
     const [draftToDate, setDraftToDate] = useState("");
-    const [draftDispatchType, setDraftDispatchType] = useState("");
+    const [draftCustomerGradeId, setDraftCustomerGradeId] = useState("");
+    const [draftCustomerTypeId, setDraftCustomerTypeId] = useState("");
+    const [draftOrderSource, setDraftOrderSource] = useState("");
 
-    const hasActiveFilters = !!(fromDate || toDate || dispatchType);
-    const activeFilterCount = [fromDate, toDate, dispatchType].filter(Boolean).length;
+    const hasActiveFilters = !!(fromDate || toDate || customerGradeId || customerTypeId || orderSource);
+    const activeFilterCount = [fromDate, toDate, customerGradeId, customerTypeId, orderSource].filter(Boolean).length;
 
     const fetchOrders = useCallback(async () => {
         if (!can("sales-orders.view")) return;
@@ -179,7 +284,10 @@ const AllSalesOrderList: React.FC = () => {
                 search: searchTerm || undefined,
                 fromDate: fromDate || undefined,
                 toDate: toDate || undefined,
-                dispatchType: dispatchType || undefined,
+                customerGradeId: customerGradeId || undefined,
+                customerTypeId: customerTypeId || undefined,
+                orderSource: orderSource || undefined,
+                docType: "SO",
                 status: [
                     "DRAFT",
                     "CONFIRMED",
@@ -196,13 +304,12 @@ const AllSalesOrderList: React.FC = () => {
             setData(response.data || []);
             setTotal(Math.ceil((response.total ?? 0) / ITEMS_PER_PAGE));
         } catch (error: any) {
-            console.error("❌ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch orders");
             setData([]);
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm, fromDate, toDate, dispatchType, can]);
+    }, [currentPage, searchTerm, fromDate, toDate, customerGradeId, customerTypeId, orderSource, can]);
 
     useSocketSync("salesOrder", undefined, fetchOrders);
 
@@ -210,35 +317,43 @@ const AllSalesOrderList: React.FC = () => {
     useEffect(() => {
         const timer = setTimeout(() => {
             fetchOrders();
-        }, 500);
+        }, 300);
         return () => clearTimeout(timer);
     }, [fetchOrders]);
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
-    };
+    }, []);
 
     const handleOpenFilter = () => {
         setDraftFromDate(fromDate);
         setDraftToDate(toDate);
-        setDraftDispatchType(dispatchType);
+        setDraftCustomerGradeId(customerGradeId);
+        setDraftCustomerTypeId(customerTypeId);
+        setDraftOrderSource(orderSource);
     };
 
     const handleApplyFilters = () => {
         setFromDate(draftFromDate);
         setToDate(draftToDate);
-        setDispatchType(draftDispatchType);
+        setCustomerGradeId(draftCustomerGradeId);
+        setCustomerTypeId(draftCustomerTypeId);
+        setOrderSource(draftOrderSource);
         setCurrentPage(1);
     };
 
     const handleClearFilters = () => {
         setDraftFromDate("");
         setDraftToDate("");
-        setDraftDispatchType("");
+        setDraftCustomerGradeId("");
+        setDraftCustomerTypeId("");
+        setDraftOrderSource("");
         setFromDate("");
         setToDate("");
-        setDispatchType("");
+        setCustomerGradeId("");
+        setCustomerTypeId("");
+        setOrderSource("");
         setCurrentPage(1);
     };
 
@@ -248,17 +363,17 @@ const AllSalesOrderList: React.FC = () => {
         return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
     };
 
-    const handleOpenView = (id: number) => {
+    const handleOpenView = useCallback((id: number) => {
         navigate(`/sales-order/details/${id}`);
-    };
+    }, [navigate]);
 
     const handleOpenEdit = useCallback((item: any) => {
         navigate(`/sales-order/edit/${item.id}`, { state: item });
     }, [navigate]);
 
-    const handleOpenAdd = () => {
+    const handleOpenAdd = useCallback(() => {
         navigate("/sales-order/create");
-    };
+    }, [navigate]);
 
     return (
         <div>
@@ -304,22 +419,44 @@ const AllSalesOrderList: React.FC = () => {
                                 />
 
                                 <SelectInput
-                                    label="Dispatch Type"
-                                    name="dispatchType"
-                                    value={draftDispatchType}
-                                    defaultOptionLabel="All"
-                                    options={DISPATCH_TYPE_OPTIONS}
+                                    label="Customer Type"
+                                    name="customerTypeId"
+                                    value={draftCustomerTypeId}
+                                    defaultOptionLabel="All Types"
+                                    options={customerTypes.map((t) => ({ label: t.name, value: String(t.id) }))}
                                     searchable={false}
-                                    onChange={(e) => setDraftDispatchType(e.target.value)}
+                                    onChange={(e) => setDraftCustomerTypeId(e.target.value)}
+                                />
+
+                                <SelectInput
+                                    label="Customer Grade"
+                                    name="customerGradeId"
+                                    value={draftCustomerGradeId}
+                                    defaultOptionLabel="All Grades"
+                                    options={customerGrades.map((g) => ({ label: g.name, value: String(g.id) }))}
+                                    searchable={false}
+                                    onChange={(e) => setDraftCustomerGradeId(e.target.value)}
+                                />
+
+                                <SelectInput
+                                    label="Order Source"
+                                    name="orderSource"
+                                    value={draftOrderSource}
+                                    defaultOptionLabel="All Sources"
+                                    options={ORDER_SOURCE_OPTIONS}
+                                    searchable={false}
+                                    onChange={(e) => setDraftOrderSource(e.target.value)}
                                 />
                             </div>
                         </FilterPopover>
 
-                        <CustomButton
-                            text="Add Sales Order"
-                            icon={FaPlus}
-                            onClick={handleOpenAdd}
-                        />
+                        {can("sales-orders.create") && (
+                            <CustomButton
+                                text="Add Sales Order"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -358,7 +495,7 @@ const AllSalesOrderList: React.FC = () => {
                                     <IconButton
                                         icon={FiClipboard}
                                         variant="info"
-                                        title={isGstUser ? "Print / View Sales Order" : "View Estimated Pricing"}
+                                        title="Print / View Sales Order"
                                         onClick={() => handleOpenEstimate(item.id)}
                                     />
                                     {can("sales-orders.edit") && item.status !== "CONFIRMED" && <EditButton onClick={() => handleOpenEdit(item)} />}
@@ -385,7 +522,7 @@ const AllSalesOrderList: React.FC = () => {
                             {/* Header */}
                             <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
                                 <h3 className="text-lg font-bold text-ink">
-                                    {isGstUser ? "Sales Order Confirmation" : "Sales Order Estimate"}
+                                    Sales Order Confirmation
                                 </h3>
                                 <button
                                     onClick={() => setShowEstimateModal(false)}
@@ -396,23 +533,29 @@ const AllSalesOrderList: React.FC = () => {
                             </div>
 
                             {/* Body */}
-                            <div className="p-6 bg-card-2 min-h-[400px]">
+                            <div className="p-6 bg-card-2 min-h-[400px] max-h-[calc(100vh-200px)] overflow-y-auto">
                                 {loadingEstimate ? (
                                     <div className="flex flex-col items-center justify-center py-20 h-full">
                                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
                                         <span className="mt-4 text-ink-subtle font-semibold">Loading details...</span>
                                     </div>
                                 ) : estimateOrder ? (
-                                    <DocumentPrintLayout
-                                        subtitle="Sales Order"
-                                        title={isGstUser ? "SALES ORDER" : "ESTIMATE"}
-                                    >
-                                        <SalesOrderEstimateContent
-                                            estimateOrder={estimateOrder}
-                                            formatDate={formatDate}
-                                            onItemRemarksChange={handleItemRemarksChange}
-                                        />
-                                    </DocumentPrintLayout>
+                                    <SalesOrderDeliveryEstimate
+                                        order={estimateOrder}
+                                        company={company}
+                                        formatDate={formatDate}
+                                        isEditable={true}
+                                        itemRemarks={itemRemarks}
+                                        onItemRemarksChange={(id, val) =>
+                                            setRemarksMap((prev) => ({
+                                                ...prev,
+                                                [estimateOrder.id]: {
+                                                    ...(prev[estimateOrder.id] ?? {}),
+                                                    [id]: val,
+                                                },
+                                            }))
+                                        }
+                                    />
                                 ) : (
                                     <div className="text-center py-10 text-ink-subtle">
                                         Failed to load sales order details.
@@ -428,14 +571,7 @@ const AllSalesOrderList: React.FC = () => {
                                             text="Print"
                                             icon={FaPrint}
                                             onClick={() => window.print()}
-                                            variant="primary"
-                                        />
-                                        <CustomButton
-                                            text={generatingPdf ? "Generating..." : "View PDF"}
-                                            icon={FaEye}
-                                            onClick={() => generatePdf("view")}
                                             variant="secondary"
-                                            disabled={generatingPdf}
                                         />
                                         <CustomButton
                                             text={generatingPdf ? "Downloading..." : "Download PDF"}
@@ -453,28 +589,24 @@ const AllSalesOrderList: React.FC = () => {
             )}
 
             {/* Print-Only Estimate Section */}
-            {estimateOrder && (
+            {estimateOrderForPdf && (
                 <div id="print-only-estimate-section" className="hidden print:block">
-                    <DocumentPrintLayout subtitle="Sales Order" title={isGstUser ? "SALES ORDER" : "ESTIMATE"}>
-                        <SalesOrderEstimateContent
-                            estimateOrder={estimateOrder}
-                            formatDate={formatDate}
-                            isEditable={false}
-                        />
-                    </DocumentPrintLayout>
+                    <SalesOrderDeliveryEstimate
+                        order={estimateOrderForPdf}
+                        company={company}
+                        formatDate={formatDate}
+                    />
                 </div>
             )}
 
             {/* Off-screen section for PDF generation */}
-            {estimateOrder && (
+            {estimateOrderForPdf && (
                 <div id="pdf-estimate-section" style={{ position: "absolute", left: "-9999px", top: "0", width: "794px", minHeight: "1123px", background: "white" }}>
-                    <DocumentPrintLayout subtitle="Sales Order" title={isGstUser ? "SALES ORDER" : "ESTIMATE"}>
-                        <SalesOrderEstimateContent
-                            estimateOrder={estimateOrder}
-                            formatDate={formatDate}
-                            isEditable={false}
-                        />
-                    </DocumentPrintLayout>
+                    <SalesOrderDeliveryEstimate
+                        order={estimateOrderForPdf}
+                        company={company}
+                        formatDate={formatDate}
+                    />
                 </div>
             )}
 
@@ -487,6 +619,9 @@ const AllSalesOrderList: React.FC = () => {
                 message="Are you sure you want to delete this sales order? This action cannot be undone."
                 confirmText="Delete"
                 confirmVariant="danger"
+                isDangerous={true}
+                isLoading={isDeleting}
+                loadingText="Deleting..."
             />
         </div>
     );

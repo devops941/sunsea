@@ -58,6 +58,9 @@ export interface Customer {
   status: string;
   addresses?: CustomerAddress[];
   transports?: CustomerTransport[];
+  netBalance?: number;
+  balanceAmount?: number;
+  balanceType?: string;
   createdAt: string;
   updatedAt: string;
   createdUser?: {
