@@ -262,7 +262,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
   },
   {
     id: "stores",
-    groupName: "Store & Locations",
+    groupName: "Store",
     icon: <FaLayerGroup />,
     colorId: "stores",
     modules: [

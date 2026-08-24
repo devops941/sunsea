@@ -86,6 +86,8 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
         dispatch(fetchRawMaterialStocks({
             search: debouncedSearch || undefined,
             storeId: activeStoreId || undefined,
+            storeCategory: "RAW_MATERIAL",
+            itemType: "RAW_MATERIAL",
             categoryId: appliedCategory || undefined,
             status: appliedStatus || undefined,
             page: currentPage,
@@ -231,6 +233,7 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             />
                         )}
                     </div>
+                    
                 </div>
 
                 {/* Table */}

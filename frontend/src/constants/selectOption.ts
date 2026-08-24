@@ -18,6 +18,24 @@ export const ORDER_TYPE_OPTIONS = [
     { value: "reference", label: "Reference" },
 ];
 
+// New 7-type Order Source options (replaces ORDER_TYPE_OPTIONS for new orders)
+export const ORDER_SOURCE_OPTIONS = [
+    { value: "SALES_PERSON",  label: "Sales Person" },
+    { value: "TELE_CALLING",  label: "Tele Calling" },
+    { value: "WALK_IN",       label: "Walk-in" },
+    { value: "WHATSAPP",      label: "WhatsApp" },
+    { value: "REFERRAL",      label: "Referral" },
+    { value: "REPEAT_ORDER",  label: "Repeat Order" },
+    { value: "DEALER_AGENT",  label: "Dealer / Agent" },
+];
+
+// Sources that require an employee link
+export const ORDER_SOURCE_NEEDS_EMPLOYEE = ["SALES_PERSON", "TELE_CALLING", "WALK_IN", "WHATSAPP"];
+// Sources that require referral info (customer or name)
+export const ORDER_SOURCE_NEEDS_REFERRAL = ["REFERRAL"];
+// Sources that require dealer/agent name
+export const ORDER_SOURCE_NEEDS_DEALER   = ["DEALER_AGENT"];
+
 export const COLOUR_OPTIONS = [
     { value: "sc", label: "Single Color" },
     { value: "mc", label: "Multi Color" },

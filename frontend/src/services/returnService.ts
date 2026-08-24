@@ -29,7 +29,14 @@ export interface SalesReturn {
   status: string;
   narration?: string | null;
   createdAt: string;
-  customer?: { id: string; firmName: string; customerCode: string };
+  customer?: {
+    id: string;
+    firmName: string;
+    customerCode?: string;
+    customerGradeId?: number | null;
+    customerGrade?: { id: number; name: string } | null;
+    grade?: string | null;
+  };
   items: SalesReturnItem[];
 }
 
@@ -40,6 +47,7 @@ export interface CreateSalesReturnDto {
   refundMode?: "CREDIT_NOTE" | "CASH" | "BANK";
   narration?: string;
   companyId: string;
+  status?: "DRAFT" | "APPROVED" | "COMPLETED";
   items: {
     productId: number;
     salesInvoiceItemId?: string;
@@ -103,6 +111,21 @@ export const returnService = {
 
   createSalesReturn: async (data: CreateSalesReturnDto): Promise<SalesReturn> => {
     const response = await apiClient.post("/returns/sales", data);
+    return response.data?.data;
+  },
+
+  fetchSalesReturnById: async (id: string): Promise<SalesReturn> => {
+    const response = await apiClient.get(`/returns/sales/${id}`);
+    return response.data?.data;
+  },
+
+  updateSalesReturn: async (id: string, data: CreateSalesReturnDto): Promise<SalesReturn> => {
+    const response = await apiClient.put(`/returns/sales/${id}`, data);
+    return response.data?.data;
+  },
+
+  confirmSalesReturn: async (id: string): Promise<SalesReturn> => {
+    const response = await apiClient.patch(`/returns/sales/${id}/confirm`);
     return response.data?.data;
   },
 

@@ -37,6 +37,8 @@ export const CreateSalesInvoiceSchema = z.object({
   ),
   payments: z.array(PaymentSchema).optional().default([]),
   items: z.array(ItemSchema).min(1, "At least one item is required"),
+  status: z.string().optional(),
+  narration: z.string().optional().nullable(),
 });
 
 export const UpdateSalesInvoiceSchema = CreateSalesInvoiceSchema.partial();

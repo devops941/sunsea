@@ -8,8 +8,6 @@ import {
     updateSalesOrderSchema,
     salesOrderIdSchema,
     salesOrderQuerySchema,
-    submitForMdApprovalSchema,
-    reopenSalesOrderSchema,
 } from "./sales-order.validation";
 import { requirePermission, requireAnyPermission } from "../../middleware/permission.middleware";
 
@@ -115,44 +113,11 @@ router.delete(
 // ─── Workflow actions ────────────────────────────────────────────────
 
 router.patch(
-    "/:id/submit-approval",
-    authMiddleware,
-    requirePermission("sales-orders.edit"),
-    validateMiddleware(submitForMdApprovalSchema),
-    SalesOrderController.submitForApproval
-);
-
-router.patch(
-    "/:id/approve",
-    authMiddleware,
-    requirePermission("pending-quotations.edit"),
-    validateMiddleware(salesOrderIdSchema),
-    SalesOrderController.approveOrder
-);
-
-// Same action, accessible with sales-orders.edit (for MD/admin direct approval from quotation list)
-router.patch(
-    "/:id/md-approve",
+    "/:id/confirm",
     authMiddleware,
     requirePermission("sales-orders.edit"),
     validateMiddleware(salesOrderIdSchema),
-    SalesOrderController.approveOrder
-);
-
-router.patch(
-    "/:id/reject",
-    authMiddleware,
-    requirePermission("pending-quotations.edit"),
-    validateMiddleware(salesOrderIdSchema),
-    SalesOrderController.rejectOrder
-);
-
-router.patch(
-    "/:id/reopen",
-    authMiddleware,
-    requirePermission("sales-orders.edit"),
-    validateMiddleware(reopenSalesOrderSchema),
-    SalesOrderController.reopen
+    SalesOrderController.confirmOrder
 );
 
 router.patch(

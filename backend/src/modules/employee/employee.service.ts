@@ -493,8 +493,8 @@ class EmployeeService {
     const linkedStores = await prisma.store.findFirst({ where: { inchargeId: id } });
     if (linkedStores) throw new ApiError(400, "Cannot delete employee because they are assigned as Incharge for a Store.");
 
-    const linkedCustomers = await prisma.customer.findFirst({ where: { collectionAgentId: id } });
-    if (linkedCustomers) throw new ApiError(400, "Cannot delete employee because they are assigned as a Collection Agent for a Customer.");
+    const linkedSalesOrders = await prisma.salesOrder.findFirst({ where: { sourceEmployeeId: id } });
+    if (linkedSalesOrders) throw new ApiError(400, "Cannot delete employee because they are linked as Source Employee on Sales Orders.");
 
     // explicitly delete linked records first to prevent RESTRICT foreign key constraint failures
     return prisma.$transaction(async (tx) => {

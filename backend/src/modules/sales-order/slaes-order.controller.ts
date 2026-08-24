@@ -42,7 +42,13 @@ class SalesOrderController {
             pageSize: req.query.pageSize ? Number(req.query.pageSize) : 20,
             customerId: req.query.customerId as string,
             orderNo: req.query.orderNo as string,
+            docType: req.query.docType ? (req.query.docType as string).toUpperCase() : undefined,
+            customerGradeId: req.query.customerGradeId ? Number(req.query.customerGradeId) : undefined,
+            customerTypeId: req.query.customerTypeId ? Number(req.query.customerTypeId) : undefined,
             orderType: req.query.orderType as string | undefined,
+            orderSource: req.query.orderSource as string | undefined,
+            dispatchType: req.query.dispatchType as string | undefined,
+            sourceEmployeeId: req.query.sourceEmployeeId ? Number(req.query.sourceEmployeeId) : undefined,
             status: this.parseSalesOrderStatuses(req.query.status),
             search: req.query.search as string,
             fromDate: req.query.fromDate as string,
@@ -77,29 +83,6 @@ class SalesOrderController {
         return res.status(200).json(new ApiResponse("Next sales order code fetched successfully", { nextCode }));
     });
 
-    submitForApproval = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.submitForApproval(Number(req.params.id), getPerms(req));
-        getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(new ApiResponse("Sales Order submitted for approval", order));
-    });
-
-    reopen = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.reopen(Number(req.params.id), getPerms(req));
-        getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(new ApiResponse("Sales Order reopened for editing", order));
-    });
-
-    approveOrder = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.approveOrder(Number(req.params.id), getPerms(req));
-        getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(new ApiResponse("Sales Order approved successfully", order));
-    });
-
-    rejectOrder = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.rejectOrder(Number(req.params.id), getPerms(req));
-        getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(new ApiResponse("Sales Order rejected", order));
-    });
 
     getStatus = asyncHandler(async (req: Request, res: Response) => {
         const status = await salesOrderService.getOrderStatus(Number(req.params.id), getPerms(req));
@@ -148,6 +131,12 @@ class SalesOrderController {
             attachments: [{ filename, content: pdfBuffer }],
         });
         return res.status(200).json(new ApiResponse("Email sent successfully!"));
+    });
+
+    confirmOrder = asyncHandler(async (req: Request, res: Response) => {
+        const order = await salesOrderService.confirmOrder(Number(req.params.id), getPerms(req));
+        getIO().emit("salesOrder:updated", order);
+        return res.status(200).json(new ApiResponse("Order confirmed successfully", order));
     });
 
     convertToSalesOrder = asyncHandler(async (req: Request, res: Response) => {

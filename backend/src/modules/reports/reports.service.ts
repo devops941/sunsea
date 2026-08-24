@@ -243,10 +243,7 @@ class ReportsService {
     orderNo?: string,
     customerId?: string,
     status?: string,
-    mdApprovalStatus?: string,
-    customerApprovalStatus?: string,
     salesPersonName?: string,
-    dispatchType?: string,
     orderType?: string,
     productionStatus?: string,
     page: number = 1,
@@ -266,10 +263,7 @@ class ReportsService {
     if (orderNo) whereClause.orderNo = { contains: orderNo, mode: 'insensitive' };
     if (customerId) whereClause.customerId = customerId;
     if (status) whereClause.status = status;
-    if (mdApprovalStatus) whereClause.mdApprovalStatus = mdApprovalStatus;
-    if (customerApprovalStatus) whereClause.customerApprovalStatus = customerApprovalStatus;
     if (salesPersonName) whereClause.salesPersonName = { contains: salesPersonName, mode: 'insensitive' };
-    if (dispatchType) whereClause.dispatchType = { contains: dispatchType, mode: 'insensitive' };
     if (orderType) whereClause.orderType = { contains: orderType, mode: 'insensitive' };
     if (productionStatus) whereClause.productionStatus = productionStatus;
 
@@ -311,12 +305,7 @@ class ReportsService {
         itemsCount: so.items.length,
         netAmount: Number(so.netAmount),
         status: so.status,
-        dispatchType: so.dispatchType,
-        mdApprovalStatus: so.mdApprovalStatus,
-        customerApprovalStatus: so.customerApprovalStatus,
         totalQty: so.items.reduce((sum, item) => sum + Number(item.quantity), 0),
-        billingAddress: `${so.billingAddressLine1 || ''} ${so.billingCity || ''} ${so.billingState || ''} ${so.billingPincode || ''}`.trim(),
-        shippingAddress: `${so.shippingAddressLine1 || ''} ${so.shippingCity || ''} ${so.shippingState || ''} ${so.shippingPincode || ''}`.trim(),
         totalDiscount: Number(so.totalDiscount || 0),
         orderDiscountType: so.orderDiscountType,
         orderDiscountValue: Number(so.orderDiscountValue || 0),

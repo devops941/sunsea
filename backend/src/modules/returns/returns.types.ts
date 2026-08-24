@@ -18,6 +18,7 @@ export const createSalesReturnSchema = z.object({
   refundMode: z.enum(["CREDIT_NOTE", "CASH", "BANK"]).optional().default("CREDIT_NOTE"),
   narration: z.string().max(500).optional(),
   companyId: z.string().uuid(),
+  status: z.enum(["DRAFT", "APPROVED", "COMPLETED"]).optional().default("APPROVED"),
   items: z.array(salesReturnItemSchema).min(1, "At least one item is required"),
 });
 

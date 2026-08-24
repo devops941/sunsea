@@ -1,240 +1,366 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface EstimateItem {
+    id: string | number;
+    productId?: string | number;
+    product?: {
+        id?: string | number;
+        productName?: string;
+        productCode?: string;
+    };
+    quantity: number | string;
+    unitPrice?: number | string | null;
+    lineTotal?: number | string | null;
+}
+
+interface EstimateCustomer {
+    id?: string | number;
+    displayName?: string;
+    firmName?: string;
+    customerCode?: string;
+    openingBalance?: number | string | null;
+    openingBalanceType?: string | null; // "CREDIT" | "DEBIT"
+}
 
 interface SalesOrderEstimateContentProps {
     estimateOrder: {
-        customer?: {
-            displayName?: string;
-            firmName?: string;
-        };
+        id?: number;
+        orderNo?: string;
+        orderDate?: string | Date;
+        customer?: EstimateCustomer;
+        items?: EstimateItem[];
+        subtotal?: number | string | null;
+        totalDiscount?: number | string | null;
+        orderDiscountValue?: number | string | null;
+        orderDiscountType?: string | null;
+        netAmount?: number | string | null;
+        // kept for backwards compat — unused in new layout
         billingAddressLine1?: string;
         billingCity?: string;
         billingState?: string;
         billingPincode?: string;
-        orderNo?: string;
-        orderDate?: string | Date;
-        items?: Array<{
-            id: string | number;
-            product?: {
-                productName?: string;
-                uom?: {
-                    uomName?: string;
-                };
-            };
-            quantity: number | string;
-            remarks?: string;
-            notes?: string;
-        }>;
     };
     formatDate: (dateStr: any) => string;
+    /** unused in new layout — kept for interface compatibility */
     onItemRemarksChange?: (itemId: string | number, remarks: string) => void;
-    /** Set explicitly to false when rendering for Print / PDF export so inputs collapse to plain text */
     isEditable?: boolean;
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const n = (val: any, decimals = 2) =>
+    Number(val ?? 0).toLocaleString("en-IN", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+
+const SEPARATOR = "─".repeat(70);
+const SHORT_SEP = "─".repeat(18);
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps> = ({
     estimateOrder,
     formatDate,
-    onItemRemarksChange,
-    isEditable = true,
 }) => {
-    // Internal fallback state so the field is editable even if the parent
-    // doesn't pass onItemRemarksChange. Keyed by item id.
-    const [localRemarks, setLocalRemarks] = useState<Record<string | number, string>>({});
+    const cust = estimateOrder.customer as any;
+    const customerName = cust?.displayName || cust?.firmName || "—";
+    const customerCode = cust?.customerCode || cust?.id || "—";
+    const openingBalance = Number(cust?.openingBalance ?? 0);
+    const openingBalanceType = (cust?.openingBalanceType || "CREDIT").toUpperCase();
 
-    useEffect(() => {
-        // seed local state whenever the incoming items change (e.g. new order loaded)
-        const seeded: Record<string | number, string> = {};
-        estimateOrder.items?.forEach((item) => {
-            seeded[item.id] = item.remarks !== undefined ? item.remarks : (item.notes || "");
-        });
-        setLocalRemarks(seeded);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [estimateOrder.items?.map((i) => i.id).join(",")]);
+    const orderNo = estimateOrder.orderNo || "—";
+    const orderDate = formatDate(estimateOrder.orderDate);
 
-    const getValue = (item: NonNullable<typeof estimateOrder.items>[number]) => {
-        if (isEditable && localRemarks[item.id] !== undefined) return localRemarks[item.id];
-        return item.remarks !== undefined ? item.remarks : (item.notes || "");
-    };
+    const items: EstimateItem[] = estimateOrder.items || [];
+    const subtotal = Number(estimateOrder.subtotal ?? 0);
+    const totalDiscount = Number(estimateOrder.totalDiscount ?? 0);
+    const discountPct = Number(estimateOrder.orderDiscountValue ?? 0);
+    const netAmount = Number(estimateOrder.netAmount ?? 0);
 
-    const handleChange = (itemId: string | number, value: string) => {
-        setLocalRemarks((prev) => ({ ...prev, [itemId]: value }));
-        onItemRemarksChange?.(itemId, value);
-    };
+    const isInterState = Boolean((estimateOrder as any).isInterState);
 
-    const extractAddress = () => {
-        const isValid = (val?: any) => val && typeof val === "string" && val.trim() !== "" && val.trim() !== "-";
-        const cust = estimateOrder.customer as any;
+    let totalCgst = Number((estimateOrder as any).totalCgst ?? 0);
+    let totalSgst = Number((estimateOrder as any).totalSgst ?? 0);
+    let totalIgst = Number((estimateOrder as any).totalIgst ?? 0);
 
-        let line1 = estimateOrder.billingAddressLine1 || cust?.billingAddressLine1 || "";
-        let city = estimateOrder.billingCity || cust?.billingCity || "";
-        let state = estimateOrder.billingState || cust?.billingState || "";
-        let pincode = estimateOrder.billingPincode || cust?.billingPincode || "";
+    if (totalCgst === 0 && totalSgst === 0 && totalIgst === 0) {
+        items.forEach((it: any) => {
+            const itemCgst = Number(it.cgstAmount ?? 0);
+            const itemSgst = Number(it.sgstAmount ?? 0);
+            const itemIgst = Number(it.igstAmount ?? 0);
+            const itemGst = Number(it.gstAmount ?? 0);
 
-        if (!isValid(line1) && Array.isArray(cust?.addresses) && cust.addresses.length > 0) {
-            const billingObj = cust.addresses.find((a: any) => a.addressType === "BILLING" || a.type === "BILLING") || cust.addresses[0];
-            const addr = billingObj?.address || billingObj;
-            if (addr) {
-                if (!isValid(line1)) line1 = addr.addressLine1 || addr.addressLine || addr.street || "";
-                if (!isValid(city)) city = addr.city || "";
-                if (!isValid(state)) state = addr.state || "";
-                if (!isValid(pincode)) pincode = addr.pincode || addr.zipCode || "";
+            if (itemCgst > 0 || itemSgst > 0 || itemIgst > 0) {
+                totalCgst += itemCgst;
+                totalSgst += itemSgst;
+                totalIgst += itemIgst;
+            } else if (itemGst > 0) {
+                if (isInterState) {
+                    totalIgst += itemGst;
+                } else {
+                    totalCgst += itemGst / 2;
+                    totalSgst += itemGst / 2;
+                }
             }
+        });
+    }
+
+    const taxDiff = netAmount - (subtotal - totalDiscount);
+    if (totalCgst === 0 && totalSgst === 0 && totalIgst === 0 && taxDiff > 0.009) {
+        if (isInterState) {
+            totalIgst = taxDiff;
+        } else {
+            totalCgst = taxDiff / 2;
+            totalSgst = taxDiff / 2;
         }
+    }
 
-        const cleanLine1 = isValid(line1) ? String(line1) : "";
-        const cleanCity = isValid(city) ? String(city) : "";
-        const cleanState = isValid(state) ? String(state) : "";
-        const cleanPincode = isValid(pincode) ? String(pincode) : "";
-        const cityStatePin = [cleanCity, cleanState].filter(Boolean).join(", ") + (cleanPincode ? ` - ${cleanPincode}` : "");
+    const totalTax = totalCgst + totalSgst + totalIgst;
+    const hasTax = totalTax > 0.009;
 
-        return { cleanLine1, cityStatePin };
+    const totalCess = Number((estimateOrder as any).totalCess ?? items.reduce((acc: number, it: any) => acc + Number(it.cessAmount || 0), 0));
+
+    const taxableBase = Math.max(0, subtotal - totalDiscount);
+
+    const cgstRates = Array.from(new Set(items.map((it: any) => Number(it.cgstRate || (Number(it.gstRate || 0) / 2) || 0)).filter((r: number) => r > 0)));
+    const cgstRateDisplay = cgstRates.length === 1 ? cgstRates[0] : (totalCgst > 0 && taxableBase > 0 ? (totalCgst / taxableBase) * 100 : null);
+
+    const sgstRates = Array.from(new Set(items.map((it: any) => Number(it.sgstRate || (Number(it.gstRate || 0) / 2) || 0)).filter((r: number) => r > 0)));
+    const sgstRateDisplay = sgstRates.length === 1 ? sgstRates[0] : (totalSgst > 0 && taxableBase > 0 ? (totalSgst / taxableBase) * 100 : null);
+
+    const igstRates = Array.from(new Set(items.map((it: any) => Number(it.igstRate || it.gstRate || 0)).filter((r: number) => r > 0)));
+    const igstRateDisplay = igstRates.length === 1 ? igstRates[0] : (totalIgst > 0 && taxableBase > 0 ? (totalIgst / taxableBase) * 100 : null);
+
+    const isOpBalDebit = openingBalanceType === "DEBIT" || openingBalanceType === "DR";
+    const signedOpBalance = isOpBalDebit ? openingBalance : -openingBalance;
+    const signedClosing = signedOpBalance + netAmount;
+    const closingBalance = Math.abs(signedClosing);
+    const closingBalanceType = signedClosing >= 0 ? "Dr" : "Cr";
+
+    const bundleCount = items.length;
+
+    // ─── Styles ───────────────────────────────────────────────────────────
+    const wrap: React.CSSProperties = {
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: "13px",
+        lineHeight: "1.7",
+        color: "#000",
+        background: "#fff",
+        padding: "28px 32px",
+        width: "100%",
+        boxSizing: "border-box",
     };
-
-    const { cleanLine1, cityStatePin } = extractAddress();
+    const row: React.CSSProperties = {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+    };
+    const sep: React.CSSProperties = {
+        borderTop: "1px dashed #000",
+        margin: "4px 0",
+    };
+    const th: React.CSSProperties = {
+        fontWeight: "bold",
+        paddingBottom: "2px",
+    };
+    const rightAlign: React.CSSProperties = { textAlign: "right" };
 
     return (
-        <div className="flex-1 flex flex-col justify-between">
-            <div>
-                {/* details-box */}
-                <div className="flex border-b border-black">
-                    {/* party-details */}
-                    <div className="flex-[1.2] border-r border-black p-3 text-[14px] leading-[1.5]">
-                        <div className="font-bold mb-1">Party Details :</div>
-                        <div className="font-semibold text-slate-800">
-                            {estimateOrder.customer?.displayName || estimateOrder.customer?.firmName || "N/A"}
-                        </div>
-                        <div className="text-slate-600 mt-1">
-                            {cleanLine1 && <div>{cleanLine1}</div>}
-                            {cityStatePin && <div>{cityStatePin}</div>}
-                            {!cleanLine1 && !cityStatePin && <div className="text-slate-400 italic">Address not specified</div>}
-                        </div>
-                    </div>
-                    {/* order-details */}
-                    <div className="flex-[0.8] p-3 text-[14px] leading-[1.6]">
-                        <div className="flex mb-1.5">
-                            <span className="w-[90px] font-bold">Order No.</span>
-                            <span className="flex-1">: {estimateOrder.orderNo}</span>
-                        </div>
-                        <div className="flex mb-1.5">
-                            <span className="w-[90px] font-bold">Dated</span>
-                            <span className="flex-1">: {formatDate(estimateOrder.orderDate)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* intro-text */}
-                <div className="px-3 py-2.5 text-[14px] border-b border-black text-slate-700">
-                    We are pleased to receive the order for the following items :
-                </div>
-
-                {/* items-table */}
-                <table className="w-full border-collapse text-[14px]">
-                    <thead>
-                        <tr style={{ height: "32px" }}>
-                            <th
-                                className="text-center border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]"
-                                style={{ width: "50px" }}
-                            >
-                                S.N.
-                            </th>
-                            <th className="text-left border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]">
-                                Description of Goods
-                            </th>
-                            <th
-                                className="text-right border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]"
-                                style={{ width: "90px" }}
-                            >
-                                Qty.
-                            </th>
-                            <th
-                                className="text-center border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]"
-                                style={{ width: "90px" }}
-                            >
-                                Unit
-                            </th>
-                            <th className="text-left border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]">
-                                Remarks
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {estimateOrder.items?.map((item, idx) => (
-                            <tr key={item.id} style={{ height: "28px" }}>
-                                <td
-                                    className="text-center border border-black px-2.5 py-0 align-middle"
-                                    style={{ width: "50px" }}
-                                >
-                                    {idx + 1}.
-                                </td>
-                                <td className="border border-black px-2.5 py-0 align-middle font-medium text-slate-800">
-                                    {item.product?.productName || "N/A"}
-                                </td>
-                                <td
-                                    className="text-right border border-black px-2.5 py-0 align-middle font-bold"
-                                    style={{ width: "90px" }}
-                                >
-                                    {item.quantity}
-                                </td>
-                                <td
-                                    className="text-center border border-black px-2.5 py-0 align-middle text-slate-600"
-                                    style={{ width: "90px" }}
-                                >
-                                    {item.product?.uom?.uomName || "Pcs."}
-                                </td>
-                                <td
-                                    className="border border-black px-2.5 py-0 align-middle text-slate-500"
-                                    style={{ width: "200px" }}
-                                >
-                                    {isEditable ? (
-                                        <input
-                                            type="text"
-                                            value={getValue(item)}
-                                            onChange={(e) => handleChange(item.id, e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-full bg-transparent border border-slate-300 rounded px-2 py-1 text-slate-700 text-sm focus:border-indigo-500 focus:outline-none"
-                                            placeholder="Add remarks..."
-                                        />
-                                    ) : (
-                                        getValue(item)
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {/* Clean empty rows filling out A4 sheet — always 25 total rows on a single page */}
-                        {Array.from({ length: Math.max(0, 25 - (estimateOrder.items?.length || 0)) }).map((_, idx) => (
-                            <tr key={`empty-${idx}`} style={{ height: "28px" }}>
-                                <td className="border border-black px-2.5 py-0 align-middle text-center"></td>
-                                <td className="border border-black px-2.5 py-0 align-middle"></td>
-                                <td className="border border-black px-2.5 py-0 align-middle"></td>
-                                <td className="border border-black px-2.5 py-0 align-middle"></td>
-                                <td className="border border-black px-2.5 py-0 align-middle"></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                    <tfoot>
-                        <tr className="font-bold bg-[#f7f7f7] border-t border-black" style={{ height: "32px" }}>
-                            <td colSpan={2} className="text-right border border-black px-4 py-0 align-middle font-bold text-[14px]">
-                                Grand Total
-                            </td>
-                            <td className="text-right border border-black px-2.5 py-0 align-middle font-bold text-[14px]">
-                                {(estimateOrder.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0)}{" "}
-                                {estimateOrder.items?.[0]?.product?.uom?.uomName || "Pcs."}
-                            </td>
-                            <td className="border border-black px-2.5 py-0 align-middle"></td>
-                            <td className="border border-black px-2.5 py-0 align-middle"></td>
-                        </tr>
-                    </tfoot>
-                </table>
+        <div style={wrap}>
+            {/* ── Title ── */}
+            <div style={{ textAlign: "center", letterSpacing: "8px", fontWeight: "bold", fontSize: "15px", marginBottom: "14px" }}>
+                E s t i m a t e
             </div>
 
-            {/* Authorised Signatory Block */}
-            <div className="mt-4 mb-3 flex justify-end px-4">
-                <div className="text-right pt-2 min-w-[200px]">
-                    <div className="text-[14px] font-semibold text-slate-700 mb-6">for ESTIMATE</div>
-                    <div className="font-bold text-[14px] text-slate-900 border-t border-black pt-1">
-                        Authorised Signatory
-                    </div>
-                </div>
+            {/* ── D.No. / Op.Balance ── */}
+            <div style={row}>
+                <span>D. No.&nbsp;&nbsp;: {customerCode}</span>
+                <span>
+                    Op. Balance :&nbsp;&nbsp;
+                    <strong>{n(openingBalance)}</strong>&nbsp;{openingBalanceType === "DEBIT" ? "Dr" : "Cr"}
+                </span>
+            </div>
+
+            <div style={sep} />
+
+            {/* ── To / No. / Date ── */}
+            <div style={row}>
+                <span>To :</span>
+                <span>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {orderNo}</span>
+            </div>
+            <div style={row}>
+                <strong>{customerName}</strong>
+                <span>Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {orderDate}</span>
+            </div>
+
+            <div style={sep} />
+
+            {/* ── Column Headers ── */}
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "4px" }}>
+                <colgroup>
+                    <col style={{ width: "40px" }} />
+                    <col />
+                    <col style={{ width: "68px" }} />
+                    <col style={{ width: "80px" }} />
+                    <col style={{ width: "100px" }} />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th style={{ ...th, textAlign: "left" }}>S.N.</th>
+                        <th style={{ ...th, textAlign: "left" }}>Particulars</th>
+                        <th style={{ ...th, textAlign: "right" }}>Pcs.</th>
+                        <th style={{ ...th, textAlign: "right" }}>Rate</th>
+                        <th style={{ ...th, textAlign: "right" }}>Amount</th>
+                    </tr>
+                    <tr>
+                        <td colSpan={5} style={{ padding: 0 }}><div style={sep} /></td>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {/* empty spacer row */}
+                    <tr><td colSpan={5} style={{ height: "6px" }} /></tr>
+
+                    {items.map((item, idx) => {
+                        const qty = Number(item.quantity ?? 0);
+                        const rate = Number(item.unitPrice ?? 0);
+                        const amount = Number(item.lineTotal ?? qty * rate);
+                        const name = item.product?.productName || `Product #${item.productId}`;
+
+                        return (
+                            <tr key={item.id}>
+                                <td style={{ verticalAlign: "top" }}>{idx + 1}.</td>
+                                <td style={{ paddingLeft: "2px" }}>{name}</td>
+                                <td style={{ ...rightAlign }}>{qty}</td>
+                                <td style={{ ...rightAlign }}>{n(rate)}</td>
+                                <td style={{ ...rightAlign }}>{n(amount)}</td>
+                            </tr>
+                        );
+                    })}
+
+                    {/* empty spacer row */}
+                    <tr><td colSpan={5} style={{ height: "6px" }} /></tr>
+
+                    {/* ── Sub Total ── */}
+                    <tr>
+                        <td colSpan={4} style={{ ...rightAlign, paddingRight: "4px" }}>
+                            <span style={{ paddingRight: "8px" }}>Sub Total</span>
+                        </td>
+                        <td style={{ borderTop: "1px solid #000", ...rightAlign, fontWeight: "bold" }}>
+                            {n(subtotal)}
+                        </td>
+                    </tr>
+
+                    {/* ── Discount ── */}
+                    {totalDiscount > 0 && (
+                        <tr>
+                            <td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>
+                                <span>Less : DISCOUNT (-)</span>
+                                {discountPct > 0 && (
+                                    <span>&nbsp;&nbsp;@&nbsp;&nbsp;{n(discountPct, 2)}&nbsp;&nbsp;%</span>
+                                )}
+                            </td>
+                            <td style={{ ...rightAlign }}>{n(totalDiscount)}</td>
+                        </tr>
+                    )}
+
+                    {/* ── GST Calculations (Only shown if GST > 0) ── */}
+                    {hasTax && (
+                        isInterState ? (
+                            totalIgst > 0 && (
+                                <tr>
+                                    <td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>
+                                        <span>Add : IGST (+)</span>
+                                        {igstRateDisplay != null && igstRateDisplay > 0 && (
+                                            <span>&nbsp;&nbsp;@&nbsp;&nbsp;{n(igstRateDisplay, 2)}&nbsp;&nbsp;%</span>
+                                        )}
+                                    </td>
+                                    <td style={{ ...rightAlign }}>{n(totalIgst)}</td>
+                                </tr>
+                            )
+                        ) : (
+                            <>
+                                {totalCgst > 0 && (
+                                    <tr>
+                                        <td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>
+                                            <span>Add : CGST (+)</span>
+                                            {cgstRateDisplay != null && cgstRateDisplay > 0 && (
+                                                <span>&nbsp;&nbsp;@&nbsp;&nbsp;{n(cgstRateDisplay, 2)}&nbsp;&nbsp;%</span>
+                                            )}
+                                        </td>
+                                        <td style={{ ...rightAlign }}>{n(totalCgst)}</td>
+                                    </tr>
+                                )}
+                                {totalSgst > 0 && (
+                                    <tr>
+                                        <td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>
+                                            <span>Add : SGST (+)</span>
+                                            {sgstRateDisplay != null && sgstRateDisplay > 0 && (
+                                                <span>&nbsp;&nbsp;@&nbsp;&nbsp;{n(sgstRateDisplay, 2)}&nbsp;&nbsp;%</span>
+                                            )}
+                                        </td>
+                                        <td style={{ ...rightAlign }}>{n(totalSgst)}</td>
+                                    </tr>
+                                )}
+                            </>
+                        )
+                    )}
+
+                    {/* ── CESS (if any) ── */}
+                    {totalCess > 0 && (
+                        <tr>
+                            <td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>
+                                <span>Add : CESS (+)</span>
+                            </td>
+                            <td style={{ ...rightAlign }}>{n(totalCess)}</td>
+                        </tr>
+                    )}
+
+                    {/* ── Additional Charges / Deductions ── */}
+                    {(() => {
+                        const ch = (estimateOrder as any).__charges__ || {};
+                        const lf  = Number(ch.lorryFreight  || 0);
+                        const op  = Number(ch.othersPlus    || 0);
+                        const om  = Number(ch.othersMinus   || 0);
+                        const rop = Number(ch.roundOffPlus  || 0);
+                        const rom = Number(ch.roundOffMinus || 0);
+                        const td  = Number(ch.tds           || 0);
+                        return (
+                            <>
+                                {lf  > 0 && <tr><td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>Add : Lorry Freight (+)</td><td style={{ ...rightAlign }}>{n(lf)}</td></tr>}
+                                {op  > 0 && <tr><td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>Add : Others (+)</td><td style={{ ...rightAlign }}>{n(op)}</td></tr>}
+                                {om  > 0 && <tr><td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>Less : Others (-)</td><td style={{ ...rightAlign }}>({n(om)})</td></tr>}
+                                {rop > 0 && <tr><td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>Add : Round Off (+)</td><td style={{ ...rightAlign }}>{n(rop)}</td></tr>}
+                                {rom > 0 && <tr><td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>Less : Round Off (-)</td><td style={{ ...rightAlign }}>({n(rom)})</td></tr>}
+                                {td  > 0 && <tr><td colSpan={4} style={{ textAlign: "right", paddingRight: "4px" }}>Less : TDS on Pymt./Purc. (-)</td><td style={{ ...rightAlign }}>({n(td)})</td></tr>}
+                            </>
+                        );
+                    })()}
+
+                    {/* ── Grand Total ── */}
+                    <tr>
+                        <td colSpan={4} style={{ ...rightAlign, paddingRight: "4px", paddingTop: "2px" }}>
+                            <strong>Grand Total</strong>
+                        </td>
+                        <td style={{ borderTop: "1px solid #000", borderBottom: "1px solid #000", ...rightAlign, fontWeight: "bold" }}>
+                            {n(netAmount)}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style={{ ...sep, marginTop: "10px" }} />
+
+            {/* ── Footer ── */}
+            <div style={row}>
+                <span>No. Of Bundles : {bundleCount}</span>
+                <span>
+                    Closing Balance :&nbsp;&nbsp;
+                    <strong>{n(closingBalance)}</strong>&nbsp;{closingBalanceType}
+                </span>
             </div>
         </div>
     );

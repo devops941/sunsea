@@ -12,9 +12,6 @@ export type SalesOrderStatus =
     | 'CONFIRMED'
     | 'QUOTATION_IN_PROGRESS'
     | 'QUOTATION_COMPLETED'
-    | 'PENDING_MD_APPROVAL'
-    | 'MD_APPROVED'
-    | 'MD_REJECTED'
     | 'PENDING_CUSTOMER_APPROVAL'
     | 'CUSTOMER_APPROVED'
     | 'CUSTOMER_REJECTED'
@@ -39,7 +36,6 @@ export interface SalesOrder {
     id: number;
     orderNo: string;
     orderDate: string;
-    expectedCompletionDate: string;
     customerId: string;
     customer?: {
         id: string;
@@ -47,53 +43,37 @@ export interface SalesOrder {
         displayName: string;
         mobile?: { label: string; number: string }[];
     };
-    customerType?: string;
     mobile?: string | null;
-
-    paymentTermId?: number | null;
-    billingAddressLine1: string;
-    billingCity: string;
-    billingState: string;
-    billingPincode: string;
+    orderType?: string;
+    orderSource?: string;
+    referenceText?: string | null;
+    salesPersonName?: string | null;
+    narration?: string | null;
+    remarks?: string;
+    internalNotes?: string;
+    dispatchType?: string;
+    billingAddressLine1?: string | null;
+    billingCity?: string | null;
+    billingState?: string | null;
+    billingPincode?: string | null;
     shippingAddressLine1?: string | null;
     shippingCity?: string | null;
     shippingState?: string | null;
     shippingPincode?: string | null;
-    sameAsBilling: boolean;
-    remarks?: string;
-    internalNotes?: string;
-    dispatchType?: string;
-    orderType?: string;
-    referenceText?: string | null;
-    salesPersonId?: number | null;
-    transportName?: string | null;
-    salesPersonName?: string | null;
 
-    // ─── Workflow status (drives the quotation list / UI state) ───────
+    // ─── Workflow status ───────────────────────────────────────────────
     status?: SalesOrderStatus;
-
 
     // ─── Money totals (rolled up from items) ───────────────────────────
     subtotal: number;
     totalDiscount: number;
-    totalGst: number;
-    totalCess: number;
     netAmount: number;
     isInterState?: boolean;
     totalIgst?: number;
     totalCgst?: number;
     totalSgst?: number;
+    totalTax?: number;
 
-    mdApprovalStatus: ApprovalStatus;
-    customerApprovalStatus: ApprovalStatus;
-    mdApprovedBy?: string | null;
-    mdApprovedAt?: string | null;
-    mdRejectionReason?: string | null;
-    mdApprovalReason?: string | null;
-    creditCheckOutstanding?: number | null;
-    creditCheckLimit?: number | null;
-    creditCheckExceededBy?: number | null;
-    customerApprovedAt?: string | null;
     customerRejectionReason?: string | null;
     createdBy?: string | null;
     createdAt: string;
@@ -159,7 +139,11 @@ export interface SalesOrderQueryParams {
     customerApprovalStatus?: ApprovalStatus;
     fromDate?: string;
     toDate?: string;
-    dispatchType?: string
+    dispatchType?: string;
+    orderSource?: string;
+    customerGradeId?: number | string;
+    customerTypeId?: number | string;
+    docType?: "SO" | "QT" | string;
 }
 
 export interface OrderStatusSummary {
@@ -372,33 +356,37 @@ export const salesOrderService = {
         return response.data?.data || response.data;
     },
     updateDiscount: async (orderId: number, items: { itemId: number; discountType: string; discountValue: number }[]) => {
-        return apiClient.patch(`/sales-orders/${orderId}/discounts`, { items });
+        return apiClient.patch(`${config.salesOrder.getAllSalesOrder}/${orderId}/discounts`, { items });
     },
     checkCreditBlock: async (customerId: string): Promise<any> => {
-        const response = await apiClient.get(`/sales-orders/credit-block-check`, {
+        const response = await apiClient.get(`${config.salesOrder.getAllSalesOrder}/credit-block-check`, {
             params: { customerId }
         });
         return response.data?.data || response.data;
     },
 
     submitForApproval: async (id: number | string): Promise<SalesOrder> => {
-        const response = await apiClient.patch(`/sales-orders/${id}/submit-approval`);
+        const response = await apiClient.patch(`${config.salesOrder.getAllSalesOrder}/${id}/submit-approval`);
+        return response.data?.data || response.data;
+    },
+
+    confirmOrder: async (id: number | string): Promise<SalesOrder> => {
+        const response = await apiClient.patch(`${config.salesOrder.getAllSalesOrder}/${id}/confirm`);
         return response.data?.data || response.data;
     },
 
     convertToSalesOrder: async (id: number | string): Promise<SalesOrder> => {
-        const response = await apiClient.patch(`/sales-orders/${id}/convert-to-order`);
+        const response = await apiClient.patch(`${config.salesOrder.getAllSalesOrder}/${id}/convert-to-order`);
         return response.data?.data || response.data;
     },
 
     markInQuotation: async (id: number | string): Promise<void> => {
-        await apiClient.patch(`/sales-orders/${id}/mark-in-quotation`);
+        await apiClient.patch(`${config.salesOrder.getAllSalesOrder}/${id}/mark-in-quotation`);
     },
 
-    // Returns only CONFIRMED GST sales orders for a customer — always queries
-    // the GST table regardless of the caller's role (used for "Load from Previous Order" dropdown).
+    // Returns only CONFIRMED sales orders for a customer (used for "Load from Previous Order" dropdown).
     getSourceOrders: async (customerId: string): Promise<SalesOrder[]> => {
-        const response = await apiClient.get('/sales-orders/source-orders', { params: { customerId } });
+        const response = await apiClient.get(`${config.salesOrder.getAllSalesOrder}/source-orders`, { params: { customerId } });
         return response.data?.data || [];
     },
 };

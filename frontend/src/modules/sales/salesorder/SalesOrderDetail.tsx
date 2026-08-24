@@ -1,6 +1,4 @@
-// src/pages/sales/SalesOrderDetail/SalesOrderDetail.tsx
-import React, { useEffect, useState } from "react";
-import { FaExclamationTriangle } from "react-icons/fa";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -8,7 +6,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
-import { getUnitPrice } from "../../../utils/pricingUtils";
+import { salesProductService } from "../../../services/salesProductService";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -26,12 +24,55 @@ const formatDateTime = (val: string | null | undefined) => {
     return new Date(val).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
+const getOrderSourceLabel = (src?: string | null, legacyType?: string | null) => {
+    if (!src && !legacyType) return "—";
+    const map: Record<string, string> = {
+        SALES_PERSON: "Sales Person",
+        TELE_CALLING: "Tele Calling",
+        WALK_IN: "Walk-in",
+        WHATSAPP: "WhatsApp",
+        REFERRAL: "Referral",
+        REPEAT_ORDER: "Repeat Order",
+        DEALER_AGENT: "Dealer / Agent",
+        salesperson: "Sales Person",
+        telephone: "Telephonic Enquiry",
+        website: "Website",
+        reference: "Reference",
+    };
+    if (src && map[src]) return map[src];
+    if (legacyType && map[legacyType]) return map[legacyType];
+    return src || legacyType || "—";
+};
+
+const getResponsiblePerson = (order: any) => {
+    if (order.sourceEmployee) {
+        const emp = order.sourceEmployee;
+        return emp.fullName || emp.name || emp.empCode || `Employee #${emp.id}`;
+    }
+    if (order.salesPersonName) {
+        return order.salesPersonName;
+    }
+    return null;
+};
+
+const getReferralInfo = (order: any) => {
+    if (order.referredByCustomer) {
+        const refCust = order.referredByCustomer;
+        return refCust.displayName || refCust.firmName;
+    }
+    if (order.referredByName) {
+        return order.referredByName;
+    }
+    if (order.referenceText) {
+        return order.referenceText;
+    }
+    return null;
+};
+
 // ─── Status → pill modifier map ──
 const STATUS_MODIFIER: Record<string, "active" | "inactive" | "hold"> = {
     DRAFT: "hold",
     CONFIRMED: "active",
-    PENDING_MD_APPROVAL: "hold",
-    MD_REJECTED: "inactive",
     IN_PRODUCTION: "hold",
     PENDING_CUSTOMER_APPROVAL: "hold",
     CUSTOMER_REJECTED: "inactive",
@@ -67,6 +108,7 @@ const SalesOrderDetail: React.FC = () => {
     const { id: idParam } = useParams<{ id: string }>();
 
     const [order, setOrder] = useState<SalesOrder | null>((location.state as SalesOrder) || null);
+    const [salesProducts, setSalesProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(!location.state);
 
     useEffect(() => {
@@ -79,8 +121,12 @@ const SalesOrderDetail: React.FC = () => {
 
         const load = async () => {
             try {
-                const data = await salesOrderService.fetchById(id);
+                const [data, spData] = await Promise.all([
+                    salesOrderService.fetchById(id),
+                    salesProductService.fetchAll().catch(() => []),
+                ]);
                 setOrder(data);
+                setSalesProducts(Array.isArray(spData) ? spData : []);
             } catch (error) {
                 toast.error("Failed to load order details");
                 navigate("/sales-order");
@@ -91,6 +137,265 @@ const SalesOrderDetail: React.FC = () => {
 
         load();
     }, [idParam, location.state, navigate]);
+
+    const isInterState = Boolean((order as any)?.isInterState);
+
+    const groupedItems = useMemo(() => {
+        if (!order?.items || order.items.length === 0) return [];
+        const orderItems = order.items;
+
+        if (!salesProducts || salesProducts.length === 0) {
+            return orderItems.map((item: any) => {
+                const qty = Number(item.quantity || 0);
+                const unitPrice = Number(item.unitPrice ?? item.rate ?? 0);
+                const lineTotal = Number(item.lineTotal ?? item.taxableAmount ?? (qty * unitPrice));
+                const cgst = Number(item.cgstAmount ?? 0);
+                const sgst = Number(item.sgstAmount ?? 0);
+                const igst = Number(item.igstAmount ?? 0);
+                const gstRate = Number(item.igstRate || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0)) || 0);
+                const gstAmount = igst > 0 ? igst : (cgst + sgst);
+                return {
+                    id: item.id || item.productId,
+                    productName: item.product?.productName || `Product #${item.productId}`,
+                    productCode: item.product?.productCode,
+                    quantity: qty,
+                    unitPrice,
+                    subtotal: lineTotal,
+                    cgstAmount: cgst > 0 ? cgst : (gstAmount > 0 && !isInterState ? gstAmount / 2 : 0),
+                    sgstAmount: sgst > 0 ? sgst : (gstAmount > 0 && !isInterState ? gstAmount / 2 : 0),
+                    igstAmount: igst > 0 ? igst : (gstAmount > 0 && isInterState ? gstAmount : 0),
+                    cgstRate: Number(item.cgstRate || (gstRate / 2) || 0),
+                    sgstRate: Number(item.sgstRate || (gstRate / 2) || 0),
+                    igstRate: Number(item.igstRate || gstRate || 0),
+                    gstRate,
+                    gstAmount,
+                    totalAmount: lineTotal + gstAmount,
+                    components: [],
+                };
+            });
+        }
+
+        const result: Array<{
+            id: any;
+            productName: string;
+            productCode?: string;
+            quantity: number;
+            unitPrice: number;
+            subtotal: number;
+            cgstAmount: number;
+            sgstAmount: number;
+            igstAmount: number;
+            cgstRate: number;
+            sgstRate: number;
+            igstRate: number;
+            gstRate: number;
+            gstAmount: number;
+            totalAmount: number;
+            components: Array<{ name: string; code?: string; perUnit: number; totalQty: number; included: boolean }>;
+        }> = [];
+        const processedItemIds = new Set<any>();
+
+        salesProducts.forEach(sp => {
+            const spComps = (sp?.components || []).filter(
+                (comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION"
+            );
+
+            if (spComps.length === 0) return;
+
+            const matchingOrderItems = orderItems.filter(oi =>
+                spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
+            );
+
+            if (matchingOrderItems.length > 0) {
+                matchingOrderItems.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+
+                const calcOrderQty = Math.max(...matchingOrderItems.map(oi => {
+                    const matchingSpComp = spComps.find((c: any) => String(c.componentProductId) === String(oi.productId));
+                    const perUnit = Number(matchingSpComp?.quantity || 1);
+                    return Math.round(Number(oi.quantity || 1) / perUnit);
+                }), 1);
+
+                const itemSubtotal = matchingOrderItems.reduce((s, oi) => s + Number(oi.lineTotal ?? oi.taxableAmount ?? (Number(oi.quantity || 0) * Number(oi.unitPrice ?? oi.rate ?? 0))), 0);
+                const itemCgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.cgstAmount || 0), 0);
+                const itemSgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.sgstAmount || 0), 0);
+                const itemIgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.igstAmount || 0), 0);
+                const itemGstAmount = itemIgst > 0 ? itemIgst : (itemCgst + itemSgst);
+                const itemUnitPrice = calcOrderQty > 0 ? (itemSubtotal / calcOrderQty) : 0;
+                const maxGstRate = Math.max(...matchingOrderItems.map(oi => Number(oi.igstRate || (Number(oi.cgstRate || 0) + Number(oi.sgstRate || 0)) || 0)), 0);
+
+                const components = spComps.map((c: any) => {
+                    const compPerUnit = Number(c.quantity || 1);
+                    const oi = matchingOrderItems.find(
+                        item => String(item.productId) === String(c.componentProductId)
+                    );
+                    const totalQty = oi ? Number(oi.quantity || 0) : 0;
+                    const included = Boolean(oi && totalQty > 0);
+                    return {
+                        name: c.componentProduct?.productName || c.componentProduct?.productCode || `Product #${c.componentProductId}`,
+                        code: c.componentProduct?.productCode,
+                        perUnit: compPerUnit,
+                        totalQty,
+                        included,
+                    };
+                });
+
+                result.push({
+                    id: `sp-${sp.id}`,
+                    productName: sp.salesProductName || sp.salesProductCode,
+                    productCode: sp.salesProductCode,
+                    quantity: calcOrderQty,
+                    unitPrice: itemUnitPrice,
+                    subtotal: itemSubtotal,
+                    cgstAmount: itemCgst > 0 ? itemCgst : (itemGstAmount > 0 && !isInterState ? itemGstAmount / 2 : 0),
+                    sgstAmount: itemSgst > 0 ? itemSgst : (itemGstAmount > 0 && !isInterState ? itemGstAmount / 2 : 0),
+                    igstAmount: itemIgst > 0 ? itemIgst : (itemGstAmount > 0 && isInterState ? itemGstAmount : 0),
+                    cgstRate: itemCgst > 0 && itemSubtotal > 0 ? (itemCgst / itemSubtotal) * 100 : (maxGstRate / 2),
+                    sgstRate: itemSgst > 0 && itemSubtotal > 0 ? (itemSgst / itemSubtotal) * 100 : (maxGstRate / 2),
+                    igstRate: itemIgst > 0 && itemSubtotal > 0 ? (itemIgst / itemSubtotal) * 100 : maxGstRate,
+                    gstRate: maxGstRate,
+                    gstAmount: itemGstAmount,
+                    totalAmount: itemSubtotal + itemGstAmount,
+                    components,
+                });
+            }
+        });
+
+        // Any remaining items that don't belong to a composite sales product
+        const remainingItems = orderItems.filter(oi => !processedItemIds.has(oi.id || oi.productId));
+        remainingItems.forEach(oi => {
+            const qty = Number(oi.quantity || 0);
+            const unitPrice = Number(oi.unitPrice ?? oi.rate ?? 0);
+            const lineTotal = Number(oi.lineTotal ?? oi.taxableAmount ?? (qty * unitPrice));
+            const cgst = Number(oi.cgstAmount ?? 0);
+            const sgst = Number(oi.sgstAmount ?? 0);
+            const igst = Number(oi.igstAmount ?? 0);
+            const gstRate = Number(oi.igstRate || (Number(oi.cgstRate || 0) + Number(oi.sgstRate || 0)) || 0);
+            const gstAmount = igst > 0 ? igst : (cgst + sgst);
+            result.push({
+                id: oi.id || oi.productId,
+                productName: oi.product?.productName || `Product #${oi.productId}`,
+                productCode: oi.product?.productCode,
+                quantity: qty,
+                unitPrice,
+                subtotal: lineTotal,
+                cgstAmount: cgst > 0 ? cgst : (gstAmount > 0 && !isInterState ? gstAmount / 2 : 0),
+                sgstAmount: sgst > 0 ? sgst : (gstAmount > 0 && !isInterState ? gstAmount / 2 : 0),
+                igstAmount: igst > 0 ? igst : (gstAmount > 0 && isInterState ? gstAmount : 0),
+                cgstRate: Number(oi.cgstRate || (gstRate / 2) || 0),
+                sgstRate: Number(oi.sgstRate || (gstRate / 2) || 0),
+                igstRate: Number(oi.igstRate || gstRate || 0),
+                gstRate,
+                gstAmount,
+                totalAmount: lineTotal + gstAmount,
+                components: [],
+            });
+        });
+
+        return result;
+    }, [order?.items, salesProducts, isInterState]);
+
+    // ── Financial Totals ────────────────────────────────────────────────
+    const calcSubtotal = useMemo(() => {
+        if (!order) return 0;
+        if (Number(order.subtotal || 0) > 0) return Number(order.subtotal);
+        return (order.items || []).reduce((acc: number, it: any) => {
+            return acc + Number(it.lineTotal ?? it.taxableAmount ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
+        }, 0);
+    }, [order]);
+
+    const discValue = Number((order as any)?.orderDiscountValue || 0);
+    const discType = (order as any)?.orderDiscountType || "PERCENT";
+    const calcDiscount = useMemo(() => {
+        if (!order) return 0;
+        if (Number(order.totalDiscount || 0) > 0) return Number(order.totalDiscount);
+        if (discValue > 0) {
+            return discType === "FLAT" ? discValue : (calcSubtotal * discValue / 100);
+        }
+        return 0;
+    }, [order, calcSubtotal, discValue, discType]);
+
+    const taxableAmount = Math.max(0, calcSubtotal - calcDiscount);
+
+    // ── GST recalculated on the POST-DISCOUNT taxable base ─────────────────────
+    // Raw item cgstAmount/sgstAmount are stored PRE-discount; we recompute from
+    // each item's GST rate applied proportionally to the discounted subtotal so
+    // the detail view matches the create-page preview exactly.
+
+    const calcCgst = useMemo(() => {
+        if (!order || isInterState) return 0;
+        const rawItems = order.items || [];
+        const discountRatio = calcSubtotal > 0 ? Math.max(0, calcSubtotal - calcDiscount) / calcSubtotal : 1;
+        const fromRates = rawItems.reduce((acc: number, it: any) => {
+            const lineTotal  = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
+            const gstRate    = Number(it.gstRate ?? 0);
+            const cgstRate   = Number(it.cgstRate ?? (gstRate / 2));
+            return acc + lineTotal * discountRatio * (cgstRate / 100);
+        }, 0);
+        if (fromRates > 0) return fromRates;
+        // Fallback to stored value if items lack rate info
+        if (Number(order.totalCgst || 0) > 0) return Number(order.totalCgst);
+        return rawItems.reduce((acc: number, it: any) => acc + Number(it.cgstAmount || 0), 0);
+    }, [order, isInterState, calcSubtotal, calcDiscount]);
+
+    const calcSgst = useMemo(() => {
+        if (!order || isInterState) return 0;
+        const rawItems = order.items || [];
+        const discountRatio = calcSubtotal > 0 ? Math.max(0, calcSubtotal - calcDiscount) / calcSubtotal : 1;
+        const fromRates = rawItems.reduce((acc: number, it: any) => {
+            const lineTotal  = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
+            const gstRate    = Number(it.gstRate ?? 0);
+            const sgstRate   = Number(it.sgstRate ?? (gstRate / 2));
+            return acc + lineTotal * discountRatio * (sgstRate / 100);
+        }, 0);
+        if (fromRates > 0) return fromRates;
+        if (Number(order.totalSgst || 0) > 0) return Number(order.totalSgst);
+        return rawItems.reduce((acc: number, it: any) => acc + Number(it.sgstAmount || 0), 0);
+    }, [order, isInterState, calcSubtotal, calcDiscount]);
+
+    const calcIgst = useMemo(() => {
+        if (!order || !isInterState) return 0;
+        const rawItems = order.items || [];
+        const discountRatio = calcSubtotal > 0 ? Math.max(0, calcSubtotal - calcDiscount) / calcSubtotal : 1;
+        const fromRates = rawItems.reduce((acc: number, it: any) => {
+            const lineTotal  = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
+            const gstRate    = Number(it.igstRate ?? it.gstRate ?? 0);
+            return acc + lineTotal * discountRatio * (gstRate / 100);
+        }, 0);
+        if (fromRates > 0) return fromRates;
+        if (Number(order.totalIgst || 0) > 0) return Number(order.totalIgst);
+        return rawItems.reduce((acc: number, it: any) => acc + Number(it.igstAmount || 0), 0);
+    }, [order, isInterState, calcSubtotal, calcDiscount]);
+
+    const calcTotalTax = useMemo(() => calcCgst + calcSgst + calcIgst,
+        [calcCgst, calcSgst, calcIgst]);
+
+    const hasGst = Boolean(
+        calcTotalTax > 0 ||
+        (order?.items || []).some((it: any) => Number(it.cgstRate || it.sgstRate || it.igstRate || 0) > 0)
+    );
+
+    // Always derive net amount from recalculated values (never use stored netAmount
+    // directly, as it may reflect pre-discount GST)
+    const calcNetAmount = useMemo(() => {
+        if (!order) return 0;
+        const computed = taxableAmount + calcTotalTax;
+        return computed > 0 ? computed : Math.max(0, Number(order.netAmount || 0));
+    }, [order, taxableAmount, calcTotalTax]);
+
+    const isQuotation = Boolean(
+        order?.orderNo?.startsWith("QT") ||
+        order?.status === "QUOTATION_IN_PROGRESS" ||
+        order?.status === "MD_APPROVED" ||
+        order?.status === "MD_REJECTED" ||
+        order?.status === "CUSTOMER_APPROVED" ||
+        order?.status === "CUSTOMER_REJECTED"
+    );
+
+    const hasAnyPricing = isQuotation && (
+        calcSubtotal > 0 ||
+        calcNetAmount > 0 ||
+        (order?.items || []).some((it: any) => Number(it.unitPrice || it.rate || 0) > 0)
+    );
 
     if (loading || !order) {
         return <CommonLoader text="Loading order details..." fullScreen={false} />;
@@ -132,18 +437,6 @@ const SalesOrderDetail: React.FC = () => {
         ? order.shippingPincode
         : customer?.shippingPincode || customer?.addresses?.[1]?.address?.pincode || "";
 
-    const QUOTATION_WORKFLOW_STATUSES = new Set([
-        "QUOTATION_IN_PROGRESS",
-        "QUOTATION_COMPLETED",
-        "PENDING_MD_APPROVAL",
-        "MD_APPROVED",
-        "MD_REJECTED",
-        "PENDING_CUSTOMER_APPROVAL",
-        "CUSTOMER_APPROVED",
-        "CUSTOMER_REJECTED",
-    ]);
-    const showPricing = QUOTATION_WORKFLOW_STATUSES.has(order.status ?? "");
-
     return (
         <div className="w-full mx-auto space-y-6">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
@@ -156,277 +449,278 @@ const SalesOrderDetail: React.FC = () => {
                             </h2>
                             <StatusPill status={order.status} modifierMap={STATUS_MODIFIER} />
                         </div>
-                        <div>
+                        <div className="flex items-center gap-2">
                             <BackButton text="Back to List" />
                         </div>
                     </div>
                 </div>
 
-                <div className="p-6 space-y-6">
-                    {/* ── Rejection reason banner ── */}
-                    {order.status === "MD_REJECTED" && order.mdRejectionReason && (
-                        <div className="bg-red-500/10 border-l-4 border-red-500 p-4 flex items-start gap-3 rounded-r-lg">
-                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-base shrink-0" />
-                            <div>
-                                <div className="text-red-500 font-semibold text-xs uppercase tracking-wide">MD Rejected this order</div>
-                                <p className="text-ink text-sm m-0 mt-0.5">{order.mdRejectionReason}</p>
-                            </div>
-                        </div>
-                    )}
+                <div className="p-6 space-y-5">
+
+                    {/* ── Customer Rejection banner ── */}
                     {order.status === "CUSTOMER_REJECTED" && order.customerRejectionReason && (
-                        <div className="bg-red-500/10 border-l-4 border-red-500 p-4 flex items-start gap-3 rounded-r-lg">
-                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-base shrink-0" />
-                            <div>
-                                <div className="text-red-500 font-semibold text-xs uppercase tracking-wide">Customer Rejected this order</div>
-                                <p className="text-ink text-sm m-0 mt-0.5">{order.customerRejectionReason}</p>
-                            </div>
+                        <div className="bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r-lg">
+                            <div className="text-red-500 font-semibold text-xs uppercase tracking-wide mb-0.5">Customer Rejected this order</div>
+                            <p className="text-ink text-sm m-0">{order.customerRejectionReason}</p>
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* ── Left column: main details ── */}
-                        <div className="lg:col-span-2 space-y-6">
-
-                            {/* ── Order Information ── */}
-                            <div className="bg-card-2 p-5 rounded-xl border border-line-soft">
-                                <h3 className="text-base font-semibold text-ink mb-4">
-                                    Order Information
-                                </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                    <DetailBox label="Order No" value={order.orderNo} />
-                                    <DetailBox label="Order Date" value={formatDate(order.orderDate)} />
-                                    <DetailBox label="Order Source Platform" value={order.orderType || "—"} />
-                                    <DetailBox label="Salesperson Name" value={order.salesPersonName || "—"} />
-                                    {order.referenceText && <DetailBox label="Reference Name" value={order.referenceText} />}
-                                    {(order as any).narration && (
-                                        <div className="col-span-2 sm:col-span-3">
-                                            <DetailBox label="Narration" value={(order as any).narration} />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* ── Customer Details ── */}
-                            <div className="bg-card-2 p-5 rounded-xl border border-line-soft">
-                                <h3 className="text-base font-semibold text-ink mb-4">
-                                    Customer Details
-                                </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                    <DetailBox label="Firm / Legal Name" value={customer?.firmName || customer?.displayName || "—"} />
-                                    <DetailBox label="Display Name" value={customer?.displayName || "—"} />
-                                    <DetailBox label="Customer Grade" value={customer?.customerGrade?.name || "—"} />
-                                    <DetailBox label="Customer Type" value={customer?.customerType?.name || "—"} />
-                                    <DetailBox
-                                        label="Mobile Number"
-                                        value={
-                                            order.mobile ||
-                                            (Array.isArray(customer?.mobile)
-                                                ? customer.mobile.map((m: any) => m.number).join(", ")
-                                                : typeof customer?.mobile === "string" ? customer.mobile : "—")
-                                        }
-                                    />
-                                    <DetailBox label="Email" value={customer?.email || "—"} />
-                                    <DetailBox label="GSTIN" value={customer?.gstin || "—"} />
-                                    <DetailBox label="Credit Limit" value={customer?.creditLimit ? formatMoney(customer.creditLimit) : "—"} />
-                                </div>
-                            </div>
-
-                            {/* ── Addresses ── */}
-                            <div className="bg-card-2 p-5 rounded-xl border border-line-soft">
-                                <h3 className="text-base font-semibold text-ink mb-4">
-                                    Addresses
-                                </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="p-3 bg-card rounded-lg border border-line-soft">
-                                        <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1">Billing Address</div>
-                                        <div className="text-sm font-semibold text-ink">{billingLine}</div>
-                                        {(billingCity || billingState || billingPincode) && (
-                                            <div className="text-xs text-ink-muted mt-0.5">
-                                                {[billingCity, billingState].filter(Boolean).join(", ")} {billingPincode ? `— ${billingPincode}` : ""}
-                                            </div>
-                                        )}
+                    {/* ── Order Information, Customer Details & Addresses (Single Unified Box) ── */}
+                    <div className="bg-card-2 p-5 rounded-xl border border-line-soft space-y-6">
+                        {/* ── 1. Order Information ── */}
+                        <div>
+                            <h3 className="text-base font-semibold text-ink mb-4">Order Information</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                <DetailBox label="Order No" value={order.orderNo} />
+                                <DetailBox label="Order Date" value={formatDate(order.orderDate)} />
+                                <DetailBox label="Order Source" value={getOrderSourceLabel((order as any).orderSource, order.orderType)} />
+                                {getResponsiblePerson(order) && (
+                                    <DetailBox label="Responsible Employee" value={getResponsiblePerson(order)!} />
+                                )}
+                                {getReferralInfo(order) && (
+                                    <DetailBox label="Referral / Dealer" value={getReferralInfo(order)!} />
+                                )}
+                                {(order as any).narration && (
+                                    <div className="col-span-2 sm:col-span-3 lg:col-span-4">
+                                        <DetailBox label="Narration" value={(order as any).narration} />
                                     </div>
-                                    <div className="p-3 bg-card rounded-lg border border-line-soft">
-                                        <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1">Shipping Address</div>
-                                        {shippingLine ? (
-                                            <>
-                                                <div className="text-sm font-semibold text-ink">{shippingLine}</div>
-                                                <div className="text-xs text-ink-muted mt-0.5">
-                                                    {[shippingCity, shippingState].filter(Boolean).join(", ")} {shippingPincode ? `— ${shippingPincode}` : ""}
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="text-xs text-ink-subtle italic">Same as Billing Address</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* ── Order Items Table ── */}
-                            <div className="bg-card-2 p-5 rounded-xl border border-line-soft">
-                                <h3 className="text-base font-semibold text-ink mb-4">
-                                    Order Items
-                                </h3>
-                                <div className="border border-line rounded-lg overflow-hidden">
-                                    <table className="min-w-full text-sm">
-                                        <thead>
-                                            <tr className="bg-head border-b border-line text-ink">
-                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold uppercase tracking-wider w-8">#</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold uppercase tracking-wider">Product</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">Qty</th>
-                                                {showPricing && (
-                                                    <>
-                                                        <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">Unit Price</th>
-                                                        {order.isInterState ? (
-                                                            <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">IGST</th>
-                                                        ) : (
-                                                            <>
-                                                                <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">CGST</th>
-                                                                <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">SGST</th>
-                                                            </>
-                                                        )}
-                                                        <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold uppercase tracking-wider">Line Total</th>
-                                                    </>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-line-soft">
-                                            {order.items?.map((item: any, idx: number) => {
-                                                const unitPrice = getUnitPrice(item);
-                                                const qty = Number(item.quantity || 0);
-                                                const lineSubtotal = Number(item.lineTotal || (Number(unitPrice) * qty));
-                                                return (
-                                                    <tr key={item.id} className="hover:bg-card/50 transition-colors">
-                                                        <td className="py-3 pl-4 pr-2 text-ink-subtle">{idx + 1}</td>
-                                                        <td className="py-3 px-2">
-                                                            <div className="font-semibold text-ink">{item.product?.productName || `Product #${item.productId}`}</div>
-                                                            {item.product?.productCode && (
-                                                                <div className="text-ink-subtle text-xs">{item.product.productCode}</div>
-                                                            )}
-                                                        </td>
-
-                                                        <td className="py-3 px-2 text-right text-ink font-medium">{qty}</td>
-
-                                                        {showPricing && (
-                                                            <>
-                                                                <td className="py-3 px-2 text-right text-ink font-medium">{formatMoney(unitPrice)}</td>
-                                                                {order.isInterState ? (
-                                                                    <td className="py-3 px-2 text-right text-ink">
-                                                                        {formatMoney(item.igstAmount || 0)}
-                                                                        <div className="text-ink-subtle text-xs">({item.igstRate || 0}%)</div>
-                                                                    </td>
-                                                                ) : (
-                                                                    <>
-                                                                        <td className="py-3 px-2 text-right text-ink">
-                                                                            {formatMoney(item.cgstAmount || 0)}
-                                                                            <div className="text-ink-subtle text-xs">({item.cgstRate || 0}%)</div>
-                                                                        </td>
-                                                                        <td className="py-3 px-2 text-right text-ink">
-                                                                            {formatMoney(item.sgstAmount || 0)}
-                                                                            <div className="text-ink-subtle text-xs">({item.sgstRate || 0}%)</div>
-                                                                        </td>
-                                                                    </>
-                                                                )}
-                                                                <td className="py-3 pr-4 pl-2 text-right font-semibold text-ink">{formatMoney(lineSubtotal)}</td>
-                                                            </>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                            {(!order.items || order.items.length === 0) && (
-                                                <tr>
-                                                    <td colSpan={10} className="py-8 text-center text-ink-subtle text-sm">
-                                                        No items found.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* ── Right column: sticky approval status + totals ── */}
-                        <div className="space-y-6 sticky top-6 self-start">
+                        <div className="border-t border-line-soft" />
 
-                            {/* ── Approval Status ── */}
-                            <div className="bg-card-2 rounded-xl p-5 border border-line-soft">
-                                <h3 className="text-base font-semibold text-ink mb-4">
-                                    Approval Status
-                                </h3>
+                        {/* ── 2. Customer Details ── */}
+                        <div>
+                            <h3 className="text-base font-semibold text-ink mb-4">Customer Details</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                <DetailBox label="Firm / Legal Name" value={customer?.firmName || customer?.displayName || "—"} />
+                                <DetailBox label="Display Name" value={customer?.displayName || "—"} />
+                                <DetailBox label="Customer Grade" value={customer?.customerGrade?.name || "—"} />
+                                <DetailBox label="Customer Type" value={customer?.customerType?.name || "—"} />
+                                <DetailBox
+                                    label="Mobile Number"
+                                    value={
+                                        order.mobile ||
+                                        (Array.isArray(customer?.mobile)
+                                            ? customer.mobile.map((m: any) => m.number).join(", ")
+                                            : typeof customer?.mobile === "string" ? customer.mobile : "—")
+                                    }
+                                />
+                                <DetailBox label="Email" value={customer?.email || "—"} />
+                                <DetailBox label="GSTIN" value={customer?.gstin || "—"} />
+                                <DetailBox label="Credit Limit" value={customer?.creditLimit ? formatMoney(customer.creditLimit) : "—"} />
+                            </div>
+                        </div>
 
-                                <div className="mb-4">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">MD Approval</span>
-                                        <StatusPill status={order.mdApprovalStatus} modifierMap={APPROVAL_MODIFIER} />
-                                    </div>
-                                    {order.mdApprovedAt && (
-                                        <div className="text-ink-subtle text-xs mt-1">Decided on {formatDateTime(order.mdApprovedAt)}</div>
-                                    )}
-                                    {order.mdRejectionReason && (
-                                        <div className="text-red-500 text-xs mt-1">Reason: {order.mdRejectionReason}</div>
+                        <div className="border-t border-line-soft" />
+
+                        {/* ── 3. Addresses ── */}
+                        <div>
+                            <h3 className="text-base font-semibold text-ink mb-4">Addresses</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="p-4 bg-card rounded-lg border border-line-soft">
+                                    <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-2">Billing Address</div>
+                                    <div className="text-sm font-semibold text-ink">{billingLine}</div>
+                                    {(billingCity || billingState || billingPincode) && (
+                                        <div className="text-xs text-ink-muted mt-1">
+                                            {[billingCity, billingState].filter(Boolean).join(", ")}{billingPincode ? ` — ${billingPincode}` : ""}
+                                        </div>
                                     )}
                                 </div>
-
-                                <div className="pt-3 border-t border-line-soft">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Customer Approval</span>
-                                        <StatusPill status={order.customerApprovalStatus} modifierMap={APPROVAL_MODIFIER} />
-                                    </div>
-                                    {order.customerApprovedAt && (
-                                        <div className="text-ink-subtle text-xs mt-1">Decided on {formatDateTime(order.customerApprovedAt)}</div>
-                                    )}
-                                    {order.customerRejectionReason && (
-                                        <div className="text-red-500 text-xs mt-1">Reason: {order.customerRejectionReason}</div>
+                                <div className="p-4 bg-card rounded-lg border border-line-soft">
+                                    <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-2">Shipping Address</div>
+                                    {shippingLine ? (
+                                        <>
+                                             <div className="text-sm font-semibold text-ink">{shippingLine}</div>
+                                            <div className="text-xs text-ink-muted mt-1">
+                                                {[shippingCity, shippingState].filter(Boolean).join(", ")}{shippingPincode ? ` — ${shippingPincode}` : ""}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-xs text-ink-subtle italic">Same as Billing Address</div>
                                     )}
                                 </div>
                             </div>
-
-                            {/* ── Amount Summary ── */}
-                            {showPricing && (
-                                <div className="bg-card-2 rounded-xl p-5 border border-line-soft">
-                                    <h3 className="text-base font-semibold text-ink mb-4">Amount Summary</h3>
-                                    <div className="space-y-2.5 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-ink-muted">Subtotal</span>
-                                            <span className="text-ink font-semibold">{formatMoney(order.subtotal)}</span>
-                                        </div>
-
-                                        {order.isInterState ? (
-                                            <div className="flex justify-between text-green-500">
-                                                <span>IGST</span>
-                                                <span className="font-semibold">+ {formatMoney(order.totalIgst || order.totalGst || 0)}</span>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <div className="flex justify-between text-green-500">
-                                                    <span>CGST</span>
-                                                    <span className="font-semibold">+ {formatMoney(order.totalCgst || (Number(order.totalGst || 0) / 2))}</span>
-                                                </div>
-                                                <div className="flex justify-between text-green-500">
-                                                    <span>SGST</span>
-                                                    <span className="font-semibold">+ {formatMoney(order.totalSgst || (Number(order.totalGst || 0) / 2))}</span>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {Number(order.totalDiscount) !== 0 && (
-                                            <div className="flex justify-between text-red-500">
-                                                <span>Discount</span>
-                                                <span className="font-semibold">− {formatMoney(order.totalDiscount)}</span>
-                                            </div>
-                                        )}
-
-                                        <div className="flex justify-between pt-3 mt-3 border-t border-line-soft">
-                                            <span className="font-bold text-ink text-base">Net Amount</span>
-                                            <span className="font-bold text-xl text-primary">{formatMoney(order.netAmount)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
                         </div>
                     </div>
+
+                    {/* ── Order Items ── */}
+                    <div className="bg-card-2 p-5 rounded-xl border border-line-soft">
+                        <h3 className="text-base font-semibold text-ink mb-4">Order Items</h3>
+                        <div className="border border-line rounded-lg overflow-hidden">
+                            <table className="min-w-full text-sm">
+                                <thead>
+                                    <tr className="bg-head border-b border-line text-ink">
+                                        <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold uppercase tracking-wider w-10">#</th>
+                                        <th className="py-3 px-3 text-left text-[11px] font-bold uppercase tracking-wider">Sales Product</th>
+                                        <th className="py-3 px-3 text-center text-[11px] font-bold uppercase tracking-wider w-20">Qty</th>
+                                        {hasAnyPricing && (
+                                            <>
+                                                <th className="py-3 px-3 text-right text-[11px] font-bold uppercase tracking-wider w-28">Unit Price</th>
+                                                <th className="py-3 px-3 text-right text-[11px] font-bold uppercase tracking-wider w-28">Subtotal</th>
+                                                {hasGst && (
+                                                    order.isInterState ? (
+                                                        <th className="py-3 px-3 text-right text-[11px] font-bold uppercase tracking-wider w-28">IGST</th>
+                                                    ) : (
+                                                        <>
+                                                            <th className="py-3 px-3 text-right text-[11px] font-bold uppercase tracking-wider w-28">CGST</th>
+                                                            <th className="py-3 px-3 text-right text-[11px] font-bold uppercase tracking-wider w-28">SGST</th>
+                                                        </>
+                                                    )
+                                                )}
+                                                <th className="py-3 pr-4 pl-3 text-right text-[11px] font-bold uppercase tracking-wider w-32">Total</th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-line-soft">
+                                    {groupedItems.map((item: any, idx: number) => (
+                                        <tr key={item.id} className="hover:bg-card/50 transition-colors">
+                                            <td className="py-3.5 pl-4 pr-2 text-ink-subtle text-left align-middle">{idx + 1}</td>
+                                            <td className="py-3.5 px-3 align-middle">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <span className="font-semibold text-ink text-[15px]">{item.productName}</span>
+                                                    {item.components && item.components.length > 0 && (
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            {item.components.map((c: any, cIdx: number) => {
+                                                                const isExcluded = !c.included || c.totalQty <= 0;
+                                                                return (
+                                                                    <div
+                                                                        key={cIdx}
+                                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs border ${
+                                                                            isExcluded
+                                                                                ? "bg-red-500/10 text-red-400 border-red-500/20"
+                                                                                : "bg-card text-ink border-line-soft shadow-sm"
+                                                                        }`}
+                                                                    >
+                                                                        <span className={isExcluded ? "line-through opacity-80" : "font-medium"}>
+                                                                            {c.name}
+                                                                        </span>
+                                                                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                                                                            isExcluded
+                                                                                ? "bg-red-500/20 text-red-400"
+                                                                                : "bg-primary/15 text-primary"
+                                                                        }`}>
+                                                                            {isExcluded ? "0 (Excluded)" : `${c.totalQty}`}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="py-3.5 px-3 text-center font-bold text-ink text-sm align-middle">{item.quantity}</td>
+                                            {hasAnyPricing && (
+                                                <>
+                                                    <td className="py-3.5 px-3 text-right font-medium text-ink text-sm align-middle">
+                                                        {item.unitPrice > 0 ? formatMoney(item.unitPrice) : "—"}
+                                                    </td>
+                                                    <td className="py-3.5 px-3 text-right font-medium text-ink text-sm align-middle">
+                                                        {item.subtotal > 0 ? formatMoney(item.subtotal) : "—"}
+                                                    </td>
+                                                    {hasGst && (
+                                                        order.isInterState ? (
+                                                            <td className="py-3.5 px-3 text-right text-sm align-middle">
+                                                                <div className="font-medium text-ink">
+                                                                    {item.igstAmount > 0 ? formatMoney(item.igstAmount) : (item.gstAmount > 0 ? formatMoney(item.gstAmount) : "—")}
+                                                                </div>
+                                                                {item.igstRate > 0 && (
+                                                                    <div className="text-[11px] text-ink-muted">({Number(item.igstRate).toFixed(2).replace(/\.00$/, "")}%)</div>
+                                                                )}
+                                                            </td>
+                                                        ) : (
+                                                            <>
+                                                                <td className="py-3.5 px-3 text-right text-sm align-middle">
+                                                                    <div className="font-medium text-ink">
+                                                                        {item.cgstAmount > 0 ? formatMoney(item.cgstAmount) : (item.gstAmount > 0 ? formatMoney(item.gstAmount / 2) : "—")}
+                                                                    </div>
+                                                                    {item.cgstRate > 0 && (
+                                                                        <div className="text-[11px] text-ink-muted">({Number(item.cgstRate).toFixed(2).replace(/\.00$/, "")}%)</div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-3.5 px-3 text-right text-sm align-middle">
+                                                                    <div className="font-medium text-ink">
+                                                                        {item.sgstAmount > 0 ? formatMoney(item.sgstAmount) : (item.gstAmount > 0 ? formatMoney(item.gstAmount / 2) : "—")}
+                                                                    </div>
+                                                                    {item.sgstRate > 0 && (
+                                                                        <div className="text-[11px] text-ink-muted">({Number(item.sgstRate).toFixed(2).replace(/\.00$/, "")}%)</div>
+                                                                    )}
+                                                                </td>
+                                                            </>
+                                                        )
+                                                    )}
+                                                    <td className="py-3.5 pr-4 pl-3 text-right font-bold text-ink text-sm align-middle">
+                                                        {item.totalAmount > 0 ? formatMoney(item.totalAmount) : "—"}
+                                                    </td>
+                                                </>
+                                            )}
+                                        </tr>
+                                    ))}
+                                    {groupedItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={hasAnyPricing ? (hasGst ? (order.isInterState ? 7 : 8) : 6) : 3} className="py-10 text-center text-ink-subtle text-sm">No items found.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* ── Totals / Summary Card ── */}
+                        {hasAnyPricing && (
+                            <div className="flex justify-end mt-5">
+                                <div className="w-full max-w-sm border border-line rounded-xl p-4 bg-card shadow-xs">
+                                    <h4 className="text-xs font-bold text-ink uppercase tracking-wide mb-3 pb-2 border-b border-line-soft">
+                                        {order.orderNo?.startsWith("QT") || order.status === "QUOTATION_IN_PROGRESS" ? "Quotation Summary" : "Sales Order Summary"}
+                                    </h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between text-ink-subtle">
+                                            <span>Subtotal</span>
+                                            <span className="text-ink font-semibold">{formatMoney(calcSubtotal)}</span>
+                                        </div>
+
+                                        {calcDiscount > 0 && (
+                                            <>
+                                                <div className="flex justify-between text-red-500 font-medium">
+                                                    <span>Discount {discValue > 0 ? `(${discValue}${discType === "PERCENT" ? "%" : " Flat"})` : ""}</span>
+                                                    <span>- {formatMoney(calcDiscount)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-ink-subtle text-xs">
+                                                    <span>Taxable Amount</span>
+                                                    <span className="text-ink font-medium">{formatMoney(taxableAmount)}</span>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {hasGst && (order.isInterState ? (
+                                            <div className="flex justify-between text-ink-subtle">
+                                                <span>IGST</span>
+                                                <span className="text-ink font-medium">+ {formatMoney(calcIgst || calcTotalTax)}</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex justify-between text-ink-subtle">
+                                                    <span>CGST</span>
+                                                    <span className="text-ink font-medium">+ {formatMoney(calcCgst || (calcTotalTax / 2))}</span>
+                                                </div>
+                                                <div className="flex justify-between text-ink-subtle">
+                                                    <span>SGST</span>
+                                                    <span className="text-ink font-medium">+ {formatMoney(calcSgst || (calcTotalTax / 2))}</span>
+                                                </div>
+                                            </>
+                                        ))}
+
+                                        <div className="flex justify-between pt-3 border-t border-line mt-2 text-ink items-center">
+                                            <span className="text-base font-bold">Net Amount</span>
+                                            <span className="text-lg font-bold text-primary">{formatMoney(calcNetAmount)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                 </div>
             </div>
         </div>

@@ -168,9 +168,7 @@ const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOr
 const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"));
 
 const QuotationList = lazy(() => import("../modules/sales/quatation/QuatationList"));
-const PendingQuotationList = lazy(() => import("../modules/sales/quatation/PendingQuatation"));
 const QuotationCreate = lazy(() => import("../modules/sales/quatation/CreateQuatation"));
-const UpdateQuatation = lazy(() => import("../modules/sales/quatation/UpdateQuatation"));
 
 const SalesInvoiceList = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceList"));
 const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceCreate"));
@@ -214,6 +212,9 @@ const ProfitLossPage = lazy(() => import("../modules/accounts/pages/reports/Prof
 
 const SalesReturnPage = lazy(() =>
   import("../modules/accounts/pages/returns/SalesReturnPage").then((m) => ({ default: m.SalesReturnPage }))
+);
+const SalesReturnCreatePage = lazy(() =>
+  import("../modules/accounts/pages/returns/SalesReturnCreatePage").then((m) => ({ default: m.SalesReturnCreatePage }))
 );
 const PurchaseReturnPage = lazy(() =>
   import("../modules/accounts/pages/returns/PurchaseReturnPage").then((m) => ({ default: m.PurchaseReturnPage }))
@@ -401,9 +402,6 @@ const AppRoutes = () => {
               </Route>
               <Route element={<ProtectedRoute permission="quotations.view" />}>
                 <Route path="/quatation-order" element={<QuotationList />} />
-              </Route>
-              <Route element={<ProtectedRoute permission="pending-quotations.view" />}>
-                <Route path="/pending-quotations" element={<PendingQuotationList />} />
               </Route>
               <Route element={<ProtectedRoute permission="sales-invoices.view" />}>
                 <Route path="/sales-invoices" element={<SalesInvoiceList />} />
@@ -626,9 +624,6 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="quotations.edit" />}>
               <Route path="/quatation-order/edit/:id" element={<QuotationCreate />} />
             </Route>
-            <Route element={<ProtectedRoute permission="pending-quotations.edit" />}>
-              <Route path="/pending-quotations/edit/:id" element={<UpdateQuatation />} />
-            </Route>
             <Route element={<ProtectedRoute permission="sales-invoices.view" />}>
               <Route path="/sales-invoices/details/:id" element={<SalesInvoiceView />} />
             </Route>
@@ -637,6 +632,12 @@ const AppRoutes = () => {
             </Route>
             <Route element={<ProtectedRoute permission="sales-invoices.edit" />}>
               <Route path="/sales-invoices/edit/:id" element={<SalesInvoiceForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permissionAny={["sales-returns.view", "sales-invoices.view", "sales-orders.view"]} />}>
+              <Route path="/sales-returns/create" element={<SalesReturnCreatePage />} />
+              <Route path="/sales-returns/edit/:id" element={<SalesReturnCreatePage />} />
+              <Route path="/accounts/sales-returns/create" element={<SalesReturnCreatePage />} />
+              <Route path="/accounts/sales-returns/edit/:id" element={<SalesReturnCreatePage />} />
             </Route>
 
             {/* ---------- Purchase ---------- */}

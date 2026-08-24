@@ -59,12 +59,8 @@ export const creditCheckService = {
     const blockingOrder = await prisma.salesOrder.findFirst({
       where: {
         customerId,
-        mdApprovalStatus: "PENDING",
-        OR: [
-          { mdApprovalReason: { contains: "CREDIT_LIMIT_EXCEEDED" } },
-          { mdApprovalReason: { contains: "OVERDUE_INVOICE" } },
-        ],
-      } as any,
+        status: "PENDING_CUSTOMER_APPROVAL" as any,
+      },
       select: {
         id: true,
         orderNo: true,

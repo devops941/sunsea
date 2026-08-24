@@ -29,6 +29,7 @@ export interface CustomerReceivableDetail {
     customerCode: string;
     firmName: string;
     gstin?: string | null;
+    customerType?: string;
     openingBalance: number;
   };
   ledger: any;
@@ -131,7 +132,9 @@ class ReceivableService {
 
     const results: CustomerReceivableSummary[] = await Promise.all(
       customers.map(async (customer) => {
-        const openingBalance = Number(customer.openingBalance || 0);
+        const rawOpBal = Number(customer.openingBalance || 0);
+        const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+        const openingBalance = opType === "CREDIT" ? -Math.abs(rawOpBal) : Math.abs(rawOpBal);
 
         // Ensure customer ledger exists
         const ledger = await accountsService.ensureCustomerLedger(customer);

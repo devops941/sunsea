@@ -4,12 +4,22 @@ import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "../features
 
 export const customerService = {
   // BUG-CUST-004 fix: added page and limit params for server-side pagination
-  fetchAll: async (params?: { search?: string; page?: number; limit?: number }): Promise<{ customers: Customer[]; total: number; page: number; totalPages: number }> => {
+  fetchAll: async (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    status?: string;
+    customerTypeId?: number;
+    customerGradeId?: number;
+  }): Promise<{ customers: Customer[]; total: number; page: number; totalPages: number }> => {
     const response = await apiClient.get(config.customer.base, {
       params: {
         search: params?.search,
         page: params?.page ?? 1,
         limit: params?.limit ?? 10,
+        status: params?.status,
+        customerTypeId: params?.customerTypeId,
+        customerGradeId: params?.customerGradeId,
       },
     });
     const data = response.data?.data || response.data;
