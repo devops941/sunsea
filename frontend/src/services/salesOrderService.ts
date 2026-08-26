@@ -28,7 +28,9 @@ export type SalesOrderStatus =
     | 'FG_RECEIVED'
     | 'READY_FOR_DISPATCH'
     | 'PARTIALLY_DISPATCHED'
-    | 'DISPATCHED';
+    | 'DISPATCHED'
+    | 'QUOTED'
+    | 'INVOICED';
 
 export type DiscountType = 'PERCENT' | 'FLAT';
 
@@ -46,6 +48,9 @@ export interface SalesOrder {
     mobile?: string | null;
     orderType?: string;
     orderSource?: string;
+    sourceEmployeeId?: number | string | null;
+    referredByCustomerId?: string | null;
+    referredByName?: string | null;
     referenceText?: string | null;
     salesPersonName?: string | null;
     narration?: string | null;
@@ -143,7 +148,7 @@ export interface SalesOrderQueryParams {
     orderSource?: string;
     customerGradeId?: number | string;
     customerTypeId?: number | string;
-    docType?: "SO" | "QT" | string;
+    quotationOnly?: boolean;
 }
 
 export interface OrderStatusSummary {
@@ -224,6 +229,11 @@ export const salesOrderService = {
 
     getNextOrderNo: async (): Promise<string> => {
         const response = await apiClient.get(config.salesOrder.getNextOrderNo);
+        return response.data?.data?.nextCode;
+    },
+
+    getNextQuotationNo: async (): Promise<string> => {
+        const response = await apiClient.get(`${config.salesOrder.getAllSalesOrder}/next-quotation-code`);
         return response.data?.data?.nextCode;
     },
 

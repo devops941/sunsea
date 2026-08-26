@@ -641,8 +641,9 @@ model SalesProduct {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  components SalesProductComponent[]
-  stocks     SalesProductStock[]
+  components     SalesProductComponent[]
+  stocks         SalesProductStock[]
+  salesOrderItems SalesOrderItem[]
 
   @@index([salesProductName])
   @@map("sales_products")
@@ -1211,7 +1212,6 @@ model SalesOrder {
   createdAt        DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
   orderType            String?
-  productionStatus     String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
   salesPersonName      String?          @db.VarChar(100)
   sourceSalesOrderId   Int?             @map("source_sales_order_id")
   // Order Source Tracking (7 types)
@@ -1231,25 +1231,29 @@ model SalesOrder {
 }
 
 model SalesOrderItem {
-  id            BigInt       @id @default(autoincrement())
-  salesOrderId  Int
-  productId     BigInt
-  quantity      Decimal      @db.Decimal(14, 3)
-  invoicedQty   Decimal      @default(0) @db.Decimal(14, 3)
-  unitPrice     Decimal      @default(0) @map("unit_price") @db.Decimal(14, 2)
-  lineTotal     Decimal      @default(0) @db.Decimal(14, 2)
-  taxableAmount Decimal      @default(0) @map("taxable_amount") @db.Decimal(14, 2)
-  cgstRate      Decimal      @default(0) @map("cgst_rate") @db.Decimal(5, 2)
-  cgstAmount    Decimal      @default(0) @map("cgst_amount") @db.Decimal(14, 2)
-  sgstRate      Decimal      @default(0) @map("sgst_rate") @db.Decimal(5, 2)
-  sgstAmount    Decimal      @default(0) @map("sgst_amount") @db.Decimal(14, 2)
-  igstRate      Decimal      @default(0) @map("igst_rate") @db.Decimal(5, 2)
-  igstAmount    Decimal      @default(0) @map("igst_amount") @db.Decimal(14, 2)
-  product       Product      @relation("SalesOrderItemProduct", fields: [productId], references: [id])
-  salesOrder    SalesOrder   @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  id             BigInt        @id @default(autoincrement())
+  salesOrderId   Int
+  productId      BigInt
+  salesProductId BigInt?       @map("sales_product_id")
+  quantity       Decimal       @db.Decimal(14, 3)
+  invoicedQty    Decimal       @default(0) @db.Decimal(14, 3)
+  unitPrice      Decimal       @default(0) @map("unit_price") @db.Decimal(14, 2)
+  quotationUnitPrice Decimal?  @map("quotation_unit_price") @db.Decimal(14, 2)
+  lineTotal      Decimal       @default(0) @db.Decimal(14, 2)
+  taxableAmount  Decimal       @default(0) @map("taxable_amount") @db.Decimal(14, 2)
+  cgstRate       Decimal       @default(0) @map("cgst_rate") @db.Decimal(5, 2)
+  cgstAmount     Decimal       @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstRate       Decimal       @default(0) @map("sgst_rate") @db.Decimal(5, 2)
+  sgstAmount     Decimal       @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstRate       Decimal       @default(0) @map("igst_rate") @db.Decimal(5, 2)
+  igstAmount     Decimal       @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  product        Product       @relation("SalesOrderItemProduct", fields: [productId], references: [id])
+  salesProduct   SalesProduct? @relation(fields: [salesProductId], references: [id])
+  salesOrder     SalesOrder    @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
   @@index([salesOrderId])
   @@index([productId])
+  @@index([salesProductId])
   @@map("sales_order_items")
 }
 
@@ -1876,6 +1880,8 @@ enum SalesOrderStatus {
   READY_FOR_DISPATCH
   PARTIALLY_DISPATCHED
   DISPATCHED
+  QUOTED
+  INVOICED
 }
 
 enum Status {

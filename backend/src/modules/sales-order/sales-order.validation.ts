@@ -45,6 +45,8 @@ export const SalesOrderStatusEnum = z.enum([
     "READY_FOR_DISPATCH",
     "PARTIALLY_DISPATCHED",
     "DISPATCHED",
+    "QUOTED",
+    "INVOICED",
 ]);
 export type SalesOrderStatus = z.infer<typeof SalesOrderStatusEnum>;
 
@@ -87,11 +89,15 @@ export type Address = z.infer<typeof addressSchema>;
 const salesOrderItemInputSchema = z.object({
     productId: z.union([z.string(), z.number()])
         .refine((val) => !isNaN(Number(val)), "Product ID must be a valid number"),
+    salesProductId: z.union([z.string(), z.number()]).optional().nullable()
+        .transform((val) => (val != null && val !== "" && !isNaN(Number(val)) ? Number(val) : null)),
     quantity: z.union([z.number(), z.string()])
         .transform(Number)
         .refine((val) => Number.isFinite(val) && val > 0, "Quantity must be a valid positive number"),
     // Manually entered unit price (overrides grade-based pricing when present)
     unitPrice: z.union([z.number(), z.string()]).optional().nullable()
+        .transform((val) => (val != null && val !== "" && !isNaN(Number(val)) && Number(val) > 0 ? Number(val) : undefined)),
+    quotationUnitPrice: z.union([z.number(), z.string()]).optional().nullable()
         .transform((val) => (val != null && val !== "" && !isNaN(Number(val)) && Number(val) > 0 ? Number(val) : undefined)),
     // GST fields (optional — stored in sales_order_items)
     cgstRate: z.number().min(0).max(100).optional().nullable(),
@@ -147,18 +153,19 @@ const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
         });
     }
 
-    // Reject duplicate (productId) pairs at the validation layer too,
+    // Reject duplicate (productId + salesProductId) pairs at the validation layer too,
     // so the client gets a field-level Zod error before it even hits the service.
     const seen = new Map<string, number>();
     data.items.forEach((item, index) => {
-        const key = `${item.productId}`;
+        const key = item.salesProductId
+            ? `${item.productId}:${item.salesProductId}`
+            : `${item.productId}`;
         if (seen.has(key)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: `Duplicate item: productId=${item.productId}`,
                 path: ["items", index, "productId"],
             });
-            // also flag the original occurrence
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: `Duplicate item: productId=${item.productId}`,
@@ -244,10 +251,10 @@ export const salesOrderQuerySchema = z.object({
             .optional()
             .transform((val) => (val && val.trim() !== "" ? val : undefined)),
 
-        docType: z
+        quotationOnly: z
             .string()
             .optional()
-            .transform((val) => (val && val.trim() !== "" ? val.toUpperCase() : undefined)),
+            .transform((val) => val === "true"),
 
         customerGradeId: z
             .string()

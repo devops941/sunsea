@@ -18,13 +18,12 @@ type ComponentItem = { productCode: string; quantity: string };
 
 const productLabel = (p: any) => {
     const typeLabel = p.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production";
-    return `${p.productCode} - ${p.productName} (${typeLabel})`;
+    return `${p.productName}`;
 };
 
 const initialFormState = {
     salesProductName: "",
     hsnCode: "",
-    rate: "",
 };
 
 const SalesProductForm: React.FC = () => {
@@ -65,33 +64,10 @@ const SalesProductForm: React.FC = () => {
     // Keep products dropdown fresh when a product is added/updated in another tab
     useSocketSync("product", undefined, loadProducts);
 
-    // Automatically calculate overall Sales Product Rate (₹) when components or quantities change
-    useEffect(() => {
-        if (products.length === 0) return;
-        let sum = 0;
-        let hasSelectedComponent = false;
-        currentItems.forEach((it: any) => {
-            if (it?.productCode) {
-                const prod = products.find((p: any) => String(p.id) === String(it.productCode));
-                if (prod) {
-                    hasSelectedComponent = true;
-                    const unitRate = prod.rate != null ? Number(prod.rate) : (prod.mrp != null ? Number(prod.mrp) : 0);
-                    const qty = Number(it.quantity) || 0;
-                    sum += unitRate * qty;
-                }
-            }
-        });
-        if (hasSelectedComponent) {
-            setFormData((prev) => ({ ...prev, rate: sum.toFixed(2) }));
-            setErrors((prev) => (prev.rate ? { ...prev, rate: "" } : prev));
-        }
-    }, [currentItems, products]);
-
     const populateForm = useCallback((sp: any) => {
         setFormData({
             salesProductName: sp.salesProductName || "",
             hsnCode: sp.hsnCode || "",
-            rate: sp.rate != null ? String(sp.rate) : "",
         });
         replace((sp.components || []).map((it: any) => ({
             productCode: String(it.componentProductId),
@@ -134,12 +110,6 @@ const SalesProductForm: React.FC = () => {
 
         if (!formData.salesProductName.trim()) newErrors.salesProductName = "Sales Product Name is required.";
         if (!formData.hsnCode.trim()) newErrors.hsnCode = "HSN Code is required.";
-        if (!formData.rate.trim()) {
-            newErrors.rate = "Rate (₹) is required.";
-        } else if (isNaN(Number(formData.rate)) || Number(formData.rate) < 0) {
-            newErrors.rate = "Rate must be a valid non-negative number.";
-        }
-
         const items = getValues("items");
         if (items.length === 0) {
             newErrors.items = "At least one component product is required.";
@@ -156,7 +126,7 @@ const SalesProductForm: React.FC = () => {
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0 || items.some(it => !it.productCode || !it.quantity || Number(it.quantity) <= 0)) {
-            toast.error(newErrors.items || newErrors.salesProductName || newErrors.hsnCode || newErrors.rate || "Please fix the highlighted fields.");
+            toast.error(newErrors.items || newErrors.salesProductName || newErrors.hsnCode || "Please fix the highlighted fields.");
             return false;
         }
         return true;
@@ -181,7 +151,6 @@ const SalesProductForm: React.FC = () => {
         const payload: any = {
             salesProductName: formData.salesProductName,
             hsnCode: formData.hsnCode,
-            rate: Number(formData.rate),
             components: getValues("items").map(it => ({
                 componentProductId: Number(it.productCode),
                 quantity: Number(it.quantity),
@@ -206,11 +175,13 @@ const SalesProductForm: React.FC = () => {
     };
 
     const componentProductOptions = useMemo(() => {
-        return products.map((p: any) => ({
-            value: String(p.id),
-            label: productLabel(p),
-            disabled: currentItems.some((it: any) => String(it.productCode) === String(p.id)),
-        }));
+        return products
+            .filter((p: any) => p.productType === "SALES_PRODUCTION")
+            .map((p: any) => ({
+                value: String(p.id),
+                label: productLabel(p),
+                disabled: currentItems.some((it: any) => String(it.productCode) === String(p.id)),
+            }));
     }, [products, currentItems]);
 
     if (isLoadingData) {
@@ -253,18 +224,6 @@ const SalesProductForm: React.FC = () => {
                                 required
                                 onChange={handleChange}
                                 error={errors.hsnCode}
-                                disabled={!canSave}
-                            />
-                            <TextInput
-                                label="Rate (₹)"
-                                name="rate"
-                                type="number"
-                                step="0.01"
-                                value={formData.rate}
-                                placeholder="0.00"
-                                required
-                                onChange={handleChange}
-                                error={errors.rate}
                                 disabled={!canSave}
                             />
                         </div>

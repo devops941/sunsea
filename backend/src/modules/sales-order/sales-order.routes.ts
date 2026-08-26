@@ -45,6 +45,13 @@ router.get(
 );
 
 router.get(
+    "/next-quotation-code",
+    authMiddleware,
+    requirePermission("sales-orders.view"),
+    SalesOrderController.getNextQuotationCode
+);
+
+router.get(
     "/source-orders",
     authMiddleware,
     requirePermission("sales-orders.view"),

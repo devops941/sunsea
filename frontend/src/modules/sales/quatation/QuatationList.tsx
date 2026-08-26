@@ -223,7 +223,7 @@ const QuotationList: React.FC = () => {
                 customerTypeId: customerTypeId || undefined,
                 dispatchType: dispatchType || undefined,
                 orderSource: orderSource || undefined,
-                docType: "QT",
+                quotationOnly: true,
                 status: [
                     "DRAFT",
                     "CONFIRMED",

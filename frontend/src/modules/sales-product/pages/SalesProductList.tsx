@@ -107,11 +107,11 @@ const SalesProductList: React.FC = () => {
                     .filter(Boolean)
                     .join(", ") || "-",
         },
-        {
-            header: "RATE (₹)",
-            align: "right",
-            render: (item) => item.rate != null ? Number(item.rate).toFixed(2) : "-",
-        },
+        // {
+        //     header: "RATE (₹)",
+        //     align: "right",
+        //     render: (item) => item.rate != null ? Number(item.rate).toFixed(2) : "-",
+        // },
         {
             header: "STATUS",
             align: "center",

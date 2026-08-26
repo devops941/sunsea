@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { Controller, useWatch } from "react-hook-form";
+import React from "react";
+import { Controller } from "react-hook-form";
 import type { FieldErrors, UseFieldArrayRemove } from "react-hook-form";
 import SelectInput from "../SelectInput/SelectInput";
 import TextInput from "../TextInput/TextInput";
@@ -10,7 +10,6 @@ export interface OrderItemsTableProps {
     fields: any[];
     errors: FieldErrors<any>;
     productOptions: { value: string; label: string }[];
-    products?: any[];
     remove: UseFieldArrayRemove;
     editable?: boolean;
 }
@@ -21,16 +20,10 @@ const RowItem: React.FC<{
     field: any;
     errors: any;
     productOptions: { value: string; label: string }[];
-    productsMap: Map<string, any>;
     editable: boolean;
     remove: UseFieldArrayRemove;
     canRemove: boolean;
-}> = ({ control, index, field, errors, productOptions, productsMap, editable, remove, canRemove }) => {
-    const itemValue = useWatch({ control, name: `items.${index}` });
-    const selectedProd = itemValue?.productCode ? productsMap.get(String(itemValue.productCode)) : null;
-    const unitRate = selectedProd ? (selectedProd.rate != null ? Number(selectedProd.rate) : (selectedProd.mrp != null ? Number(selectedProd.mrp) : 0)) : 0;
-    const qty = Number(itemValue?.quantity) || 0;
-    const lineTotal = unitRate * qty;
+}> = ({ control, index, field, errors, productOptions, editable, remove, canRemove }) => {
 
     return (
         <tr key={field.id} className="hover:bg-card-2/50 transition-colors duration-200">
@@ -57,10 +50,6 @@ const RowItem: React.FC<{
                 />
             </td>
 
-            <td className="px-3 py-2 whitespace-nowrap text-sm text-ink font-medium">
-                {selectedProd ? `₹${unitRate.toFixed(2)}` : "-"}
-            </td>
-
             <td className="px-3 py-2 whitespace-nowrap">
                 <Controller
                     name={`items.${index}.quantity`}
@@ -78,10 +67,6 @@ const RowItem: React.FC<{
                         />
                     )}
                 />
-            </td>
-
-            <td className="px-3 py-2 whitespace-nowrap text-sm font-semibold text-ink">
-                {selectedProd ? `₹${lineTotal.toFixed(2)}` : "-"}
             </td>
 
             {editable && (
@@ -102,16 +87,9 @@ const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
     fields,
     errors,
     productOptions,
-    products = [],
     remove,
     editable = true,
 }) => {
-    const productsMap = useMemo(() => {
-        const map = new Map<string, any>();
-        products.forEach((p) => map.set(String(p.id), p));
-        return map;
-    }, [products]);
-
     return (
         <div className="rounded-xl border border-line bg-card [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-x-auto">
             <table className="min-w-full divide-y divide-line">
@@ -119,9 +97,7 @@ const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
                     <tr>
                         <th className="px-3 py-3 text-center text-[11px] font-bold text-ink-muted uppercase tracking-widest w-12 border-b border-line">#</th>
                         <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">Product</th>
-                        <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest w-32 border-b border-line">Unit Rate (₹)</th>
                         <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest w-32 border-b border-line">Quantity</th>
-                        <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest w-32 border-b border-line">Amount (₹)</th>
                         {editable && (
                             <th className="px-3 py-3 text-center text-[11px] font-bold text-ink-muted uppercase tracking-widest w-16 border-b border-line"></th>
                         )}
@@ -136,7 +112,6 @@ const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
                             field={field}
                             errors={errors}
                             productOptions={productOptions}
-                            productsMap={productsMap}
                             editable={editable}
                             remove={remove}
                             canRemove={fields.length > 1}

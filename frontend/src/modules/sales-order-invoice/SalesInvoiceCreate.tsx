@@ -220,7 +220,7 @@ const SalesInvoiceForm: React.FC = () => {
       productService.fetchAll().catch(() => []),
       invoiceSettingsService.getConfig().catch(() => null),
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
-      salesOrderService.fetchAll({ pageSize: 100, docType: 'QT' }).catch(() => ({ data: [] } as any)),
+      salesOrderService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),
     ])
       .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse]) => {
@@ -246,7 +246,7 @@ const SalesInvoiceForm: React.FC = () => {
         setAllOrders(ordersList);
 
         const rawSalesOrdersList: any[] = salesOrdersResponse?.data || (salesOrdersResponse as any)?.orders || [];
-        setSalesOrders(rawSalesOrdersList.filter((so: any) => so && so.status !== 'CANCELLED'));
+        setSalesOrders(rawSalesOrdersList.filter((so: any) => so && ['CONFIRMED', 'QUOTED'].includes(so.status)));
 
         const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
         const fgStockMap = new Map<string, number>();
@@ -296,9 +296,9 @@ const SalesInvoiceForm: React.FC = () => {
 
   const loadCustomerOrders = useCallback((custId: string) => {
     if (!custId) return;
-    salesOrderService.fetchAll({ customerId: custId, pageSize: 500, docType: 'QT' })
+    salesOrderService.fetchAll({ customerId: custId, pageSize: 500 })
       .then((res: any) => {
-        const list = (res?.data || res || []).filter((so: any) => so.status !== 'CANCELLED');
+        const list = (res?.data || res || []).filter((so: any) => ['CONFIRMED', 'QUOTED'].includes(so.status));
         setSalesOrders((prev: any[]) => {
           const map = new Map<string, any>();
           prev.forEach((o: any) => map.set(String(o.id), o));
@@ -329,7 +329,9 @@ const SalesInvoiceForm: React.FC = () => {
       const qty = Number(item.quantity || item.qty || 1);
       const perItemDisc = Number(item.discountAmount || 0);
       let rate = 0;
-      if (Number(item.unitPrice) > 0) rate = Number(item.unitPrice);
+      // Quotation price takes priority, then unitPrice, then grade/product price
+      if (Number(item.quotationUnitPrice) > 0) rate = Number(item.quotationUnitPrice);
+      else if (Number(item.unitPrice) > 0) rate = Number(item.unitPrice);
       else if (Number(item.rate) > 0) rate = Number(item.rate);
       else if (Number(item.b2b) > 0) rate = Number(item.b2b);
       else if (Number(item.mrp) > 0) rate = Number(item.mrp);

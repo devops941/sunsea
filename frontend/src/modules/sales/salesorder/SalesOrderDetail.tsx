@@ -195,19 +195,30 @@ const SalesOrderDetail: React.FC = () => {
         }> = [];
         const processedItemIds = new Set<any>();
 
-        salesProducts.forEach(sp => {
+        // Group order items by salesProductId for exact matching
+        const groupedBySp = new Map<string, any[]>();
+        orderItems.forEach(oi => {
+            const spId = oi.salesProductId ? String(oi.salesProductId) : null;
+            if (spId) {
+                if (!groupedBySp.has(spId)) groupedBySp.set(spId, []);
+                groupedBySp.get(spId)!.push(oi);
+            }
+        });
+
+        // Process items grouped by salesProductId first
+        groupedBySp.forEach((items, spIdStr) => {
+            const sp = salesProducts.find(s => String(s.id) === spIdStr);
+            if (!sp) return;
+
             const spComps = (sp?.components || []).filter(
                 (comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION"
             );
-
             if (spComps.length === 0) return;
 
-            const matchingOrderItems = orderItems.filter(oi =>
-                spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
-            );
+            items.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+            const matchingOrderItems = items;
 
-            if (matchingOrderItems.length > 0) {
-                matchingOrderItems.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+            {
 
                 const calcOrderQty = Math.max(...matchingOrderItems.map(oi => {
                     const matchingSpComp = spComps.find((c: any) => String(c.componentProductId) === String(oi.productId));
@@ -236,6 +247,72 @@ const SalesOrderDetail: React.FC = () => {
                         perUnit: compPerUnit,
                         totalQty,
                         included,
+                    };
+                });
+
+                result.push({
+                    id: `sp-${sp.id}`,
+                    productName: sp.salesProductName || sp.salesProductCode,
+                    productCode: sp.salesProductCode,
+                    quantity: calcOrderQty,
+                    unitPrice: itemUnitPrice,
+                    subtotal: itemSubtotal,
+                    cgstAmount: itemCgst > 0 ? itemCgst : (itemGstAmount > 0 && !isInterState ? itemGstAmount / 2 : 0),
+                    sgstAmount: itemSgst > 0 ? itemSgst : (itemGstAmount > 0 && !isInterState ? itemGstAmount / 2 : 0),
+                    igstAmount: itemIgst > 0 ? itemIgst : (itemGstAmount > 0 && isInterState ? itemGstAmount : 0),
+                    cgstRate: itemCgst > 0 && itemSubtotal > 0 ? (itemCgst / itemSubtotal) * 100 : (maxGstRate / 2),
+                    sgstRate: itemSgst > 0 && itemSubtotal > 0 ? (itemSgst / itemSubtotal) * 100 : (maxGstRate / 2),
+                    igstRate: itemIgst > 0 && itemSubtotal > 0 ? (itemIgst / itemSubtotal) * 100 : maxGstRate,
+                    gstRate: maxGstRate,
+                    gstAmount: itemGstAmount,
+                    totalAmount: itemSubtotal + itemGstAmount,
+                    components,
+                });
+            }
+        });
+
+        // Fallback: match remaining items without salesProductId using old component-matching logic
+        salesProducts.forEach(sp => {
+            const spComps = (sp?.components || []).filter(
+                (comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION"
+            );
+            if (spComps.length === 0) return;
+
+            const matchingOrderItems = orderItems.filter(oi =>
+                !processedItemIds.has(oi.id || oi.productId) &&
+                !oi.salesProductId &&
+                spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
+            );
+
+            if (matchingOrderItems.length > 0) {
+                matchingOrderItems.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+
+                const calcOrderQty = Math.max(...matchingOrderItems.map(oi => {
+                    const matchingSpComp = spComps.find((c: any) => String(c.componentProductId) === String(oi.productId));
+                    const perUnit = Number(matchingSpComp?.quantity || 1);
+                    return Math.round(Number(oi.quantity || 1) / perUnit);
+                }), 1);
+
+                const itemSubtotal = matchingOrderItems.reduce((s, oi) => s + Number(oi.lineTotal ?? oi.taxableAmount ?? (Number(oi.quantity || 0) * Number(oi.unitPrice ?? oi.rate ?? 0))), 0);
+                const itemCgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.cgstAmount || 0), 0);
+                const itemSgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.sgstAmount || 0), 0);
+                const itemIgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.igstAmount || 0), 0);
+                const itemGstAmount = itemIgst > 0 ? itemIgst : (itemCgst + itemSgst);
+                const itemUnitPrice = calcOrderQty > 0 ? (itemSubtotal / calcOrderQty) : 0;
+                const maxGstRate = Math.max(...matchingOrderItems.map(oi => Number(oi.igstRate || (Number(oi.cgstRate || 0) + Number(oi.sgstRate || 0)) || 0)), 0);
+
+                const components = spComps.map((c: any) => {
+                    const compPerUnit = Number(c.quantity || 1);
+                    const oi = matchingOrderItems.find(
+                        item => String(item.productId) === String(c.componentProductId)
+                    );
+                    const totalQty = oi ? Number(oi.quantity || 0) : 0;
+                    return {
+                        name: c.componentProduct?.productName || c.componentProduct?.productCode || `Product #${c.componentProductId}`,
+                        code: c.componentProduct?.productCode,
+                        perUnit: compPerUnit,
+                        totalQty,
+                        included: Boolean(oi && totalQty > 0),
                     };
                 });
 

@@ -287,18 +287,6 @@ const AllSalesOrderList: React.FC = () => {
                 customerGradeId: customerGradeId || undefined,
                 customerTypeId: customerTypeId || undefined,
                 orderSource: orderSource || undefined,
-                docType: "SO",
-                status: [
-                    "DRAFT",
-                    "CONFIRMED",
-                    "IN_PRODUCTION",
-                    "PLANNED",
-                    "READY_FOR_DISPATCH",
-                    "PARTIALLY_DISPATCHED",
-                    "DISPATCHED",
-                    "COMPLETED",
-                    "CANCELLED",
-                ] as any,
             });
 
             setData(response.data || []);
