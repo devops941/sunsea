@@ -9,6 +9,8 @@ router.get("/ledgers/:id", (req, res, next) => accountsController.getLedgerById(
 router.patch("/ledgers/:id", (req, res, next) => accountsController.updateLedger(req, res, next));
 router.get("/ledgers/:id/statement", (req, res, next) => accountsController.getLedgerStatement(req, res, next));
 
+router.get("/bank-accounts", (req, res, next) => accountsController.getBankAccounts(req, res, next));
+
 router.get("/payable", (req, res, next) => accountsController.getPayableSummaries(req, res, next));
 router.get("/payable/:supplierId", (req, res, next) => accountsController.getSupplierPayableDetail(req, res, next));
 
@@ -16,6 +18,7 @@ router.get("/receivable", (req, res, next) => accountsController.getReceivableSu
 router.get("/receivable/:customerId", (req, res, next) => accountsController.getCustomerReceivableDetail(req, res, next));
 
 // Reports
+router.get("/balance-sheet", (req, res, next) => accountsController.getBalanceSheet(req, res, next));
 router.get("/trial-balance", (req, res, next) => accountsController.getTrialBalance(req, res, next));
 router.get("/profit-loss", (req, res, next) => accountsController.getProfitAndLoss(req, res, next));
 

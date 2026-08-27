@@ -323,7 +323,6 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "goods-dispatch.view", path: "/production/goods-dispatch" },
       { permission: "shift-execution.view", path: "/shift-execution" },
       { permission: "oee-dashboard.view", path: "/oee-dashboard" },
-      { permission: "sales_products.view", path: "/sales-products" },
     ],
     children: [
       { title: "Order History", path: "/allproduction-orders", permission: "production_orders.view" },
@@ -345,7 +344,6 @@ export const sidebarItems: SidebarItem[] = [
       "/oee-dashboard",
       "/shift-execution",
       "/production-dashboard",
-      "/sales-products",
       "/production/goods-dispatch",
     ],
     permissionAny: [
@@ -357,7 +355,6 @@ export const sidebarItems: SidebarItem[] = [
       "goods-dispatch.view",
       "shift-execution.view",
       "oee-dashboard.view",
-      "sales_products.view",
     ],
   },
   // 8. Inventory
@@ -408,28 +405,65 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "chart-of-accounts.view", path: "/accounts/chart-of-accounts" },
     ],
     children: [
+      // ── Daily Entry (Primary workflow) ──
+      {
+        title: "Payment",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/accounts/payment-voucher/add", permission: "vouchers.view" },
+          { title: "List", path: "/accounts/payment-voucher", permission: "vouchers.view" },
+        ],
+      },
+      {
+        title: "Receipt",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/accounts/receipt-voucher/add", permission: "vouchers.view" },
+          { title: "List", path: "/accounts/receipt-voucher", permission: "vouchers.view" },
+        ],
+      },
+      {
+        title: "Journal",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/accounts/journal-entry/add", permission: "vouchers.view" },
+          { title: "List", path: "/accounts/journal-entry", permission: "vouchers.view" },
+        ],
+      },
+      {
+        title: "Contra",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/accounts/contra-entry/add", permission: "vouchers.view" },
+          { title: "List", path: "/accounts/contra-entry", permission: "vouchers.view" },
+        ],
+      },
+      { title: "Petty Cash", path: "/accounts/petty-cash", permission: "petty-cash.view" },
+      // ── Accounts & Bank ──
+      { title: "Bank Accounts", path: "/accounts/bank-accounts", permission: "accounts.view" },
+      { title: "Chart of Accounts", path: "/accounts/chart-of-accounts", permission: "chart-of-accounts.view" },
+      { title: "Ledger Statement", path: "/accounts/ledger-statement", permission: "accounts.view" },
+      // ── Overview & Reports ──
       { title: "Amount Payable", path: "/accounts/payable", permission: "payable.view" },
       { title: "Amount Receivable", path: "/accounts/receivable", permission: "receivable.view" },
-      { title: "Ledger Statement", path: "/accounts/ledger-statement", permission: "accounts.view" },
-      { title: "Chart of Accounts", path: "/accounts/chart-of-accounts", permission: "chart-of-accounts.view" },
-      { title: "Vouchers Register", path: "/accounts/vouchers", permission: "vouchers.view" },
-      { title: "Sales Return", path: "/accounts/sales-returns", permission: "accounts.view" },
-      { title: "Purchase Return", path: "/accounts/purchase-returns", permission: "accounts.view" },
-      { title: "Petty Cash", path: "/accounts/petty-cash", permission: "petty-cash.view" },
       { title: "Trial Balance", path: "/accounts/trial-balance", permission: "accounts.view" },
       { title: "Profit & Loss", path: "/accounts/profit-loss", permission: "accounts.view" },
+      { title: "Balance Sheet", path: "/accounts/balance-sheet", permission: "accounts.view" },
     ],
     activePaths: [
       "/accounts/payable",
       "/accounts/receivable",
       "/accounts/ledger-statement",
       "/accounts/chart-of-accounts",
-      "/accounts/vouchers",
-      "/accounts/sales-returns",
-      "/accounts/purchase-returns",
       "/accounts/petty-cash",
       "/accounts/trial-balance",
       "/accounts/profit-loss",
+      "/accounts/payment-voucher",
+      "/accounts/receipt-voucher",
+      "/accounts/journal-entry",
+      "/accounts/contra-entry",
+      "/accounts/bank-accounts",
+      "/accounts/balance-sheet",
     ],
     permissionAny: [
       "accounts.view",

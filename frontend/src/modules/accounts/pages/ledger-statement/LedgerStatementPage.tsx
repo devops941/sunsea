@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   FaBook,
-  FaCalendarAlt,
-  FaFileDownload,
-  FaPrint,
   FaSync,
   FaSearch,
 } from "react-icons/fa";
@@ -27,7 +24,6 @@ export const LedgerStatementPage: React.FC = () => {
   const [endDate, setEndDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // Draft filter state for Apply / Clear All
   const [draftLedgerId, setDraftLedgerId] = useState<string>("");
   const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
   const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
@@ -82,7 +78,6 @@ export const LedgerStatementPage: React.FC = () => {
   useSocketSync("salesInvoice", undefined, loadStatement);
   useSocketSync("expense", undefined, loadStatement);
 
-  // Date range preset handler
   const handleDateRangeChange = (val: string) => {
     setDateRangePreset(val);
     if (val === "custom") return;
@@ -134,7 +129,6 @@ export const LedgerStatementPage: React.FC = () => {
     setSearchTerm("");
   };
 
-  // Client-side search filtering on statement entries
   const filteredEntries = useMemo(() => {
     if (!statement || !statement.entries) return [];
     if (!searchTerm.trim()) return statement.entries;
@@ -149,7 +143,6 @@ export const LedgerStatementPage: React.FC = () => {
     );
   }, [statement, searchTerm]);
 
-  // CSV Export dataset configuration
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     if (!statement) return { csvData: [], csvColumns: [], csvFilename: "Ledger_Statement.csv" };
 
@@ -172,30 +165,19 @@ export const LedgerStatementPage: React.FC = () => {
   }, [statement, filteredEntries]);
 
   return (
-    <div className="w-full p-4 md:p-6 bg-card-2 min-h-screen font-sans text-ink space-y-6">
-      {/* UNIFIED HEADER CONTAINER WITH FILTERS */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line">
-        {/* Header Title Bar */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line rounded-t-2xl">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
-                Financial Statements
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold text-ink mt-2 flex items-center gap-2">
-              <FaBook className="text-blue-600 text-xl" /> Account Ledger Statement
-            </h2>
-            <p className="text-xs text-ink-subtle mt-1">
-              Detailed Debit & Credit voucher entries with running balance computation
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+    <div className="w-full p-3 bg-card-2 min-h-screen font-sans text-ink space-y-3">
+      {/* COMPACT HEADER + FILTERS */}
+      <div className="bg-card rounded-lg border border-line">
+        {/* Title Bar - compact */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
+          <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+            <FaBook className="text-blue-600 text-sm" /> Ledger Statement
+          </h2>
+          <div className="flex items-center gap-2">
             <button
               onClick={loadStatement}
-              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
-              title="Refresh Data"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
+              title="Refresh"
             >
               <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
@@ -203,200 +185,197 @@ export const LedgerStatementPage: React.FC = () => {
               data={csvData}
               columns={csvColumns}
               filename={csvFilename}
-              text="Export CSV"
+              text="Export"
             />
           </div>
         </div>
 
-        {/* Filters Panel Inside Header */}
-        <div className="p-6 bg-card-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div className="sm:col-span-2 xl:col-span-1">
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Select Ledger</label>
-              <SelectInput
-                name="draftLedgerId"
-                value={draftLedgerId}
-                options={ledgers.map((l) => ({
-                  label: `[${l.code}] ${l.name}`,
-                  value: String(l.id),
-                }))}
-                hideLabel={true}
-                searchable
-                onChange={(e) => setDraftLedgerId(e.target.value)}
-              />
-            </div>
+        {/* Filter Row - single compact row */}
+        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[220px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Ledger</label>
+            <SelectInput
+              name="draftLedgerId"
+              value={draftLedgerId}
+              options={ledgers.map((l) => ({
+                label: `[${l.code}] ${l.name}`,
+                value: String(l.id),
+              }))}
+              hideLabel={true}
+              searchable
+              onChange={(e) => setDraftLedgerId(e.target.value)}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
-              <SelectInput
-                name="dateRangePreset"
-                value={dateRangePreset}
-                options={DATE_RANGE_OPTIONS}
-                hideLabel={true}
-                onChange={(e) => handleDateRangeChange(e.target.value)}
-              />
-            </div>
+          <div className="w-[140px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+            <SelectInput
+              name="dateRangePreset"
+              value={dateRangePreset}
+              options={DATE_RANGE_OPTIONS}
+              hideLabel={true}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
-              <DatePickerCalendar
-                name="draftStartDate"
-                value={draftStartDate}
-                onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+            <DatePickerCalendar
+              name="draftStartDate"
+              value={draftStartDate}
+              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
-              <DatePickerCalendar
-                name="draftEndDate"
-                value={draftEndDate}
-                onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+            <DatePickerCalendar
+              name="draftEndDate"
+              value={draftEndDate}
+              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="w-full border border-line rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
-                  value={draftSearchTerm}
-                  onChange={(e) => setDraftSearchTerm(e.target.value)}
-                  placeholder="Search particulars or voucher no..."
-                />
-                <FaSearch className="absolute left-3 top-3 text-ink-subtle text-xs" />
-              </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full border border-line rounded pl-7 pr-2 py-1.5 text-xs bg-card text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                value={draftSearchTerm}
+                onChange={(e) => setDraftSearchTerm(e.target.value)}
+                placeholder="Voucher no or particulars..."
+              />
+              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-line">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
+              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded transition-colors border border-line"
             >
-              Clear All
+              Clear
             </button>
             <button
               onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
             >
-              Apply Filters
+              Apply
             </button>
           </div>
         </div>
       </div>
 
-      {/* LEDGER DETAILS & STATEMENT TABLE */}
+      {/* STATEMENT */}
       {statement && (
-        <div className="bg-card border border-line rounded-2xl shadow-sm overflow-hidden">
-          {/* Account Summary Banner matching Amount Payable design */}
-          <div className="p-6 bg-card-2 text-ink border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="inline-block px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded font-mono font-bold text-xs uppercase tracking-wider border border-blue-200 mb-1">
+        <div className="bg-card border border-line rounded-lg overflow-hidden">
+          {/* Compact Summary Banner */}
+          <div className="px-3 py-2 bg-card-2 text-ink border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded font-mono font-bold text-[10px] uppercase tracking-wide border border-blue-200 shrink-0">
                 {statement.ledger.code}
               </span>
-              <h2 className="text-xl font-bold text-ink">{statement.ledger.name}</h2>
-              <div className="text-xs text-ink-subtle mt-1">
-                Category: <strong className="text-ink-muted">{statement.ledger.group}</strong> | Type:{" "}
-                <strong className="text-ink-muted">{statement.ledger.type}</strong>
-              </div>
+              <span className="text-sm font-bold text-ink truncate">{statement.ledger.name}</span>
+              <span className="text-[11px] text-ink-subtle whitespace-nowrap">
+                · {statement.ledger.group} · {statement.ledger.type}
+              </span>
             </div>
 
-            <div className="flex items-center gap-6 text-right">
+            <div className="flex items-center gap-4 text-right shrink-0">
               <div>
-                <span className="text-xs text-ink-subtle font-bold uppercase tracking-wider block">Opening Balance</span>
-                <span className="text-lg font-mono font-bold text-ink">
+                <span className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide block leading-tight">Opening</span>
+                <span className="text-sm font-mono font-bold text-ink">
                   ₹ {statement.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="border-l border-line pl-6">
-                <span className="text-xs text-blue-600 font-bold uppercase tracking-wider block">Closing Balance</span>
-                <span className="text-xl font-mono font-black text-blue-600">
+              <div className="border-l border-line pl-4">
+                <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide block leading-tight">Closing</span>
+                <span className="text-sm font-mono font-black text-blue-600">
                   ₹ {statement.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Statement Table */}
+          {/* Statement Table - compact */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
+            <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-card-2/80 text-ink-muted font-bold border-b border-line text-xs uppercase tracking-wider">
-                  <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Voucher No</th>
-                  <th className="py-3.5 px-4">Type</th>
-                  <th className="py-3.5 px-4">Particulars</th>
-                  <th className="py-3.5 px-4">Narration</th>
-                  <th className="py-3.5 px-4 text-right">Debit (Dr)</th>
-                  <th className="py-3.5 px-4 text-right">Credit (Cr)</th>
-                  <th className="py-3.5 px-4 text-right">Running Balance</th>
+                <tr className="bg-card-2/80 text-ink-muted font-bold border-b border-line text-[10px] uppercase tracking-wide">
+                  <th className="py-2 px-3">Date</th>
+                  <th className="py-2 px-3">Voucher No</th>
+                  <th className="py-2 px-3">Type</th>
+                  <th className="py-2 px-3">Particulars</th>
+                  <th className="py-2 px-3">Narration</th>
+                  <th className="py-2 px-3 text-right">Debit (Dr)</th>
+                  <th className="py-2 px-3 text-right">Credit (Cr)</th>
+                  <th className="py-2 px-3 text-right">Balance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line font-medium text-ink-muted">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-ink-subtle">
-                      <FaSync className="animate-spin text-2xl mx-auto mb-2 text-blue-500" />
-                      Loading statement ledger entries...
+                    <td colSpan={8} className="text-center py-8 text-ink-subtle">
+                      <FaSync className="animate-spin text-lg mx-auto mb-1 text-blue-500" />
+                      Loading entries...
                     </td>
                   </tr>
                 ) : filteredEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-ink-subtle">
-                      No voucher entries found for this ledger matching the selected criteria.
+                    <td colSpan={8} className="text-center py-8 text-ink-subtle text-xs">
+                      No voucher entries found.
                     </td>
                   </tr>
                 ) : (
                   filteredEntries.map((row) => (
-                    <tr key={row.id} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="py-3.5 px-4 font-mono text-xs whitespace-nowrap">{row.date}</td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-ink whitespace-nowrap">
+                    <tr key={row.id} className="hover:bg-card-2/50 transition-colors">
+                      <td className="py-1.5 px-3 font-mono text-[11px] whitespace-nowrap">{row.date}</td>
+                      <td className="py-1.5 px-3 font-mono font-bold text-ink whitespace-nowrap">
                         {row.voucherNo}
                       </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-card-2 text-ink-muted border border-line">
+                      <td className="py-1.5 px-3 whitespace-nowrap">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
                           {row.voucherType}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-ink whitespace-nowrap">
+                      <td className="py-1.5 px-3 font-semibold text-ink whitespace-nowrap">
                         {row.particulars}
                       </td>
-                      <td className="py-3.5 px-4 text-ink-subtle text-xs max-w-xs truncate">
+                      <td className="py-1.5 px-3 text-ink-subtle text-[11px] max-w-xs truncate">
                         {row.narration || "-"}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-ink whitespace-nowrap">
+                      <td className="py-1.5 px-3 text-right font-mono text-ink whitespace-nowrap">
                         {row.debit > 0 ? `₹ ${row.debit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-amber-800 font-bold whitespace-nowrap">
+                      <td className="py-1.5 px-3 text-right font-mono text-amber-700 font-semibold whitespace-nowrap">
                         {row.credit > 0 ? `₹ ${row.credit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-ink whitespace-nowrap">
+                      <td className="py-1.5 px-3 text-right font-mono font-bold text-ink whitespace-nowrap">
                         ₹ {row.runningBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
-              <tfoot className="bg-card-2 text-ink font-bold text-sm border-t-2 border-line">
+              <tfoot className="bg-card-2 text-ink font-bold text-xs border-t-2 border-line">
                 <tr>
-                  <td colSpan={5} className="py-4 px-4 text-right uppercase tracking-wider text-xs text-ink-muted">
-                    Filtered Totals:
+                  <td colSpan={5} className="py-2 px-3 text-right uppercase tracking-wide text-[10px] text-ink-muted">
+                    Totals:
                   </td>
-                  <td className="py-4 px-4 text-right font-mono text-ink font-bold">
+                  <td className="py-2 px-3 text-right font-mono text-ink font-bold">
                     ₹{" "}
                     {filteredEntries
                       .reduce((acc, curr) => acc + curr.debit, 0)
                       .toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="py-4 px-4 text-right font-mono text-amber-800 font-bold">
+                  <td className="py-2 px-3 text-right font-mono text-amber-700 font-bold">
                     ₹{" "}
                     {filteredEntries
                       .reduce((acc, curr) => acc + curr.credit, 0)
                       .toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="py-4 px-4 text-right font-mono text-lg text-blue-700 font-black">
+                  <td className="py-2 px-3 text-right font-mono text-sm text-blue-700 font-black">
                     ₹ {statement.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>

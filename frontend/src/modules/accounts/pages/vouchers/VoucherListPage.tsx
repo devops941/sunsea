@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   FaFileInvoiceDollar,
   FaSearch,
-  FaFileDownload,
-  FaCalendarAlt,
   FaEye,
   FaTimes,
   FaChevronLeft,
@@ -12,7 +10,7 @@ import {
   FaBuilding,
   FaReceipt,
   FaInfoCircle,
-  FaSync
+  FaSync,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
@@ -143,27 +141,27 @@ export const VoucherListPage: React.FC = () => {
     const s = (statusStr || "POSTED").toUpperCase();
     if (s === "POSTED" || s === "CLOSED") {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
           POSTED
         </span>
       );
     }
     if (s === "DRAFT") {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
           DRAFT
         </span>
       );
     }
     if (s === "CANCELLED" || s === "VOID") {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
           CANCELLED
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
         {s}
       </span>
     );
@@ -229,29 +227,18 @@ export const VoucherListPage: React.FC = () => {
   }, [vouchers]);
 
   return (
-    <div className="w-full p-4 md:p-6 bg-card-2 min-h-screen font-sans text-ink space-y-6">
-      {/* UNIFIED HEADER CONTAINER WITH TABS & FILTERS */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line">
-        {/* Header Title Bar */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 border-b border-line rounded-t-2xl">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
-                General Ledger
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold text-ink mt-2 flex items-center gap-2">
-              <FaFileInvoiceDollar className="text-blue-600 text-xl" /> Accounting Vouchers
-            </h2>
-            <p className="text-xs text-ink-subtle mt-1">
-              General ledger transactions, purchase & sales vouchers, payments and receipts
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+    <div className="p-3 space-y-3 bg-card-2 min-h-screen">
+      {/* Compact Header + Tabs + Filters */}
+      <div className="bg-card rounded-lg border border-line">
+        {/* Header row */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
+          <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+            <FaFileInvoiceDollar className="text-blue-600 text-sm" /> Accounting Vouchers
+          </h2>
+          <div className="flex items-center gap-2">
             <button
               onClick={loadVouchers}
-              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh Data"
             >
               <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
@@ -260,121 +247,120 @@ export const VoucherListPage: React.FC = () => {
               data={csvData}
               columns={csvColumns}
               filename={csvFilename}
-              text="Export CSV"
+              text="Export"
             />
           </div>
         </div>
 
-        {/* Voucher Type Tabs Header Row */}
-        <div className="px-6 py-3 bg-card-2/50 flex items-center gap-2 overflow-x-auto border-b border-line-soft">
+        {/* Type tabs - compact */}
+        <div className="px-3 py-1.5 bg-card-2 flex items-center gap-1.5 overflow-x-auto border-b border-line-soft">
           {["ALL", "PURCHASE", "SALES", "PAYMENT", "RECEIPT", "JOURNAL", "CONTRA"].map((t) => (
             <button
               key={t}
               onClick={() => handleTypeChange(t)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${typeFilter === t
-                  ? "bg-blue-600 text-white shadow-sm"
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all whitespace-nowrap ${
+                typeFilter === t
+                  ? "bg-blue-600 text-white"
                   : "bg-card text-ink-muted hover:bg-card-2 border border-line"
-                }`}
+              }`}
             >
               {t}
             </button>
           ))}
         </div>
 
-        {/* Integrated Filters Panel Directly In Header */}
-        <div className="p-2 bg-card">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
-              <SelectInput
-                name="dateRangePreset"
-                value={dateRangePreset}
-                options={DATE_RANGE_OPTIONS}
-                hideLabel={true}
-                onChange={(e) => handleDateRangeChange(e.target.value)}
-              />
-            </div>
+        {/* Filter row - single compact row */}
+        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+          <div className="w-[140px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+            <SelectInput
+              name="dateRangePreset"
+              value={dateRangePreset}
+              options={DATE_RANGE_OPTIONS}
+              hideLabel={true}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
-              <DatePickerCalendar
-                name="draftStartDate"
-                value={draftStartDate}
-                onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+            <DatePickerCalendar
+              name="draftStartDate"
+              value={draftStartDate}
+              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
-              <DatePickerCalendar
-                name="draftEndDate"
-                value={draftEndDate}
-                onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+            <DatePickerCalendar
+              name="draftEndDate"
+              value={draftEndDate}
+              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="w-full border border-line rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
-                  value={draftSearchTerm}
-                  onChange={(e) => setDraftSearchTerm(e.target.value)}
-                  placeholder="Search voucher no or narration..."
-                />
-                <FaSearch className="absolute left-3 top-3 text-ink-subtle text-xs" />
-              </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
+                value={draftSearchTerm}
+                onChange={(e) => setDraftSearchTerm(e.target.value)}
+                placeholder="Voucher no or narration..."
+              />
+              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-4 pt-3 border-t border-line-soft">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
+              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
             >
-              Clear All
+              Clear
             </button>
             <button
               onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded cursor-pointer"
             >
-              Apply Filters
+              Apply
             </button>
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-xl border border-line shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-line bg-card-2 flex items-center justify-between">
-          <h2 className="font-semibold text-ink">
+      <div className="bg-card rounded-lg border border-line overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
+          <h2 className="text-xs font-semibold text-ink">
             {typeFilter === "ALL" ? "All Registered Vouchers" : `${typeFilter} Vouchers`}
           </h2>
-          <span className="text-xs text-ink-subtle font-mono">Total Count: {total}</span>
+          <span className="text-[11px] text-ink-subtle font-mono">Total: {total}</span>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-ink-subtle">Loading vouchers...</div>
+          <div className="p-6 text-center text-xs text-ink-muted">Loading vouchers...</div>
         ) : vouchers.length === 0 ? (
-          <div className="p-12 text-center text-ink-subtle">No vouchers matching your filter criteria.</div>
+          <div className="p-8 text-center text-xs text-ink-subtle">No vouchers matching your filter criteria.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-ink-muted">
-              <thead className="bg-card-2 text-ink-muted uppercase font-semibold text-xs border-b border-line">
+            <table className="w-full text-left text-xs text-ink-muted">
+              <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
                 <tr>
-                  <th className="px-4 py-3">Voucher No</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Debit Ledger</th>
-                  <th className="px-4 py-3">Credit Ledger</th>
-                  <th className="px-4 py-3 text-right">Amount (₹)</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3">Narration</th>
-                  {typeFilter !== "PAYMENT" && <th className="px-4 py-3 text-center">Actions</th>}
+                  <th className="px-3 py-2">Voucher No</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Debit Ledger</th>
+                  <th className="px-3 py-2">Credit Ledger</th>
+                  <th className="px-3 py-2 text-right">Amount (₹)</th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2">Narration</th>
+                  {typeFilter !== "PAYMENT" && <th className="px-3 py-2 text-center">Actions</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y divide-line-soft">
                 {vouchers.map((v) => {
                   const debitItem = v.items.find((i) => i.debitLedger) || v.items.find((i) => Number(i.debitAmount) > 0) || v.items[0];
                   const creditItem = v.items.find((i) => i.creditLedger) || v.items.find((i) => Number(i.creditAmount) > 0) || v.items[1] || v.items[0];
@@ -387,49 +373,41 @@ export const VoucherListPage: React.FC = () => {
                   );
 
                   return (
-                    <tr key={v.id} className="hover:bg-card-2 transition">
-                      {/* Clickable Voucher No */}
-                      <td className="px-4 py-3">
+                    <tr key={v.id} className="hover:bg-card-2 transition-colors">
+                      <td className="px-3 py-1.5">
                         <button
                           onClick={() => openViewModal(v)}
-                          className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline transition"
+                          className="font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline transition cursor-pointer"
                           title="Click to view voucher details"
                         >
                           {v.voucherNo}
                         </button>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-card-2 text-ink">
+                      <td className="px-3 py-1.5">
+                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink border border-line">
                           {v.type}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-ink-muted">
+                      <td className="px-3 py-1.5 font-mono text-[11px]">
                         {new Date(v.date).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",
                           year: "numeric",
                         })}
                       </td>
-                      <td className="px-4 py-3 font-medium text-ink">{debitLedgerName}</td>
-                      <td className="px-4 py-3 text-ink-muted">{creditLedgerName}</td>
-                      {/* Formatted Amount */}
-                      <td className="px-4 py-3 text-right font-bold text-ink whitespace-nowrap">
-                        ₹
-                        {(amount || 0).toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                      <td className="px-3 py-1.5 font-semibold text-ink">{debitLedgerName}</td>
+                      <td className="px-3 py-1.5 text-ink-muted">{creditLedgerName}</td>
+                      <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
+                        ₹{(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      {/* Status Column */}
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-1.5 text-center">
                         {renderStatusBadge(v.status)}
                       </td>
-                      <td className="px-4 py-3 text-ink-subtle max-w-xs truncate" title={v.narration || ""}>
+                      <td className="px-3 py-1.5 text-ink-subtle max-w-xs truncate" title={v.narration || ""}>
                         {v.narration || "-"}
                       </td>
-                      {/* Actions Column */}
                       {typeFilter !== "PAYMENT" && (
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <td className="px-3 py-1.5 text-center whitespace-nowrap">
                           {v.type === "PURCHASE" ? (
                             <button
                               onClick={() => {
@@ -440,10 +418,10 @@ export const VoucherListPage: React.FC = () => {
                                   openViewModal(v);
                                 }
                               }}
-                              className="p-1.5 text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 border border-blue-200 rounded-md transition inline-flex items-center justify-center gap-1 text-xs font-semibold"
+                              className="p-1 text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 border border-blue-200 rounded transition inline-flex items-center justify-center gap-1 text-[10px] font-semibold cursor-pointer"
                               title="View GRN / Purchase Invoice Detail"
                             >
-                              <FaEye className="w-3.5 h-3.5" />
+                              <FaEye className="w-2.5 h-2.5" />
                               <span>View</span>
                             </button>
                           ) : v.type === "SALES" ? (
@@ -456,14 +434,14 @@ export const VoucherListPage: React.FC = () => {
                                   openViewModal(v);
                                 }
                               }}
-                              className="p-1.5 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md transition inline-flex items-center justify-center gap-1 text-xs font-semibold"
+                              className="p-1 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 border border-emerald-200 rounded transition inline-flex items-center justify-center gap-1 text-[10px] font-semibold cursor-pointer"
                               title="View Sales Invoice Detail"
                             >
-                              <FaEye className="w-3.5 h-3.5" />
+                              <FaEye className="w-2.5 h-2.5" />
                               <span>View</span>
                             </button>
                           ) : (
-                            <span className="text-ink-subtle text-xs">—</span>
+                            <span className="text-ink-subtle text-[11px]">—</span>
                           )}
                         </td>
                       )}
@@ -475,112 +453,110 @@ export const VoucherListPage: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination Controls */}
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-line bg-card-2 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-ink-subtle font-medium">
-              Showing <span className="font-semibold text-ink">{(page - 1) * pageSize + 1}</span> to{" "}
-              <span className="font-semibold text-ink">{Math.min(page * pageSize, total)}</span> of{" "}
-              <span className="font-semibold text-ink">{total}</span> vouchers
-            </div>
+          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
+            <span className="text-[11px] text-ink-subtle">
+              Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total} vouchers
+            </span>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                className="p-2 border border-line rounded-lg text-ink-muted hover:bg-card-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                <FaChevronLeft className="w-3.5 h-3.5" />
+                <FaChevronLeft className="w-2.5 h-2.5" />
               </button>
-              <span className="text-xs font-semibold text-ink-muted">
-                Page {page} of {totalPages}
+              <span className="text-[11px] font-semibold text-ink-muted px-1">
+                {page} / {totalPages}
               </span>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                className="p-2 border border-line rounded-lg text-ink-muted hover:bg-card-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                <FaChevronRight className="w-3.5 h-3.5" />
+                <FaChevronRight className="w-2.5 h-2.5" />
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal - View Voucher Details */}
+      {/* Modal - View Voucher Details (compact) */}
       {isModalOpen && selectedVoucher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-card rounded-2xl border border-line shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 animate-fade-in">
+          <div className="bg-card rounded-lg border border-line w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center justify-between">
               <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-bold font-mono">{selectedVoucher.voucherNo}</h2>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold font-mono text-ink">{selectedVoucher.voucherNo}</h2>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/20 text-blue-500 border border-blue-500/30">
                     {selectedVoucher.type}
                   </span>
                   {renderStatusBadge(selectedVoucher.status)}
                 </div>
-                <p className="text-xs text-ink-subtle mt-1">
-                  Voucher Date: {new Date(selectedVoucher.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
+                <p className="text-[11px] text-ink-subtle mt-0.5">
+                  Date: {new Date(selectedVoucher.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
                 </p>
               </div>
               <button
                 onClick={closeViewModal}
-                className="p-2 text-ink-subtle hover:text-white hover:bg-slate-800 rounded-lg transition"
+                className="p-1 text-ink-subtle hover:text-ink hover:bg-card rounded cursor-pointer"
               >
-                <FaTimes className="w-5 h-5" />
+                <FaTimes className="w-3 h-3" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
-              {/* Ref Document Info Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-card-2 p-4 rounded-xl border border-line">
+            <div className="p-3 overflow-y-auto space-y-3 flex-1 text-xs">
+              {/* Ref Document Info */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-card-2 p-2 rounded border border-line">
                 <div>
-                  <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider block">Invoice Number</span>
-                  <span className="font-bold text-ink">{selectedVoucher.refDoc?.invoiceNo || "-"}</span>
+                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block">Invoice Number</span>
+                  <span className="font-bold text-ink text-xs">{selectedVoucher.refDoc?.invoiceNo || "-"}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider block">GRN / PO Ref</span>
-                  <span className="font-mono font-medium text-ink">{getGrnRef(selectedVoucher)}</span>
+                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block">GRN / PO Ref</span>
+                  <span className="font-mono font-medium text-ink text-xs">{getGrnRef(selectedVoucher)}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider block">Supplier / Customer</span>
-                  <span className="font-bold text-blue-900 flex items-center gap-1 mt-0.5">
-                    <FaBuilding className="text-ink-subtle text-xs" />
+                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block">Supplier / Customer</span>
+                  <span className="font-bold text-blue-600 flex items-center gap-1 mt-0.5 text-xs">
+                    <FaBuilding className="text-ink-subtle text-[10px]" />
                     {getPartyName(selectedVoucher)}
                   </span>
                 </div>
               </div>
 
-              {/* Items Detail Table (If GRN/Invoice items exist) */}
+              {/* Items Table */}
               {selectedVoucher.refDoc?.items && selectedVoucher.refDoc.items.length > 0 && (
                 <div>
-                  <h3 className="font-semibold text-ink mb-2 flex items-center gap-2">
-                    <FaReceipt className="text-blue-600" /> Item Description & Quantities
+                  <h3 className="text-xs font-semibold text-ink mb-1.5 flex items-center gap-1.5">
+                    <FaReceipt className="text-blue-600 text-[10px]" /> Item Description & Quantities
                   </h3>
-                  <div className="border border-line rounded-lg overflow-hidden">
+                  <div className="border border-line rounded overflow-hidden">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-card-2 text-ink-muted font-semibold uppercase">
+                      <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
                         <tr>
-                          <th className="px-3 py-2">Item Description</th>
-                          <th className="px-3 py-2 text-center">UOM</th>
-                          <th className="px-3 py-2 text-right">Qty</th>
-                          <th className="px-3 py-2 text-right">Unit Price (₹)</th>
-                          <th className="px-3 py-2 text-right">Tax (%)</th>
-                          <th className="px-3 py-2 text-right">Line Total (₹)</th>
+                          <th className="px-3 py-1.5">Item Description</th>
+                          <th className="px-3 py-1.5 text-center">UOM</th>
+                          <th className="px-3 py-1.5 text-right">Qty</th>
+                          <th className="px-3 py-1.5 text-right">Unit Price (₹)</th>
+                          <th className="px-3 py-1.5 text-right">Tax (%)</th>
+                          <th className="px-3 py-1.5 text-right">Line Total (₹)</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-line text-ink-muted">
+                      <tbody className="divide-y divide-line-soft text-ink-muted">
                         {selectedVoucher.refDoc.items.map((item, idx) => (
                           <tr key={idx} className="hover:bg-card-2">
-                            <td className="px-3 py-2 font-medium text-ink">{item.description}</td>
-                            <td className="px-3 py-2 text-center">{item.uom || "-"}</td>
-                            <td className="px-3 py-2 text-right font-bold text-ink">{item.quantity}</td>
-                            <td className="px-3 py-2 text-right">₹{item.unitPrice.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-right">{item.tax || 0}%</td>
-                            <td className="px-3 py-2 text-right font-bold text-ink">
+                            <td className="px-3 py-1.5 font-medium text-ink">{item.description}</td>
+                            <td className="px-3 py-1.5 text-center">{item.uom || "-"}</td>
+                            <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">{item.quantity}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">₹{item.unitPrice.toFixed(2)}</td>
+                            <td className="px-3 py-1.5 text-right">{item.tax || 0}%</td>
+                            <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
                               ₹{item.lineTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -591,36 +567,36 @@ export const VoucherListPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Journal Double-Entry Ledger Details */}
+              {/* Journal Postings */}
               <div>
-                <h3 className="font-semibold text-ink mb-2 flex items-center gap-2">
-                  <FaInfoCircle className="text-ink-subtle" /> Journal Postings (Debit / Credit Ledgers)
+                <h3 className="text-xs font-semibold text-ink mb-1.5 flex items-center gap-1.5">
+                  <FaInfoCircle className="text-ink-subtle text-[10px]" /> Journal Postings (Debit / Credit Ledgers)
                 </h3>
-                <div className="border border-line rounded-lg overflow-hidden">
+                <div className="border border-line rounded overflow-hidden">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-card-2 text-ink-muted font-semibold uppercase">
+                    <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
                       <tr>
-                        <th className="px-3 py-2">Debit Ledger</th>
-                        <th className="px-3 py-2">Credit Ledger</th>
-                        <th className="px-3 py-2 text-right">Debit (₹)</th>
-                        <th className="px-3 py-2 text-right">Credit (₹)</th>
+                        <th className="px-3 py-1.5">Debit Ledger</th>
+                        <th className="px-3 py-1.5">Credit Ledger</th>
+                        <th className="px-3 py-1.5 text-right">Debit (₹)</th>
+                        <th className="px-3 py-1.5 text-right">Credit (₹)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line text-ink-muted">
+                    <tbody className="divide-y divide-line-soft text-ink-muted">
                       {selectedVoucher.items.map((item, idx) => (
                         <tr key={idx} className="hover:bg-card-2">
-                          <td className="px-3 py-2 font-medium text-ink">
+                          <td className="px-3 py-1.5 font-medium text-ink">
                             {item.debitLedger?.name ? `${item.debitLedger.name} (${item.debitLedger.code})` : "-"}
                           </td>
-                          <td className="px-3 py-2 font-medium text-ink">
+                          <td className="px-3 py-1.5 font-medium text-ink">
                             {item.creditLedger?.name ? `${item.creditLedger.name} (${item.creditLedger.code})` : "-"}
                           </td>
-                          <td className="px-3 py-2 text-right font-bold text-ink">
+                          <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
                             {Number(item.debitAmount) > 0
                               ? `₹${Number(item.debitAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
                               : "-"}
                           </td>
-                          <td className="px-3 py-2 text-right font-bold text-ink">
+                          <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
                             {Number(item.creditAmount) > 0
                               ? `₹${Number(item.creditAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
                               : "-"}
@@ -632,20 +608,20 @@ export const VoucherListPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Narration Note */}
+              {/* Narration */}
               {selectedVoucher.narration && (
-                <div className="bg-card-2 p-4 rounded-xl border border-line">
-                  <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider block mb-1">Narration</span>
-                  <p className="text-ink-muted italic">{selectedVoucher.narration}</p>
+                <div className="bg-card-2 p-2 rounded border border-line">
+                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block mb-0.5">Narration</span>
+                  <p className="text-ink-muted italic text-xs">{selectedVoucher.narration}</p>
                 </div>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-card-2 border-t border-line flex justify-end">
+            <div className="px-3 py-2 bg-card-2 border-t border-line flex justify-end">
               <button
                 onClick={closeViewModal}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl text-xs transition"
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-xs transition cursor-pointer"
               >
                 Close
               </button>

@@ -206,8 +206,18 @@ const SupplierBreakdownPage = lazy(() => import("../modules/accounts/pages/payab
 const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/receivable/CustomerBreakdownPage"));
 const LedgerStatementPage = lazy(() => import("../modules/accounts/pages/ledger-statement/LedgerStatementPage"));
 const ChartOfAccountsPage = lazy(() => import("../modules/accounts/pages/chart-of-accounts/ChartOfAccountsPage"));
-const VoucherListPage = lazy(() => import("../modules/accounts/pages/vouchers/VoucherListPage"));
+const BankAccountsPage = lazy(() => import("../modules/accounts/pages/bank/BankAccountsPage"));
+const BankStatementPage = lazy(() => import("../modules/accounts/pages/bank/BankStatementPage"));
+const PaymentVoucherPage = lazy(() => import("../modules/accounts/pages/vouchers/PaymentVoucherPage"));
+const PaymentVoucherAddPage = lazy(() => import("../modules/accounts/pages/vouchers/PaymentVoucherAddPage"));
+const ReceiptVoucherPage = lazy(() => import("../modules/accounts/pages/vouchers/ReceiptVoucherPage"));
+const ReceiptVoucherAddPage = lazy(() => import("../modules/accounts/pages/vouchers/ReceiptVoucherAddPage"));
+const JournalEntryPage = lazy(() => import("../modules/accounts/pages/vouchers/JournalEntryPage"));
+const JournalEntryAddPage = lazy(() => import("../modules/accounts/pages/vouchers/JournalEntryAddPage"));
+const ContraVoucherPage = lazy(() => import("../modules/accounts/pages/vouchers/ContraVoucherPage"));
+const ContraVoucherAddPage = lazy(() => import("../modules/accounts/pages/vouchers/ContraVoucherAddPage"));
 const TrialBalancePage = lazy(() => import("../modules/accounts/pages/reports/TrialBalancePage"));
+const BalanceSheetPage = lazy(() => import("../modules/accounts/pages/reports/BalanceSheetPage"));
 const ProfitLossPage = lazy(() => import("../modules/accounts/pages/reports/ProfitLossPage"));
 
 const SalesReturnPage = lazy(() =>
@@ -429,17 +439,18 @@ const AppRoutes = () => {
 
               {/* ---------- Accounts & Financials ---------- */}
               <Route element={<ProtectedRoute permissionAny={["accounts.view", "payable.view", "receivable.view", "vouchers.view", "petty-cash.view", "chart-of-accounts.view"]} />}>
-                <Route path="/accounts" element={<AmountPayablePage />} />
                 <Route path="/accounts/payable" element={<AmountPayablePage />} />
                 <Route path="/accounts/receivable" element={<AmountReceivablePage />} />
                 <Route path="/accounts/ledger-statement" element={<LedgerStatementPage />} />
                 <Route path="/accounts/chart-of-accounts" element={<ChartOfAccountsPage />} />
-                <Route path="/accounts/vouchers" element={<VoucherListPage />} />
-                <Route path="/accounts/vouchers/*" element={<VoucherListPage />} />
-                <Route path="/accounts/sales-returns" element={<SalesReturnPage />} />
-                <Route path="/accounts/purchase-returns" element={<PurchaseReturnPage />} />
+                <Route path="/accounts/bank-accounts" element={<BankAccountsPage />} />
+                <Route path="/accounts/payment-voucher" element={<PaymentVoucherPage />} />
+                <Route path="/accounts/receipt-voucher" element={<ReceiptVoucherPage />} />
+                <Route path="/accounts/journal-entry" element={<JournalEntryPage />} />
+                <Route path="/accounts/contra-entry" element={<ContraVoucherPage />} />
                 <Route path="/accounts/petty-cash" element={<PettyCashPage />} />
                 <Route path="/accounts/trial-balance" element={<TrialBalancePage />} />
+                <Route path="/accounts/balance-sheet" element={<BalanceSheetPage />} />
                 <Route path="/accounts/profit-loss" element={<ProfitLossPage />} />
               </Route>
 
@@ -449,6 +460,15 @@ const AppRoutes = () => {
             {/* ================================================================= */}
             {/* FULL-WIDTH PAGES (forms, detail views, dashboards)                */}
             {/* ================================================================= */}
+
+            {/* ---------- Accounts Voucher Add Pages + Bank Statement ---------- */}
+            <Route element={<ProtectedRoute permissionAny={["vouchers.view", "accounts.view"]} />}>
+              <Route path="/accounts/payment-voucher/add" element={<PaymentVoucherAddPage />} />
+              <Route path="/accounts/receipt-voucher/add" element={<ReceiptVoucherAddPage />} />
+              <Route path="/accounts/journal-entry/add" element={<JournalEntryAddPage />} />
+              <Route path="/accounts/contra-entry/add" element={<ContraVoucherAddPage />} />
+              <Route path="/accounts/bank-accounts/:id" element={<BankStatementPage />} />
+            </Route>
 
             {/* ---------- Categories ---------- */}
             <Route element={<ProtectedRoute permission="categories.create" />}>

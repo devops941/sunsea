@@ -157,6 +157,24 @@ export class AccountsController {
     }
   }
 
+  async getBankAccounts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await accountsService.getBankAccounts();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBalanceSheet(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await accountsService.getBalanceSheet();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getTrialBalance(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await accountsService.getTrialBalance();

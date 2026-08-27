@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaBoxes, FaPlus, FaTimes, FaTrash, FaEraser, FaSave } from "react-icons/fa";
+import { FaBoxes, FaPlus, FaTimes, FaTrash, FaSearch, FaChevronLeft, FaChevronRight, FaEye } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
 import { supplierService } from "../../../../services/supplierService";
@@ -7,14 +7,6 @@ import { rawMaterialService } from "../../../../services/rawMaterialService";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { storeService } from "../../../../services/storeService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
-
-import DataTable from "../../../../components/ui/table/DataTable";
-import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
-import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
-import CustomButton from "../../../../components/ui/Button/Button";
-import CommonModal from "../../../../components/ui/Modal/CommonModal";
-import SelectInput from "../../../../components/form/SelectInput/SelectInput";
-import TextInput from "../../../../components/form/TextInput/TextInput";
 
 interface FormReturnRow {
   rawMaterialId: string;
@@ -312,410 +304,490 @@ export const PurchaseReturnPage: React.FC = () => {
   );
 
   return (
-    <div className="bg-card rounded-xl shadow-xs border border-line-soft p-4 space-y-4">
-      {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-ink">Purchase Returns (Debit Note)</h1>
-          <p className="text-sm text-ink-subtle mt-1">
-            Manage supplier purchase returns, stock deductions, and debit notes.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-          <SearchInput
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search returns..."
-          />
-          <CustomButton
-            text="Process Purchase Return"
-            icon={FaPlus}
+    <div className="p-3 space-y-3 bg-card-2 min-h-screen">
+      {/* Compact Header + Filters */}
+      <div className="bg-card rounded-lg border border-line">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
+          <h1 className="text-sm font-bold text-ink flex items-center gap-2">
+            <FaBoxes className="text-orange-500 text-sm" /> Purchase Returns (Debit Note)
+          </h1>
+          <button
             onClick={() => {
               resetForm();
               setShowModal(true);
             }}
-          />
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-semibold transition cursor-pointer"
+          >
+            <FaPlus className="text-[10px]" /> Process Purchase Return
+          </button>
+        </div>
+
+        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Return no, supplier, GRN, reason..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+              />
+              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
+            </div>
+          </div>
+          {searchTerm && (
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setCurrentPage(1);
+              }}
+              className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
       {/* Table */}
-      <DataTable
-        data={paginatedReturns}
-        rowKey={(item) => item.id}
-        loading={loading}
-        emptyMessage="No purchase return records found."
-        pagination={{
-          currentPage,
-          totalPages,
-          onPageChange: (page) => setCurrentPage(page),
-        }}
-        columns={[
-          {
-            header: "#",
-            width: "60px",
-            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
-          },
-          {
-            header: "RETURN NO",
-            render: (item) => (
+      <div className="bg-card rounded-lg border border-line overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
+          <h2 className="text-xs font-semibold text-ink">Purchase Returns</h2>
+          <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredReturns.length}</span>
+        </div>
+        {loading ? (
+          <div className="p-6 text-center text-xs text-ink-muted">Loading...</div>
+        ) : paginatedReturns.length === 0 ? (
+          <div className="p-8 text-center text-xs text-ink-subtle">No purchase return records found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-ink-muted">
+              <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                <tr>
+                  <th className="px-3 py-2 w-10">#</th>
+                  <th className="px-3 py-2">Return No</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Supplier</th>
+                  <th className="px-3 py-2">GRN Invoice</th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2 text-right">Grand Total (₹)</th>
+                  <th className="px-3 py-2">Reason</th>
+                  <th className="px-3 py-2 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {paginatedReturns.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-card-2 transition-colors">
+                    <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
+                      {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <button
+                        onClick={() => setSelectedViewReturn(item)}
+                        className="font-mono font-semibold text-orange-500 hover:underline cursor-pointer"
+                        title="Click to view PO Return Details"
+                      >
+                        {item.returnNo}
+                      </button>
+                    </td>
+                    <td className="px-3 py-1.5 font-mono text-[11px]">
+                      {new Date(item.returnDate).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="px-3 py-1.5 font-semibold text-ink">{item.supplier?.legalName || "-"}</td>
+                    <td className="px-3 py-1.5 text-ink-muted font-mono text-[11px]">
+                      {item.grnInvoice?.invoiceNo || (item.grnInvoiceId ? `GRN #${item.grnInvoiceId}` : "-")}
+                    </td>
+                    <td className="px-3 py-1.5 text-center">
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-orange-500 whitespace-nowrap">
+                      ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-3 py-1.5 text-ink-subtle max-w-xs truncate">{item.reason || "-"}</td>
+                    <td className="px-3 py-1.5 text-center">
+                      <button
+                        onClick={() => setSelectedViewReturn(item)}
+                        className="p-1 text-orange-500 hover:text-white hover:bg-orange-500 border border-orange-200 rounded transition cursor-pointer"
+                        title="View"
+                      >
+                        <FaEye className="w-2.5 h-2.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-line bg-card-2">
+                <tr>
+                  <td colSpan={6} className="px-3 py-2 text-right text-[10px] font-bold text-ink uppercase tracking-wide">
+                    Page Total ({paginatedReturns.length}):
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-sm text-orange-500 font-mono">
+                    ₹{paginatedReturns.reduce((s, r) => s + Number(r.grandTotal || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
+            <span className="text-[11px] text-ink-subtle">
+              Page {currentPage} of {totalPages} ({filteredReturns.length} records)
+            </span>
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setSelectedViewReturn(item)}
-                className="font-mono font-bold text-amber-600 hover:underline text-left"
-                title="Click to view PO Return Details"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                {item.returnNo}
+                <FaChevronLeft className="w-2.5 h-2.5" />
               </button>
-            ),
-          },
-          {
-            header: "DATE",
-            render: (item) => new Date(item.returnDate).toLocaleDateString("en-IN"),
-          },
-          {
-            header: "SUPPLIER",
-            render: (item) => item.supplier?.legalName || "-",
-          },
-          {
-            header: "GRN INVOICE",
-            render: (item) => item.grnInvoice?.invoiceNo || (item.grnInvoiceId ? `GRN #${item.grnInvoiceId}` : "-"),
-          },
-          {
-            header: "STATUS",
-            render: (item) => (
-              <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                {item.status}
-              </span>
-            ),
-          },
-          {
-            header: "GRAND TOTAL",
-            align: "right",
-            render: (item) => (
-              <span className="font-semibold text-blue-600">
-                ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </span>
-            ),
-          },
-          {
-            header: "REASON",
-            render: (item) => <span className="text-ink-subtle max-w-xs truncate block">{item.reason || "-"}</span>,
-          },
-          {
-            header: "ACTIONS",
-            render: (item) => (
-              <div className="flex items-center gap-2">
-                <ViewButton onClick={() => setSelectedViewReturn(item)} />
-              </div>
-            ),
-          },
-        ]}
-      />
-
-      <CommonModal
-        show={showModal}
-        onHide={() => setShowModal(false)}
-        title="New Purchase Return (Debit Note)"
-        maxWidth="3xl"
-        footer={
-          <div className="flex items-center justify-end gap-2 w-full">
-            <CustomButton
-              text="Clear"
-              icon={FaEraser}
-              variant="secondary"
-              onClick={resetForm}
-              disabled={submitting}
-              type="button"
-            />
-            <CustomButton
-              type="submit"
-              text={submitting ? "Processing Return..." : "Submit Return"}
-              icon={FaSave}
-              variant="primary"
-              disabled={submitting}
-              onClick={handleSubmit}
-            />
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <FaChevronRight className="w-2.5 h-2.5" />
+              </button>
+            </div>
           </div>
-        }
-      >
-        <form onSubmit={handleSubmit} className="space-y-4 p-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SelectInput
-              label="SUPPLIER"
-              name="supplierId"
-              value={supplierId}
-              required
-              defaultOptionLabel="Select Supplier"
-              searchable
-              options={suppliers.map((s) => ({
-                label: `${s.supplierCode} - ${s.legalName}`,
-                value: String(s.id),
-              }))}
-              onChange={(e) => setSupplierId(e.target.value)}
-            />
+        )}
+      </div>
 
-            <SelectInput
-              label="ORIGINAL GRN INVOICE"
-              name="selectedGrnId"
-              value={selectedGrnId}
-              disabled={!supplierId}
-              defaultOptionLabel="-- Direct Return (No GRN Link) --"
-              searchable
-              options={supplierInvoices.map((grn) => ({
-                label: `${grn.invoiceNo || grn.grnNumber} (₹${Number(grn.netAmount || grn.subtotal || grn.grandTotal || 0).toFixed(2)}) - ${new Date(grn.receiveDate || grn.createdAt).toLocaleDateString("en-IN")}`,
-                value: String(grn.id),
-              }))}
-              onChange={(e) => setSelectedGrnId(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SelectInput
-              label="STORE / WAREHOUSE"
-              name="selectedStoreId"
-              value={selectedStoreId}
-              required={!selectedGrnId}
-              defaultOptionLabel="Select Store"
-              options={stores.map((st) => ({
-                label: `${st.storeCode ? `${st.storeCode} - ` : ""}${st.storeName || st.name}`,
-                value: String(st.storeId || st.id),
-              }))}
-              onChange={(e) => setSelectedStoreId(e.target.value)}
-            />
-
-            <SelectInput
-              label="REFUND / SETTLEMENT MODE"
-              name="refundMode"
-              value={refundMode}
-              required
-              options={[
-                { label: "Debit Note (Adjust against supplier ledger)", value: "CREDIT_NOTE" },
-                { label: "Cash Refund (Receive Cash-in-Hand)", value: "CASH" },
-                { label: "Bank Refund (Receive in Bank Account)", value: "BANK" },
-              ]}
-              onChange={(e) => setRefundMode(e.target.value as any)}
-            />
-          </div>
-
-          <TextInput
-            label="REASON FOR RETURN"
-            name="reason"
-            value={reason}
-            required
-            placeholder="e.g. Damaged material / Substandard quality"
-            onChange={(e) => setReason(e.target.value)}
-          />
-
-          {/* Items Section */}
-          <div className="pt-2">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <label className="block text-xs font-semibold text-ink uppercase">Return Raw Materials</label>
-                {selectedGrnId && (
-                  <p className="text-[11px] text-amber-700 font-medium">
-                    Showing purchased items from selected GRN/PO. Only purchased items can be returned.
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                {fetchingGrn && <span className="text-xs text-blue-600 animate-pulse font-medium">Fetching GRN items...</span>}
-                {!selectedGrnId && (
-                  <CustomButton
-                    text="Add Item Row"
-                    icon={FaPlus}
-                    onClick={handleAddManualRow}
-                    type="button"
-                  />
-                )}
-              </div>
+      {/* Compact Add Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 overflow-y-auto">
+          <div className="bg-card rounded-lg border border-line w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+                <FaBoxes className="text-orange-500 text-sm" /> New Purchase Return (Debit Note)
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 text-ink-subtle hover:text-ink hover:bg-card rounded cursor-pointer"
+              >
+                <FaTimes className="text-xs" />
+              </button>
             </div>
 
-            {returnRows.length === 0 ? (
-              <div className="p-4 border border-dashed border-line-soft rounded-lg text-center text-xs text-ink-subtle">
-                {selectedGrnId ? "No returnable items found for this GRN." : "Select a GRN Invoice or click '+ Add Item Row' to select raw materials."}
+            <form onSubmit={handleSubmit} className="p-3 space-y-2 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">
+                    Supplier <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={supplierId}
+                    required
+                    onChange={(e) => setSupplierId(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.supplierCode} - {s.legalName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">
+                    Original GRN Invoice
+                  </label>
+                  <select
+                    value={selectedGrnId}
+                    disabled={!supplierId}
+                    onChange={(e) => setSelectedGrnId(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="">-- Direct Return (No GRN Link) --</option>
+                    {supplierInvoices.map((grn) => (
+                      <option key={grn.id} value={String(grn.id)}>
+                        {grn.invoiceNo || grn.grnNumber} (₹{Number(grn.netAmount || grn.subtotal || grn.grandTotal || 0).toFixed(2)}) - {new Date(grn.receiveDate || grn.createdAt).toLocaleDateString("en-IN")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            ) : (
-              <div className="border border-line-soft rounded-lg overflow-hidden">
-                <table className="w-full text-left text-xs text-ink">
-                  <thead className="bg-card-2 uppercase font-semibold text-ink-muted border-b border-line-soft">
-                    <tr>
-                      <th className="px-3 py-2">Raw Material</th>
-                      <th className="px-3 py-2 w-28 text-center">Return Qty</th>
-                      <th className="px-3 py-2 w-32 text-right">Unit Price (₹)</th>
-                      <th className="px-3 py-2 w-32 text-right">Line Total (₹)</th>
-                      {!selectedGrnId && <th className="px-3 py-2 w-10 text-center"></th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line-soft bg-card">
-                    {returnRows.map((row, idx) => {
-                      const lineTot = row.quantity * row.unitPrice;
-                      return (
-                        <tr key={idx} className="hover:bg-card-2/50">
-                          <td className="px-3 py-2">
-                            {row.isGrnLinked ? (
-                              <div>
-                                <div className="font-bold text-ink text-xs">
-                                  {row.materialName}
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] text-ink-subtle mt-0.5 font-mono">
-                                  <span>Purchased Qty: <strong className="text-ink-muted">{row.purchasedQty}</strong></span>
-                                  {row.alreadyReturnedQty > 0 && (
-                                    <span>| Already Returned: <strong className="text-amber-700">{row.alreadyReturnedQty}</strong></span>
-                                  )}
-                                  <span>| Max Returnable: <strong className="text-emerald-700">{row.maxReturnable}</strong></span>
-                                </div>
-                              </div>
-                            ) : (
-                              <select
-                                value={row.rawMaterialId}
-                                onChange={(e) => handleRowMaterialChange(idx, e.target.value)}
-                                className="w-full px-2 py-1 border border-line-soft rounded text-xs font-medium bg-card-2 text-ink focus:outline-none focus:border-blue-500"
-                              >
-                                {materials.map((m) => {
-                                  const rmId = String(m.rawMaterialId || m.id);
-                                  const matName = m.materialName || m.name || m.materialCode || rmId;
-                                  return (
-                                    <option key={rmId} value={rmId}>
-                                      {rmId} - {matName}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={row.maxReturnable}
-                              step="0.01"
-                              value={row.quantity || ""}
-                              placeholder="0"
-                              disabled={row.maxReturnable <= 0}
-                              onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 border border-line-soft rounded text-center font-bold text-blue-600 bg-card-2 focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={row.unitPrice || ""}
-                              disabled={row.isGrnLinked}
-                              onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)}
-                              className="w-24 px-2 py-1 border border-line-soft rounded text-right font-mono bg-card-2 text-ink focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-ink">
-                            ₹{lineTot.toFixed(2)}
-                          </td>
-                          {!selectedGrnId && (
-                            <td className="px-3 py-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveRow(idx)}
-                                className="text-ink-subtle hover:text-rose-600 p-1"
-                                title="Remove item"
-                              >
-                                <FaTrash size={12} />
-                              </button>
-                            </td>
-                          )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">
+                    Store / Warehouse {!selectedGrnId && <span className="text-red-500">*</span>}
+                  </label>
+                  <select
+                    value={selectedStoreId}
+                    required={!selectedGrnId}
+                    onChange={(e) => setSelectedStoreId(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">Select Store</option>
+                    {stores.map((st) => (
+                      <option key={String(st.storeId || st.id)} value={String(st.storeId || st.id)}>
+                        {st.storeCode ? `${st.storeCode} - ` : ""}{st.storeName || st.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">
+                    Refund / Settlement Mode <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={refundMode}
+                    required
+                    onChange={(e) => setRefundMode(e.target.value as any)}
+                    className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="CREDIT_NOTE">Debit Note (Adjust against supplier ledger)</option>
+                    <option value="CASH">Cash Refund (Receive Cash-in-Hand)</option>
+                    <option value="BANK">Bank Refund (Receive in Bank Account)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">
+                  Reason for Return <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={reason}
+                  required
+                  placeholder="e.g. Damaged material / Substandard quality"
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Items Section */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-semibold text-ink uppercase tracking-wide">Return Raw Materials</label>
+                  <div className="flex items-center gap-2">
+                    {fetchingGrn && <span className="text-[11px] text-orange-500 animate-pulse font-medium">Fetching GRN items...</span>}
+                    {!selectedGrnId && (
+                      <button
+                        type="button"
+                        onClick={handleAddManualRow}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-orange-500 hover:text-orange-600 cursor-pointer"
+                      >
+                        <FaPlus className="w-2.5 h-2.5" /> Add Row
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {returnRows.length === 0 ? (
+                  <div className="p-3 border border-dashed border-line rounded text-center text-[11px] text-ink-subtle">
+                    {selectedGrnId ? "No returnable items found for this GRN." : "Select a GRN Invoice or click Add Row to select raw materials."}
+                  </div>
+                ) : (
+                  <div className="border border-line rounded overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-card-2 text-ink uppercase text-[10px] tracking-wide font-bold border-b border-line">
+                        <tr>
+                          <th className="px-2 py-1.5">Raw Material</th>
+                          <th className="px-2 py-1.5 w-24 text-center">Qty</th>
+                          <th className="px-2 py-1.5 w-28 text-right">Unit Price (₹)</th>
+                          <th className="px-2 py-1.5 w-28 text-right">Line Total (₹)</th>
+                          {!selectedGrnId && <th className="px-2 py-1.5 w-8 text-center"></th>}
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-line-soft">
+                        {returnRows.map((row, idx) => {
+                          const lineTot = row.quantity * row.unitPrice;
+                          return (
+                            <tr key={idx} className="hover:bg-card-2/50">
+                              <td className="px-2 py-1.5">
+                                {row.isGrnLinked ? (
+                                  <div>
+                                    <div className="font-semibold text-ink text-xs">{row.materialName}</div>
+                                    <div className="flex items-center gap-2 text-[10px] text-ink-subtle mt-0.5 font-mono">
+                                      <span>Purchased: <strong className="text-ink-muted">{row.purchasedQty}</strong></span>
+                                      {row.alreadyReturnedQty > 0 && (
+                                        <span>| Returned: <strong className="text-orange-500">{row.alreadyReturnedQty}</strong></span>
+                                      )}
+                                      <span>| Max: <strong className="text-emerald-500">{row.maxReturnable}</strong></span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={row.rawMaterialId}
+                                    onChange={(e) => handleRowMaterialChange(idx, e.target.value)}
+                                    className="w-full px-2 py-1 border border-line rounded text-xs bg-card text-ink focus:outline-none focus:border-orange-500"
+                                  >
+                                    {materials.map((m) => {
+                                      const rmId = String(m.rawMaterialId || m.id);
+                                      const matName = m.materialName || m.name || m.materialCode || rmId;
+                                      return (
+                                        <option key={rmId} value={rmId}>
+                                          {rmId} - {matName}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={row.maxReturnable}
+                                  step="0.01"
+                                  value={row.quantity || ""}
+                                  placeholder="0"
+                                  disabled={row.maxReturnable <= 0}
+                                  onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)}
+                                  className="w-full px-2 py-1 border border-line rounded text-center font-mono font-semibold text-orange-500 bg-card focus:outline-none focus:border-orange-500 disabled:opacity-60"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={row.unitPrice || ""}
+                                  disabled={row.isGrnLinked}
+                                  onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)}
+                                  className="w-full px-2 py-1 border border-line rounded text-right font-mono bg-card text-ink focus:outline-none focus:border-orange-500 disabled:opacity-60"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
+                                ₹{lineTot.toFixed(2)}
+                              </td>
+                              {!selectedGrnId && (
+                                <td className="px-2 py-1.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRow(idx)}
+                                    className="p-1 text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                  >
+                                    <FaTrash className="w-2.5 h-2.5" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="border-t-2 border-line bg-card-2">
+                        <tr>
+                          <td colSpan={3} className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide">
+                            Grand Total:
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-bold text-sm text-orange-500 font-mono">
+                            ₹{grandTotal.toFixed(2)}
+                          </td>
+                          {!selectedGrnId && <td></td>}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Totals Summary */}
-          {returnRows.length > 0 && (
-            <div className="bg-card-2 p-3 rounded-lg border border-line-soft flex flex-col items-end space-y-1 text-xs">
-              <div className="flex justify-between w-48 font-bold text-ink text-sm">
-                <span>Grand Total:</span>
-                <span className="font-mono text-blue-600">₹{grandTotal.toFixed(2)}</span>
-              </div>
-            </div>
-          )}
-
-          <TextInput
-            label="NARRATION / INTERNAL NOTES"
-            name="narration"
-            value={narration}
-            as="textarea"
-            rows={2}
-            placeholder="Additional accounting notes..."
-            onChange={(e) => setNarration(e.target.value)}
-          />
-        </form>
-      </CommonModal>
-      {/* PO Return Detail Modal */}
-      {selectedViewReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-card rounded-xl shadow-xl border border-line-soft w-full max-w-2xl overflow-hidden my-8">
-            <div className="p-5 border-b border-line-soft bg-amber-500/10 flex items-center justify-between">
               <div>
-                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Purchase Return Detail</span>
-                <h3 className="text-xl font-bold text-ink font-mono flex items-center gap-2 mt-0.5">
+                <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">
+                  Narration / Internal Notes
+                </label>
+                <textarea
+                  value={narration}
+                  rows={2}
+                  placeholder="Additional accounting notes..."
+                  onChange={(e) => setNarration(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={submitting}
+                  className="px-3 py-1.5 text-ink-muted bg-card-2 hover:bg-card border border-line rounded font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  Clear
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  {submitting ? "Processing..." : "Submit Return"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PO Return Detail Modal - compact */}
+      {selectedViewReturn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 overflow-y-auto">
+          <div className="bg-card rounded-lg border border-line w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-semibold text-orange-500 uppercase tracking-wide">Purchase Return Detail</span>
+                <h3 className="text-sm font-bold text-ink font-mono flex items-center gap-2 mt-0.5">
                   {selectedViewReturn.returnNo}
                 </h3>
               </div>
               <button
                 onClick={() => setSelectedViewReturn(null)}
-                className="text-ink-subtle hover:text-ink p-1.5 rounded-lg hover:bg-card-2 transition"
+                className="p-1 text-ink-subtle hover:text-ink hover:bg-card rounded cursor-pointer"
               >
-                <FaTimes />
+                <FaTimes className="text-xs" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-sm">
+            <div className="p-3 space-y-3 overflow-y-auto flex-1 text-xs">
               {/* Key Metadata */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-card-2 p-4 rounded-xl border border-line-soft">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-card-2 p-2 rounded border border-line">
                 <div>
-                  <div className="text-xs text-ink-subtle font-medium">Return Date</div>
-                  <div className="font-semibold text-ink mt-0.5">
+                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Return Date</div>
+                  <div className="font-semibold text-ink mt-0.5 text-xs">
                     {new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")}
                   </div>
                 </div>
-
                 <div>
-                  <div className="text-xs text-ink-subtle font-medium">Supplier</div>
-                  <div className="font-semibold text-ink mt-0.5">
+                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Supplier</div>
+                  <div className="font-semibold text-ink mt-0.5 text-xs">
                     {selectedViewReturn.supplier?.legalName || "-"}
                   </div>
                 </div>
-
                 <div>
-                  <div className="text-xs text-ink-subtle font-medium">GRN Invoice Ref</div>
-                  <div className="font-semibold text-ink mt-0.5 font-mono text-xs">
+                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">GRN Invoice Ref</div>
+                  <div className="font-semibold text-ink mt-0.5 font-mono text-[11px]">
                     {selectedViewReturn.grnInvoice?.invoiceNo || (selectedViewReturn.grnInvoiceId ? `GRN #${selectedViewReturn.grnInvoiceId}` : "Direct Return")}
                   </div>
                 </div>
-
                 <div>
-                  <div className="text-xs text-ink-subtle font-medium">Status</div>
+                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Status</div>
                   <div className="mt-0.5">
-                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                    <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                       {selectedViewReturn.status}
                     </span>
                   </div>
                 </div>
-
                 <div>
-                  <div className="text-xs text-ink-subtle font-medium">Grand Total</div>
-                  <div className="font-bold text-amber-700 mt-0.5 font-mono">
+                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Grand Total</div>
+                  <div className="font-bold text-orange-500 mt-0.5 font-mono text-xs">
                     ₹{Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </div>
                 </div>
-
                 <div>
-                  <div className="text-xs text-ink-subtle font-medium">Reason</div>
-                  <div className="font-medium text-ink-muted mt-0.5 truncate">
+                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Reason</div>
+                  <div className="font-medium text-ink-muted mt-0.5 truncate text-xs">
                     {selectedViewReturn.reason || "-"}
                   </div>
                 </div>
@@ -723,45 +795,45 @@ export const PurchaseReturnPage: React.FC = () => {
 
               {/* Items Table */}
               <div>
-                <h4 className="font-semibold text-ink mb-3 flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-ink mb-1.5 flex items-center justify-between">
                   <span>Returned Raw Materials</span>
-                  <span className="text-xs font-normal text-ink-subtle">Items: {selectedViewReturn.items?.length || 0}</span>
+                  <span className="text-[11px] font-normal text-ink-subtle">Items: {selectedViewReturn.items?.length || 0}</span>
                 </h4>
-                <div className="border border-line-soft rounded-lg overflow-hidden">
-                  <table className="w-full text-left text-xs text-ink">
-                    <thead className="bg-card-2 uppercase font-semibold text-ink-muted border-b border-line-soft">
+                <div className="border border-line rounded overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
                       <tr>
-                        <th className="px-3 py-2.5">Material ID</th>
-                        <th className="px-3 py-2.5">Material Name</th>
-                        <th className="px-3 py-2.5 text-center">Returned Qty</th>
-                        <th className="px-3 py-2.5 text-right">Unit Price (₹)</th>
-                        <th className="px-3 py-2.5 text-right">Line Total (₹)</th>
+                        <th className="px-3 py-1.5">Material ID</th>
+                        <th className="px-3 py-1.5">Material Name</th>
+                        <th className="px-3 py-1.5 text-center">Returned Qty</th>
+                        <th className="px-3 py-1.5 text-right">Unit Price (₹)</th>
+                        <th className="px-3 py-1.5 text-right">Line Total (₹)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line-soft bg-card">
+                    <tbody className="divide-y divide-line-soft text-ink-muted">
                       {selectedViewReturn.items && selectedViewReturn.items.length > 0 ? (
                         selectedViewReturn.items.map((item, i) => (
                           <tr key={item.id || i} className="hover:bg-card-2/50">
-                            <td className="px-3 py-2.5 font-mono text-amber-700 font-medium">
+                            <td className="px-3 py-1.5 font-mono text-orange-500 font-medium">
                               {item.rawMaterialId}
                             </td>
-                            <td className="px-3 py-2.5 font-medium text-ink">
+                            <td className="px-3 py-1.5 font-medium text-ink">
                               {item.rawMaterial?.materialName || item.rawMaterial?.name || item.rawMaterialId}
                             </td>
-                            <td className="px-3 py-2.5 text-center font-bold text-ink">
+                            <td className="px-3 py-1.5 text-center font-mono font-semibold text-ink">
                               {item.quantity}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-mono">
+                            <td className="px-3 py-1.5 text-right font-mono">
                               ₹{Number(item.unitPrice).toFixed(2)}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-ink">
+                            <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
                               ₹{(Number(item.lineTotal) || Number(item.quantity) * Number(item.unitPrice)).toFixed(2)}
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-6 text-center text-ink-subtle">
+                          <td colSpan={5} className="px-3 py-6 text-center text-ink-subtle text-xs">
                             No item details found for this return.
                           </td>
                         </tr>
@@ -772,17 +844,17 @@ export const PurchaseReturnPage: React.FC = () => {
               </div>
 
               {selectedViewReturn.narration && (
-                <div className="bg-card-2 p-3.5 rounded-lg border border-line-soft text-xs">
-                  <span className="font-semibold text-ink block mb-1">Narration / Notes:</span>
+                <div className="bg-card-2 p-2 rounded border border-line text-xs">
+                  <span className="font-semibold text-ink block mb-0.5 text-[10px] uppercase tracking-wide">Narration / Notes</span>
                   <p className="text-ink-muted leading-relaxed">{selectedViewReturn.narration}</p>
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-line-soft bg-card-2 flex justify-end">
+            <div className="px-3 py-2 border-t border-line bg-card-2 flex justify-end">
               <button
                 onClick={() => setSelectedViewReturn(null)}
-                className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium text-sm transition shadow-sm"
+                className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded font-semibold text-xs transition cursor-pointer"
               >
                 Close
               </button>

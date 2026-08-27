@@ -101,22 +101,14 @@ class ReceivableService {
     customerId?: string;
     search?: string;
   }): Promise<CustomerReceivableSummary[]> {
-    try {
-      const { voucherPostingService } = require("./voucherPosting.service");
-      await voucherPostingService.syncUnpostedVouchers();
-    } catch (err) {
-      console.error("[ReceivableService] Sync unposted vouchers failed:", err);
-    }
-
     const cutoffDate = params?.asOnDate ? new Date(params.asOnDate) : new Date();
-    if (params?.asOnDate) {
-      cutoffDate.setHours(23, 59, 59, 999);
-    }
+    if (params?.asOnDate) cutoffDate.setHours(23, 59, 59, 999);
 
     const startDateObj = params?.startDate ? new Date(params.startDate) : undefined;
     const endDateObj = params?.endDate ? new Date(params.endDate) : undefined;
     if (endDateObj) endDateObj.setHours(23, 59, 59, 999);
 
+    // 1. Fetch customers
     const customers = await prisma.customer.findMany({
       where: {
         ...(params?.customerId && { id: params.customerId }),
@@ -130,123 +122,151 @@ class ReceivableService {
       orderBy: { firmName: "asc" },
     });
 
-    const results: CustomerReceivableSummary[] = await Promise.all(
-      customers.map(async (customer) => {
-        const rawOpBal = Number(customer.openingBalance || 0);
-        const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
-        const openingBalance = opType === "CREDIT" ? -Math.abs(rawOpBal) : Math.abs(rawOpBal);
+    const customerIds = customers.map((c) => c.id);
 
-        // Ensure customer ledger exists
-        const ledger = await accountsService.ensureCustomerLedger(customer);
+    // 2. Batch fetch all ledgers for these customers
+    const existingLedgers = await prisma.accountLedger.findMany({
+      where: { customerId: { in: customerIds } },
+    });
+    const ledgerMap = new Map<string, any>();
+    existingLedgers.forEach((l) => { if (l.customerId) ledgerMap.set(l.customerId, l); });
 
-        const voucherDateFilter: Prisma.DateTimeFilter = {
-          ...(startDateObj && { gte: startDateObj }),
-          ...(endDateObj ? { lte: endDateObj } : { lte: cutoffDate }),
-        };
+    // Ensure missing ledgers (batch, sequential to avoid pool exhaustion)
+    const missingCustomers = customers.filter((c) => !ledgerMap.has(c.id));
+    for (const c of missingCustomers) {
+      const l = await accountsService.ensureCustomerLedger(c);
+      ledgerMap.set(c.id, l);
+    }
 
-        // Fetch journal items and Sales Invoices concurrently
-        const [journalItems, salesInvoices] = await Promise.all([
-          prisma.journalItem.findMany({
-            where: {
-              OR: [{ debitLedgerId: ledger.id }, { creditLedgerId: ledger.id }],
-              voucher: {
-                date: voucherDateFilter,
-              },
-            },
-            include: {
-              voucher: true,
-            },
-          }),
-          (prisma as any).salesInvoice.findMany({
-            where: {
-              customerId: customer.id,
-            },
-          }),
-        ]);
+    const ledgerIds = Array.from(ledgerMap.values()).map((l) => l.id);
 
-        let totalBilled = 0;
-        let totalPaid = 0;
-        let totalReturned = 0;
+    const voucherDateFilter: Prisma.DateTimeFilter = {
+      ...(startDateObj && { gte: startDateObj }),
+      ...(endDateObj ? { lte: endDateObj } : { lte: cutoffDate }),
+    };
 
-        for (const item of journalItems) {
-          if (item.voucher.refDocType === "CUSTOMER_OPENING_BALANCE" || item.narration?.includes("Opening balance")) {
-            continue;
-          }
+    // 3. Batch fetch ALL journal items and invoices in 2 queries (not per-customer)
+    const [allJournalItems, allSalesInvoices] = await Promise.all([
+      prisma.journalItem.findMany({
+        where: {
+          OR: [{ debitLedgerId: { in: ledgerIds } }, { creditLedgerId: { in: ledgerIds } }],
+          voucher: { date: voucherDateFilter },
+        },
+        include: { voucher: true },
+      }),
+      (prisma as any).salesInvoice.findMany({
+        where: { customerId: { in: customerIds } },
+      }),
+    ]);
 
-          let isDebit = item.debitLedgerId === ledger.id;
-          let isCredit = item.creditLedgerId === ledger.id;
+    // Group by ledger ID
+    const itemsByLedger = new Map<number, typeof allJournalItems>();
+    for (const item of allJournalItems) {
+      if (item.debitLedgerId && ledgerIds.includes(item.debitLedgerId)) {
+        const list = itemsByLedger.get(item.debitLedgerId) || [];
+        list.push(item);
+        itemsByLedger.set(item.debitLedgerId, list);
+      }
+      if (item.creditLedgerId && ledgerIds.includes(item.creditLedgerId)) {
+        const list = itemsByLedger.get(item.creditLedgerId) || [];
+        list.push(item);
+        itemsByLedger.set(item.creditLedgerId, list);
+      }
+    }
 
-          if (item.voucher.type === VoucherType.SALES_RETURN) {
-            isDebit = false;
-            isCredit = true;
-          }
+    // Group invoices by customer
+    const invoicesByCustomer = new Map<string, any[]>();
+    for (const inv of allSalesInvoices) {
+      const list = invoicesByCustomer.get(inv.customerId) || [];
+      list.push(inv);
+      invoicesByCustomer.set(inv.customerId, list);
+    }
 
-          const debitAmt = Number(item.debitAmount);
-          const creditAmt = Number(item.creditAmount);
-          const amt = debitAmt > 0 ? debitAmt : creditAmt;
+    // 4. Calculate per customer (no DB calls in this loop)
+    const results: CustomerReceivableSummary[] = customers.map((customer) => {
+      const rawOpBal = Number(customer.openingBalance || 0);
+      const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+      const openingBalance = opType === "CREDIT" ? -Math.abs(rawOpBal) : Math.abs(rawOpBal);
 
-          if (isDebit) {
-            totalBilled += amt;
-          } else if (isCredit) {
-            if (item.voucher.type === VoucherType.SALES_RETURN) {
-              totalReturned += amt;
-            } else {
-              totalPaid += amt;
-            }
-          }
+      const ledger = ledgerMap.get(customer.id);
+      const journalItems = ledger ? itemsByLedger.get(ledger.id) || [] : [];
+      const salesInvoices = invoicesByCustomer.get(customer.id) || [];
+
+      let totalBilled = 0;
+      let totalPaid = 0;
+      let totalReturned = 0;
+
+      for (const item of journalItems) {
+        if (item.voucher.refDocType === "CUSTOMER_OPENING_BALANCE" || item.narration?.includes("Opening balance")) {
+          continue;
         }
 
-        // BUG-2 FIX (symmetric for customers): Do NOT use Math.max(ledger_total, invoice_raw_total).
-        // Invoice raw amounts duplicate what is already captured in journal items,
-        // including the opening-balance journal entry — causing the balance to appear doubled.
-        // Use only journal-item-based totals (CUSTOMER_OPENING_BALANCE is already excluded above).
+        let isDebit = item.debitLedgerId === ledger?.id;
+        let isCredit = item.creditLedgerId === ledger?.id;
 
-        const netAsset = openingBalance + totalBilled - totalPaid - totalReturned;
-        const debit = totalBilled;
-        const credit = totalPaid + totalReturned;
-        const balanceAsOnDate = netAsset;
-        const isOverdue = balanceAsOnDate > 0;
+        if (item.voucher.type === VoucherType.SALES_RETURN) {
+          isDebit = false;
+          isCredit = true;
+        }
 
-        // Calculate actual overdue days from earliest unpaid invoice's dueDate
-        const earliestUnpaidDueDate = salesInvoices
-          .filter((inv: any) => {
-            const amount = Number(inv.grandTotal || inv.subTotal || 0);
-            const pList = extractPaymentsArray(inv.payments);
-            const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-            const paidAmt = Math.max(pSum, Number((inv as any).paidAmount || 0));
-            return amount - paidAmt > 0 && inv.dueDate;
-          })
-          .map((inv: any) => new Date(inv.dueDate))
-          .sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
+        const debitAmt = Number(item.debitAmount);
+        const creditAmt = Number(item.creditAmount);
+        const amt = debitAmt > 0 ? debitAmt : creditAmt;
 
-        const dueDays = isOverdue
-          ? earliestUnpaidDueDate
-            ? Math.max(0, Math.floor((cutoffDate.getTime() - earliestUnpaidDueDate.getTime()) / 86400000))
-            : null
-          : 0;
+        if (isDebit) {
+          totalBilled += amt;
+        } else if (isCredit) {
+          if (item.voucher.type === VoucherType.SALES_RETURN) {
+            totalReturned += amt;
+          } else {
+            totalPaid += amt;
+          }
+        }
+      }
 
-        const netBalance = balanceAsOnDate;
+      const netAsset = openingBalance + totalBilled - totalPaid - totalReturned;
+      // Opening balance (DEBIT) counts as debit, negative opening (CREDIT) counts as credit
+      const debit = totalBilled + (openingBalance > 0 ? openingBalance : 0);
+      const credit = totalPaid + totalReturned + (openingBalance < 0 ? Math.abs(openingBalance) : 0);
+      const balanceAsOnDate = netAsset;
+      const isOverdue = balanceAsOnDate > 0;
 
-        return {
-          customerId: customer.id,
-          customerCode: customer.customerCode,
-          firmName: customer.firmName,
-          gstin: customer.gstin,
-          phone: (customer as any).phone || (customer as any).mobile || null,
-          openingBalance,
-          totalBilled,
-          totalPaid,
-          totalReturned,
-          debit,
-          credit,
-          netBalance,
-          balanceAsOnDate,
-          overdueAmount: isOverdue ? balanceAsOnDate : 0,
-          dueDays,
-          isOverdue,
-        };
-      })
-    );
+      const earliestUnpaidDueDate = salesInvoices
+        .filter((inv: any) => {
+          const amount = Number(inv.grandTotal || inv.subTotal || 0);
+          const pList = extractPaymentsArray(inv.payments);
+          const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+          const paidAmt = Math.max(pSum, Number((inv as any).paidAmount || 0));
+          return amount - paidAmt > 0 && inv.dueDate;
+        })
+        .map((inv: any) => new Date(inv.dueDate))
+        .sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
+
+      const dueDays = isOverdue
+        ? earliestUnpaidDueDate
+          ? Math.max(0, Math.floor((cutoffDate.getTime() - earliestUnpaidDueDate.getTime()) / 86400000))
+          : null
+        : 0;
+
+      return {
+        customerId: customer.id,
+        customerCode: customer.customerCode,
+        firmName: customer.firmName,
+        gstin: customer.gstin,
+        phone: (customer as any).phone || (customer as any).mobile || null,
+        openingBalance,
+        totalBilled,
+        totalPaid,
+        totalReturned,
+        debit,
+        credit,
+        netBalance: balanceAsOnDate,
+        balanceAsOnDate,
+        overdueAmount: isOverdue ? balanceAsOnDate : 0,
+        dueDays,
+        isOverdue,
+      };
+    });
 
     return results;
   }
@@ -255,13 +275,6 @@ class ReceivableService {
    * Per-customer invoice breakdown + collection history + statement.
    */
   async getCustomerReceivableDetail(customerId: string, options?: { startDate?: string; endDate?: string }): Promise<CustomerReceivableDetail> {
-    try {
-      const { voucherPostingService } = require("./voucherPosting.service");
-      await voucherPostingService.syncUnpostedVouchers();
-    } catch (err) {
-      console.error("[ReceivableService] Sync unposted vouchers failed:", err);
-    }
-
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
     });
@@ -271,7 +284,6 @@ class ReceivableService {
     }
 
     const ledger = await accountsService.ensureCustomerLedger(customer);
-    await voucherPostingService.syncUnpostedVouchers();
     const statement = await accountsService.getLedgerStatement(ledger.id, options || {});
 
     // Fetch Sales Invoices for per-invoice breakdown

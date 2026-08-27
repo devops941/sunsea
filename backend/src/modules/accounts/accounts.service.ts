@@ -3,7 +3,12 @@ import { LedgerType, VoucherType, Prisma } from "@prisma/client";
 import { ApiError } from "../../utils/ApiError";
 import { CreateLedgerInput, UpdateLedgerInput } from "./accounts.types";
 
-export const SYSTEM_LEDGERS = [
+/**
+ * Default seed ledgers — created once when the DB has zero ledger rows.
+ * After initial seeding, all ledger management happens through the UI.
+ * The auto-posting system looks up ledgers from DB by code at runtime.
+ */
+const DEFAULT_SEED_LEDGERS = [
   { code: "CASH-001", name: "Cash in Hand", type: LedgerType.ASSET, group: "Cash & Bank" },
   { code: "BANK-001", name: "Main Bank Account", type: LedgerType.ASSET, group: "Cash & Bank" },
   { code: "CRED-001", name: "Sundry Creditors", type: LedgerType.LIABILITY, group: "Current Liabilities" },
@@ -14,30 +19,36 @@ export const SYSTEM_LEDGERS = [
   { code: "PCASH-001", name: "Petty Cash Account", type: LedgerType.ASSET, group: "Cash & Bank" },
   { code: "SRT-001", name: "Sales Return Account", type: LedgerType.INCOME, group: "Direct Income" },
   { code: "PRT-001", name: "Purchase Return Account", type: LedgerType.EXPENSE, group: "Direct Expenses" },
-  // GST Liability ledgers (output tax — collected from customers)
   { code: "CGST-LIA-001", name: "CGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
   { code: "SGST-LIA-001", name: "SGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
   { code: "IGST-LIA-001", name: "IGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
-  // GST Input Credit ledgers (input tax — paid to suppliers)
   { code: "CGST-REC-001", name: "CGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
   { code: "SGST-REC-001", name: "SGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
   { code: "IGST-REC-001", name: "IGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
-  // System Equity ledger for double-entry opening balances
   { code: "EQ-001", name: "Opening Balance Equity", type: LedgerType.EQUITY, group: "Equity" },
 ];
 
 class AccountsService {
+  /**
+   * Ensures system ledgers exist (PURCH-001, SALES-001, CASH-001, etc.).
+   * Fast path: check all codes in ONE query; only upsert if any are missing.
+   * Avoids per-ledger upserts (17 sequential queries) that timeout inside transactions.
+   */
   async ensureSystemLedgersExist(txClient?: Prisma.TransactionClient) {
     const db = txClient || prisma;
-    for (const ledger of SYSTEM_LEDGERS) {
+    const codes = DEFAULT_SEED_LEDGERS.map((l) => l.code);
+    const existing = await db.accountLedger.findMany({
+      where: { code: { in: codes } },
+      select: { code: true },
+    });
+    const existingCodes = new Set(existing.map((e) => e.code));
+    if (existingCodes.size === codes.length) return; // All exist, fast exit
+
+    const missing = DEFAULT_SEED_LEDGERS.filter((l) => !existingCodes.has(l.code));
+    for (const ledger of missing) {
       await db.accountLedger.upsert({
         where: { code: ledger.code },
-        update: {
-          name: ledger.name,
-          type: ledger.type,
-          group: ledger.group,
-          isActive: true,
-        },
+        update: {},
         create: {
           code: ledger.code,
           name: ledger.name,
@@ -97,6 +108,48 @@ class AccountsService {
       page,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async getBankAccounts() {
+    const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand", "BANK ACCOUNTS", "CASH IN HAND"];
+
+    const ledgers = await prisma.accountLedger.findMany({
+      where: {
+        type: LedgerType.ASSET,
+        group: { in: bankGroups, mode: "insensitive" },
+        isActive: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const results = await Promise.all(
+      ledgers.map(async (ledger) => {
+        const debitSum = await prisma.journalItem.aggregate({
+          _sum: { debitAmount: true },
+          where: { debitLedgerId: ledger.id },
+        });
+        const creditSum = await prisma.journalItem.aggregate({
+          _sum: { creditAmount: true },
+          where: { creditLedgerId: ledger.id },
+        });
+        const totalDebit = Number(debitSum._sum.debitAmount || 0);
+        const totalCredit = Number(creditSum._sum.creditAmount || 0);
+        const currentBalance = totalDebit - totalCredit;
+
+        return {
+          id: ledger.id,
+          code: ledger.code,
+          name: ledger.name,
+          group: ledger.group,
+          currentBalance,
+          totalDebit,
+          totalCredit,
+        };
+      })
+    );
+
+    const totalBalance = results.reduce((sum, r) => sum + r.currentBalance, 0);
+    return { accounts: results, totalBalance };
   }
 
   async createLedger(data: CreateLedgerInput) {
@@ -362,6 +415,42 @@ class AccountsService {
       totalDebitBalance,
       totalCreditBalance,
       isBalanced: Math.abs(totalDebitBalance - totalCreditBalance) < 0.01,
+    };
+  }
+
+  async getBalanceSheet() {
+    const trialBalance = await this.getTrialBalance();
+
+    const assets: any[] = [];
+    const liabilities: any[] = [];
+    const equity: any[] = [];
+
+    for (const row of trialBalance.rows) {
+      const item = { code: row.code, name: row.name, group: row.group, balance: row.closingBalance };
+      if (row.type === "ASSET") assets.push(item);
+      else if (row.type === "LIABILITY") liabilities.push(item);
+      else if (row.type === "EQUITY") equity.push(item);
+    }
+
+    // Get P&L net profit and add to equity
+    const pnl = await this.getProfitAndLoss({});
+    if (pnl.netProfit !== 0) {
+      equity.push({ code: "NET-PNL", name: "Net Profit / (Loss)", group: "Profit & Loss", balance: pnl.netProfit });
+    }
+
+    const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
+    const totalLiabilities = liabilities.reduce((s, l) => s + l.balance, 0);
+    const totalEquity = equity.reduce((s, e) => s + e.balance, 0);
+
+    return {
+      assets,
+      liabilities,
+      equity,
+      totalAssets,
+      totalLiabilities,
+      totalEquity,
+      totalLiabilitiesAndEquity: totalLiabilities + totalEquity,
+      isBalanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01,
     };
   }
 

@@ -241,8 +241,9 @@ class PayableService {
       // Instead, derive totals purely from journal items (SUPPLIER_OPENING_BALANCE is already skipped above).
 
       const netLiability = openingBalance + totalBilled - totalPaid - totalReturned;
-      const credit = totalBilled;
-      const debit = totalPaid + totalReturned;
+      // Opening balance (CREDIT) counts as credit, negative opening counts as debit
+      const credit = totalBilled + (openingBalance > 0 ? openingBalance : 0);
+      const debit = totalPaid + totalReturned + (openingBalance < 0 ? Math.abs(openingBalance) : 0);
       const balanceAsOnDate = netLiability;
       const isOverdue = balanceAsOnDate > 0;
 

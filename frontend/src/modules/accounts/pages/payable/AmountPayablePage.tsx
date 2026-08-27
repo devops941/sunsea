@@ -181,9 +181,29 @@ export const AmountPayablePage: React.FC = () => {
     setSearch("");
   };
 
+  const [sortBy, setSortBy] = useState<string>("activity");
+
   const filteredSuppliers = useMemo(() => {
-    return Array.isArray(payables) ? payables : [];
-  }, [payables]);
+    const list = Array.isArray(payables) ? [...payables] : [];
+    if (sortBy === "activity") {
+      list.sort((a: any, b: any) => {
+        const aAct = (a.totalBilled || 0) + (a.totalPaid || 0);
+        const bAct = (b.totalBilled || 0) + (b.totalPaid || 0);
+        if (aAct !== bAct) return bAct - aAct;
+        return (b.balanceAsOnDate || 0) - (a.balanceAsOnDate || 0);
+      });
+    } else if (sortBy === "balance") {
+      list.sort((a: any, b: any) => (b.balanceAsOnDate || 0) - (a.balanceAsOnDate || 0));
+    } else if (sortBy === "overdue") {
+      list.sort((a: any, b: any) => {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        return (b.overdueAmount || 0) - (a.overdueAmount || 0);
+      });
+    } else if (sortBy === "name") {
+      list.sort((a: any, b: any) => (a.legalName || "").localeCompare(b.legalName || ""));
+    }
+    return list;
+  }, [payables, sortBy]);
 
   // Dashboard Totals
   const totals = useMemo(() => {
@@ -314,9 +334,9 @@ export const AmountPayablePage: React.FC = () => {
       render: (item: any) => (
         <button
           onClick={() => navigate(`/accounts/payable/${item.supplierId}`)}
-          className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-lg text-xs transition-colors border border-blue-200 shadow-sm"
+          className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 font-semibold rounded text-[11px] transition-colors border border-orange-200"
         >
-          View Breakdown <FaChevronRight size={10} />
+          View <FaChevronRight size={8} />
         </button>
       ),
     },
@@ -338,194 +358,192 @@ export const AmountPayablePage: React.FC = () => {
   }, [filteredSuppliers, currentPage]);
 
   return (
-    <div className="w-full p-4 md:p-6 bg-card-2 font-sans text-ink">
-      {/* HEADER SECTION MATCHING REPORTS CENTER */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line mb-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
-                Accounts Payable
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold text-ink mt-1 flex items-center gap-2">
-              <FaBuilding className="text-blue-600 text-xl" /> Amount Payable Report
-            </h2>
-            <p className="text-xs text-ink-subtle mt-1">
-              Outstanding Supplier Ledger Statements & Accounts Payable Breakdown
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+    <div className="p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
+      {/* COMPACT HEADER + FILTERS */}
+      <div className="bg-card rounded-lg border border-line">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
+          <h1 className="text-sm font-bold text-ink flex items-center gap-2">
+            <FaBuilding className="text-orange-600 text-sm" /> Amount Payable
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded uppercase tracking-wide">
+              A/P
+            </span>
+          </h1>
+          <div className="flex items-center gap-2">
             <button
               onClick={loadData}
-              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
-              title="Refresh Data"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
+              title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
+              <FaSync className={loading ? "animate-spin text-orange-600" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}
               columns={csvColumns}
               filename={csvFilename}
-              text="Export CSV"
+              text="Export"
             />
           </div>
         </div>
 
-        {/* DASHBOARD CARDS */}
-        <div className="p-6 border-b border-line bg-card-2/50">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Amount Payable</span>
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                  <FaMoneyBillWave size={18} />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-ink mt-2">
-                ₹ {totals.totalNetBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-ink-subtle mt-1">
-                Across <strong className="text-ink-muted">{filteredSuppliers.length}</strong> active suppliers
-              </div>
-            </div>
+        {/* Filter Row - single compact row */}
+        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">As On</label>
+            <DatePickerCalendar
+              name="draftAsOnDate"
+              value={draftAsOnDate}
+              onChange={(e) => setDraftAsOnDate(e.target.value)}
+            />
+          </div>
 
-            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Suppliers</span>
-                <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                  <FaBuilding size={18} />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-ink mt-2">{payables.length}</div>
-              <div className="text-xs text-ink-subtle mt-1">Registered Vendor Accounts</div>
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+            <SelectInput
+              name="dateRangePreset"
+              value={dateRangePreset}
+              options={DATE_RANGE_OPTIONS}
+              hideLabel={true}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
+            />
+          </div>
 
-            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Overdue Accounts</span>
-                <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-                  <FaExclamationTriangle size={18} />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-amber-600 mt-2">{totals.overdueCount}</div>
-              <div className="text-xs text-amber-700/80 mt-1 font-medium">Exceeding payment terms</div>
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+            <DatePickerCalendar
+              name="draftStartDate"
+              value={draftStartDate}
+              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
 
-            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Credit</span>
-                <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                  <FaCheckCircle size={18} />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-ink mt-2">
-                ₹ {totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-ink-subtle mt-1">Cumulative Purchases</div>
-            </div>
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+            <DatePickerCalendar
+              name="draftEndDate"
+              value={draftEndDate}
+              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
+
+          <div className="flex-1 min-w-[140px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
+            <input
+              type="text"
+              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+              value={draftSearch}
+              onChange={(e) => setDraftSearch(e.target.value)}
+              placeholder="Code / Name..."
+            />
+          </div>
+
+          <div className="w-[160px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Supplier</label>
+            <SelectInput
+              name="draftSupplierId"
+              value={draftSupplierId}
+              options={suppliersList.map(s => ({ label: s.legalName || s.displayName || s.supplierCode, value: s.id }))}
+              defaultOptionLabel="All Suppliers"
+              hideLabel={true}
+              searchable
+              onChange={(e) => setDraftSupplierId(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleClearFilters}
+              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded transition-colors border border-line"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleApplyFilters}
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* COMPACT KPI CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="bg-card border border-line rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Payable</span>
+            <FaMoneyBillWave className="text-orange-600 text-xs" />
+          </div>
+          <div className="text-lg font-mono font-bold text-ink mt-1">
+            ₹ {totals.totalNetBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-[10px] text-ink-subtle mt-0.5">
+            {filteredSuppliers.length} suppliers
           </div>
         </div>
 
-        {/* REPORT FILTERS CONTROL PANEL */}
-        <div className="p-6 border-b border-line bg-card-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">As On Date</label>
-              <DatePickerCalendar
-                name="draftAsOnDate"
-                value={draftAsOnDate}
-                onChange={(e) => setDraftAsOnDate(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
-              <SelectInput
-                name="dateRangePreset"
-                value={dateRangePreset}
-                options={DATE_RANGE_OPTIONS}
-                hideLabel={true}
-                onChange={(e) => handleDateRangeChange(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
-              <DatePickerCalendar
-                name="draftStartDate"
-                value={draftStartDate}
-                onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
-              <DatePickerCalendar
-                name="draftEndDate"
-                value={draftEndDate}
-                onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search</label>
-              <input
-                type="text"
-                className="w-full border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
-                value={draftSearch}
-                onChange={(e) => setDraftSearch(e.target.value)}
-                placeholder="Search Code / Name..."
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Supplier</label>
-              <SelectInput
-                name="draftSupplierId"
-                value={draftSupplierId}
-                options={suppliersList.map(s => ({ label: s.legalName || s.displayName || s.supplierCode, value: s.id }))}
-                defaultOptionLabel="All Suppliers"
-                hideLabel={true}
-                searchable
-                onChange={(e) => setDraftSupplierId(e.target.value)}
-              />
-            </div>
+        <div className="bg-card border border-line rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Suppliers</span>
+            <FaBuilding className="text-indigo-600 text-xs" />
           </div>
+          <div className="text-lg font-mono font-bold text-ink mt-1">{payables.length}</div>
+          <div className="text-[10px] text-ink-subtle mt-0.5">Registered vendors</div>
+        </div>
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
-            <div>
-              <ColumnToggle
-                columns={tableColumns.map(c => ({ ...c, header: c.header }))}
-                visibleColumns={visibleColumns.map(id => {
-                  const col = tableColumns.find(c => c.id === id);
-                  return col ? col.header : id;
-                })}
-                setVisibleColumns={(newHeaders) => {
-                  const updatedIds = newHeaders.map(h => tableColumns.find(c => c.header === h)?.id || h);
-                  setVisibleColumns(updatedIds);
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
+        <div className="bg-card border border-line rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Overdue</span>
+            <FaExclamationTriangle className="text-amber-600 text-xs" />
+          </div>
+          <div className="text-lg font-mono font-bold text-amber-600 mt-1">{totals.overdueCount}</div>
+          <div className="text-[10px] text-ink-subtle mt-0.5">Exceeding terms</div>
+        </div>
+
+        <div className="bg-card border border-line rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Credit</span>
+            <FaCheckCircle className="text-emerald-600 text-xs" />
+          </div>
+          <div className="text-lg font-mono font-bold text-ink mt-1">
+            ₹ {totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-[10px] text-ink-subtle mt-0.5">Cumulative purchases</div>
+        </div>
+      </div>
+
+      {/* TABLE */}
+      <div className="bg-card rounded-lg border border-line overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold text-ink">Supplier Payables</h2>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Sort:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-2 py-1 border border-line rounded text-[11px] bg-card text-ink focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
               >
-                Clear All
-              </button>
-              <button
-                onClick={handleApplyFilters}
-                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-              >
-                Apply Filters
-              </button>
+                <option value="activity">Recent Activity</option>
+                <option value="balance">Highest Balance</option>
+                <option value="overdue">Overdue First</option>
+                <option value="name">Name (A-Z)</option>
+              </select>
             </div>
+            <ColumnToggle
+              columns={tableColumns.map(c => ({ ...c, header: c.header }))}
+              visibleColumns={visibleColumns.map(id => {
+                const col = tableColumns.find(c => c.id === id);
+                return col ? col.header : id;
+              })}
+              setVisibleColumns={(newHeaders) => {
+                const updatedIds = newHeaders.map(h => tableColumns.find(c => c.header === h)?.id || h);
+                setVisibleColumns(updatedIds);
+              }}
+            />
+            <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredSuppliers.length}</span>
           </div>
         </div>
 
-        {/* DATA TABLE WITH 10 ITEMS PAGINATION */}
         <DataTable
           columns={tableColumns.filter(c => visibleColumns.includes(c.id))}
           data={paginatedSuppliers}
