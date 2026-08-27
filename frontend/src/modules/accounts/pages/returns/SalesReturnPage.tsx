@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaUndo,
   FaPlus,
+  FaSync,
   FaTimes,
   FaSearch,
   FaEye,
@@ -15,6 +16,7 @@ import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useCustomerGrades } from "../../../../hooks/useCustomerGrades";
 import { formatStockQty } from "../../../../utils/uomConversion";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 interface FilterState {
   customerGradeId: string;
@@ -28,8 +30,6 @@ const DEFAULT_FILTERS: FilterState = {
 
 export const SalesReturnPage: React.FC = () => {
   const navigate = useNavigate();
-  const [returns, setReturns] = useState<SalesReturn[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [selectedViewReturn, setSelectedViewReturn] = useState<SalesReturn | null>(null);
 
   const { customerGrades } = useCustomerGrades();
@@ -37,35 +37,37 @@ export const SalesReturnPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  const loadData = async () => {
-    setLoading(true);
+  const cacheKey = `accounts:sales-returns`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
     try {
       const rData = await returnService.fetchSalesReturns();
-      setReturns(rData || []);
+      const list = rData || [];
+      return { data: list, total: list.length };
     } catch (err: any) {
       toast.error(err?.message || "Failed to load sales returns");
-    } finally {
-      setLoading(false);
+      throw err;
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
 
-  useSocketSync("salesReturn", undefined, loadData);
-  useSocketSync("salesInvoice", undefined, loadData);
-  useSocketSync("customer", undefined, loadData);
+  const { data: returns, loading, refreshing, refresh } = useListCache<SalesReturn>({
+    cacheKey,
+    socketModule: "salesReturn",
+    fetcher,
+  });
+
+  useSocketSync("salesInvoice", undefined, refresh);
+  useSocketSync("customer", undefined, refresh);
 
   const hasActiveFilters = Boolean(appliedFilters.customerGradeId || appliedFilters.status);
 
-  const handleClearFilters = useCallback(() => {
+  const handleClearFilters = () => {
     setAppliedFilters(DEFAULT_FILTERS);
-  }, []);
+  };
 
-  const handleRemoveFilter = useCallback((key: keyof FilterState) => {
+  const handleRemoveFilter = (key: keyof FilterState) => {
     setAppliedFilters((prev) => ({ ...prev, [key]: "" }));
-  }, []);
+  };
 
   const filteredReturns = returns.filter((r) => {
     if (searchTerm) {
@@ -102,13 +104,22 @@ export const SalesReturnPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
           <h1 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaUndo className="text-pink-500 text-sm" /> Sales Returns (Credit Note)
+            {refreshing && <FaSync className="animate-spin text-pink-500 text-[10px]" />}
           </h1>
-          <button
-            onClick={() => navigate("/sales-returns/create")}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500 hover:bg-pink-600 text-white rounded text-xs font-semibold transition cursor-pointer"
-          >
-            <FaPlus className="text-[10px]" /> New Sales Return
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            >
+              <FaSync className={refreshing ? "animate-spin text-pink-500" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => navigate("/sales-returns/create")}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500 hover:bg-pink-600 text-white rounded text-xs font-semibold transition cursor-pointer"
+            >
+              <FaPlus className="text-[10px]" /> New Sales Return
+            </button>
+          </div>
         </div>
 
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">

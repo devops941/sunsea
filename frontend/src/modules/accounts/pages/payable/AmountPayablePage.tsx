@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaBuilding,
@@ -18,12 +18,10 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableSummary } from "../../../../services/payableService";
 import { supplierService } from "../../../../services/supplierService";
-
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 export const AmountPayablePage: React.FC = () => {
   const navigate = useNavigate();
-  const requestIdRef = React.useRef(0);
 
   // Applied filter state
   const [startDate, setStartDate] = useState<string>("");
@@ -42,8 +40,6 @@ export const AmountPayablePage: React.FC = () => {
 
   // Data & Loading state
   const [suppliersList, setSuppliersList] = useState<any[]>([]);
-  const [payables, setPayables] = useState<SupplierPayableSummary[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
 
   // Columns & Column Toggle by stable IDs
   const ALL_COLUMN_IDS = [
@@ -83,7 +79,7 @@ export const AmountPayablePage: React.FC = () => {
   useEffect(() => {
     const loadSuppliers = async () => {
       try {
-        const res = await supplierService.fetchAll({ limit: 10 });
+        const res = await supplierService.fetchAll({ limit: 10000 });
         const list = Array.isArray(res) ? res : (res?.suppliers || []);
         setSuppliersList(list);
       } catch (err) {
@@ -93,42 +89,35 @@ export const AmountPayablePage: React.FC = () => {
     loadSuppliers();
   }, []);
 
-  const loadData = async () => {
-    const reqId = ++requestIdRef.current;
-    setLoading(true);
-    try {
-      const res = await payableService.getPayableSummaries({
-        asOnDate,
-        startDate,
-        endDate,
-        supplierId,
-        search,
-        page: 1,
-        limit: 10000,
-      });
-      if (reqId === requestIdRef.current) {
+  const cacheKey = `accounts:amount-payable:${asOnDate}:${startDate}:${endDate}:${supplierId}:${search}`;
+
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      try {
+        const res = await payableService.getPayableSummaries({
+          asOnDate,
+          startDate,
+          endDate,
+          supplierId,
+          search,
+          page: 1,
+          limit: 10000,
+        });
         const list = Array.isArray(res) ? res : res.data || [];
-        setPayables(list);
-      }
-    } catch (err: any) {
-      if (reqId === requestIdRef.current) {
+        return { data: list, total: list.length };
+      } catch (err: any) {
         toast.error(err?.message || "Failed to load supplier payables");
+        throw err;
       }
-    } finally {
-      if (reqId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  };
+    },
+    [asOnDate, startDate, endDate, supplierId, search]
+  );
 
-  useEffect(() => {
-    loadData();
-  }, [asOnDate, startDate, endDate, supplierId, search]);
-
-  useSocketSync("voucher", undefined, loadData);
-  useSocketSync("grnInvoice", undefined, loadData);
-  useSocketSync("purchaseReturn", undefined, loadData);
-  useSocketSync("supplier", undefined, loadData);
+  const { data: payables, loading, refreshing, refresh } = useListCache<SupplierPayableSummary>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -353,14 +342,15 @@ export const AmountPayablePage: React.FC = () => {
             <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded uppercase tracking-wide">
               A/P
             </span>
+            {refreshing && <FaSync className="animate-spin text-orange-600 text-[10px]" />}
           </h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={loadData}
+              onClick={refresh}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-orange-600" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-orange-600" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}

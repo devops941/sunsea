@@ -66,6 +66,7 @@ class AccountsService {
     search?: string;
     type?: LedgerType;
     group?: string;
+    grouped?: boolean;
   }) {
     const page = params.page || 1;
     const limit = params.limit || 50;
@@ -102,8 +103,26 @@ class AccountsService {
       prisma.accountLedger.count({ where }),
     ]);
 
+    // Optional pre-grouped output for sidebar tree views
+    let grouped: Array<{ group: string; ledgers: typeof ledgers }> | null = null;
+    if (params.grouped) {
+      const buckets: Record<string, typeof ledgers> = {};
+      for (const l of ledgers) {
+        const g = l.group || "Others";
+        if (!buckets[g]) buckets[g] = [];
+        buckets[g].push(l);
+      }
+      grouped = Object.entries(buckets)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([group, groupLedgers]) => ({
+          group,
+          ledgers: [...groupLedgers].sort((a, b) => a.name.localeCompare(b.name)),
+        }));
+    }
+
     return {
       ledgers,
+      grouped,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -210,7 +229,7 @@ class AccountsService {
     return ledger;
   }
 
-  async getLedgerStatement(id: number, options: { startDate?: string; endDate?: string }) {
+  async getLedgerStatement(id: number, options: { startDate?: string; endDate?: string; search?: string }) {
     try {
       const { voucherPostingService } = require("./voucherPosting.service");
       await voucherPostingService.syncUnpostedVouchers();
@@ -233,12 +252,26 @@ class AccountsService {
         OR: [{ debitLedgerId: id }, { creditLedgerId: id }],
         voucher: {
           ...dateFilter,
+          // BUG FIX (Ledger Statement Integrity):
           // Exclude opening balance vouchers — they are already represented by the
           // synthetic "Opening Balance b/f" row built from party.openingBalance field.
           // Including them here causes the running balance to be doubled.
-          refDocType: {
-            notIn: ["SUPPLIER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE"],
-          },
+          //
+          // IMPORTANT: A bare `refDocType: { notIn: [...] }` filter unintentionally
+          // excludes vouchers with `refDocType = NULL` because in SQL/Prisma
+          // `NULL NOT IN (...)` evaluates to NULL (i.e. "not TRUE"), so the row is
+          // filtered out. All manually-created vouchers (e.g. Payment Voucher created
+          // from the UI via POST /vouchers) have `refDocType = NULL`, which caused
+          // them to be silently missing from the Supplier/Customer Ledger Statement
+          // — while still being counted in Amount Payable / Receivable summaries
+          // (which query journal items without this filter). Result: payment appeared
+          // in Payable page but NOT in the supplier's ledger statement.
+          //
+          // Fix: explicitly allow NULL refDocType through by combining with an OR clause.
+          OR: [
+            { refDocType: null },
+            { refDocType: { notIn: ["SUPPLIER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE"] } },
+          ],
         },
       },
       include: {
@@ -346,26 +379,48 @@ class AccountsService {
       });
     }
 
+    // Apply server-side search filter on entries
+    let filteredEntries = entries;
+    if (options.search && options.search.trim()) {
+      const q = options.search.toLowerCase();
+      filteredEntries = entries.filter(
+        (e) =>
+          (e.voucherNo || "").toString().toLowerCase().includes(q) ||
+          (e.particulars || "").toString().toLowerCase().includes(q) ||
+          (e.narration || "").toString().toLowerCase().includes(q) ||
+          (e.voucherType || "").toString().toLowerCase().includes(q)
+      );
+    }
+
     return {
       ledger,
       startDate: options.startDate || null,
       endDate: options.endDate || null,
       openingBalance,
       closingBalance: runningBalance,
-      entries,
+      entries: filteredEntries,
     };
   }
 
-  async getTrialBalance() {
+  async getTrialBalance(options: {
+    asOnDate?: string;
+    showZeroBalance?: boolean;
+    sortBy?: "name" | "code";
+    groupByCategory?: boolean;
+  } = {}) {
     await this.ensureSystemLedgersExist();
 
     const { voucherPostingService } = require("./voucherPosting.service");
     await voucherPostingService.syncMissingOpeningBalanceVouchers();
 
+    const asOnDate = options.asOnDate ? new Date(options.asOnDate) : null;
+    if (asOnDate) asOnDate.setHours(23, 59, 59, 999);
+    const voucherDateFilter = asOnDate ? { voucher: { date: { lte: asOnDate } } } : undefined;
+
     const ledgers = await prisma.accountLedger.findMany({
       include: {
-        debitItems: { include: { voucher: true } },
-        creditItems: { include: { voucher: true } },
+        debitItems: { where: voucherDateFilter, include: { voucher: true } },
+        creditItems: { where: voucherDateFilter, include: { voucher: true } },
         customer: { select: { openingBalance: true } },
         supplier: { select: { openingBalance: true } },
       },
@@ -406,24 +461,59 @@ class AccountsService {
       };
     });
 
-    const activeRows = rows.filter((r) => r.debitBalance > 0 || r.creditBalance > 0);
+    // Apply showZeroBalance filter (default: hide zero balance)
+    let activeRows = options.showZeroBalance
+      ? rows
+      : rows.filter((r) => r.debitBalance > 0 || r.creditBalance > 0);
+
+    // Apply sort
+    const sortBy = options.sortBy || "code";
+    activeRows = [...activeRows].sort((a, b) =>
+      sortBy === "name" ? a.name.localeCompare(b.name) : a.code.localeCompare(b.code)
+    );
+
+    // Optional pre-grouped structure for hierarchical/grouped views
+    let grouped: Array<{ group: string; rows: typeof activeRows; groupDebit: number; groupCredit: number }> | null = null;
+    if (options.groupByCategory) {
+      const buckets: Record<string, typeof activeRows> = {};
+      for (const r of activeRows) {
+        const g = r.group || "Others";
+        if (!buckets[g]) buckets[g] = [];
+        buckets[g].push(r);
+      }
+      grouped = Object.entries(buckets)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([group, groupRows]) => ({
+          group,
+          rows: groupRows,
+          groupDebit: groupRows.reduce((s, r) => s + r.debitBalance, 0),
+          groupCredit: groupRows.reduce((s, r) => s + r.creditBalance, 0),
+        }));
+    }
+
     const totalDebitBalance = activeRows.reduce((sum, r) => sum + r.debitBalance, 0);
     const totalCreditBalance = activeRows.reduce((sum, r) => sum + r.creditBalance, 0);
 
     return {
       rows: activeRows,
+      grouped,
       totalDebitBalance,
       totalCreditBalance,
       isBalanced: Math.abs(totalDebitBalance - totalCreditBalance) < 0.01,
     };
   }
 
-  async getBalanceSheet() {
-    const trialBalance = await this.getTrialBalance();
+  async getBalanceSheet(options: {
+    asOnDate?: string;
+    showZeroBalance?: boolean;
+    groupByCategory?: boolean;
+  } = {}) {
+    // Always request full data from trial balance (no filtering there); we do our own here
+    const trialBalance = await this.getTrialBalance({ asOnDate: options.asOnDate, showZeroBalance: true });
 
-    const assets: any[] = [];
-    const liabilities: any[] = [];
-    const equity: any[] = [];
+    let assets: any[] = [];
+    let liabilities: any[] = [];
+    let equity: any[] = [];
 
     for (const row of trialBalance.rows) {
       const item = { code: row.code, name: row.name, group: row.group, balance: row.closingBalance };
@@ -432,20 +522,47 @@ class AccountsService {
       else if (row.type === "EQUITY") equity.push(item);
     }
 
-    // Get P&L net profit and add to equity
-    const pnl = await this.getProfitAndLoss({});
+    // Get P&L net profit up to asOnDate and add to equity
+    const pnl = await this.getProfitAndLoss({ endDate: options.asOnDate });
     if (pnl.netProfit !== 0) {
       equity.push({ code: "NET-PNL", name: "Net Profit / (Loss)", group: "Profit & Loss", balance: pnl.netProfit });
+    }
+
+    // Apply zero balance filter (default: hide)
+    if (!options.showZeroBalance) {
+      assets = assets.filter((i) => Math.abs(i.balance) > 0.01);
+      liabilities = liabilities.filter((i) => Math.abs(i.balance) > 0.01);
+      equity = equity.filter((i) => Math.abs(i.balance) > 0.01);
     }
 
     const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
     const totalLiabilities = liabilities.reduce((s, l) => s + l.balance, 0);
     const totalEquity = equity.reduce((s, e) => s + e.balance, 0);
 
+    // Optional pre-grouped structure
+    const groupSection = (items: any[]) => {
+      const buckets: Record<string, any[]> = {};
+      items.forEach((it) => {
+        const g = it.group || "Others";
+        if (!buckets[g]) buckets[g] = [];
+        buckets[g].push(it);
+      });
+      return Object.entries(buckets)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([group, groupItems]) => ({
+          group,
+          items: groupItems,
+          groupTotal: groupItems.reduce((s, i) => s + i.balance, 0),
+        }));
+    };
+
     return {
       assets,
       liabilities,
       equity,
+      groupedAssets: options.groupByCategory ? groupSection(assets) : null,
+      groupedLiabilities: options.groupByCategory ? groupSection(liabilities) : null,
+      groupedEquity: options.groupByCategory ? groupSection(equity) : null,
       totalAssets,
       totalLiabilities,
       totalEquity,
@@ -454,7 +571,11 @@ class AccountsService {
     };
   }
 
-  async getProfitAndLoss(options: { startDate?: string; endDate?: string }) {
+  async getProfitAndLoss(options: {
+    startDate?: string;
+    endDate?: string;
+    showZeroBalance?: boolean;
+  }) {
     await this.ensureSystemLedgersExist();
 
     const dateFilter: Prisma.VoucherWhereInput = {};
@@ -507,15 +628,176 @@ class AccountsService {
       }
     }
 
-    const totalIncome = incomeAccounts.reduce((sum, a) => sum + a.netAmount, 0);
-    const totalExpense = expenseAccounts.reduce((sum, a) => sum + a.netAmount, 0);
+    // Apply zero balance filter
+    const filteredIncome = options.showZeroBalance
+      ? incomeAccounts
+      : incomeAccounts.filter((a) => Math.abs(a.netAmount) > 0.01);
+    const filteredExpense = options.showZeroBalance
+      ? expenseAccounts
+      : expenseAccounts.filter((a) => Math.abs(a.netAmount) > 0.01);
+
+    const totalIncome = filteredIncome.reduce((sum, a) => sum + a.netAmount, 0);
+    const totalExpense = filteredExpense.reduce((sum, a) => sum + a.netAmount, 0);
     const netProfit = totalIncome - totalExpense;
 
     return {
       startDate: options.startDate || null,
       endDate: options.endDate || null,
+      incomeAccounts: filteredIncome,
+      expenseAccounts: filteredExpense,
+      totalIncome,
+      totalExpense,
+      netProfit,
+      isProfit: netProfit >= 0,
+    };
+  }
+
+  /**
+   * Profit & Loss aggregated by month or quarter across the given date range.
+   * Returns a period-column matrix — each account has a per-period net amount + total.
+   */
+  async getProfitAndLossByPeriod(options: {
+    startDate: string;
+    endDate: string;
+    groupBy: "month" | "quarter";
+  }) {
+    await this.ensureSystemLedgersExist();
+
+    const startDate = new Date(options.startDate);
+    const endDate = new Date(options.endDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Build the list of periods spanning the range
+    const periods: Array<{ key: string; label: string; start: Date; end: Date }> = [];
+    if (options.groupBy === "month") {
+      let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      const last = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+      while (cursor <= last) {
+        const y = cursor.getFullYear();
+        const m = cursor.getMonth();
+        const pStart = new Date(y, m, 1);
+        const pEnd = new Date(y, m + 1, 0, 23, 59, 59, 999);
+        periods.push({
+          key: `${y}-${String(m + 1).padStart(2, "0")}`,
+          label: cursor.toLocaleString("en-IN", { month: "short", year: "2-digit" }),
+          start: pStart,
+          end: pEnd,
+        });
+        cursor = new Date(y, m + 1, 1);
+      }
+    } else {
+      // Indian FY quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar
+      const quarterForMonth = (mo: number) => (mo >= 3 && mo <= 5 ? 1 : mo >= 6 && mo <= 8 ? 2 : mo >= 9 && mo <= 11 ? 3 : 4);
+      const quarterStart = (q: number, fyYear: number) => {
+        // fyYear = the calendar year of April 1 for that FY
+        const monthMap = { 1: [3, fyYear], 2: [6, fyYear], 3: [9, fyYear], 4: [0, fyYear + 1] } as const;
+        const [mo, y] = monthMap[q as 1 | 2 | 3 | 4];
+        return new Date(y, mo, 1);
+      };
+      const quarterEnd = (q: number, fyYear: number) => {
+        const monthMap = { 1: [5, fyYear], 2: [8, fyYear], 3: [11, fyYear], 4: [2, fyYear + 1] } as const;
+        const [mo, y] = monthMap[q as 1 | 2 | 3 | 4];
+        return new Date(y, mo + 1, 0, 23, 59, 59, 999);
+      };
+      const fyOf = (d: Date) => (d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1);
+
+      let curFy = fyOf(startDate);
+      let curQ = quarterForMonth(startDate.getMonth());
+      const endFy = fyOf(endDate);
+      const endQ = quarterForMonth(endDate.getMonth());
+
+      while (curFy < endFy || (curFy === endFy && curQ <= endQ)) {
+        const pStart = quarterStart(curQ, curFy);
+        const pEnd = quarterEnd(curQ, curFy);
+        periods.push({
+          key: `${curFy}-Q${curQ}`,
+          label: `Q${curQ} ${String(curFy).slice(-2)}-${String(curFy + 1).slice(-2)}`,
+          start: pStart,
+          end: pEnd,
+        });
+        if (curQ === 4) { curFy++; curQ = 1; } else { curQ++; }
+      }
+    }
+
+    const dateFilter: Prisma.VoucherWhereInput = {
+      date: { gte: startDate, lte: endDate },
+    };
+
+    const ledgers = await prisma.accountLedger.findMany({
+      where: { type: { in: [LedgerType.INCOME, LedgerType.EXPENSE] } },
+      include: {
+        debitItems: {
+          where: { voucher: dateFilter },
+          include: { voucher: { select: { date: true } } },
+        },
+        creditItems: {
+          where: { voucher: dateFilter },
+          include: { voucher: { select: { date: true } } },
+        },
+      },
+      orderBy: { code: "asc" },
+    });
+
+    const findPeriodIndex = (date: Date) => periods.findIndex((p) => date >= p.start && date <= p.end);
+
+    const buildAccount = (ledger: (typeof ledgers)[number]) => {
+      const perPeriod = new Array(periods.length).fill(0);
+      for (const item of ledger.debitItems) {
+        const idx = findPeriodIndex(item.voucher.date);
+        if (idx < 0) continue;
+        // For INCOME accounts, a debit reduces income; for EXPENSE, debit increases expense
+        const delta = ledger.type === LedgerType.INCOME ? -Number(item.debitAmount) : Number(item.debitAmount);
+        perPeriod[idx] += delta;
+      }
+      for (const item of ledger.creditItems) {
+        const idx = findPeriodIndex(item.voucher.date);
+        if (idx < 0) continue;
+        const delta = ledger.type === LedgerType.INCOME ? Number(item.creditAmount) : -Number(item.creditAmount);
+        perPeriod[idx] += delta;
+      }
+      const total = perPeriod.reduce((s, v) => s + v, 0);
+      return {
+        ledgerId: ledger.id,
+        code: ledger.code,
+        name: ledger.name,
+        group: ledger.group,
+        perPeriod,
+        total,
+      };
+    };
+
+    const incomeAccounts: any[] = [];
+    const expenseAccounts: any[] = [];
+    for (const ledger of ledgers) {
+      const acc = buildAccount(ledger);
+      // Skip accounts with no activity in the range
+      if (Math.abs(acc.total) < 0.01 && acc.perPeriod.every((v: number) => Math.abs(v) < 0.01)) continue;
+      if (ledger.type === LedgerType.INCOME) incomeAccounts.push(acc);
+      else expenseAccounts.push(acc);
+    }
+
+    const totalIncomePerPeriod = periods.map((_, i) =>
+      incomeAccounts.reduce((s, a) => s + a.perPeriod[i], 0)
+    );
+    const totalExpensePerPeriod = periods.map((_, i) =>
+      expenseAccounts.reduce((s, a) => s + a.perPeriod[i], 0)
+    );
+    const netPerPeriod = periods.map((_, i) => totalIncomePerPeriod[i] - totalExpensePerPeriod[i]);
+
+    const totalIncome = totalIncomePerPeriod.reduce((s, v) => s + v, 0);
+    const totalExpense = totalExpensePerPeriod.reduce((s, v) => s + v, 0);
+    const netProfit = totalIncome - totalExpense;
+
+    return {
+      groupBy: options.groupBy,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      periods: periods.map((p) => ({ key: p.key, label: p.label })),
       incomeAccounts,
       expenseAccounts,
+      totalIncomePerPeriod,
+      totalExpensePerPeriod,
+      netPerPeriod,
       totalIncome,
       totalExpense,
       netProfit,

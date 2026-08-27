@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaUserFriends,
@@ -18,8 +18,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableSummary } from "../../../../services/receivableService";
 import { customerService } from "../../../../services/customerService";
-
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 export const AmountReceivablePage: React.FC = () => {
   const navigate = useNavigate();
@@ -40,8 +39,6 @@ export const AmountReceivablePage: React.FC = () => {
 
   // Data & Loading state
   const [customersList, setCustomersList] = useState<any[]>([]);
-  const [receivables, setReceivables] = useState<CustomerReceivableSummary[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
 
   // Columns & Column Toggle
   const DEFAULT_COLUMNS = [
@@ -76,7 +73,7 @@ export const AmountReceivablePage: React.FC = () => {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        const res = await customerService.fetchAll({ limit: 10 });
+        const res = await customerService.fetchAll({ limit: 10000 });
         const list = Array.isArray(res) ? res : (res?.customers || []);
         setCustomersList(list);
       } catch (err) {
@@ -86,35 +83,35 @@ export const AmountReceivablePage: React.FC = () => {
     loadCustomers();
   }, []);
 
-  // Fetch report data
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const data = await receivableService.getReceivables({
-        asOnDate,
-        startDate,
-        endDate,
-        customerId,
-        search,
-        page: 1,
-        limit: 10000,
-      });
-      setReceivables(data || []);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load customer receivables");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cacheKey = `accounts:amount-receivable:${asOnDate}:${startDate}:${endDate}:${customerId}:${search}`;
 
-  useEffect(() => {
-    loadData();
-  }, [asOnDate, startDate, endDate, customerId, search]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      try {
+        const data = await receivableService.getReceivables({
+          asOnDate,
+          startDate,
+          endDate,
+          customerId,
+          search,
+          page: 1,
+          limit: 10000,
+        });
+        const list = Array.isArray(data) ? data : [];
+        return { data: list, total: list.length };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load customer receivables");
+        throw err;
+      }
+    },
+    [asOnDate, startDate, endDate, customerId, search]
+  );
 
-  useSocketSync("voucher", undefined, loadData);
-  useSocketSync("salesInvoice", undefined, loadData);
-  useSocketSync("salesReturn", undefined, loadData);
-  useSocketSync("customer", undefined, loadData);
+  const { data: receivables, loading, refreshing, refresh } = useListCache<CustomerReceivableSummary>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -320,14 +317,15 @@ export const AmountReceivablePage: React.FC = () => {
             <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded uppercase tracking-wide">
               A/R
             </span>
+            {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
           </h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={loadData}
+              onClick={refresh}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaFileInvoiceDollar,
@@ -16,15 +16,12 @@ import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { voucherService, type Voucher, type VoucherType } from "../../../../services/voucherService";
-
+import { useListCache } from "../../../../hooks/useListCache";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 export const VoucherListPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [total, setTotal] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [startDate, setStartDate] = useState<string>("");
@@ -40,34 +37,38 @@ export const VoucherListPage: React.FC = () => {
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  const loadVouchers = async () => {
-    setLoading(true);
-    try {
-      const res = await voucherService.fetchVouchers({
-        type: typeFilter === "ALL" ? undefined : (typeFilter as VoucherType),
-        search: searchTerm || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        page: 1,
-        limit: 10000,
-      });
-      setVouchers(res.vouchers || []);
-      setTotal(res.total || 0);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load vouchers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cacheKey = `accounts:vouchers:${typeFilter}:${startDate}:${endDate}:${searchTerm}`;
 
-  useEffect(() => {
-    loadVouchers();
-  }, [typeFilter, startDate, endDate, searchTerm]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      try {
+        const res = await voucherService.fetchVouchers({
+          type: typeFilter === "ALL" ? undefined : (typeFilter as VoucherType),
+          search: searchTerm || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          page: 1,
+          limit: 10000,
+        });
+        return { data: res.vouchers || [], total: res.total || 0 };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load vouchers");
+        throw err;
+      }
+    },
+    [typeFilter, startDate, endDate, searchTerm]
+  );
 
-  useSocketSync("voucher", undefined, loadVouchers);
-  useSocketSync("payment", undefined, loadVouchers);
-  useSocketSync("grnInvoice", undefined, loadVouchers);
-  useSocketSync("salesInvoice", undefined, loadVouchers);
+  const { data: vouchers, total, loading, refreshing, refresh } = useListCache<Voucher>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
+
+  // Additional related socket triggers (payment, GRN, sales invoices can affect vouchers)
+  useSocketSync("payment", undefined, refresh);
+  useSocketSync("grnInvoice", undefined, refresh);
+  useSocketSync("salesInvoice", undefined, refresh);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -225,14 +226,15 @@ export const VoucherListPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
           <h2 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaFileInvoiceDollar className="text-blue-600 text-sm" /> Accounting Vouchers
+            {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
           </h2>
           <div className="flex items-center gap-2">
             <button
-              onClick={loadVouchers}
+              onClick={refresh}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh Data"
             >
-              <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}
@@ -332,7 +334,10 @@ export const VoucherListPage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted">Loading vouchers...</div>
+          <div className="p-6 text-center text-xs text-ink-muted">
+            <FaSync className="animate-spin text-blue-600 text-lg mx-auto mb-1" />
+            Loading vouchers...
+          </div>
         ) : vouchers.length === 0 ? (
           <div className="p-8 text-center text-xs text-ink-subtle">No vouchers matching your filter criteria.</div>
         ) : (

@@ -52,15 +52,24 @@ export const accountService = {
     search?: string;
     type?: string;
     group?: string;
-  }): Promise<{ ledgers: AccountLedger[]; total: number; page: number; totalPages: number }> => {
+    grouped?: boolean;
+  }): Promise<{
+    ledgers: AccountLedger[];
+    grouped: Array<{ group: string; ledgers: AccountLedger[] }> | null;
+    total: number;
+    page: number;
+    totalPages: number;
+  }> => {
     const response = await apiClient.get("/accounts/ledgers", { params });
     const data = response.data?.data || response.data;
+    const grouped = response.data?.grouped ?? null;
     const pagination = response.data?.pagination;
     if (Array.isArray(data)) {
-      return { ledgers: data, total: data.length, page: 1, totalPages: 1 };
+      return { ledgers: data, grouped, total: data.length, page: 1, totalPages: 1 };
     }
     return {
       ledgers: data || [],
+      grouped,
       total: pagination?.totalItems || 0,
       page: pagination?.currentPage || 1,
       totalPages: pagination?.totalPages || 1,
@@ -84,7 +93,7 @@ export const accountService = {
 
   fetchStatement: async (
     id: number,
-    params?: { startDate?: string; endDate?: string }
+    params?: { startDate?: string; endDate?: string; search?: string }
   ): Promise<LedgerStatementResult> => {
     const response = await apiClient.get(`/accounts/ledgers/${id}/statement`, { params });
     return response.data?.data || response.data;

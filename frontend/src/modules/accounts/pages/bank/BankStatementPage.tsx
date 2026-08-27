@@ -1,36 +1,43 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FaUniversity, FaArrowLeft } from "react-icons/fa";
+import { FaUniversity, FaArrowLeft, FaSync } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { accountService, type LedgerStatementResult } from "../../../../services/accountService";
+import { useListCache } from "../../../../hooks/useListCache";
 
 const BankStatementPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<LedgerStatementResult | null>(null);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const loadStatement = async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      const result = await accountService.fetchStatement(parseInt(id, 10), {
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-      });
-      setData(result);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load statement");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cacheKey = `accounts:bank-statement-${id || "none"}:${startDate}:${endDate}`;
 
-  useEffect(() => {
-    loadStatement();
-  }, [id, startDate, endDate]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      if (!id) return { data: [], total: 0 };
+      try {
+        const result = await accountService.fetchStatement(parseInt(id, 10), {
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        });
+        return { data: result ? [result] : [], total: result?.entries?.length || 0 };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load statement");
+        throw err;
+      }
+    },
+    [id, startDate, endDate]
+  );
+
+  const { data: statementList, loading, refreshing, refresh } = useListCache<LedgerStatementResult>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+    enabled: !!id,
+  });
+
+  const data: LedgerStatementResult | null = statementList[0] || null;
 
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen">
@@ -45,13 +52,22 @@ const BankStatementPage: React.FC = () => {
                 · {data.ledger.code} · {data.ledger.group}
               </span>
             )}
+            {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
           </h2>
-          <button
-            onClick={() => navigate("/accounts/bank-accounts")}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line cursor-pointer"
-          >
-            <FaArrowLeft className="text-[10px]" /> Back
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            >
+              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => navigate("/accounts/bank-accounts")}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line cursor-pointer"
+            >
+              <FaArrowLeft className="text-[10px]" /> Back
+            </button>
+          </div>
         </div>
 
         {/* Filter row */}
