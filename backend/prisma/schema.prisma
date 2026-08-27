@@ -1603,6 +1603,9 @@ model SalesInvoice {
   customerId     String                @map("customer_id") @db.Uuid
   notes          String?
   subTotal       Decimal               @map("sub_total") @db.Decimal(14, 2)
+  discountType   String?               @map("discount_type") @db.VarChar(10)
+  discountValue  Decimal?              @map("discount_value") @db.Decimal(14, 2)
+  totalDiscount  Decimal               @default(0) @map("total_discount") @db.Decimal(14, 2)
   taxTotal       Decimal               @map("tax_total") @db.Decimal(14, 2)
   grandTotal     Decimal               @map("grand_total") @db.Decimal(14, 2)
   companyId      String                @map("company_id") @db.Uuid

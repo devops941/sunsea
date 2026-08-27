@@ -46,6 +46,7 @@ export const createCustomerSchema = z.object({
         city: z.string().min(1, "City is required"),
         state: z.string().min(1, "State is required"),
         pincode: z.string().min(6, "Pincode is required"),
+        _label: z.string().optional(),
       })
     )
     .optional(),

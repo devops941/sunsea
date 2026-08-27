@@ -150,6 +150,10 @@ const CustomerFormPage: React.FC = () => {
     name: "addresses"
   });
 
+  const handleRemoveAddress = (index: number) => {
+    remove(index);
+  };
+
   useEffect(() => {
     if (isEditMode) {
       if (location.state) {
@@ -212,7 +216,10 @@ const CustomerFormPage: React.FC = () => {
         mobile: data.phones,
         email: data.email,
         gstin: data.gstin,
-        addresses: (data.addresses || []).map(addr => addr.address),
+        addresses: (data.addresses || []).map((addr, index) => ({
+          ...addr.address,
+          _label: index === 0 ? "Billing Address" : `Address ${index + 1}`,
+        })),
         creditLimit: Number(data.creditLimit) || 0,
         openingBalance: Number(data.openingBalance || 0),
         openingBalanceType: data.openingBalanceType || "DEBIT",
@@ -372,9 +379,14 @@ const CustomerFormPage: React.FC = () => {
           </div>
 
           {/* Billing Address */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              
+              <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">
+                Billing Address
+                {fields.length === 1 && (
+                  <span className="text-ink-muted font-normal normal-case ml-1 text-xs">(Same address used for Shipping)</span>
+                )}
+              </h4>
               <CustomButton
                 type="button"
                 text="Add Address"
@@ -383,43 +395,57 @@ const CustomerFormPage: React.FC = () => {
                 onClick={() => append({ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } })}
               />
             </div>
-          </div>
 
-          <div className="space-y-3 col-span-full">
-
-
-            {fields.map((field, index) => {
-
-              const fieldErrors = errors.addresses?.[index]?.address;
-
+            {/* Billing Address Form (always index 0) */}
+            {fields.length > 0 && (() => {
+              const fieldErrors = errors.addresses?.[0]?.address;
               return (
-                <div key={field.id} className={index === 0 ? "" : "p-4 border border-slate-200 rounded-md bg-slate-50 relative"}>
-                  {index > 0 && (
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
-                      <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
-                      <div className="flex items-center gap-4">
-                        <DeleteButton onClick={() => remove(index)} />
-                      </div>
-                    </div>
-                  )}
+                <AddressForm
+                  addressValue={watch(`addresses.0.address.addressLine1`)}
+                  onAddressChange={(v) => setValue(`addresses.0.address.addressLine1`, v, { shouldValidate: true })}
+                  addressError={fieldErrors?.addressLine1?.message}
+                  countryValue="India"
+                  stateValue={watch(`addresses.0.address.state`)}
+                  onStateChange={(v) => {
+                    setValue(`addresses.0.address.state`, v, { shouldValidate: true });
+                    setValue(`addresses.0.address.city`, "", { shouldValidate: true });
+                  }}
+                  stateError={fieldErrors?.state?.message}
+                  cityValue={watch(`addresses.0.address.city`)}
+                  onCityChange={(v) => setValue(`addresses.0.address.city`, v, { shouldValidate: true })}
+                  cityError={fieldErrors?.city?.message}
+                  pincodeValue={watch(`addresses.0.address.pincode`)}
+                  onPincodeChange={(v) => setValue(`addresses.0.address.pincode`, v, { shouldValidate: true })}
+                  pincodeError={fieldErrors?.pincode?.message}
+                  required
+                />
+              );
+            })()}
+
+            {/* Additional Addresses */}
+            {fields.map((field, index) => {
+              if (index === 0) return null;
+              const fieldErrors = errors.addresses?.[index]?.address;
+              return (
+                <div key={field.id} className="p-4 border border-line rounded-md relative">
+                  <div className="flex items-center justify-between mb-3 border-b border-line pb-2">
+                    <h4 className="text-sm font-semibold text-ink uppercase">Address {index + 1}</h4>
+                    <DeleteButton onClick={() => handleRemoveAddress(index)} />
+                  </div>
                   <AddressForm
                     addressValue={watch(`addresses.${index}.address.addressLine1`)}
                     onAddressChange={(v) => setValue(`addresses.${index}.address.addressLine1`, v, { shouldValidate: true })}
                     addressError={fieldErrors?.addressLine1?.message}
-
                     countryValue="India"
-
                     stateValue={watch(`addresses.${index}.address.state`)}
                     onStateChange={(v) => {
                       setValue(`addresses.${index}.address.state`, v, { shouldValidate: true });
                       setValue(`addresses.${index}.address.city`, "", { shouldValidate: true });
                     }}
                     stateError={fieldErrors?.state?.message}
-
                     cityValue={watch(`addresses.${index}.address.city`)}
                     onCityChange={(v) => setValue(`addresses.${index}.address.city`, v, { shouldValidate: true })}
                     cityError={fieldErrors?.city?.message}
-
                     pincodeValue={watch(`addresses.${index}.address.pincode`)}
                     onPincodeChange={(v) => setValue(`addresses.${index}.address.pincode`, v, { shouldValidate: true })}
                     pincodeError={fieldErrors?.pincode?.message}

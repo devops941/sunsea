@@ -202,7 +202,28 @@ const SalesInvoiceView: React.FC = () => {
     const totalSgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0), [itemsWithTax]);
     const totalIgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.igstAmount, 0), [itemsWithTax]);
     const totalTaxable = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.amount, 0), [itemsWithTax]);
-    const grandTotal = Number(invoice?.grandTotal ?? (totalTaxable + totalCgst + totalSgst + totalIgst));
+    const totalTax = totalCgst + totalSgst + totalIgst;
+    const invoiceDiscount = Number(invoice?.totalDiscount || 0);
+    const invDiscountValue = Number(invoice?.discountValue || 0);
+    const invDiscountType = (invoice as any)?.discountType || "";
+    const grandTotal = Number(invoice?.grandTotal ?? (totalTaxable + totalTax));
+
+    // Parse charge rows from narration
+    const CHARGE_META: Record<string, { label: string; sign: 1 | -1 }> = {
+        LORRY_FREIGHT: { label: "Lorry Freight", sign: 1 }, LORRY_FREIGHT_MINUS: { label: "Lorry Freight", sign: -1 },
+        OTHERS_PLUS: { label: "Others", sign: 1 }, OTHERS_MINUS: { label: "Others", sign: -1 },
+        ROUND_OFF_PLUS: { label: "Round Off", sign: 1 }, ROUND_OFF_MINUS: { label: "Round Off", sign: -1 },
+        TDS: { label: "TDS", sign: -1 },
+    };
+    const viewChargeRows = useMemo(() => {
+        if (!invoice?.narration) return [];
+        try {
+            const parsed = JSON.parse(invoice.narration);
+            return (parsed?.__chargeRows__ || [])
+                .filter((r: any) => Number(r.amount) > 0)
+                .map((r: any) => ({ label: CHARGE_META[r.type]?.label || r.type, sign: CHARGE_META[r.type]?.sign ?? 1, amount: Number(r.amount) }));
+        } catch { return []; }
+    }, [invoice?.narration]);
 
     // Tax summary grouped by rate
     const taxSummary = useMemo(() => {
@@ -384,7 +405,7 @@ const SalesInvoiceView: React.FC = () => {
                         {/* GST Tax Invoice Card — always white bg, black text */}
                         <div
                             id="printable-invoice-card"
-                            className="font-[Arial,sans-serif] border-[1.5px] w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
+                            className="font-[Arial,sans-serif] border-[1.5px] w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium p-4"
                         >
                             <div>
                                 {/* Top bar */}
@@ -496,7 +517,7 @@ const SalesInvoiceView: React.FC = () => {
                                         {itemsWithTax.map((item: any, idx: number) => (
                                             <tr key={item.id || idx} style={{ height: "30px" }}>
                                                 <Td align="center">{idx + 1}.</Td>
-                                                <Td>{item.product?.productName || "N/A"}</Td>
+                                                <Td>{item.description || item.product?.productName || "N/A"}</Td>
                                                 <Td align="center">{item.hsnCode}</Td>
                                                 <Td align="right">{item.qty}</Td>
                                                 <Td align="center">{item.unit}</Td>
@@ -552,12 +573,53 @@ const SalesInvoiceView: React.FC = () => {
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colSpan={isInterState ? 7 : 10} className="border border-black px-2 py-1 text-right font-bold">
-                                                Grand Total
-                                            </td>
-                                            <td className="border border-black px-2 py-1 text-right font-bold">
-                                                {formatMoney(grandTotal)}
-                                            </td>
+                                            <td colSpan={isInterState ? 8 : 10} className="border border-black px-2 py-1 text-right font-bold">Sub Total</td>
+                                            <td className="border border-black px-2 py-1 text-right font-bold">{formatMoney(totalTaxable)}</td>
+                                        </tr>
+                                        {invoiceDiscount > 0 && (
+                                            <>
+                                                <tr>
+                                                    <td colSpan={isInterState ? 8 : 10} className="border border-black px-2 py-1 text-right text-[13px] text-red-600">
+                                                        Discount {invDiscountValue > 0 ? `(${invDiscountValue}${invDiscountType === "PERCENT" ? "%" : " Flat"})` : ""} (-)
+                                                    </td>
+                                                    <td className="border border-black px-2 py-1 text-right text-[13px] text-red-600">- {formatMoney(invoiceDiscount)}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td colSpan={isInterState ? 8 : 10} className="border border-black px-2 py-1 text-right text-[13px]">Taxable Amount</td>
+                                                    <td className="border border-black px-2 py-1 text-right text-[13px]">{formatMoney(totalTaxable - invoiceDiscount)}</td>
+                                                </tr>
+                                            </>
+                                        )}
+                                        {totalTax > 0 && (isInterState ? (
+                                            <tr>
+                                                <td colSpan={isInterState ? 8 : 10} className="border border-black px-2 py-1 text-right text-[13px]">IGST</td>
+                                                <td className="border border-black px-2 py-1 text-right text-[13px]">+ {formatMoney(totalIgst)}</td>
+                                            </tr>
+                                        ) : (
+                                            <>
+                                                <tr>
+                                                    <td colSpan={10} className="border border-black px-2 py-1 text-right text-[13px]">CGST</td>
+                                                    <td className="border border-black px-2 py-1 text-right text-[13px]">+ {formatMoney(totalCgst)}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td colSpan={10} className="border border-black px-2 py-1 text-right text-[13px]">SGST</td>
+                                                    <td className="border border-black px-2 py-1 text-right text-[13px]">+ {formatMoney(totalSgst)}</td>
+                                                </tr>
+                                            </>
+                                        ))}
+                                        {viewChargeRows.map((cr: any, idx: number) => (
+                                            <tr key={idx}>
+                                                <td colSpan={isInterState ? 8 : 10} className="border border-black px-2 py-1 text-right text-[13px]">
+                                                    {cr.label} {cr.sign === 1 ? "(+)" : "(-)"}
+                                                </td>
+                                                <td className="border border-black px-2 py-1 text-right text-[13px]">
+                                                    {cr.sign === 1 ? "+" : "-"}&nbsp;{formatMoney(cr.amount)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        <tr>
+                                            <td colSpan={isInterState ? 8 : 10} className="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
+                                            <td className="border border-black px-2 py-1 text-right font-bold">{formatMoney(grandTotal)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

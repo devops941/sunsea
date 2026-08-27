@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaSave, FaExclamationTriangle } from "react-icons/fa";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -162,6 +163,8 @@ const SalesInvoiceForm: React.FC = () => {
 
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [salesProducts, setSalesProducts] = useState<any[]>([]);
+  const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
+  const [excludedComponents, setExcludedComponents] = useState<Record<string, Set<string>>>({});
   const [discountType, setDiscountType] = useState<string>("PERCENT");
   const [discountValue, setDiscountValue] = useState<string>("");
   const [billingAddress, setBillingAddress] = useState({ line1: "", city: "", state: "", pincode: "" });
@@ -372,10 +375,14 @@ const SalesInvoiceForm: React.FC = () => {
       }, 0);
       const unitPrice = orderQty > 0 ? Math.round((totalPrice / orderQty) * 100) / 100 : 0;
 
-      // Get GST from first item
-      const taxPercent = Number(firstItem.igstRate) > 0
+      // Get GST from order item; fall back to product's gstRate if order has 0%
+      let taxPercent = Number(firstItem.igstRate) > 0
         ? Number(firstItem.igstRate)
         : (Number(firstItem.cgstRate || 0) + Number(firstItem.sgstRate || 0));
+      if (taxPercent === 0) {
+        const productMatch = items.find((i) => i.id === spIdStr);
+        if (productMatch) taxPercent = productMatch.gstRate ?? 0;
+      }
 
       const amount = orderQty * unitPrice;
       const taxAmount = (amount * taxPercent) / 100;
@@ -401,9 +408,13 @@ const SalesInvoiceForm: React.FC = () => {
       if (Number(item.quotationUnitPrice) > 0) rate = Number(item.quotationUnitPrice);
       else if (Number(item.unitPrice) > 0) rate = Number(item.unitPrice);
       else if (Number(item.rate) > 0) rate = Number(item.rate);
-      const taxPercent = Number(item.igstRate) > 0
+      let taxPercent = Number(item.igstRate) > 0
         ? Number(item.igstRate)
         : (Number(item.cgstRate || 0) + Number(item.sgstRate || 0));
+      if (taxPercent === 0) {
+        const productMatch = items.find((i) => i.id === String(item.productId));
+        if (productMatch) taxPercent = productMatch.gstRate ?? 0;
+      }
       const amount = qty * rate;
       const taxAmount = (amount * taxPercent) / 100;
       result.push({
@@ -429,6 +440,23 @@ const SalesInvoiceForm: React.FC = () => {
       const mapped = mapOrderToLines(fullOrder);
       if (mapped.length > 0) setLines(mapped);
       setChargeRows(parseChargeRowsFromNarration((fullOrder as any).narration));
+
+      // Detect excluded components: compare order items vs sales product components
+      const orderItems: any[] = fullOrder.items || [];
+      const orderProductIds = new Set(orderItems.map((oi: any) => String(oi.productId)));
+      const newExcluded: Record<string, Set<string>> = {};
+      mapped.forEach((line) => {
+        const sp = salesProducts.find((s: any) => String(s.id) === line.itemId);
+        const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
+        const excluded = new Set<string>();
+        spComps.forEach((c: any) => {
+          if (!orderProductIds.has(String(c.componentProductId))) {
+            excluded.add(String(c.componentProductId));
+          }
+        });
+        if (excluded.size > 0) newExcluded[line.id] = excluded;
+      });
+      setExcludedComponents(newExcluded);
 
       // Load discount from sales order
       if ((fullOrder as any).orderDiscountType) setDiscountType((fullOrder as any).orderDiscountType);
@@ -536,9 +564,9 @@ const SalesInvoiceForm: React.FC = () => {
     const selectedCustomer = customersRaw.find((c) => String(c.id) === customerId);
     if (!selectedCustomer) return false;
     const creditLimit = Number(selectedCustomer.creditLimit || 0);
-    const reservedCredit = Number(selectedCustomer.reservedCredit || 0);
-    const outstandingAmount = Number(selectedCustomer.outstandingAmount || 0);
-    const remainingAmount = creditLimit - reservedCredit - outstandingAmount;
+    // Use netBalance (actual balance from receivables) instead of raw outstandingAmount
+    const currentOutstanding = Math.max(0, Number(selectedCustomer.netBalance ?? selectedCustomer.outstandingAmount ?? 0));
+    const remainingAmount = creditLimit - currentOutstanding;
     const exceededBy = totals.grandTotal - remainingAmount;
     return exceededBy > 0 ? { exceededBy, remainingAmount } : false;
   }, [customersRaw, customerId, totals.grandTotal]);
@@ -580,7 +608,17 @@ const SalesInvoiceForm: React.FC = () => {
         customerId,
         invoiceDate,
         notes,
-        narration: serializeChargeRowsToNarration(chargeRows),
+        narration: (() => {
+          const base = JSON.parse(serializeChargeRowsToNarration(chargeRows));
+          // Store excluded components per sales product in narration
+          const excl: Record<string, string[]> = {};
+          lines.forEach(l => {
+            const ex = excludedComponents[l.id];
+            if (ex && ex.size > 0) excl[l.itemId] = Array.from(ex);
+          });
+          if (Object.keys(excl).length > 0) base.__excludedComponents__ = excl;
+          return JSON.stringify(base);
+        })(),
         salesOrderId: selectedSalesOrderId ? Number(selectedSalesOrderId) : null,
         shippingAddress: (() => {
           if (addingNewAddress) return newShippingAddress;
@@ -601,8 +639,12 @@ const SalesInvoiceForm: React.FC = () => {
             amount: l.amount,
             taxAmount: l.taxAmount,
             total: l.total,
+            excludedComponents: excludedComponents[l.id] ? Array.from(excludedComponents[l.id]) : [],
           })),
         subTotal: totals.subTotal,
+        discountType: Number(discountValue) > 0 ? discountType : null,
+        discountValue: Number(discountValue) || 0,
+        totalDiscount: totals.totalDiscount,
         taxTotal: totals.taxTotal,
         grandTotal: totals.grandTotal,
         payments: [],
@@ -691,7 +733,7 @@ const SalesInvoiceForm: React.FC = () => {
               <FaExclamationTriangle className="text-red-500 mt-0.5 flex-shrink-0 text-xs" />
               <p className="text-red-500 text-xs">
                 Credit exceeded by <span className="font-bold">₹{(limitExceeded as any).exceededBy.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                {" "}· Available: <span className="font-bold">₹{(limitExceeded as any).remainingAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+               
               </p>
             </div>
           )}
@@ -766,12 +808,27 @@ const SalesInvoiceForm: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {lines.map((line, index) => (
-                  <tr key={line.id} className="border-b border-line-soft last:border-b-0 bg-card hover:bg-card-2/40">
+                {lines.map((line, index) => {
+                  const sp = selectedSalesOrderId ? salesProducts.find((s: any) => String(s.id) === line.itemId) : null;
+                  const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
+                  const hasComps = spComps.length > 0;
+                  const isExpanded = expandedLineId === line.id;
+
+                  return (
+                  <React.Fragment key={line.id}>
+                  <tr className="border-b border-line-soft last:border-b-0 bg-card hover:bg-card-2/40">
                     <td className="py-2 pl-3 pr-1 text-ink-subtle font-medium">{index + 1}</td>
                     <td className="py-1 px-1">
                       {selectedSalesOrderId ? (
-                        <span className="text-ink font-medium text-sm py-1 block">{line.itemName || "—"}</span>
+                        <span className="flex items-center gap-1 py-1">
+                          {hasComps && (
+                            <button type="button" onClick={() => setExpandedLineId(isExpanded ? null : line.id)}
+                              className="p-0.5 rounded text-ink-subtle hover:text-primary transition-colors flex-shrink-0">
+                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+                          )}
+                          <span className="text-ink font-medium text-sm">{line.itemName || "—"}</span>
+                        </span>
                       ) : (
                         <SelectInput hideLabel label="" name={`item-${line.id}`} value={line.itemId} disabled={isLocked} options={productOptions} searchable
                           onChange={(e) => updateLine(line.id, "itemId", (e as any).target ? (e as any).target.value : String(e))} />
@@ -805,7 +862,49 @@ const SalesInvoiceForm: React.FC = () => {
                         disabled={lines.length <= 1 || isEditMode} disabledMessage={lines.length <= 1 ? "At least one item." : undefined} />
                     </td>
                   </tr>
-                ))}
+                  {hasComps && isExpanded && (
+                    <tr className="bg-card-2/50">
+                      <td></td>
+                      <td colSpan={6} className="px-3 py-2">
+                        <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
+                          <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
+                            <div className="w-4" />
+                            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+                            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+                            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
+                          </div>
+                          {spComps.map((comp: any) => {
+                            const compId = String(comp.componentProductId);
+                            const compPerUnit = Number(comp.quantity || 1);
+                            const isExcluded = excludedComponents[line.id]?.has(compId) || false;
+                            const compQty = isExcluded ? 0 : compPerUnit * line.qty;
+                            return (
+                              <div key={compId} className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${isExcluded ? "bg-card-2 opacity-60" : "bg-card"}`}>
+                                <input type="checkbox" checked={!isExcluded}
+                                  onChange={() => {
+                                    setExcludedComponents(prev => {
+                                      const lineSet = new Set(prev[line.id] || []);
+                                      if (lineSet.has(compId)) lineSet.delete(compId);
+                                      else lineSet.add(compId);
+                                      return { ...prev, [line.id]: lineSet };
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+                                <span className={`text-xs ${isExcluded ? "line-through text-ink-subtle" : "text-ink font-medium"}`}>
+                                  {comp.componentProduct?.productName || comp.componentProduct?.productCode || `Product #${compId}`}
+                                </span>
+                                <span className="text-[11px] text-ink-subtle text-center w-12">x{compPerUnit}</span>
+                                <span className="text-xs text-ink font-medium text-center">{isExcluded ? "0" : compQty}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

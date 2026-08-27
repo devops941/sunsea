@@ -39,6 +39,12 @@ export const CreateSalesInvoiceSchema = z.object({
   items: z.array(ItemSchema).min(1, "At least one item is required"),
   status: z.string().optional(),
   narration: z.string().optional().nullable(),
+  subTotal: z.coerce.number().optional(),
+  discountType: z.string().optional().nullable(),
+  discountValue: z.coerce.number().optional().default(0),
+  totalDiscount: z.coerce.number().optional().default(0),
+  taxTotal: z.coerce.number().optional(),
+  grandTotal: z.coerce.number().optional(),
 });
 
 export const UpdateSalesInvoiceSchema = CreateSalesInvoiceSchema.partial();
