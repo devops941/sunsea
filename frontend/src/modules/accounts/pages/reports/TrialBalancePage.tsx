@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { FaSync, FaDownload, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
+import {
+  FaSync,
+  FaDownload,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaBalanceScale,
+  FaPrint,
+} from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
 
 interface TrialBalanceRow {
@@ -47,6 +54,8 @@ export const TrialBalancePage: React.FC = () => {
     fetchData();
   }, []);
 
+  const handlePrint = () => window.print();
+
   const exportCSV = () => {
     if (!data) return;
     const headers = ["Code", "Name", "Group", "Type", "Debit Balance", "Credit Balance"];
@@ -77,105 +86,168 @@ export const TrialBalancePage: React.FC = () => {
   };
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-slate-800">Trial Balance</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
-          >
-            <FaSync className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
-          <button
-            onClick={exportCSV}
-            disabled={!data}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition"
-          >
-            <FaDownload />
-            Export CSV
-          </button>
+    <div className="p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
+      {/* Merged Header + Filter Container */}
+      <div className="bg-card rounded-lg border border-line">
+        {/* Header Row */}
+        <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+            <FaBalanceScale className="text-indigo-500 text-sm" /> Trial Balance
+          </h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              disabled={!data}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line disabled:opacity-50"
+              title="Print"
+            >
+              <FaPrint /> Print
+            </button>
+            <button
+              onClick={exportCSV}
+              disabled={!data}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line disabled:opacity-50"
+              title="Export"
+            >
+              <FaDownload /> Export
+            </button>
+            <button
+              onClick={fetchData}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line disabled:opacity-50"
+              title="Refresh"
+            >
+              <FaSync className={loading ? "animate-spin text-indigo-500" : ""} /> Refresh
+            </button>
+          </div>
         </div>
+
+        {/* KPI Row */}
+        {data && (
+          <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[160px] bg-card border border-line rounded p-3">
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                Total Debit (Dr)
+              </div>
+              <div className="text-lg font-mono font-bold text-ink">
+                ₹{fmt(data.totalDebitBalance)}
+              </div>
+            </div>
+            <div className="flex-1 min-w-[160px] bg-card border border-line rounded p-3">
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                Total Credit (Cr)
+              </div>
+              <div className="text-lg font-mono font-bold text-ink">
+                ₹{fmt(data.totalCreditBalance)}
+              </div>
+            </div>
+            <div className="flex-1 min-w-[160px] bg-card border border-line rounded p-3">
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                Status
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {data.isBalanced ? (
+                  <>
+                    <FaCheckCircle className="text-emerald-500 text-xs" />
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      Balanced
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <FaExclamationTriangle className="text-red-500 text-xs" />
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
+                      Diff ₹{fmt(Math.abs(data.totalDebitBalance - data.totalCreditBalance))}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {data && (
-        <div
-          className={`flex items-center gap-2 mb-4 px-4 py-2 rounded-lg text-sm font-medium ${
-            data.isBalanced
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
-          {data.isBalanced ? <FaCheckCircle /> : <FaExclamationTriangle />}
-          {data.isBalanced
-            ? "Trial Balance is balanced"
-            : `Unbalanced — Difference: ₹${fmt(Math.abs(data.totalDebitBalance - data.totalCreditBalance))}`}
-        </div>
-      )}
+      {/* Report Body */}
+      <div className="bg-card border border-line rounded-lg overflow-hidden">
+        {loading && !data && (
+          <div className="p-8 text-center text-xs text-ink-subtle">
+            <FaSync className="animate-spin text-indigo-500 text-lg mx-auto mb-1" />
+            Loading trial balance...
+          </div>
+        )}
 
-      {loading && (
-        <div className="text-center py-12 text-slate-500">Loading trial balance...</div>
-      )}
+        {!loading && !data && (
+          <div className="p-8 text-center text-xs text-ink-subtle">No data available</div>
+        )}
 
-      {!loading && data && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-slate-600 uppercase text-xs">
-                <th className="px-4 py-3 text-left">Code</th>
-                <th className="px-4 py-3 text-left">Ledger Name</th>
-                <th className="px-4 py-3 text-left">Group</th>
-                <th className="px-4 py-3 text-left">Type</th>
-                <th className="px-4 py-3 text-right">Debit (Dr)</th>
-                <th className="px-4 py-3 text-right">Credit (Cr)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.rows.map((row) => (
-                <tr key={row.ledgerId} className="hover:bg-slate-50 transition">
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">{row.code}</td>
-                  <td className="px-4 py-3 font-medium text-slate-800">{row.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{row.group}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-                        row.type === "ASSET"
-                          ? "bg-blue-100 text-blue-700"
-                          : row.type === "LIABILITY"
-                          ? "bg-orange-100 text-orange-700"
-                          : row.type === "INCOME"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {row.type}
-                    </span>
+        {data && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b border-line">
+                <tr>
+                  <th className="px-3 py-1.5 text-xs">Code</th>
+                  <th className="px-3 py-1.5 text-xs">Ledger Name</th>
+                  <th className="px-3 py-1.5 text-xs">Group</th>
+                  <th className="px-3 py-1.5 text-xs">Type</th>
+                  <th className="px-3 py-1.5 text-xs text-right">Debit (Dr)</th>
+                  <th className="px-3 py-1.5 text-xs text-right">Credit (Cr)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {data.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-xs text-ink-subtle">
+                      No ledger entries found.
+                    </td>
+                  </tr>
+                ) : (
+                  data.rows.map((row) => (
+                    <tr key={row.ledgerId} className="hover:bg-card-2 transition-colors">
+                      <td className="px-3 py-1.5 text-xs font-mono text-ink-subtle">{row.code}</td>
+                      <td className="px-3 py-1.5 text-xs font-semibold text-ink">{row.name}</td>
+                      <td className="px-3 py-1.5 text-xs text-ink-muted">{row.group}</td>
+                      <td className="px-3 py-1.5 text-xs">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                            row.type === "ASSET"
+                              ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                              : row.type === "LIABILITY"
+                              ? "bg-orange-500/10 text-orange-500 border border-orange-500/20"
+                              : row.type === "INCOME"
+                              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                              : "bg-red-500/10 text-red-500 border border-red-500/20"
+                          }`}
+                        >
+                          {row.type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-xs text-right font-mono text-ink">
+                        {row.debitBalance > 0 ? `₹${fmt(row.debitBalance)}` : "-"}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs text-right font-mono text-ink">
+                        {row.creditBalance > 0 ? `₹${fmt(row.creditBalance)}` : "-"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-card-2 border-t-2 border-line font-bold text-sm font-mono">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs uppercase tracking-wide text-ink">
+                    Total
                   </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {row.debitBalance > 0 ? `₹${fmt(row.debitBalance)}` : "-"}
+                  <td className="px-3 py-1.5 text-right text-ink">
+                    ₹{fmt(data.totalDebitBalance)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {row.creditBalance > 0 ? `₹${fmt(row.creditBalance)}` : "-"}
+                  <td className="px-3 py-1.5 text-right text-ink">
+                    ₹{fmt(data.totalCreditBalance)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-100 font-bold text-slate-800 border-t-2 border-slate-300">
-                <td colSpan={4} className="px-4 py-3">TOTAL</td>
-                <td className="px-4 py-3 text-right font-mono">₹{fmt(data.totalDebitBalance)}</td>
-                <td className="px-4 py-3 text-right font-mono">₹{fmt(data.totalCreditBalance)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-
-      {!loading && !data && (
-        <div className="text-center py-12 text-slate-400">No data available</div>
-      )}
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

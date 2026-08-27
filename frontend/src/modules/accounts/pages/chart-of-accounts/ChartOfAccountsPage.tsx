@@ -7,13 +7,13 @@ import {
   FaCheckCircle,
   FaTimesCircle,
   FaTimes,
-  FaFolder
+  FaFolder,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
-import type { DataTableColumn } from "../../../../components/ui/table/DataTable";
-import DataTable from "../../../../components/ui/table/DataTable";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 
 import { useSocketSync } from "../../../../hooks/useSocketSync";
@@ -153,76 +153,9 @@ export const ChartOfAccountsPage: React.FC = () => {
     };
   }, [filteredLedgers]);
 
-  // Table Columns for DataTable
-  const tableColumns: DataTableColumn<AccountLedger>[] = [
-    {
-      header: "#",
-      width: "50px",
-      render: (_item, index) => index + 1,
-    },
-    {
-      header: "CODE",
-      render: (item) => <span className="font-mono font-bold text-ink">{item.code}</span>,
-    },
-    {
-      header: "ACCOUNT NAME",
-      render: (item) => <span className="font-bold text-ink">{item.name}</span>,
-    },
-    {
-      header: "ACCOUNT TYPE",
-      render: (item) => (
-        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getTypeBadgeClass(item.type)}`}>
-          {item.type}
-        </span>
-      ),
-    },
-    {
-      header: "GROUP CATEGORY",
-      render: (item) => (
-        <span className="flex items-center gap-1.5 text-ink-muted">
-          <FaFolder className="text-blue-500 text-xs" /> {item.group}
-        </span>
-      ),
-    },
-    {
-      header: "LINKED PARTY / SYSTEM",
-      render: (item) => (
-        <div className="text-xs">
-          {item.customer ? (
-            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Customer: {item.customer.firmName} ({item.customer.customerCode})
-            </span>
-          ) : item.supplier ? (
-            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-              Supplier: {item.supplier.legalName} ({item.supplier.supplierCode})
-            </span>
-          ) : (
-            <span className="text-ink-subtle italic">General System Ledger</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: "STATUS",
-      render: (item) => (
-        <div className="text-center">
-          {item.isActive ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              <FaCheckCircle className="text-emerald-500" /> Active
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-subtle bg-card-2 px-2 py-0.5 rounded-full border border-line">
-              <FaTimesCircle className="text-ink-subtle" /> Inactive
-            </span>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  // Pagination state (10 items per page)
+  // Pagination state (15 items per page - denser)
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 10;
+  const pageSize = 15;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -235,132 +168,219 @@ export const ChartOfAccountsPage: React.FC = () => {
   }, [filteredLedgers, currentPage]);
 
   return (
-    <div className="w-full p-4 md:p-6 bg-card-2 font-sans text-ink">
-      {/* HEADER SECTION */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line mb-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
-                Chart of Accounts
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold text-ink mt-1 flex items-center gap-2">
-              <FaSitemap className="text-blue-600 text-xl" /> General Ledger Structure
-            </h2>
-            <p className="text-xs text-ink-subtle mt-1">
-              Double-entry account categories, asset/liability grouping & system ledgers
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+    <div className="w-full p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
+      {/* COMPACT HEADER + FILTERS */}
+      <div className="bg-card rounded-lg border border-line">
+        {/* Title Bar */}
+        <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+            <FaSitemap className="text-slate-500 text-sm" /> Chart of Accounts
+          </h2>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={loadLedgers}
-              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
-              title="Refresh Data"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
+              title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
+              <FaSync className={loading ? "animate-spin text-slate-500" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}
               columns={csvColumns}
               filename={csvFilename}
-              text="Export CSV"
+              text="Export"
             />
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-semibold transition-all"
             >
-              <FaPlus /> New Ledger
+              <FaPlus className="text-[10px]" /> New Ledger
             </button>
           </div>
         </div>
 
-        {/* REPORT FILTERS CONTROL PANEL */}
-        <div className="p-6 border-b border-line bg-card-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search Ledger</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="w-full border border-line rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
-                  value={draftSearchTerm}
-                  onChange={(e) => setDraftSearchTerm(e.target.value)}
-                  placeholder="Search code, name, group..."
-                />
-                <FaSearch className="absolute left-3 top-3 text-ink-subtle text-xs" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Account Type</label>
-              <SelectInput
-                name="draftSelectedType"
-                value={draftSelectedType}
-                options={[
-                  { label: "All Account Types", value: "ALL" },
-                  { label: "Asset Accounts", value: "ASSET" },
-                  { label: "Liability Accounts", value: "LIABILITY" },
-                  { label: "Income Accounts", value: "INCOME" },
-                  { label: "Expense Accounts", value: "EXPENSE" },
-                ]}
-                hideLabel={true}
-                onChange={(e) => setDraftSelectedType(e.target.value)}
+        {/* Filter Row */}
+        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[220px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+              Search Ledger
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full border border-line bg-card rounded pl-7 pr-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-slate-500/40 focus:border-slate-500"
+                value={draftSearchTerm}
+                onChange={(e) => setDraftSearchTerm(e.target.value)}
+                placeholder="Search code, name, group..."
               />
+              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-line">
+          <div className="w-[180px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+              Account Type
+            </label>
+            <SelectInput
+              name="draftSelectedType"
+              value={draftSelectedType}
+              options={[
+                { label: "All Account Types", value: "ALL" },
+                { label: "Asset Accounts", value: "ASSET" },
+                { label: "Liability Accounts", value: "LIABILITY" },
+                { label: "Income Accounts", value: "INCOME" },
+                { label: "Expense Accounts", value: "EXPENSE" },
+              ]}
+              hideLabel={true}
+              onChange={(e) => setDraftSelectedType(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <button
               onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
+              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded transition-colors border border-line"
             >
-              Clear All
+              Clear
             </button>
             <button
               onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-700 hover:bg-slate-800 rounded transition-colors"
             >
-              Apply Filters
+              Apply
             </button>
           </div>
         </div>
       </div>
 
-      {/* DATA TABLE WITH 10 ITEMS PAGINATION */}
-      <DataTable
-        columns={tableColumns}
-        data={paginatedLedgers}
-        rowKey={(item: AccountLedger) => item.id}
-        loading={loading}
-        emptyMessage="No account ledgers found matching criteria."
-        pagination={{
-          currentPage,
-          totalPages,
-          onPageChange: setCurrentPage,
-        }}
-      />
+      {/* COMPACT TABLE */}
+      <div className="bg-card border border-line rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-head text-ink-muted text-[10px] uppercase font-bold tracking-wide border-b border-line">
+              <tr>
+                <th className="px-3 py-1.5 text-xs w-10">#</th>
+                <th className="px-3 py-1.5 text-xs">Code</th>
+                <th className="px-3 py-1.5 text-xs">Account Name</th>
+                <th className="px-3 py-1.5 text-xs">Type</th>
+                <th className="px-3 py-1.5 text-xs">Group</th>
+                <th className="px-3 py-1.5 text-xs">Linked Party / System</th>
+                <th className="px-3 py-1.5 text-xs text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line font-medium text-ink-muted">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-xs text-ink-subtle">
+                    <FaSync className="animate-spin text-lg mx-auto mb-1 text-slate-500" />
+                    Loading ledgers...
+                  </td>
+                </tr>
+              ) : paginatedLedgers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-xs text-ink-subtle">
+                    No account ledgers found matching criteria.
+                  </td>
+                </tr>
+              ) : (
+                paginatedLedgers.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-card-2/50 transition-colors">
+                    <td className="px-3 py-1.5 text-xs text-ink-subtle">
+                      {(currentPage - 1) * pageSize + index + 1}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs font-mono font-bold text-ink whitespace-nowrap">
+                      {item.code}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs font-bold text-ink">{item.name}</td>
+                    <td className="px-3 py-1.5 text-xs whitespace-nowrap">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${getTypeBadgeClass(item.type)}`}>
+                        {item.type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-xs">
+                      <span className="flex items-center gap-1 text-ink-muted text-[11px]">
+                        <FaFolder className="text-slate-500 text-[10px]" /> {item.group}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-xs">
+                      {item.customer ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Customer: {item.customer.firmName} ({item.customer.customerCode})
+                        </span>
+                      ) : item.supplier ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
+                          Supplier: {item.supplier.legalName} ({item.supplier.supplierCode})
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-ink-subtle italic">General System Ledger</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-center">
+                      {item.isActive ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          <FaCheckCircle className="text-emerald-500 text-[10px]" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-ink-subtle bg-card-2 px-1.5 py-0.5 rounded border border-line">
+                          <FaTimesCircle className="text-ink-subtle text-[10px]" /> Inactive
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {/* CREATE LEDGER MODAL */}
+        {/* Compact Pagination */}
+        {!loading && filteredLedgers.length > 0 && (
+          <div className="px-3 py-2 border-t border-line flex items-center justify-between bg-card-2">
+            <span className="text-[11px] text-ink-subtle">
+              Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredLedgers.length)} of {filteredLedgers.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 text-ink-muted hover:text-ink hover:bg-card rounded border border-line disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <FaChevronLeft className="text-[10px]" />
+              </button>
+              <span className="text-[11px] text-ink-muted px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 text-ink-muted hover:text-ink hover:bg-card rounded border border-line disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <FaChevronRight className="text-[10px]" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CREATE LEDGER MODAL - compact */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-line">
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <FaSitemap className="text-blue-400" /> New Account Ledger
+          <div className="bg-card rounded-lg shadow-2xl max-w-md w-full overflow-hidden border border-line">
+            <div className="px-3 py-2 bg-slate-900 text-white flex items-center justify-between">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <FaSitemap className="text-slate-300 text-sm" /> New Account Ledger
               </h3>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-ink-subtle hover:text-white transition-colors"
               >
-                <FaTimes size={18} />
+                <FaTimes size={14} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateLedger} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
+            <form onSubmit={handleCreateLedger} className="p-3">
+              <div className="mb-2">
+                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Ledger Code *
                 </label>
                 <input
@@ -368,13 +388,13 @@ export const ChartOfAccountsPage: React.FC = () => {
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                   placeholder="e.g. ACC-1001"
-                  className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
+                  className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-slate-500/40 focus:border-slate-500"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
+              <div className="mb-2">
+                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Account Name *
                 </label>
                 <input
@@ -382,13 +402,13 @@ export const ChartOfAccountsPage: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Office Stationery Expenses"
-                  className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-slate-500/40 focus:border-slate-500"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
+              <div className="mb-2">
+                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Ledger Type *
                 </label>
                 <select
@@ -396,7 +416,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, type: e.target.value as any })
                   }
-                  className="w-full px-3 py-2 border border-line rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-slate-500/40 focus:border-slate-500"
                 >
                   <option value="ASSET">ASSET</option>
                   <option value="LIABILITY">LIABILITY</option>
@@ -406,8 +426,8 @@ export const ChartOfAccountsPage: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
+              <div className="mb-2">
+                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Group Name *
                 </label>
                 <input
@@ -415,23 +435,23 @@ export const ChartOfAccountsPage: React.FC = () => {
                   value={formData.group}
                   onChange={(e) => setFormData({ ...formData, group: e.target.value })}
                   placeholder="e.g. Administrative Expenses, Bank Accounts"
-                  className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-slate-500/40 focus:border-slate-500"
                   required
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
+              <div className="flex items-center justify-end gap-2 pt-2 mt-2 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-semibold text-ink-muted hover:bg-card-2 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-700 hover:bg-slate-800 rounded transition-all disabled:opacity-50"
                 >
                   {submitting ? "Saving..." : "Save Ledger"}
                 </button>

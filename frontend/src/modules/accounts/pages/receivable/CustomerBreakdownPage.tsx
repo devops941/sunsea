@@ -205,7 +205,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     {
       header: "INVOICE AMOUNT",
       render: (item: any) => (
-        <div className="text-right font-mono font-bold text-ink">
+        <div className="text-right font-mono font-semibold text-ink">
           ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -213,7 +213,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     {
       header: "PAID AMOUNT",
       render: (item: any) => (
-        <div className="text-right font-mono font-bold text-emerald-600">
+        <div className="text-right font-mono font-semibold text-emerald-600">
           ₹ {item.paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -221,7 +221,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     {
       header: "OUTSTANDING",
       render: (item: any) => (
-        <div className="text-right font-mono font-bold text-blue-600">
+        <div className="text-right font-mono font-semibold text-blue-600">
           ₹ {item.balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -231,7 +231,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       render: (item: any) => (
         <div className="text-center">
           <span
-            className={`px-2.5 py-1 rounded text-xs font-semibold ${
+            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
               item.status === "PAID"
                 ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                 : item.status === "PARTIAL"
@@ -260,7 +260,7 @@ export const CustomerBreakdownPage: React.FC = () => {
           <span className="font-mono font-bold text-ink">{item.voucherNo}</span>
           {item.postedToLedger === false && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-              Not posted to ledger
+              Not posted
             </span>
           )}
         </div>
@@ -273,7 +273,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     {
       header: "PAYMENT MODE",
       render: (item: any) => (
-        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-card-2 text-ink-muted border border-line">
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
           {item.paymentMode || "General"}
         </span>
       ),
@@ -281,14 +281,14 @@ export const CustomerBreakdownPage: React.FC = () => {
     {
       header: "AMOUNT RECEIVED",
       render: (item: any) => (
-        <div className="text-right font-mono font-bold text-emerald-600">
+        <div className="text-right font-mono font-semibold text-emerald-600">
           ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
     },
     {
       header: "NARRATION",
-      render: (item: any) => <span className="text-ink-muted text-xs">{item.narration || "-"}</span>,
+      render: (item: any) => <span className="text-ink-muted text-[11px]">{item.narration || "-"}</span>,
     },
   ];
 
@@ -309,7 +309,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     },
     {
       header: "PARTICULARS",
-      render: (item: any) => <span className="text-ink text-xs font-medium">{item.particulars}</span>,
+      render: (item: any) => <span className="text-ink text-[11px] font-medium">{item.particulars}</span>,
     },
     {
       header: "DEBIT (DR)",
@@ -330,7 +330,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     {
       header: "RUNNING BALANCE",
       render: (item: any) => (
-        <div className="text-right font-mono font-bold text-blue-600">
+        <div className="text-right font-mono font-semibold text-blue-600">
           ₹ {item.runningBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -338,39 +338,33 @@ export const CustomerBreakdownPage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full p-4 md:p-6 bg-card-2 font-sans text-ink">
-      {/* HEADER SECTION MATCHING AMOUNT RECEIVABLE PAGE */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line mb-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
-          <div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate("/accounts/receivable")}
-                className="inline-flex items-center gap-1.5 px-3 py-1 bg-card-2 hover:bg-line text-ink-muted font-semibold rounded-lg text-xs transition-colors border border-line shadow-sm"
-              >
-                <FaArrowLeft size={10} /> Back to Amount Receivable
-              </button>
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
-                Customer Statement
+    <div className="p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
+      {/* COMPACT HEADER + FILTERS */}
+      <div className="bg-card rounded-lg border border-line">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => navigate("/accounts/receivable")}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted font-semibold rounded text-[11px] transition-colors border border-line shrink-0"
+            >
+              <FaArrowLeft size={9} /> Back
+            </button>
+            <h1 className="text-sm font-bold text-ink flex items-center gap-2 min-w-0 truncate">
+              <FaUserFriends className="text-blue-600 text-sm shrink-0" />
+              <span className="truncate">{customerDetail?.customer.firmName || "Customer Breakdown"}</span>
+            </h1>
+            {customerDetail?.customer.customerCode && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono uppercase tracking-wide shrink-0">
+                {customerDetail.customer.customerCode}
               </span>
-            </div>
-            <h2 className="text-2xl font-bold text-ink mt-2 flex items-center gap-2">
-              <FaUserFriends className="text-blue-600 text-xl" />
-              {customerDetail?.customer.firmName || "Customer Breakdown"}
-            </h2>
-            <p className="text-xs text-ink-subtle mt-1">
-              Customer Code: <strong className="font-mono text-ink-muted">{customerDetail?.customer.customerCode || "-"}</strong>
-              {customerDetail?.customer.gstin && (
-                <> | GSTIN: <strong className="font-mono text-ink-muted">{customerDetail.customer.gstin}</strong></>
-              )}
-            </p>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={loadData}
-              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
-              title="Refresh Data"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
+              title="Refresh"
             >
               <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
@@ -378,212 +372,192 @@ export const CustomerBreakdownPage: React.FC = () => {
               data={csvData}
               columns={csvColumns}
               filename={csvFilename}
-              text="Export CSV"
+              text="Export"
             />
           </div>
         </div>
 
-        {/* KPI METRIC CARDS */}
-        {customerDetail && (
-          <div className="p-6 border-b border-line bg-card-2/50">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Opening Balance</span>
-                  <div className="w-9 h-9 rounded-full bg-card-2 flex items-center justify-center text-ink-muted">
-                    <FaMoneyBillWave size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-ink mt-2 font-mono">
-                  ₹ {customerDetail.summary.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-ink-subtle mt-1">Starting Account Receivable</div>
-              </div>
-
-              <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Invoiced</span>
-                  <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                    <FaUserFriends size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-ink mt-2 font-mono">
-                  ₹ {customerDetail.summary.totalBilled.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-ink-subtle mt-1">Total Sales Invoices Posted</div>
-              </div>
-
-              <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Received</span>
-                  <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                    <FaCheckCircle size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-emerald-600 mt-2 font-mono">
-                  ₹ {customerDetail.summary.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-ink-subtle mt-1">Receipt Collections Settled</div>
-              </div>
-
-              <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Returned</span>
-                  <div className="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
-                    <FaMoneyBillWave size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-rose-600 mt-2 font-mono">
-                  ₹ {(customerDetail.summary.totalReturned || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-ink-subtle mt-1">Sales Returns Credit Notes</div>
-              </div>
-
-              <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Closing Outstanding</span>
-                  <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-                    <FaExclamationTriangle size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-blue-600 mt-2 font-mono">
-                  ₹ {customerDetail.summary.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-ink-subtle mt-1">Net Outstanding Balance</div>
-              </div>
-            </div>
+        {/* Filter Row - single compact row */}
+        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
+          <div className="w-[140px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+            <SelectInput
+              name="dateRangePreset"
+              value={dateRangePreset}
+              options={DATE_RANGE_OPTIONS}
+              hideLabel={true}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
+            />
           </div>
+
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+            <DatePickerCalendar
+              name="draftStartDate"
+              value={draftStartDate}
+              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
+
+          <div className="w-[130px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+            <DatePickerCalendar
+              name="draftEndDate"
+              value={draftEndDate}
+              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-1.5">
+            {activeTab === "invoices" && (
+              <ColumnToggle
+                columns={invoiceColumns}
+                visibleColumns={visibleColumns}
+                setVisibleColumns={setVisibleColumns}
+              />
+            )}
+            <button
+              onClick={handleClearFilters}
+              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded transition-colors border border-line"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleApplyFilters}
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* COMPACT KPI CARDS */}
+      {customerDetail && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="bg-card border border-line rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Opening</span>
+              <FaMoneyBillWave className="text-ink-muted text-xs" />
+            </div>
+            <div className="text-lg font-mono font-bold text-ink mt-1">
+              ₹ {customerDetail.summary.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-ink-subtle mt-0.5">Starting receivable</div>
+          </div>
+
+          <div className="bg-card border border-line rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Invoiced</span>
+              <FaUserFriends className="text-blue-600 text-xs" />
+            </div>
+            <div className="text-lg font-mono font-bold text-ink mt-1">
+              ₹ {customerDetail.summary.totalBilled.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-ink-subtle mt-0.5">Sales invoices</div>
+          </div>
+
+          <div className="bg-card border border-line rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Received</span>
+              <FaCheckCircle className="text-emerald-600 text-xs" />
+            </div>
+            <div className="text-lg font-mono font-bold text-emerald-600 mt-1">
+              ₹ {customerDetail.summary.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-ink-subtle mt-0.5">Receipts settled</div>
+          </div>
+
+          <div className="bg-card border border-line rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Returned</span>
+              <FaMoneyBillWave className="text-rose-600 text-xs" />
+            </div>
+            <div className="text-lg font-mono font-bold text-rose-600 mt-1">
+              ₹ {(customerDetail.summary.totalReturned || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-ink-subtle mt-0.5">Credit notes</div>
+          </div>
+
+          <div className="bg-card border border-line rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Outstanding</span>
+              <FaExclamationTriangle className="text-amber-600 text-xs" />
+            </div>
+            <div className="text-lg font-mono font-bold text-blue-600 mt-1">
+              ₹ {customerDetail.summary.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-ink-subtle mt-0.5">Net balance</div>
+          </div>
+        </div>
+      )}
+
+      {/* TABS & TABLE */}
+      <div className="bg-card rounded-lg border border-line overflow-hidden">
+        <div className="flex items-center gap-1 border-b border-line bg-card-2 px-2">
+          <button
+            onClick={() => setActiveTab("invoices")}
+            className={`flex items-center gap-1.5 px-3 py-2 font-semibold text-xs border-b-2 transition-colors ${
+              activeTab === "invoices"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-ink-subtle hover:text-ink"
+            }`}
+          >
+            <FaFileInvoice className="text-[10px]" /> Invoices ({customerDetail?.invoices?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab("collections")}
+            className={`flex items-center gap-1.5 px-3 py-2 font-semibold text-xs border-b-2 transition-colors ${
+              activeTab === "collections"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-ink-subtle hover:text-ink"
+            }`}
+          >
+            <FaHistory className="text-[10px]" /> Collections ({customerDetail?.collectionHistory?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab("statement")}
+            className={`flex items-center gap-1.5 px-3 py-2 font-semibold text-xs border-b-2 transition-colors ${
+              activeTab === "statement"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-ink-subtle hover:text-ink"
+            }`}
+          >
+            <FaList className="text-[10px]" /> Ledger ({customerDetail?.statementEntries?.length || 0})
+          </button>
+        </div>
+
+        {activeTab === "invoices" && (
+          <DataTable
+            columns={invoiceColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
+            data={customerDetail?.invoices || []}
+            rowKey={(item: any) => item.id}
+            loading={loading}
+            emptyMessage="No sales invoices recorded for this customer."
+          />
         )}
 
-        {/* REPORT FILTERS CONTROL PANEL */}
-        <div className="p-6 border-b border-line bg-card-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
-              <SelectInput
-                name="dateRangePreset"
-                value={dateRangePreset}
-                options={DATE_RANGE_OPTIONS}
-                hideLabel={true}
-                onChange={(e) => handleDateRangeChange(e.target.value)}
-              />
-            </div>
+        {activeTab === "collections" && (
+          <DataTable
+            columns={collectionColumns}
+            data={customerDetail?.collectionHistory || []}
+            rowKey={(item: any) => item.id}
+            loading={loading}
+            emptyMessage="No receipt collection vouchers recorded for this customer."
+          />
+        )}
 
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
-              <DatePickerCalendar
-                name="draftStartDate"
-                value={draftStartDate}
-                onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
-              <DatePickerCalendar
-                name="draftEndDate"
-                value={draftEndDate}
-                onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
-            <div>
-              {activeTab === "invoices" && (
-                <ColumnToggle
-                  columns={invoiceColumns}
-                  visibleColumns={visibleColumns}
-                  setVisibleColumns={setVisibleColumns}
-                />
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
-              >
-                Clear All
-              </button>
-              <button
-                onClick={handleApplyFilters}
-                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* TABS & DATA TABLE SECTION */}
-        <div className="p-6 space-y-6">
-          {/* Tabs Navigation */}
-          <div className="flex items-center gap-2 border-b border-line">
-            <button
-              onClick={() => setActiveTab("invoices")}
-              className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
-                activeTab === "invoices"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-ink-subtle hover:text-ink"
-              }`}
-            >
-              <FaFileInvoice /> Invoice Breakdown ({customerDetail?.invoices?.length || 0})
-            </button>
-            <button
-              onClick={() => setActiveTab("collections")}
-              className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
-                activeTab === "collections"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-ink-subtle hover:text-ink"
-              }`}
-            >
-              <FaHistory /> Collection History ({customerDetail?.collectionHistory?.length || 0})
-            </button>
-            <button
-              onClick={() => setActiveTab("statement")}
-              className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
-                activeTab === "statement"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-ink-subtle hover:text-ink"
-              }`}
-            >
-              <FaList /> Account Ledger Statement ({customerDetail?.statementEntries?.length || 0})
-            </button>
-          </div>
-
-          {/* TAB 1: INVOICES BREAKDOWN */}
-          {activeTab === "invoices" && (
-            <DataTable
-              columns={invoiceColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
-              data={customerDetail?.invoices || []}
-              rowKey={(item: any) => item.id}
-              loading={loading}
-              emptyMessage="No sales invoices recorded for this customer."
-            />
-          )}
-
-          {/* TAB 2: COLLECTION HISTORY */}
-          {activeTab === "collections" && (
-            <DataTable
-              columns={collectionColumns}
-              data={customerDetail?.collectionHistory || []}
-              rowKey={(item: any) => item.id}
-              loading={loading}
-              emptyMessage="No receipt collection vouchers recorded for this customer."
-            />
-          )}
-
-          {/* TAB 3: ACCOUNT LEDGER STATEMENT */}
-          {activeTab === "statement" && (
-            <DataTable
-              columns={statementColumns}
-              data={customerDetail?.statementEntries || []}
-              rowKey={(item: any) => item.id}
-              loading={loading}
-              emptyMessage="No ledger statement entries recorded for this customer."
-            />
-          )}
-        </div>
+        {activeTab === "statement" && (
+          <DataTable
+            columns={statementColumns}
+            data={customerDetail?.statementEntries || []}
+            rowKey={(item: any) => item.id}
+            loading={loading}
+            emptyMessage="No ledger statement entries recorded for this customer."
+          />
+        )}
       </div>
     </div>
   );

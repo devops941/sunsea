@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaSave, FaPlus, FaEraser, FaCheckCircle } from "react-icons/fa";
+import { FaSave, FaPlus, FaEraser, FaCheckCircle, FaArrowLeft, FaTrash, FaUndo } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService } from "../../../../services/returnService";
 import { customerService } from "../../../../services/customerService";
 import { productService } from "../../../../services/productService";
 import { salesProductService } from "../../../../services/salesProductService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
-import BackButton from "../../../../components/ui/BackButton/BackButton";
-import CustomButton from "../../../../components/ui/Button/Button";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
-import TextInput from "../../../../components/form/TextInput/TextInput";
 import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
-import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 
 interface FormReturnRow {
@@ -46,7 +42,7 @@ export const SalesReturnCreatePage: React.FC = () => {
   const [customerId, setCustomerId] = useState<string>("");
   const [customers, setCustomers] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
-  const [salesProductsList, setSalesProductsList] = useState<any[]>([]);
+  const [, setSalesProductsList] = useState<any[]>([]);
   const [narration, setNarration] = useState<string>("");
   const [returnRows, setReturnRows] = useState<FormReturnRow[]>([]);
   const [originalReturnNo, setOriginalReturnNo] = useState<string>("");
@@ -407,159 +403,165 @@ export const SalesReturnCreatePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Top Header Card */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-ink">
-              {isEditMode ? `Edit Sales Return (Draft ${originalReturnNo})` : "New Sales Return (Credit Note)"}
-            </h1>
-            <p className="text-xs text-ink-muted mt-0.5">
-              {isEditMode
-                ? "Update draft sales return details, or confirm to auto-post credit note and accounting entries."
-                : "Record product returns from customer, generate credit note, and update inventory & accounts."}
-            </p>
-          </div>
-
-          <BackButton to="/sales-returns" />
-        </div>
+    <div className="p-3 space-y-3 bg-card-2 min-h-screen">
+      {/* Compact Header */}
+      <div className="bg-card rounded-lg border border-line flex items-center justify-between gap-2 px-3 py-2">
+        <h1 className="text-sm font-bold text-ink flex items-center gap-2">
+          <FaUndo className="text-pink-500 text-sm" />
+          {isEditMode ? `Edit Sales Return (${originalReturnNo})` : "New Sales Return (Credit Note)"}
+        </h1>
+        <button
+          onClick={() => navigate("/sales-returns")}
+          className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-card border border-line text-ink rounded text-xs font-semibold transition cursor-pointer"
+        >
+          <FaArrowLeft className="text-[10px]" /> Back
+        </button>
       </div>
 
-      {/* Main Form Content */}
-      <div className="bg-card rounded-2xl shadow-sm border border-line p-6 space-y-6">
-        {/* Customer Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <SelectInput
-              label="CUSTOMER"
-              name="customerId"
-              value={customerId}
-              required
-              error={errors.customerId}
-              defaultOptionLabel="Select Customer"
-              searchable
-              options={customers.map((c: any) => {
-                const name = c.displayName || c.firmName;
-                const rawGrade = c.customerGrade?.name || c.grade || "";
-                const gradeShort = rawGrade ? rawGrade.replace(/grade\s*/i, "").trim() : "";
-                const gradeTag = gradeShort ? `(${gradeShort})` : null;
-
-                const location = c.billingCity || c.city || c.shippingCity || c.customerType?.name;
-                const locationTag = location ? `(${location.toLowerCase()})` : null;
-
-                const parts = [name, gradeTag, locationTag].filter(Boolean);
-                return { label: parts.join(" - "), value: String(c.id) };
-              })}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                if (errors.customerId) {
-                  setErrors((prev) => {
-                    const next = { ...prev };
-                    delete next.customerId;
-                    return next;
-                  });
-                }
-              }}
-            />
-          </div>
-
-          <div>
-            <TextInput
-              label="REFUND MODE"
-              name="refundMode"
-              value="CREDIT_NOTE (Auto-Adjusted)"
-              disabled
-            />
-          </div>
+      {/* Form */}
+      <div className="bg-card rounded-lg border border-line overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-line bg-pink-500/10 flex items-center gap-2">
+          <FaUndo className="text-pink-500 text-xs" />
+          <h2 className="text-xs font-bold text-ink">Sales Return Details</h2>
         </div>
 
-        {/* Items Section */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="p-3 space-y-3">
+          {/* Customer + Refund Mode */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div>
-              <h2 className="text-sm font-bold text-ink uppercase tracking-wider">
-                Return Line Items <span className="text-red-500">*</span>
-              </h2>
-              <p className="text-xs text-ink-muted">Select sales products and specify quantities to return.</p>
+              <label className="block mb-0.5 text-[10px] font-semibold text-ink-subtle uppercase tracking-wide">
+                Customer <span className="text-red-500">*</span>
+              </label>
+              <SelectInput
+                name="customerId"
+                value={customerId}
+                required
+                error={errors.customerId}
+                defaultOptionLabel="Select Customer"
+                hideLabel
+                searchable
+                options={customers.map((c: any) => {
+                  const name = c.displayName || c.firmName;
+                  const rawGrade = c.customerGrade?.name || c.grade || "";
+                  const gradeShort = rawGrade ? rawGrade.replace(/grade\s*/i, "").trim() : "";
+                  const gradeTag = gradeShort ? `(${gradeShort})` : null;
+
+                  const location = c.billingCity || c.city || c.shippingCity || c.customerType?.name;
+                  const locationTag = location ? `(${location.toLowerCase()})` : null;
+
+                  const parts = [name, gradeTag, locationTag].filter(Boolean);
+                  return { label: parts.join(" - "), value: String(c.id) };
+                })}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  if (errors.customerId) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.customerId;
+                      return next;
+                    });
+                  }
+                }}
+              />
             </div>
-            <CustomButton
-              text="Add Item"
-              icon={FaPlus}
-              onClick={handleAddRow}
-              variant="primary"
-              size="sm"
-              type="button"
-            />
+
+            <div>
+              <label className="block mb-0.5 text-[10px] font-semibold text-ink-subtle uppercase tracking-wide">
+                Refund Mode
+              </label>
+              <input
+                type="text"
+                value="CREDIT_NOTE (Auto-Adjusted)"
+                disabled
+                className="w-full px-2 py-1.5 border border-line bg-card-2 rounded text-xs text-ink-muted"
+              />
+            </div>
           </div>
 
-          {errors.rows && (
-            <p className="text-xs text-red-500 font-medium">{errors.rows}</p>
-          )}
-
-          {returnRows.length === 0 ? (
-            <div className="p-8 border border-dashed border-line rounded-xl text-center text-xs text-ink-subtle flex flex-col items-center gap-2 bg-card-2/50">
-              <p className="font-medium">No line items added yet.</p>
+          {/* Items Section */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <label className="text-[10px] font-semibold text-ink uppercase tracking-wide">
+                  Return Line Items <span className="text-red-500">*</span>
+                </label>
+                <p className="text-[10px] text-ink-subtle">Select sales products and specify quantities to return.</p>
+              </div>
               <button
                 type="button"
                 onClick={handleAddRow}
-                className="text-primary hover:underline font-semibold cursor-pointer"
+                className="flex items-center gap-1 text-[11px] font-semibold text-pink-500 hover:text-pink-600 cursor-pointer"
               >
-                + Click here to add item
+                <FaPlus className="w-2.5 h-2.5" /> Add Item
               </button>
             </div>
-          ) : (
-            <div className="border border-line rounded-xl overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs text-ink">
-                <thead className="bg-head uppercase font-semibold text-ink-muted border-b border-line">
-                  <tr>
-                    <th className="px-4 py-3 min-w-[240px]">
-                      Product & Group <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-4 py-3 w-28 text-center">
-                      Qty <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-4 py-3 w-48 text-center">
-                      Weight / UOM <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-4 py-3 w-36 text-center">
-                      Unit Price (₹) <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-4 py-3 w-36 text-right">Total (₹)</th>
-                    <th className="px-4 py-3 w-12 text-center"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line-soft bg-card">
-                  {returnRows.map((row, idx) => {
-                    const lineTot = row.quantity * row.unitPrice;
-                    const hasProductError = Boolean(errors[`product_${idx}`]);
-                    const hasQtyError = Boolean(errors[`qty_${idx}`]);
-                    const hasPriceError = Boolean(errors[`unitPrice_${idx}`]);
 
-                    return (
-                      <tr
-                        key={idx}
-                        className={`hover:bg-card-2 transition-colors ${
-                          row.quantity > 0 ? "bg-primary/5" : ""
-                        }`}
-                      >
-                        <td className="px-4 py-3 align-top min-w-[240px]">
-                          <SelectInput
-                            name={`product-${idx}`}
-                            value={row.productId ? String(row.productId) : ""}
-                            defaultOptionLabel="-- Select Product --"
-                            searchable
-                            noMargin
-                            error={errors[`product_${idx}`]}
-                            options={availableSalesProducts.map((p) => ({
-                              label: p.productGroup ? `${p.description} — (${p.productGroup})` : p.description,
-                              value: String(p.productId),
-                            }))}
-                            onChange={(e) => handleProductSelect(idx, e.target.value)}
-                          />
-                        </td>
-                        <td className="px-4 py-3 align-top text-center">
-                          <div className="flex flex-col items-center">
+            {errors.rows && (
+              <p className="text-[11px] text-red-500 font-medium mb-1">{errors.rows}</p>
+            )}
+
+            {returnRows.length === 0 ? (
+              <div className="p-6 border border-dashed border-line rounded text-center text-xs text-ink-subtle bg-card-2/50">
+                <p className="font-medium mb-1">No line items added yet.</p>
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="text-pink-500 hover:underline font-semibold cursor-pointer text-xs"
+                >
+                  + Click here to add item
+                </button>
+              </div>
+            ) : (
+              <div className="border border-line rounded overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-card-2 text-ink uppercase text-[10px] tracking-wide font-bold border-b border-line">
+                    <tr>
+                      <th className="px-2 py-1.5 min-w-[200px]">
+                        Product & Group <span className="text-red-500">*</span>
+                      </th>
+                      <th className="px-2 py-1.5 w-20 text-center">
+                        Qty <span className="text-red-500">*</span>
+                      </th>
+                      <th className="px-2 py-1.5 w-40 text-center">
+                        Weight / UOM <span className="text-red-500">*</span>
+                      </th>
+                      <th className="px-2 py-1.5 w-28 text-center">
+                        Unit Price (₹) <span className="text-red-500">*</span>
+                      </th>
+                      <th className="px-2 py-1.5 w-28 text-right">Total (₹)</th>
+                      <th className="px-2 py-1.5 w-8 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-soft">
+                    {returnRows.map((row, idx) => {
+                      const lineTot = row.quantity * row.unitPrice;
+                      const hasQtyError = Boolean(errors[`qty_${idx}`]);
+                      const hasPriceError = Boolean(errors[`unitPrice_${idx}`]);
+
+                      return (
+                        <tr
+                          key={idx}
+                          className={`hover:bg-card-2/50 transition-colors ${
+                            row.quantity > 0 ? "bg-pink-500/5" : ""
+                          }`}
+                        >
+                          <td className="px-2 py-1.5 align-top">
+                            <SelectInput
+                              name={`product-${idx}`}
+                              value={row.productId ? String(row.productId) : ""}
+                              defaultOptionLabel="-- Select Product --"
+                              searchable
+                              noMargin
+                              hideLabel
+                              error={errors[`product_${idx}`]}
+                              options={availableSalesProducts.map((p) => ({
+                                label: p.productGroup ? `${p.description} — (${p.productGroup})` : p.description,
+                                value: String(p.productId),
+                              }))}
+                              onChange={(e) => handleProductSelect(idx, e.target.value)}
+                            />
+                          </td>
+                          <td className="px-2 py-1.5 align-top text-center">
                             <input
                               type="number"
                               min="0"
@@ -568,36 +570,34 @@ export const SalesReturnCreatePage: React.FC = () => {
                               onChange={(e) =>
                                 handleRowFieldChange(idx, "quantity", parseFloat(e.target.value) || 0)
                               }
-                              className={`w-24 h-10 px-2 border rounded-md text-center font-bold focus:outline-none text-sm shadow-2xs ${
+                              className={`w-full px-2 py-1 border rounded text-center font-mono font-semibold text-xs focus:outline-none ${
                                 hasQtyError
-                                  ? "border-red-500 bg-red-500/5 text-red-500 focus:border-red-500"
-                                  : "border-line bg-card-2 text-ink focus:border-primary"
+                                  ? "border-red-500 bg-red-500/5 text-red-500"
+                                  : "border-line bg-card text-pink-500 focus:border-pink-500"
                               }`}
                               placeholder="0"
                             />
                             {hasQtyError && (
-                              <span className="text-red-500 text-[11px] font-medium mt-1">
+                              <span className="text-red-500 text-[10px] font-medium mt-0.5 block">
                                 {errors[`qty_${idx}`]}
                               </span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-top text-center min-w-[180px]">
-                          <QuantityInput
-                            hideLabel
-                            name={`weight-${idx}`}
-                            value={row.weight === 0 ? "" : row.weight}
-                            baseUoms={row.baseUoms || "kg, g, t"}
-                            uom={row.uom || "kg"}
-                            error={errors[`weight_${idx}`]}
-                            onChange={(e: any) =>
-                              handleRowFieldChange(idx, "weight", parseFloat(e.target.value) || 0)
-                            }
-                            onUomChange={(newUom: string) => handleRowUomChange(idx, newUom)}
-                          />
-                        </td>
-                        <td className="px-4 py-3 align-top text-center">
-                          <div className="flex flex-col items-center">
+                          </td>
+                          <td className="px-2 py-1.5 align-top text-center min-w-[150px]">
+                            <QuantityInput
+                              hideLabel
+                              name={`weight-${idx}`}
+                              value={row.weight === 0 ? "" : row.weight}
+                              baseUoms={row.baseUoms || "kg, g, t"}
+                              uom={row.uom || "kg"}
+                              error={errors[`weight_${idx}`]}
+                              onChange={(e: any) =>
+                                handleRowFieldChange(idx, "weight", parseFloat(e.target.value) || 0)
+                              }
+                              onUomChange={(newUom: string) => handleRowUomChange(idx, newUom)}
+                            />
+                          </td>
+                          <td className="px-2 py-1.5 align-top text-center">
                             <input
                               type="number"
                               min="0"
@@ -606,102 +606,113 @@ export const SalesReturnCreatePage: React.FC = () => {
                               onChange={(e) =>
                                 handleRowFieldChange(idx, "unitPrice", parseFloat(e.target.value) || 0)
                               }
-                              className={`w-32 h-10 px-3 border rounded-md text-center text-ink focus:outline-none text-sm font-medium shadow-2xs ${
+                              className={`w-full px-2 py-1 border rounded text-right font-mono text-xs focus:outline-none ${
                                 hasPriceError
-                                  ? "border-red-500 bg-red-500/5 text-red-500 focus:border-red-500"
-                                  : "border-line bg-card-2 focus:border-primary"
+                                  ? "border-red-500 bg-red-500/5 text-red-500"
+                                  : "border-line bg-card text-ink focus:border-pink-500"
                               }`}
                               placeholder="0.00"
                             />
                             {hasPriceError && (
-                              <span className="text-red-500 text-[11px] font-medium mt-1">
+                              <span className="text-red-500 text-[10px] font-medium mt-0.5 block">
                                 {errors[`unitPrice_${idx}`]}
                               </span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-top text-right">
-                          <div className="h-10 flex items-center justify-end font-mono font-bold text-ink text-sm">
+                          </td>
+                          <td className="px-2 py-1.5 align-top text-right font-mono font-semibold text-ink whitespace-nowrap">
                             {lineTot > 0 ? `₹${lineTot.toFixed(2)}` : "—"}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-top text-center">
-                          <div className="h-10 flex items-center justify-center">
-                            <DeleteButton onClick={() => handleRemoveRow(idx)} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Section: Narration and Financial Summary */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-line-soft items-start">
-          <div className="lg:col-span-2">
-            <TextInput
-              label="NARRATION / INTERNAL NOTES"
-              name="narration"
-              value={narration}
-              as="textarea"
-              rows={3}
-              placeholder="Additional accounting or return notes..."
-              onChange={(e) => setNarration(e.target.value)}
-            />
+                          </td>
+                          <td className="px-2 py-1.5 align-top text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRow(idx)}
+                              className="p-1 text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                            >
+                              <FaTrash className="w-2.5 h-2.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          <div className="bg-card-2 p-5 rounded-xl border border-line space-y-3">
-            <h3 className="text-xs font-bold text-ink uppercase tracking-wider border-b border-line pb-2">
-              Financial Summary
-            </h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between text-ink-muted">
-                <span>Sub Total:</span>
-                <span className="font-mono text-ink font-semibold">₹{subTotal.toFixed(2)}</span>
-              </div>
-              {taxTotal > 0 && (
+          {/* Narration + Summary */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 pt-2 border-t border-line-soft items-start">
+            <div className="lg:col-span-2">
+              <label className="block mb-0.5 text-[10px] font-semibold text-ink-subtle uppercase tracking-wide">
+                Narration / Internal Notes
+              </label>
+              <textarea
+                value={narration}
+                rows={3}
+                placeholder="Additional accounting or return notes..."
+                onChange={(e) => setNarration(e.target.value)}
+                className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="bg-card-2 p-2.5 rounded border border-line space-y-1.5">
+              <h3 className="text-[10px] font-bold text-ink uppercase tracking-wide border-b border-line pb-1">
+                Financial Summary
+              </h3>
+              <div className="space-y-1 text-xs">
                 <div className="flex justify-between text-ink-muted">
-                  <span>GST Amount:</span>
-                  <span className="font-mono text-ink font-semibold">₹{taxTotal.toFixed(2)}</span>
+                  <span>Sub Total:</span>
+                  <span className="font-mono text-ink font-semibold">₹{subTotal.toFixed(2)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-sm font-bold text-ink pt-2 border-t border-line">
-                <span>Grand Total:</span>
-                <span className="font-mono text-primary text-base">₹{grandTotal.toFixed(2)}</span>
+                {taxTotal > 0 && (
+                  <div className="flex justify-between text-ink-muted">
+                    <span>GST Amount:</span>
+                    <span className="font-mono text-ink font-semibold">₹{taxTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs font-bold text-ink pt-1 border-t border-line">
+                  <span>Grand Total:</span>
+                  <span className="font-mono text-pink-500 text-sm">₹{grandTotal.toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Footer Actions */}
-        <div className="flex flex-wrap items-center justify-end gap-3 pt-6 border-t border-line-soft">
-          <CustomButton
-            text="Clear"
-            icon={FaEraser}
-            variant="secondary"
-            onClick={handleReset}
-            disabled={submitting}
-            type="button"
-          />
-          <CustomButton
-            type="button"
-            text={submitting && submitMode === "DRAFT" ? "Saving Draft..." : isEditMode ? "Update Draft" : "Save as Draft"}
-            icon={FaSave}
-            variant="secondary"
-            disabled={submitting}
-            onClick={() => handleSubmit("DRAFT")}
-          />
-          <CustomButton
-            type="button"
-            text={submitting && submitMode === "APPROVED" ? "Confirming..." : "Confirm Return"}
-            icon={FaCheckCircle}
-            variant="primary"
-            disabled={submitting}
-            onClick={() => handleSubmit("APPROVED")}
-          />
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between pt-2 border-t border-line">
+            <div className="text-xs text-ink-muted">
+              {returnRows.filter((r) => r.productId > 0 && r.quantity > 0).length} items |{" "}
+              <span className="font-bold text-ink font-mono">Total: ₹{grandTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={submitting}
+                className="flex items-center gap-1 px-3 py-1.5 text-ink-muted bg-card-2 hover:bg-card border border-line rounded font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+              >
+                <FaEraser className="text-[10px]" /> Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmit("DRAFT")}
+                disabled={submitting}
+                className="flex items-center gap-1 px-3 py-1.5 bg-card-2 hover:bg-card text-ink border border-line rounded font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+              >
+                <FaSave className="text-[10px]" />
+                {submitting && submitMode === "DRAFT" ? "Saving..." : isEditMode ? "Update Draft" : "Save as Draft"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmit("APPROVED")}
+                disabled={submitting}
+                className="flex items-center gap-1 px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                <FaCheckCircle className="text-[10px]" />
+                {submitting && submitMode === "APPROVED" ? "Confirming..." : "Confirm Return"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

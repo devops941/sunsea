@@ -155,9 +155,26 @@ const SupplierList: React.FC = () => {
                             }
                             columns={[
                                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
-                                { header: "CODE", accessor: "supplierCode" },
+                                // { header: "CODE", accessor: "supplierCode" },
                                 { header: "NAME", accessor: "legalName" },
                                 { header: "MOBILE", render: (supplier) => Array.isArray(supplier.mobile) && supplier.mobile.length > 0 ? supplier.mobile[0].number : (typeof supplier.mobile === "string" ? supplier.mobile : "N/A") },
+                                { header: "EMAIL", render: (supplier) => supplier.email || "N/A" },
+                                { header: "GSTIN", render: (supplier) => supplier.gstin || "-" },
+                                {
+                                    header: "BALANCE",
+                                    align: "right",
+                                    render: (supplier) => {
+                                        const bal = Number(supplier.openingBalance || 0);
+                                        const type = supplier.openingBalanceType || "CREDIT";
+                                        const suffix = type === "CREDIT" ? "Cr" : "Dr";
+                                        const color = bal > 0 ? (type === "CREDIT" ? "text-orange-500" : "text-emerald-500") : "text-ink-subtle";
+                                        return (
+                                            <span className={`font-mono ${color}`}>
+                                                ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {bal > 0 ? suffix : ""}
+                                            </span>
+                                        );
+                                    }
+                                },
 
                                 // { header: "ON TIME", render: (supplier) => supplier.onTimePct !== null ? `${supplier.onTimePct} %` : "N/A" },
                                 {
