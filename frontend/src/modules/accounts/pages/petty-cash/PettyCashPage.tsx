@@ -5,8 +5,6 @@ import {
   FaArrowUp,
   FaPlus,
   FaSearch,
-  FaChevronLeft,
-  FaChevronRight,
   FaWallet,
   FaTimes,
 } from "react-icons/fa";
@@ -14,8 +12,6 @@ import { toast } from "react-toastify";
 import { pettyCashService, type PettyCashEntry, type PettyCashSummary } from "../../../../services/pettyCashService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
-
-const ITEMS_PER_PAGE = 10;
 
 export const PettyCashPage: React.FC = () => {
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
@@ -35,7 +31,6 @@ export const PettyCashPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<"ALL" | "IN" | "OUT">("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Form State
   const [type, setType] = useState<"IN" | "OUT">("OUT");
@@ -122,11 +117,7 @@ export const PettyCashPage: React.FC = () => {
     );
   });
 
-  const totalPages = Math.ceil(filteredEntries.length / ITEMS_PER_PAGE) || 1;
-  const paginatedEntries = filteredEntries.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const paginatedEntries = filteredEntries;
 
   // Running balance calculation (based on IN - OUT chronologically)
   const runningBalances = React.useMemo(() => {
@@ -201,7 +192,6 @@ export const PettyCashPage: React.FC = () => {
               value={typeFilter}
               onChange={(e) => {
                 setTypeFilter(e.target.value as any);
-                setCurrentPage(1);
               }}
               className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
             >
@@ -218,7 +208,6 @@ export const PettyCashPage: React.FC = () => {
               value={startDate}
               onChange={(e) => {
                 setStartDate(e.target.value);
-                setCurrentPage(1);
               }}
               className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
             />
@@ -231,7 +220,6 @@ export const PettyCashPage: React.FC = () => {
               value={endDate}
               onChange={(e) => {
                 setEndDate(e.target.value);
-                setCurrentPage(1);
               }}
               className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
             />
@@ -246,7 +234,6 @@ export const PettyCashPage: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
                 }}
                 className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
               />
@@ -261,7 +248,6 @@ export const PettyCashPage: React.FC = () => {
                 setStartDate("");
                 setEndDate("");
                 setTypeFilter("ALL");
-                setCurrentPage(1);
               }}
               className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
             >
@@ -301,7 +287,7 @@ export const PettyCashPage: React.FC = () => {
                 {paginatedEntries.map((item, index) => (
                   <tr key={item.id} className="hover:bg-card-2 transition-colors">
                     <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
-                      {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                      {index + 1}
                     </td>
                     <td className="px-3 py-1.5 font-mono font-semibold text-amber-500">{item.entryNo}</td>
                     <td className="px-3 py-1.5 font-mono text-[11px]">
@@ -348,29 +334,6 @@ export const PettyCashPage: React.FC = () => {
           </div>
         )}
 
-        {totalPages > 1 && (
-          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
-            <span className="text-[11px] text-ink-subtle">
-              Page {currentPage} of {totalPages} ({filteredEntries.length} records)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronLeft className="w-2.5 h-2.5" />
-              </button>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronRight className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Record Cash Entry Modal - compact */}

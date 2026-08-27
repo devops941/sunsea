@@ -5,8 +5,6 @@ import {
   FaSearch,
   FaEye,
   FaTimes,
-  FaChevronLeft,
-  FaChevronRight,
   FaBuilding,
   FaReceipt,
   FaInfoCircle,
@@ -26,9 +24,6 @@ export const VoucherListPage: React.FC = () => {
 
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [total, setTotal] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [page, setPage] = useState<number>(1);
-  const [pageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -53,12 +48,11 @@ export const VoucherListPage: React.FC = () => {
         search: searchTerm || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
-        page,
-        limit: pageSize,
+        page: 1,
+        limit: 10000,
       });
       setVouchers(res.vouchers || []);
       setTotal(res.total || 0);
-      setTotalPages(res.totalPages || 1);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load vouchers");
     } finally {
@@ -68,7 +62,7 @@ export const VoucherListPage: React.FC = () => {
 
   useEffect(() => {
     loadVouchers();
-  }, [typeFilter, startDate, endDate, searchTerm, page]);
+  }, [typeFilter, startDate, endDate, searchTerm]);
 
   useSocketSync("voucher", undefined, loadVouchers);
   useSocketSync("payment", undefined, loadVouchers);
@@ -107,7 +101,6 @@ export const VoucherListPage: React.FC = () => {
     setStartDate(draftStartDate);
     setEndDate(draftEndDate);
     setSearchTerm(draftSearchTerm);
-    setPage(1);
   };
 
   const handleClearFilters = () => {
@@ -119,12 +112,10 @@ export const VoucherListPage: React.FC = () => {
     setStartDate("");
     setEndDate("");
     setSearchTerm("");
-    setPage(1);
   };
 
   const handleTypeChange = (t: string) => {
     setTypeFilter(t);
-    setPage(1);
   };
 
   const openViewModal = (v: Voucher) => {
@@ -453,34 +444,6 @@ export const VoucherListPage: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
-            <span className="text-[11px] text-ink-subtle">
-              Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total} vouchers
-            </span>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronLeft className="w-2.5 h-2.5" />
-              </button>
-              <span className="text-[11px] font-semibold text-ink-muted px-1">
-                {page} / {totalPages}
-              </span>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronRight className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Modal - View Voucher Details (compact) */}

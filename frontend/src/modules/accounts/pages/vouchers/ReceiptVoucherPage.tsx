@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaReceipt, FaPlus, FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaReceipt, FaPlus, FaSearch } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService, type Voucher } from "../../../../services/voucherService";
 
@@ -10,21 +10,19 @@ const ReceiptVoucherPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filterDate, setFilterDate] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await voucherService.fetchVouchers({
         type: "RECEIPT", startDate: filterDate || undefined, endDate: filterDate || undefined,
-        search: searchTerm || undefined, page, limit: 15,
+        search: searchTerm || undefined, page: 1, limit: 10000,
       });
-      setVouchers(res.vouchers || []); setTotal(res.total || 0); setTotalPages(res.totalPages || 1);
+      setVouchers(res.vouchers || []); setTotal(res.total || res.vouchers?.length || 0);
     } catch (err: any) { toast.error(err?.message || "Failed to load"); }
     finally { setLoading(false); }
-  }, [filterDate, searchTerm, page]);
+  }, [filterDate, searchTerm]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -45,20 +43,20 @@ const ReceiptVoucherPage: React.FC = () => {
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
           <div className="w-[150px]">
             <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Date</label>
-            <input type="date" value={filterDate} onChange={(e) => { setFilterDate(e.target.value); setPage(1); }}
+            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
               className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-green-500/40 focus:border-green-500 focus:outline-none" />
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
             <div className="relative">
               <input type="text" placeholder="Voucher no or narration..." value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-green-500/40 focus:border-green-500 focus:outline-none" />
               <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
             </div>
           </div>
           {(filterDate || searchTerm) && (
-            <button onClick={() => { setFilterDate(""); setSearchTerm(""); setPage(1); }}
+            <button onClick={() => { setFilterDate(""); setSearchTerm(""); }}
               className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer">Clear</button>
           )}
         </div>
@@ -121,21 +119,6 @@ const ReceiptVoucherPage: React.FC = () => {
                 </tfoot>
               )}
             </table>
-          </div>
-        )}
-        {totalPages > 1 && (
-          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
-            <span className="text-[11px] text-ink-subtle">Page {page} of {totalPages} ({total} records)</span>
-            <div className="flex items-center gap-1.5">
-              <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                <FaChevronLeft className="w-2.5 h-2.5" />
-              </button>
-              <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                <FaChevronRight className="w-2.5 h-2.5" />
-              </button>
-            </div>
           </div>
         )}
       </div>

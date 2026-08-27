@@ -46,10 +46,7 @@ export const SupplierBreakdownPage: React.FC = () => {
     "INVOICE NO",
     "DATE",
     "DUE DATE",
-    "INVOICE AMOUNT",
-    "PAID AMOUNT",
-    "OUTSTANDING",
-    "STATUS"
+    "INVOICE AMOUNT"
   ];
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -148,9 +145,6 @@ export const SupplierBreakdownPage: React.FC = () => {
           { header: "Date", accessor: (item: any) => item.date },
           { header: "Due Date", accessor: (item: any) => item.dueDate || "-" },
           { header: "Invoice Amount", accessor: (item: any) => item.amount },
-          { header: "Paid Amount", accessor: (item: any) => item.paidAmount },
-          { header: "Outstanding", accessor: (item: any) => item.balance },
-          { header: "Status", accessor: (item: any) => item.status },
         ],
         csvFilename: `${legalName}_Invoices_${new Date().toISOString().split("T")[0]}.csv`,
       };
@@ -183,38 +177,9 @@ export const SupplierBreakdownPage: React.FC = () => {
     }
   }, [supplierDetail, activeTab]);
 
-  // 10-item Pagination state per tab
-  const [invoicePage, setInvoicePage] = useState<number>(1);
-  const [paymentPage, setPaymentPage] = useState<number>(1);
-  const [statementPage, setStatementPage] = useState<number>(1);
-  const breakdownPageSize = 10;
-
-  useEffect(() => {
-    setInvoicePage(1);
-    setPaymentPage(1);
-    setStatementPage(1);
-  }, [startDate, endDate, activeTab]);
-
   const invoices = supplierDetail?.invoices || [];
-  const invoiceTotalPages = Math.ceil(invoices.length / breakdownPageSize) || 1;
-  const paginatedInvoices = useMemo(() => {
-    const start = (invoicePage - 1) * breakdownPageSize;
-    return invoices.slice(start, start + breakdownPageSize);
-  }, [invoices, invoicePage]);
-
   const payments = supplierDetail?.paymentHistory || [];
-  const paymentTotalPages = Math.ceil(payments.length / breakdownPageSize) || 1;
-  const paginatedPayments = useMemo(() => {
-    const start = (paymentPage - 1) * breakdownPageSize;
-    return payments.slice(start, start + breakdownPageSize);
-  }, [payments, paymentPage]);
-
   const statements = supplierDetail?.statementEntries || [];
-  const statementTotalPages = Math.ceil(statements.length / breakdownPageSize) || 1;
-  const paginatedStatements = useMemo(() => {
-    const start = (statementPage - 1) * breakdownPageSize;
-    return statements.slice(start, start + breakdownPageSize);
-  }, [statements, statementPage]);
 
   // Invoice Table Columns
   const invoiceColumns: DataTableColumn<any>[] = [
@@ -240,40 +205,6 @@ export const SupplierBreakdownPage: React.FC = () => {
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-ink">
           ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      header: "PAID AMOUNT",
-      render: (item: any) => (
-        <div className="text-right font-mono font-semibold text-emerald-600">
-          ₹ {item.paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      header: "OUTSTANDING",
-      render: (item: any) => (
-        <div className="text-right font-mono font-semibold text-orange-600">
-          ₹ {item.balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      header: "STATUS",
-      render: (item: any) => (
-        <div className="text-center">
-          <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-              item.status === "PAID"
-                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                : item.status === "PARTIAL"
-                ? "bg-amber-100 text-amber-800 border border-amber-300"
-                : "bg-red-100 text-red-800 border border-red-300"
-            }`}
-          >
-            {item.status}
-          </span>
         </div>
       ),
     },
@@ -558,45 +489,30 @@ export const SupplierBreakdownPage: React.FC = () => {
         {activeTab === "invoices" && (
           <DataTable
             columns={invoiceColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
-            data={paginatedInvoices}
+            data={invoices}
             rowKey={(item: any) => item.id}
             loading={loading}
             emptyMessage="No purchase invoices recorded for this supplier."
-            pagination={{
-              currentPage: invoicePage,
-              totalPages: invoiceTotalPages,
-              onPageChange: setInvoicePage,
-            }}
           />
         )}
 
         {activeTab === "payments" && (
           <DataTable
             columns={paymentColumns}
-            data={paginatedPayments}
+            data={payments}
             rowKey={(item: any) => item.id}
             loading={loading}
             emptyMessage="No payment vouchers recorded for this supplier."
-            pagination={{
-              currentPage: paymentPage,
-              totalPages: paymentTotalPages,
-              onPageChange: setPaymentPage,
-            }}
           />
         )}
 
         {activeTab === "statement" && (
           <DataTable
             columns={statementColumns}
-            data={paginatedStatements}
+            data={statements}
             rowKey={(item: any) => item.id}
             loading={loading}
             emptyMessage="No ledger statement entries recorded for this supplier."
-            pagination={{
-              currentPage: statementPage,
-              totalPages: statementTotalPages,
-              onPageChange: setStatementPage,
-            }}
           />
         )}
       </div>

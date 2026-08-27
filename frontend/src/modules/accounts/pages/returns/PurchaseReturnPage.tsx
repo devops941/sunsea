@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaBoxes, FaPlus, FaTimes, FaTrash, FaSearch, FaChevronLeft, FaChevronRight, FaEye } from "react-icons/fa";
+import { FaBoxes, FaPlus, FaTimes, FaTrash, FaSearch, FaEye } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
 import { supplierService } from "../../../../services/supplierService";
@@ -22,8 +22,6 @@ interface FormReturnRow {
 
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
-const ITEMS_PER_PAGE = 10;
-
 export const PurchaseReturnPage: React.FC = () => {
   const [returns, setReturns] = useState<PurchaseReturn[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -35,7 +33,6 @@ export const PurchaseReturnPage: React.FC = () => {
   const [selectedViewReturn, setSelectedViewReturn] = useState<PurchaseReturn | null>(null);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const { data: company } = useAppSelector((state) => state.company);
 
@@ -297,11 +294,7 @@ export const PurchaseReturnPage: React.FC = () => {
     );
   });
 
-  const totalPages = Math.ceil(filteredReturns.length / ITEMS_PER_PAGE) || 1;
-  const paginatedReturns = filteredReturns.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const paginatedReturns = filteredReturns;
 
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen">
@@ -332,7 +325,6 @@ export const PurchaseReturnPage: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
                 }}
                 className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
               />
@@ -343,7 +335,6 @@ export const PurchaseReturnPage: React.FC = () => {
             <button
               onClick={() => {
                 setSearchTerm("");
-                setCurrentPage(1);
               }}
               className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
             >
@@ -383,7 +374,7 @@ export const PurchaseReturnPage: React.FC = () => {
                 {paginatedReturns.map((item, index) => (
                   <tr key={item.id} className="hover:bg-card-2 transition-colors">
                     <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
-                      {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                      {index + 1}
                     </td>
                     <td className="px-3 py-1.5">
                       <button
@@ -434,29 +425,6 @@ export const PurchaseReturnPage: React.FC = () => {
                 </tr>
               </tfoot>
             </table>
-          </div>
-        )}
-        {totalPages > 1 && (
-          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
-            <span className="text-[11px] text-ink-subtle">
-              Page {currentPage} of {totalPages} ({filteredReturns.length} records)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronLeft className="w-2.5 h-2.5" />
-              </button>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronRight className="w-2.5 h-2.5" />
-              </button>
-            </div>
           </div>
         )}
       </div>
