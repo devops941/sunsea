@@ -301,14 +301,28 @@ class AccountsService {
     });
 
     const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
+
+    // Read opening balance AND its side ("DEBIT" | "CREDIT") from the party record.
+    // Customer defaults to DEBIT (they owe us), Supplier defaults to CREDIT (we owe them).
+    // If the user chose the OPPOSITE side, that means:
+    //   • Customer + CREDIT = advance received from customer → we owe them (negative receivable)
+    //   • Supplier + DEBIT   = advance paid to supplier    → they owe us (negative payable)
     let openingBalance = 0;
+    let openingType: "DEBIT" | "CREDIT" = "DEBIT";
     if (ledger.customer) {
       openingBalance = Number((ledger.customer as any).openingBalance || 0);
+      openingType = String((ledger.customer as any).openingBalanceType || "DEBIT").toUpperCase() === "CREDIT" ? "CREDIT" : "DEBIT";
     } else if (ledger.supplier) {
       openingBalance = Number((ledger.supplier as any).openingBalance || 0);
+      openingType = String((ledger.supplier as any).openingBalanceType || "CREDIT").toUpperCase() === "DEBIT" ? "DEBIT" : "CREDIT";
     }
 
-    let runningBalance = openingBalance;
+    // The ledger's natural side (Asset/Expense → DEBIT natural, Liability/Income/Equity → CREDIT natural).
+    // If the opening is on the natural side, running balance starts positive; otherwise negative.
+    const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
+    const signedOpeningBalance = openingType === naturalSide ? openingBalance : -openingBalance;
+
+    let runningBalance = signedOpeningBalance;
     const entries: any[] = [];
 
     if (openingBalance !== 0) {
@@ -317,11 +331,13 @@ class AccountsService {
         voucherNo: "-",
         voucherType: "OPENING",
         date: options.startDate || (journalItems.length > 0 ? journalItems[0].voucher.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
-        narration: "Opening Balance b/f",
+        narration: openingType === naturalSide
+          ? "Opening Balance b/f"
+          : (ledger.customer ? "Opening advance received from customer" : "Opening advance paid to supplier"),
         particulars: "Opening Balance",
-        debit: isAssetOrExpense ? openingBalance : 0,
-        credit: !isAssetOrExpense ? openingBalance : 0,
-        runningBalance: openingBalance,
+        debit: openingType === "DEBIT" ? openingBalance : 0,
+        credit: openingType === "CREDIT" ? openingBalance : 0,
+        runningBalance: signedOpeningBalance,
       });
     }
 
@@ -498,9 +514,19 @@ class AccountsService {
     let hasAsset = false;
     for (const ledger of ledgers) {
       let opening = 0;
-      if (ledger.customer) opening = Number((ledger.customer as any).openingBalance || 0);
-      else if (ledger.supplier) opening = Number((ledger.supplier as any).openingBalance || 0);
-      openingBalance += opening;
+      let openingType: "DEBIT" | "CREDIT" = "DEBIT";
+      if (ledger.customer) {
+        opening = Number((ledger.customer as any).openingBalance || 0);
+        openingType = String((ledger.customer as any).openingBalanceType || "DEBIT").toUpperCase() === "CREDIT" ? "CREDIT" : "DEBIT";
+      } else if (ledger.supplier) {
+        opening = Number((ledger.supplier as any).openingBalance || 0);
+        openingType = String((ledger.supplier as any).openingBalanceType || "CREDIT").toUpperCase() === "DEBIT" ? "DEBIT" : "CREDIT";
+      }
+      // Adjust to natural sign: if opening is on the ledger's opposite side (advance received/paid),
+      // it counts as a NEGATIVE balance in that ledger's natural direction.
+      const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
+      const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
+      openingBalance += openingType === naturalSide ? opening : -opening;
       if (ledger.type === LedgerType.LIABILITY || ledger.type === LedgerType.INCOME || ledger.type === LedgerType.EQUITY) hasLiability = true;
       if (ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE) hasAsset = true;
     }
