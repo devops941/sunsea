@@ -287,18 +287,6 @@ const AllSalesOrderList: React.FC = () => {
                 customerGradeId: customerGradeId || undefined,
                 customerTypeId: customerTypeId || undefined,
                 orderSource: orderSource || undefined,
-                docType: "SO",
-                status: [
-                    "DRAFT",
-                    "CONFIRMED",
-                    "IN_PRODUCTION",
-                    "PLANNED",
-                    "READY_FOR_DISPATCH",
-                    "PARTIALLY_DISPATCHED",
-                    "DISPATCHED",
-                    "COMPLETED",
-                    "CANCELLED",
-                ] as any,
             });
 
             setData(response.data || []);
@@ -492,14 +480,19 @@ const AllSalesOrderList: React.FC = () => {
                             render: (item) => (
                                 <div className="flex items-center justify-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item.id)} />
-                                    <IconButton
+                                        <IconButton
                                         icon={FiClipboard}
                                         variant="info"
                                         title="Print / View Sales Order"
                                         onClick={() => handleOpenEstimate(item.id)}
                                     />
-                                    {can("sales-orders.edit") && item.status !== "CONFIRMED" && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                    {can("sales-orders.delete") && item.status !== "CONFIRMED" && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                    {item.status === "DRAFT" && (
+                                        <>
+                                        
+                                            {can("sales-orders.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                            {can("sales-orders.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                        </>
+                                    )}
                                 </div>
                             ),
                         },

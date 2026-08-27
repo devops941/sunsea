@@ -223,15 +223,9 @@ const QuotationList: React.FC = () => {
                 customerTypeId: customerTypeId || undefined,
                 dispatchType: dispatchType || undefined,
                 orderSource: orderSource || undefined,
-                docType: "QT",
+                quotationOnly: true,
                 status: [
-                    "DRAFT",
-                    "CONFIRMED",
-                    "QUOTATION_IN_PROGRESS",
-                    "QUOTATION_COMPLETED",
-                    "PENDING_CUSTOMER_APPROVAL",
-                    "CUSTOMER_APPROVED",
-                    "CUSTOMER_REJECTED",
+                    "QUOTED",
                 ] as SalesOrderStatus[],
             });
             setData(response.data || []);

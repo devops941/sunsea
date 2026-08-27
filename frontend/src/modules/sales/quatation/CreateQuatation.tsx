@@ -1,5 +1,6 @@
 // src/pages/sales/QuotationForm/QuotationForm.tsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -14,44 +15,38 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { useProducts } from "../../../hooks/useProducts";
+import { salesProductService } from "../../../services/salesProductService";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { customerService } from "../../../services/customerService";
 import {
-    DISPATCH_TYPE_OPTIONS,
-    ORDER_TYPE_OPTIONS,
-    ORDER_SOURCE_OPTIONS,
     ORDER_SOURCE_NEEDS_EMPLOYEE,
     ORDER_SOURCE_NEEDS_REFERRAL,
     ORDER_SOURCE_NEEDS_DEALER,
 } from "../../../constants/selectOption";
 import { useAppSelector } from "../../../hooks/reduxHooks";
 import { usePermission } from "../../../hooks/usePermission";
-import AdditionalChargesTable, {
-    type ChargeRow,
-    DEFAULT_CHARGE_OPTIONS as CHARGE_OPTIONS,
-    serializeChargeRowsToNarration,
-    computeChargeTotals,
-} from "../../../components/sales/AdditionalChargesTable";
 
 
 
 // ─── Zod Schema ─────────────────────────────────────────────────────────────
-// No per-item discount fields — discount is now ONLY at order level.
-const orderItemSchema = z.object({
-    productId: z.string().min(1, "Product is required"),
-    quantity: z
-        .string()
-        .min(1, "Required")
-        .refine(v => !isNaN(Number(v)) && Number(v) > 0, { message: "Must be > 0" }),
 
+const componentSchema = z.object({
+    componentProductId: z.string(),
+    productName: z.string(),
+    perUnit: z.number(),
+    included: z.boolean(),
+    quantity: z.string(),
+});
+
+type ComponentItem = z.infer<typeof componentSchema>;
+
+const orderItemSchema = z.object({
+    salesProductId: z.string().min(1, "Sales product is required"),
+    orderQuantity: z.string().min(1, "Required"),
     unitPrice: z.string().optional(),
-    mrp: z.string().optional(),
-    b2b: z.string().optional(),
-    b2c: z.string().optional(),
-    exportPrice: z.string().optional(),
     gstRate: z.string().optional(),
-    cessRate: z.string().optional(),
+    components: z.array(componentSchema),
 });
 
 const quotationSchema = z.object({
@@ -75,7 +70,7 @@ const quotationSchema = z.object({
     shippingCity: z.string().optional(),
     shippingState: z.string().optional(),
     shippingPincode: z.string().optional(),
-    items: z.array(orderItemSchema).min(1, "At least one item is required"),
+    items: z.array(orderItemSchema).min(1, "At least one sales product is required"),
     isInterState: z.boolean(),
     remarks: z.string().optional(),
     internalNotes: z.string().optional(),
@@ -111,16 +106,149 @@ const defaultValues: QuotationFormValues = {
     shippingCity: "",
     shippingState: "",
     shippingPincode: "",
-    items: [{
-        productId: "", quantity: "", unitPrice: "",
-        mrp: "", b2b: "", b2c: "", exportPrice: "",
-        gstRate: "", cessRate: "",
-    }],
+    items: [{ salesProductId: "", orderQuantity: "1", unitPrice: "", gstRate: "", components: [] }],
     remarks: "",
     internalNotes: "",
     orderDiscountType: "PERCENT",
     orderDiscountValue: "",
 };
+
+// ─── Build components from a SalesProduct ──
+function buildComponents(sp: any, orderQty: number): ComponentItem[] {
+    const comps = (sp?.components || []).filter(
+        (c: any) => c.componentProduct?.productType === "SALES_PRODUCTION"
+    );
+    if (comps.length === 0) return [];
+    return comps.map((c: any) => ({
+        componentProductId: String(c.componentProductId),
+        productName: c.componentProduct?.productName || c.componentProduct?.productCode || String(c.componentProductId),
+        perUnit: Number(c.quantity || 1),
+        included: true,
+        quantity: String(Number(c.quantity || 1) * orderQty),
+    }));
+}
+
+// ─── Compute unit price for a sales product from its component prices ──
+function computeSalesProductUnitPrice(sp: any, products: any[]): number {
+    const comps = (sp?.components || []).filter(
+        (c: any) => c.componentProduct?.productType === "SALES_PRODUCTION"
+    );
+    if (comps.length === 0) return 0;
+    return comps.reduce((sum: number, c: any) => {
+        const prod = products.find((p: any) => String(p.id) === String(c.componentProductId));
+        const rate = prod ? (Number(prod.rate) || Number(prod.b2b) || Number(prod.mrp) || 0) : 0;
+        return sum + rate * Number(c.quantity || 1);
+    }, 0);
+}
+
+// ─── Reconstruct quotation form items from saved order items ──
+function reconstructQuotationItems(orderItems: any[], salesProds: any[], prods: any[]) {
+    if (!Array.isArray(orderItems) || orderItems.length === 0) {
+        return [{ salesProductId: "", orderQuantity: "1", unitPrice: "", gstRate: "", components: [] }];
+    }
+
+    const result: Array<{ salesProductId: string; orderQuantity: string; unitPrice: string; gstRate: string; components: ComponentItem[] }> = [];
+    const processedIds = new Set<any>();
+
+    // Group by salesProductId
+    const grouped = new Map<string, any[]>();
+    orderItems.forEach(oi => {
+        const spId = oi.salesProductId ? String(oi.salesProductId) : null;
+        if (spId) {
+            if (!grouped.has(spId)) grouped.set(spId, []);
+            grouped.get(spId)!.push(oi);
+        }
+    });
+
+    grouped.forEach((items, spIdStr) => {
+        const sp = salesProds.find(s => String(s.id) === spIdStr);
+        if (!sp) return;
+        items.forEach(oi => processedIds.add(oi.id || oi.productId));
+
+        const spComps = (sp?.components || []).filter(
+            (c: any) => c.componentProduct?.productType === "SALES_PRODUCTION"
+        );
+        const firstMatch = items[0];
+        const matchingComp = spComps.find((c: any) => String(c.componentProductId) === String(firstMatch.productId));
+        const perUnit = Number(matchingComp?.quantity || 1);
+        const calcOrderQty = Math.max(1, Math.round(Number(firstMatch.quantity || 1) / perUnit));
+
+        // Get GST rate from first item
+        const cgst = Number(firstMatch.cgstRate ?? 0);
+        const sgst = Number(firstMatch.sgstRate ?? 0);
+        const igst = Number(firstMatch.igstRate ?? 0);
+        const gstRate = igst > 0 ? igst : cgst + sgst;
+
+        // Calculate total unit price from component prices
+        const totalPrice = items.reduce((sum: number, oi: any) => {
+            return sum + (Number(oi.quotationUnitPrice ?? oi.unitPrice ?? 0) * Number(oi.quantity || 0));
+        }, 0);
+        const unitPricePerOrder = calcOrderQty > 0 ? totalPrice / calcOrderQty : 0;
+
+        const components: ComponentItem[] = spComps.map((c: any) => {
+            const oi = items.find(item => String(item.productId) === String(c.componentProductId));
+            return {
+                componentProductId: String(c.componentProductId),
+                productName: c.componentProduct?.productName || c.componentProduct?.productCode || String(c.componentProductId),
+                perUnit: Number(c.quantity || 1),
+                included: Boolean(oi),
+                quantity: oi ? String(oi.quantity) : String(Number(c.quantity || 1) * calcOrderQty),
+            };
+        });
+
+        result.push({
+            salesProductId: spIdStr,
+            orderQuantity: String(calcOrderQty),
+            unitPrice: unitPricePerOrder > 0 ? String(Math.round(unitPricePerOrder * 100) / 100) : "",
+            gstRate: gstRate > 0 ? String(gstRate) : "",
+            components,
+        });
+    });
+
+    // Fallback for items without salesProductId
+    const remaining = orderItems.filter(oi => !processedIds.has(oi.id || oi.productId));
+    if (remaining.length > 0) {
+        salesProds.forEach(sp => {
+            const spComps = (sp?.components || []).filter(
+                (c: any) => c.componentProduct?.productType === "SALES_PRODUCTION"
+            );
+            const matching = remaining.filter(oi =>
+                !processedIds.has(oi.id || oi.productId) &&
+                spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
+            );
+            if (matching.length > 0) {
+                matching.forEach(oi => processedIds.add(oi.id || oi.productId));
+                const first = matching[0];
+                const comp = spComps.find((c: any) => String(c.componentProductId) === String(first.productId));
+                const perUnit = Number(comp?.quantity || 1);
+                const qty = Math.max(1, Math.round(Number(first.quantity || 1) / perUnit));
+                const cgst = Number(first.cgstRate ?? 0);
+                const sgst = Number(first.sgstRate ?? 0);
+                const igst = Number(first.igstRate ?? 0);
+                const gstRate = igst > 0 ? igst : cgst + sgst;
+
+                result.push({
+                    salesProductId: String(sp.id),
+                    orderQuantity: String(qty),
+                    unitPrice: "",
+                    gstRate: gstRate > 0 ? String(gstRate) : "",
+                    components: spComps.map((c: any) => {
+                        const oi = matching.find(item => String(item.productId) === String(c.componentProductId));
+                        return {
+                            componentProductId: String(c.componentProductId),
+                            productName: c.componentProduct?.productName || String(c.componentProductId),
+                            perUnit: Number(c.quantity || 1),
+                            included: Boolean(oi),
+                            quantity: oi ? String(oi.quantity) : String(Number(c.quantity || 1) * qty),
+                        };
+                    }),
+                });
+            }
+        });
+    }
+
+    return result.length > 0 ? result : [{ salesProductId: "", orderQuantity: "1", unitPrice: "", gstRate: "", components: [] }];
+}
 
 // ─── CtrlText: bridges Controller field → TextInput ──
 type CtrlTextProps = {
@@ -160,37 +288,32 @@ const QuotationForm: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { id: idParam } = useParams<{ id: string }>();
-    const { can, isSuperAdmin, permissions } = usePermission();
-
-    const docNoLabel = "Quotation No";
-    const docNoPrefix = "QT";
-    const [gstEnabled, setGstEnabled] = useState<boolean>(true);
+    const { can } = usePermission();
 
     // ─── State ──────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null);
     const [loadingOrder, setLoadingOrder] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [quotationId, setQuotationId] = useState<number | null>(null);
     const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
-    const [mobile, setMobile] = useState<string | null>(null);
     const [customerOrders, setCustomerOrders] = useState<SalesOrder[]>([]);
     const [loadingCustomerOrders, setLoadingCustomerOrders] = useState(false);
     const [selectedPrevOrderId, setSelectedPrevOrderId] = useState<number | null>(null);
 
-    // ── Read-only order metadata ──
-    const [dispatchType, setDispatchType] = useState<string | null>(null);
-    const [orderType, setOrderType] = useState<string | null>(null);
-    const [salesPersonId, setSalesPersonId] = useState<string | null>(null);
-    const [transportName, setTransportName] = useState<string | null>(null);
-
-    // ── Additional charges / deductions (dynamic rows) ──
-    const [chargeRows, setChargeRows] = useState<ChargeRow[]>([]);
-
-    // ── Draft orders dropdown ──
-    const [draftOrders, setDraftOrders] = useState<SalesOrder[]>([]);
-    const [loadingDraftOrders, setLoadingDraftOrders] = useState(false);
+    // Used by populateFormFromOrder / load order flow (values set but not displayed)
+    const [, setDispatchType] = useState<string | null>(null);
+    const [, setOrderType] = useState<string | null>(null);
+    const [, setSalesPersonId] = useState<string | null>(null);
+    const [, setTransportName] = useState<string | null>(null);
+    const [, setMobile] = useState<string | null>(null);
+    const [, setDraftOrders] = useState<SalesOrder[]>([]);
+    const [, setLoadingDraftOrders] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState<number | null>(null);
+
+    const [salesProducts, setSalesProducts] = useState<any[]>([]);
+    const [salesProductsLoading, setSalesProductsLoading] = useState(false);
     const {
         control,
         handleSubmit,
@@ -227,12 +350,7 @@ const QuotationForm: React.FC = () => {
 
     // ── Watch values ──
     const items = watch("items");
-    const quotationNo = watch("quotationNo");
-    const quotationDate = watch("quotationDate");
-    const validUntil = watch("validUntil");
     const customerId = watch("customerId");
-    const remarks = watch("remarks");
-    const internalNotes = watch("internalNotes");
     const orderDiscountType = watch("orderDiscountType");
     const orderDiscountValue = watch("orderDiscountValue");
     const isInterState = watch("isInterState");
@@ -240,41 +358,13 @@ const QuotationForm: React.FC = () => {
     const company = useAppSelector((state: any) => state.company.data);
     const companyState = company?.state;
 
-    const customerName = useMemo(() => {
-        const c = customers.find(c => String(c.id) === customerId);
-        return c?.displayName || c?.firmName || null;
-    }, [customers, customerId]);
-
-    const salesPersonName = useMemo(() => {
-        if (!salesPersonId) return null;
-        const emp = employees.find(e => String(e?.id) === salesPersonId);
-        return emp?.fullName || null;
-    }, [employees, salesPersonId]);
-
-    const orderTypeLabel = useMemo(
-        () => ORDER_TYPE_OPTIONS.find(o => o.value === orderType)?.label || orderType,
-        [orderType]
-    );
-    const dispatchTypeLabel = useMemo(
-        () => DISPATCH_TYPE_OPTIONS.find(o => o.value === dispatchType)?.label || dispatchType,
-        [dispatchType]
-    );
-
-    const employeeOptions = useMemo(() =>
-        employees.map((e: any) => ({
-            value: String(e.id),
-            label: `${e.fullName || e.name || 'Employee'} (${e.empCode || `EMP #${e.id}`})`,
+    const salesProductOptions = useMemo(() => [
+        { value: "", label: salesProductsLoading ? "Loading..." : "-- Select Sales Product --" },
+        ...salesProducts.map((sp: any) => ({
+            value: String(sp.id),
+            label: sp.salesProductName || sp.salesProductCode || String(sp.id),
         })),
-        [employees]
-    );
-
-    const productsOptions = useMemo(() => [
-        { value: "", label: productsLoading ? "Loading products..." : "-- Select Product --" },
-        ...products.map((p: any) => ({
-            value: String(p.id),
-            label: p.productName || p.productCode || String(p.id),
-        })),
-    ], [products, productsLoading]);
+    ], [salesProducts, salesProductsLoading]);
 
     const customerOptions = useMemo(() => [
         { value: "", label: customersLoading ? "Loading customers..." : "-- Select Customer --" },
@@ -314,11 +404,6 @@ const QuotationForm: React.FC = () => {
             };
         }),
     ], [customerOrders, loadingCustomerOrders]);
-
-    const formatDate = (val?: string | null) => {
-        if (!val) return "—";
-        return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    };
 
     const extractBillingAddress = (custOrOrder: any) => {
         if (!custOrOrder) return { line1: "", city: "", state: "", pincode: "" };
@@ -360,41 +445,7 @@ const QuotationForm: React.FC = () => {
             pincode: order.shippingPincode || "",
         };
 
-        const items = order.items && order.items.length > 0
-            ? order.items.map((item: any) => {
-                // Use productsRef so we always read the latest loaded products
-                // even when this function is called inside an async callback.
-                const product = productsRef.current.find((p: any) => String(p.id) === String(item.productId));
-                const gradedPrice = product ? resolveGradedUnitPrice(product) : 0;
-                const itemRate = item.unitPrice ?? item.rate ?? item.estimatedRate ?? (Number(item.quantity) > 0 && Number(item.lineTotal) > 0 ? Number(item.lineTotal) / Number(item.quantity) : gradedPrice);
-                // Reconstruct combined GST rate from stored item tax columns
-                // (cgst+sgst intra-state, igst inter-state)
-                const cgst = Number(item.cgstRate ?? 0);
-                const sgst = Number(item.sgstRate ?? 0);
-                const igst = Number(item.igstRate ?? 0);
-                const combinedGstRate = igst > 0 ? igst : cgst + sgst;
-                const finalGst = combinedGstRate > 0
-                    ? combinedGstRate
-                    : (item.gstRate != null && Number(item.gstRate) > 0
-                        ? Number(item.gstRate)
-                        : (product?.gstRate && Number(product.gstRate) > 0 ? Number(product.gstRate) : 18));
-                return {
-                    productId: String(item.productId || ""),
-                    quantity: String(item.quantity || ""),
-                    unitPrice: itemRate > 0 ? String(itemRate) : (gradedPrice > 0 ? String(gradedPrice) : ""),
-                    mrp: item.mrp != null ? String(item.mrp) : "",
-                    b2b: item.b2b != null ? String(item.b2b) : "",
-                    b2c: item.b2c != null ? String(item.b2c) : "",
-                    exportPrice: item.exportPrice != null ? String(item.exportPrice) : "",
-                    gstRate: String(finalGst),
-                    cessRate: item.cessRate != null ? String(item.cessRate) : "0",
-                };
-            })
-            : [{
-                productId: "", quantity: "", unitPrice: "",
-                mrp: "", b2b: "", b2c: "", exportPrice: "",
-                gstRate: "", cessRate: "",
-            }];
+        const items = reconstructQuotationItems(order.items || [], salesProducts, productsRef.current);
 
         reset({
             id: order.id,
@@ -427,39 +478,6 @@ const QuotationForm: React.FC = () => {
                 ? String((order as any).orderDiscountValue)
                 : "",
         });
-
-        // Restore additional charges stored in narration JSON
-        try {
-            const raw = (order as any).narration || "";
-            const parsed = raw.startsWith("{") ? JSON.parse(raw) : null;
-            if (parsed?.__chargeRows__) {
-                setChargeRows(
-                    (parsed.__chargeRows__ as { type: string; amount: number }[]).map(r => ({
-                        id: `${Date.now()}-${Math.random()}`,
-                        type: r.type,
-                        amount: String(r.amount),
-                    }))
-                );
-            } else if (parsed?.__charges__) {
-                const ch = parsed.__charges__ as Record<string, number>;
-                const MAP: { key: string; type: string }[] = [
-                    { key: 'lorryFreight',  type: 'LORRY_FREIGHT'   },
-                    { key: 'othersPlus',    type: 'OTHERS_PLUS'     },
-                    { key: 'othersMinus',   type: 'OTHERS_MINUS'    },
-                    { key: 'roundOffPlus',  type: 'ROUND_OFF_PLUS'  },
-                    { key: 'roundOffMinus', type: 'ROUND_OFF_MINUS' },
-                    { key: 'tds',           type: 'TDS'             },
-                ];
-                const rows: ChargeRow[] = MAP.filter(m => Number(ch[m.key]) > 0).map(m => ({
-                    id: `${Date.now()}-${Math.random()}`,
-                    type: m.type,
-                    amount: String(ch[m.key]),
-                }));
-                setChargeRows(rows);
-            } else {
-                setChargeRows([]);
-            }
-        } catch { /* ignore parse errors */ }
 
         setRejectionReason((order as any).mdRejectionReason || null);
         setIsEditMode(true);
@@ -494,14 +512,13 @@ const QuotationForm: React.FC = () => {
                 try {
                     const order = await salesOrderService.fetchById(reuseId);
                     populateFormFromOrder(order);
-                    // Reset to create mode with fresh quotation number
+                    // Reset to create mode with the same SO number
                     setIsEditMode(false);
                     setQuotationId(null);
-                    const orderNo = await salesOrderService.getNextOrderNo();
-                    const qtNo = orderNo.replace('SO', docNoPrefix);
-                    setValue("quotationNo", qtNo);
+                    setValue("quotationNo", order.orderNo);
                     setValue("quotationDate", new Date().toISOString().split("T")[0]);
-                    toast.info(`Quotation details reused from ${order.orderNo}`);
+                    setSelectedPrevOrderId(reuseId);
+                    toast.info(`Quotation details loaded from ${order.orderNo}`);
                 } catch (error) {
                     toast.error("Failed to load quotation for reuse");
                 } finally {
@@ -564,11 +581,16 @@ const QuotationForm: React.FC = () => {
         loadDraftOrders();
     }, [isEditMode]);
 
-    // ─── Load Customers, Products & Employees ────────────────────────────
+    // ─── Load Customers, Products, SalesProducts & Employees ──────────────
     useEffect(() => {
         loadCustomers();
         loadProducts();
         if (can("employees.view")) loadEmployees({ limit: 500 });
+        setSalesProductsLoading(true);
+        salesProductService.fetchAll()
+            .then((data: any) => setSalesProducts(Array.isArray(data) ? data.filter((sp: any) => sp.isActive !== false) : []))
+            .catch(() => setSalesProducts([]))
+            .finally(() => setSalesProductsLoading(false));
     }, [loadCustomers, loadProducts, loadEmployees, can]);
 
     // ─── Clear source sub-fields when orderSource changes ───
@@ -624,17 +646,6 @@ const QuotationForm: React.FC = () => {
         fetchPrevOrders();
     }, [customerId, isEditMode]);
 
-    // ─── Get Next Quotation Number (Create Mode) ──────────────
-    useEffect(() => {
-        const state = location.state as any;
-        if (state?.id || isEditMode) return;
-
-        salesOrderService.getNextOrderNo().then((orderNo) => {
-            const qtNo = orderNo.replace('SO', docNoPrefix);
-            setValue("quotationNo", qtNo);
-        });
-    }, [location, setValue, isEditMode, docNoPrefix]);
-
     const computedIsInterState = useMemo(() => {
         if (!companyState || !billingState) return false;
         return companyState.toLowerCase().trim() !== billingState.toLowerCase().trim();
@@ -675,137 +686,25 @@ const QuotationForm: React.FC = () => {
         };
     }, [customerId, customers, isEditMode, setValue]);
 
-    // ─── Calculate totals ────────────────────────────────────
-    const resolveUnitPrice = (
-        pricing: { b2b?: number | null; mrp?: number | null; b2c?: number | null; exportPrice?: number | null }
-    ) => {
-        return pricing.b2b ?? pricing.mrp ?? pricing.b2c ?? pricing.exportPrice ?? 0;
-    };
-
-    // ─── Resolve customer-grade unit price ───────────────────────────────────────
-    // Mirrors the backend's computeLineTotals(): gradeRates[grade] → product.rate → b2b/mrp fallback
-    const resolveGradedUnitPrice = useCallback((product: any) => {
-        if (!product) return 0;
-        const selectedCustomer = customers.find(c => String(c.id) === customerId);
-        const customerGrade = (selectedCustomer as any)?.customerGrade;
-        const rawGrade = typeof customerGrade === "object" ? (customerGrade?.name || customerGrade?.gradeName || "") : String(customerGrade || "");
-
-        if (rawGrade && product.gradeRates && typeof product.gradeRates === "object") {
-            const rates = product.gradeRates as Record<string, number>;
-            const gClean = rawGrade.toUpperCase().replace(/[^A-Z0-9]/g, "");
-            for (const [k, val] of Object.entries(rates)) {
-                const kClean = k.toUpperCase().replace(/[^A-Z0-9]/g, "");
-                if (kClean === gClean || kClean.endsWith(gClean) || gClean.endsWith(kClean)) {
-                    if (val != null && !isNaN(Number(val)) && Number(val) > 0) {
-                        return Number(val);
-                    }
-                }
-            }
-        }
-        if (product.rate != null && Number(product.rate) > 0) return Number(product.rate);
-        return resolveUnitPrice({ b2b: product.b2b, mrp: product.mrp, b2c: product.b2c, exportPrice: product.exportPrice });
-    }, [customers, customerId]);
-
-    // ─── Update unit prices for current items when Customer changes ──
-    // Skip in edit mode — the saved unit prices from the order must not be
-    // overwritten by grade prices when the form first loads.
-    useEffect(() => {
-        if (idParam) return;   // edit mode: keep saved prices
-        if (customerId && items && items.length > 0 && products.length > 0) {
-            items.forEach((item: any, index: number) => {
-                if (item.productId) {
-                    const product = products.find((p: any) => String(p.id) === String(item.productId));
-                    if (product) {
-                        const gradedPrice = resolveGradedUnitPrice(product);
-                        if (gradedPrice > 0) {
-                            setValue(`items.${index}.unitPrice`, String(gradedPrice));
-                        }
-                    }
-                }
-            });
-        }
-    }, [idParam, customerId, products, resolveGradedUnitPrice, setValue]);
-
-    // ─── Re-populate product IDs when products load ──
-    useEffect(() => {
-        if (products.length > 0 && quotationId && items && items.length > 0) {
-            items.forEach((item: any, index: number) => {
-                if (item.productId) {
-                    setValue(`items.${index}.productId`, item.productId);
-                }
-            });
-        }
-    }, [products, quotationId, items, setValue]);
-
-    // Per-item base calc — NO discount applied here anymore. That's the
-    // whole point: only quantity × unit price + GST rate per item.
+    // ─── Calculation: per-item base ──
     const calculateItemBase = (item: any) => {
-        const quantity = Number(item.quantity) || 0;
-
-        let gstRate = item.gstRate !== undefined && item.gstRate !== "" ? Number(item.gstRate) : NaN;
-        let cessRate = item.cessRate !== undefined && item.cessRate !== "" ? Number(item.cessRate) : NaN;
-
-        let mrp = item.mrp !== undefined && item.mrp !== "" ? Number(item.mrp) : NaN;
-        let b2b = item.b2b !== undefined && item.b2b !== "" ? Number(item.b2b) : NaN;
-        let b2c = item.b2c !== undefined && item.b2c !== "" ? Number(item.b2c) : NaN;
-        let exportPrice = item.exportPrice !== undefined && item.exportPrice !== "" ? Number(item.exportPrice) : NaN;
-
-        if (isNaN(b2b) && isNaN(mrp) && isNaN(b2c) && isNaN(exportPrice)) {
-            const product = products.find(p => String(p.id) === item.productId);
-            if (product) {
-                mrp = Number(product.mrp) || 0;
-                b2b = Number(product.b2b) || 0;
-                b2c = Number(product.b2c) || 0;
-                exportPrice = Number(product.exportPrice) || 0;
-
-                if (isNaN(Number(item.gstRate)) || item.gstRate === "" || item.gstRate === undefined) {
-                    gstRate = Number(product.gstRate) > 0 ? Number(product.gstRate) : 18;
-                }
-                if (isNaN(Number(item.cessRate)) || item.cessRate === "" || item.cessRate === undefined) {
-                    cessRate = Number(product.cess) || 0;
-                }
-            }
-        }
-
-        if (isNaN(mrp)) mrp = 0;
-        if (isNaN(b2b)) b2b = 0;
-        if (isNaN(b2c)) b2c = 0;
-        if (isNaN(exportPrice)) exportPrice = 0;
-        if (isNaN(gstRate)) gstRate = 18;
-        if (isNaN(cessRate)) cessRate = 0;
-
-        // Custom entered unit price takes priority; falls back to grade price / rate
-        const customUnitPrice = item.unitPrice !== undefined && item.unitPrice !== "" ? Number(item.unitPrice) : NaN;
-        const product = products.find((p: any) => String(p.id) === item.productId);
-        const gradedPrice = resolveGradedUnitPrice(product);
-        const resolvedAutoPrice = gradedPrice > 0
-            ? gradedPrice
-            : resolveUnitPrice({ b2b, mrp, b2c, exportPrice });
-
-        const unitPrice = !isNaN(customUnitPrice) ? customUnitPrice : resolvedAutoPrice;
-        const subtotal = quantity * unitPrice;
-
-        return { subtotal, unitPrice, gstRate, cessRate };
+        const orderQty = Number(item.orderQuantity) || 0;
+        const unitPrice = Number(item.unitPrice) || 0;
+        const gstRate = Number(item.gstRate) || 0;
+        const subtotal = orderQty * unitPrice;
+        return { subtotal, unitPrice, gstRate };
     };
 
-    // Kept for the per-row "GST AMT" column display — computes each row's
-    // OWN gst amount ignoring order discount (matches what backend shows
-    // pre-discount too, since GST recompute happens after discount is
-    // distributed server-side).
     const calculateItemDisplay = (item: any) => {
         const base = calculateItemBase(item);
-        const gstAmount = gstEnabled ? (base.subtotal * base.gstRate) / 100 : 0;
-        const cessAmount = gstEnabled ? (base.subtotal * base.cessRate) / 100 : 0;
-        const totalWithGst = base.subtotal + gstAmount + cessAmount;
-        return { ...base, gstAmount, cessAmount, totalWithGst, discountAmount: 0 };
+        const gstAmount = (base.subtotal * base.gstRate) / 100;
+        const totalWithGst = base.subtotal + gstAmount;
+        return { ...base, gstAmount, totalWithGst };
     };
 
-    // Order-level totals — the ONE discount is applied here, proportionally
-    // distributed across each item's share of the subtotal (mirrors the
-    // backend's updateOrderDiscount()).
     const calculateOrderTotals = () => {
         const bases = (items || [])
-            .filter((item: any) => item.productId && item.quantity)
+            .filter((item: any) => item.salesProductId && item.orderQuantity)
             .map((item: any) => calculateItemBase(item));
 
         const subtotal = bases.reduce((sum, b) => sum + b.subtotal, 0);
@@ -817,22 +716,17 @@ const QuotationForm: React.FC = () => {
         const totalDiscount = Math.min(rawDiscount, subtotal);
 
         let totalGst = 0;
-        let totalCess = 0;
-
-        if (gstEnabled && subtotal > 0) {
+        if (subtotal > 0) {
             for (const b of bases) {
                 const share = b.subtotal / subtotal;
                 const itemDiscount = totalDiscount * share;
                 const taxableValue = b.subtotal - itemDiscount;
                 totalGst += (taxableValue * b.gstRate) / 100;
-                totalCess += (taxableValue * b.cessRate) / 100;
             }
         }
 
-        const { additions, deductions } = computeChargeTotals(chargeRows);
-        const netAmount = subtotal - totalDiscount + totalGst + totalCess + additions - deductions;
-
-        return { subtotal, totalDiscount, totalGst, totalCess, netAmount, additions, deductions };
+        const netAmount = subtotal - totalDiscount + totalGst;
+        return { subtotal, totalDiscount, totalGst, netAmount };
     };
 
     const totals = calculateOrderTotals();
@@ -851,10 +745,6 @@ const QuotationForm: React.FC = () => {
             setTransportName(null);
             setMobile(null);
             reset(defaultValues);
-            salesOrderService.getNextOrderNo().then((orderNo) => {
-                const qtNo = orderNo.replace('SO', docNoPrefix);
-                setValue("quotationNo", qtNo);
-            });
             return;
         }
 
@@ -890,27 +780,8 @@ const QuotationForm: React.FC = () => {
                 toast.info("Selected order has no items.");
                 return;
             }
-            const newItems = order.items.map((item: any) => {
-                const product = products.find((p: any) => String(p.id) === String(item.productId));
-                const gradedPrice = product ? resolveGradedUnitPrice(product) : 0;
-                const itemRate = gradedPrice > 0
-                    ? gradedPrice
-                    : (item.unitPrice ?? item.rate ?? item.estimatedRate ?? (Number(item.quantity) > 0 && Number(item.lineTotal) > 0 ? Number(item.lineTotal) / Number(item.quantity) : 0));
-                const itemGst = item.gstRate != null && Number(item.gstRate) > 0
-                    ? Number(item.gstRate)
-                    : (product?.gstRate && Number(product.gstRate) > 0 ? Number(product.gstRate) : 18);
-                return {
-                    productId: String(item.productId || ""),
-                    quantity: String(item.quantity || "1"),
-                    unitPrice: itemRate > 0 ? String(itemRate) : "",
-                    mrp: product ? String(product.mrp ?? gradedPrice) : "",
-                    b2b: product ? String(product.b2b ?? gradedPrice) : "",
-                    b2c: product ? String(product.b2c ?? "") : "",
-                    exportPrice: product ? String(product.exportPrice ?? "") : "",
-                    gstRate: String(itemGst),
-                    cessRate: item.cessRate != null ? String(item.cessRate) : (product ? String(product.cess ?? "") : ""),
-                };
-            });
+            setValue("quotationNo", order.orderNo);
+            const newItems = reconstructQuotationItems(order.items || [], salesProducts, products);
             setValue("items", newItems);
 
             // ── Carry over order-level discount from the selected order ──
@@ -920,39 +791,6 @@ const QuotationForm: React.FC = () => {
             if ((order as any).orderDiscountValue != null) {
                 setValue("orderDiscountValue", String((order as any).orderDiscountValue));
             }
-
-            // ── Carry over additional charges stored in narration ──
-            try {
-                const raw = (order as any).narration || "";
-                const parsed = raw.startsWith("{") ? JSON.parse(raw) : null;
-                if (parsed?.__chargeRows__) {
-                    setChargeRows(
-                        (parsed.__chargeRows__ as { type: string; amount: number }[]).map(r => ({
-                            id: `${Date.now()}-${Math.random()}`,
-                            type: r.type,
-                            amount: String(r.amount),
-                        }))
-                    );
-                } else if (parsed?.__charges__) {
-                    const ch = parsed.__charges__;
-                    const MAP: { key: string; type: string }[] = [
-                        { key: 'lorryFreight',  type: 'LORRY_FREIGHT'   },
-                        { key: 'othersPlus',    type: 'OTHERS_PLUS'     },
-                        { key: 'othersMinus',   type: 'OTHERS_MINUS'    },
-                        { key: 'roundOffPlus',  type: 'ROUND_OFF_PLUS'  },
-                        { key: 'roundOffMinus', type: 'ROUND_OFF_MINUS' },
-                        { key: 'tds',           type: 'TDS'             },
-                    ];
-                    const rows: ChargeRow[] = MAP.filter(m => Number(ch[m.key]) > 0).map(m => ({
-                        id: `${Date.now()}-${Math.random()}`,
-                        type: m.type,
-                        amount: String(ch[m.key]),
-                    }));
-                    setChargeRows(rows);
-                } else {
-                    setChargeRows([]);
-                }
-            } catch { /* ignore parse errors */ }
 
             toast.success(`Loaded ${newItems.length} item(s) from order ${order.orderNo}`);
         } catch (err: any) {
@@ -969,31 +807,53 @@ const QuotationForm: React.FC = () => {
 
         try {
 
-            // Pass unitPrice if manually specified.
-            // When GST is disabled (estimated mode without "Include GST"), strip GST entirely.
-            const transformedItems = data.items.map(item => {
-                const totalRate = gstEnabled ? (Number(item.gstRate) || 0) : 0;
-                return {
-                    productId: Number(item.productId),
-                    quantity: Number(item.quantity),
-                    unitPrice: item.unitPrice ? Number(item.unitPrice) : undefined,
-                    ...(gstEnabled && totalRate > 0 && {
+            // Expand sales products into component-level items
+            const transformedItems: any[] = [];
+            data.items.forEach(item => {
+                const totalRate = Number(item.gstRate) || 0;
+                const spId = item.salesProductId ? Number(item.salesProductId) : null;
+                const orderQty = Number(item.orderQuantity) || 1;
+                const unitPricePerOrder = Number(item.unitPrice) || 0;
+
+                const includedComps = (item.components || []).filter(c => c.included && Number(c.quantity) > 0);
+                const sp = salesProducts.find(s => String(s.id) === item.salesProductId);
+                const spComps = (sp?.components || []).filter((comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION");
+
+                // Calculate total rate across INCLUDED components only for proportional distribution
+                const includedCompDefs = includedComps.map(c => {
+                    const def = spComps.find((comp: any) => String(comp.componentProductId) === c.componentProductId);
+                    const rate = Number(def?.componentProduct?.rate ?? 0);
+                    const perUnit = Number(def?.quantity || 1);
+                    return { c, def, rate, perUnit, rateWeight: rate * perUnit };
+                });
+                const totalWeight = includedCompDefs.reduce((sum, d) => sum + d.rateWeight, 0);
+
+                includedCompDefs.forEach(({ c, def, perUnit, rateWeight }) => {
+                    // Distribute unit price proportionally across included components
+                    const share = totalWeight > 0 ? rateWeight / totalWeight : 1 / includedCompDefs.length;
+                    const compUnitPrice = unitPricePerOrder > 0 ? (unitPricePerOrder * share) / perUnit : undefined;
+
+                    transformedItems.push({
+                        productId: Number(c.componentProductId),
+                        salesProductId: spId,
+                        quantity: Number(c.quantity),
+                        quotationUnitPrice: compUnitPrice && compUnitPrice > 0 ? Math.round(compUnitPrice * 100) / 100 : undefined,
                         cgstRate: data.isInterState ? 0 : totalRate / 2,
                         sgstRate: data.isInterState ? 0 : totalRate / 2,
                         igstRate: data.isInterState ? totalRate : 0,
-                    }),
-                };
+                    });
+                });
             });
 
-            // idParam from the URL is the single source of truth for edit mode.
-            // State/refs can lag on HMR remounts; the URL param never lies.
-            const currentIsEditMode = Boolean(idParam);
-            const currentQuotationId = idParam ? Number(idParam) : null;
+            // Use URL param first (survives refresh), fall back to refs
+            // (set by handleDraftOrderSelect / populateFormFromOrder).
+            const currentIsEditMode = Boolean(idParam) || isEditModeRef.current;
+            const currentQuotationId = idParam ? Number(idParam) : quotationIdRef.current;
 
             const payload: any = {
                 orderNo: data.quotationNo,
                 orderDate: new Date(data.quotationDate).toISOString(),
-                sourceSalesOrderId: (!currentIsEditMode && selectedPrevOrderId) ? selectedPrevOrderId : undefined,
+                sourceSalesOrderId: selectedPrevOrderId || undefined,
                 expectedCompletionDate: data.validUntil ? new Date(data.validUntil).toISOString() : undefined,
                 customerId: data.customerId,
                 mobile: data.mobile || null,
@@ -1020,22 +880,26 @@ const QuotationForm: React.FC = () => {
                 isInterState: data.isInterState,
                 remarks: data.remarks,
                 internalNotes: data.internalNotes,
-                narration: serializeChargeRowsToNarration(chargeRows),
+                narration: null,
                 items: transformedItems,
                 orderDiscountType: data.orderDiscountType,
                 orderDiscountValue: data.orderDiscountValue,
-                status: confirm ? "CONFIRMED" : "DRAFT",
+                status: confirm ? "QUOTED" : "DRAFT",
             };
 
             let response;
 
-            if (currentIsEditMode && currentQuotationId) {
-                response = await salesOrderService.update(currentQuotationId, payload);
+            const existingSalesOrderId = currentIsEditMode
+                ? currentQuotationId
+                : selectedPrevOrderId;
+
+            if (existingSalesOrderId) {
+                response = await salesOrderService.update(existingSalesOrderId, payload);
             } else {
                 response = await salesOrderService.create(payload);
             }
 
-            const orderId = currentIsEditMode ? currentQuotationId! : response.id;
+            const orderId = existingSalesOrderId || response.id;
 
             if (confirm) {
                 toast.success("Quotation confirmed successfully!");
@@ -1053,7 +917,7 @@ const QuotationForm: React.FC = () => {
     };
 
     // ─── Render ──────────────────────────────────────────────────
-    const isLoading = customersLoading || productsLoading || loadingOrder;
+    const isLoading = customersLoading || productsLoading || salesProductsLoading || loadingOrder;
     const billing = {
         addressLine1: watch("billingAddressLine1"),
         city: watch("billingCity"),
@@ -1070,27 +934,27 @@ const QuotationForm: React.FC = () => {
 
 
     return (
-        <div className="w-full mx-auto">
+        <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
             {isLoading ? (
                 <CommonLoader text="Loading data..." fullScreen={false} />
             ) : (
-                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden flex-1 flex flex-col">
 
                     {/* Page Header */}
-                    <div className="px-6 py-4 border-b border-line bg-card-2">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-xl font-bold text-ink">
-                                    {isEditMode ? "Edit Quotation" : "Create Quotation"}
-                                </h2>
-                            </div>
-                            <div>
-                                <BackButton text="Back to List" />
-                            </div>
+                    <div className="px-4 py-3 border-b border-line bg-card-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <h2 className="text-xl font-bold text-ink flex items-start">
+                                {isEditMode ? "Edit Quotation" : "Create Quotation"}
+                                <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("quotationNo")}</span>
+                            </h2>
+                            <BackButton text="Back to List" />
                         </div>
                     </div>
 
-                    <form className="p-6 space-y-6" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
+                    <form className="p-4 flex-1 flex flex-col" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
+                        <div className="flex flex-col lg:flex-row gap-4">
+                        {/* ── Left: Form (75%) ── */}
+                        <div className="w-full lg:w-3/4 space-y-4">
                         {/* ── Rejection banner (edit mode only) ── */}
                         {isEditMode && rejectionReason && (
                             <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2">
@@ -1102,18 +966,8 @@ const QuotationForm: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ── Full Editable Form (create & edit) ── */}
-                        {(
-                            <>
                                 {/* ── Order Info ── */}
-                                <div className={`grid grid-cols-1 sm:grid-cols-2 ${!isEditMode ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
-                                    <Controller
-                                        name="quotationNo"
-                                        control={control}
-                                        render={({ field: f }) => (
-                                            <CtrlText field={f} label={docNoLabel} disabled error={errors.quotationNo?.message} />
-                                        )}
-                                    />
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                                     <Controller
                                         name="quotationDate"
                                         control={control}
@@ -1153,305 +1007,291 @@ const QuotationForm: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* ── Billing Address ── */}
-                                <div>
-                                    <h3 className="text-base font-semibold text-ink mb-3">Billing Address</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <Controller name="billingAddressLine1" control={control} render={({ field: f }) => (
-                                            <CtrlText field={f} label="Address Line" placeholder="Street / locality" />
-                                        )} />
-                                        <Controller name="billingCity" control={control} render={({ field: f }) => (
-                                            <CtrlText field={f} label="City" placeholder="City" />
-                                        )} />
-                                        <Controller name="billingState" control={control} render={({ field: f }) => (
-                                            <CtrlText field={f} label="State" placeholder="State" />
-                                        )} />
-                                        <Controller name="billingPincode" control={control} render={({ field: f }) => (
-                                            <CtrlText field={f} label="Pincode" placeholder="Pincode" />
-                                        )} />
+                                {/* ── Billing Address (info display) ── */}
+                                {(watch("billingAddressLine1") || watch("billingCity") || watch("billingState")) && (
+                                    <div className="text-xs text-ink-subtle">
+                                        <span className="font-semibold text-ink text-[11px] uppercase tracking-wide mr-2">Billing:</span>
+                                        {[watch("billingAddressLine1"), watch("billingCity"), watch("billingState"), watch("billingPincode")].filter(Boolean).join(", ")}
                                     </div>
-                                </div>
-
-                                {/* ── Items Table Header with Include GST Checkbox ── */}
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-base font-semibold text-ink">Quotation Items</h3>
-                                    <label className="inline-flex items-center gap-2 cursor-pointer select-none px-3 py-1.5 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={gstEnabled}
-                                            onChange={(e) => setGstEnabled(e.target.checked)}
-                                            className="w-4 h-4 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-transparent border-line cursor-pointer"
-                                        />
-                                        <span className="text-sm font-medium text-ink">Include GST</span>
-                                    </label>
-                                </div>
-                                {errors.items?.root && (
-                                    <div className="text-red-500 text-sm mb-3">{errors.items.root.message}</div>
                                 )}
-                                <div className="border border-line-soft rounded-xl overflow-visible mb-4 bg-card shadow-xs">
-                                    <table className="min-w-full text-sm">
-                                        <thead>
-                                            <tr className="bg-card-2 border-b border-line-soft">
-                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[4%]">#</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[24%]">Product</th>
-                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[10%]">Qty</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[11%]">Unit Price</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[11%]">Subtotal</th>
-                                                {gstEnabled && (
-                                                    <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[11%]">GST (%)</th>
-                                                )}
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[15%]">
-                                                    {gstEnabled ? "Total (Inc. GST)" : "Total"}
-                                                </th>
-                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[8%]">Remove</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {fields.map((field, index) => {
-                                                const itemValue = items?.[index];
-                                                const rowProduct = products.find((p: any) => String(p.id) === String(itemValue?.productId));
-                                                const rowCalc = calculateItemDisplay(itemValue);
-                                                const rowUnitPrice = rowCalc.unitPrice;
-                                                const rowQty = Number(itemValue?.quantity) || 0;
-                                                const rowSubtotal = rowCalc.subtotal;
-                                                const rowGstAmount = rowCalc.gstAmount;
-                                                const rowTotalWithGst = rowCalc.totalWithGst;
-                                                return (
-                                                    <tr key={field.id} className="border-b border-line-soft last:border-b-0 bg-card hover:bg-card-2/40">
-                                                        <td className="py-3 pl-4 pr-2 text-ink font-medium">{index + 1}</td>
-                                                        <td className="py-2 px-2 min-w-[12rem]">
-                                                             <Controller
-                                                                name={`items.${index}.productId`}
-                                                                control={control}
-                                                                render={({ field: f }) => (
-                                                                    <SelectInput
-                                                                        hideLabel
-                                                                        label=""
-                                                                        name={f.name}
-                                                                        value={f.value ?? ""}
-                                                                        options={productsOptions}
-                                                                        onChange={(e) => {
-                                                                            f.onChange(e);
-                                                                            const productId = (e as any).target ? (e as any).target.value : String(e);
-                                                                            const product = products.find((p: any) => String(p.id) === productId);
-                                                                            if (product) {
-                                                                                const gradedPrice = resolveGradedUnitPrice(product);
-                                                                                const autoPrice = gradedPrice > 0 ? gradedPrice : resolveUnitPrice({ b2b: product.b2b, mrp: product.mrp, b2c: product.b2c, exportPrice: product.exportPrice });
-                                                                                setValue(`items.${index}.unitPrice`, autoPrice > 0 ? String(autoPrice) : "");
-                                                                                setValue(`items.${index}.mrp`, String(product.mrp ?? ""));
-                                                                                setValue(`items.${index}.b2b`, String(product.b2b ?? gradedPrice));
-                                                                                setValue(`items.${index}.b2c`, String(product.b2c ?? ""));
-                                                                                setValue(`items.${index}.exportPrice`, String(product.exportPrice ?? ""));
-                                                                                const prodGst = product.gstRate != null && Number(product.gstRate) > 0 ? String(product.gstRate) : "18";
-                                                                                setValue(`items.${index}.gstRate`, prodGst);
-                                                                                setValue(`items.${index}.cessRate`, String(product.cess ?? ""));
-                                                                            }
-                                                                        }}
-                                                                        searchable
-                                                                    />
-                                                                )}
-                                                            />
-                                                        </td>
-                                                        <td className="py-2 px-2 w-28">
-                                                            <Controller
-                                                                name={`items.${index}.quantity`}
-                                                                control={control}
-                                                                render={({ field: f }) => (
-                                                                    <TextInput
-                                                                        name={f.name}
-                                                                        type="number"
-                                                                        min="1"
-                                                                        preventNegative
-                                                                        value={f.value ?? ""}
-                                                                        onChange={f.onChange}
-                                                                        onBlur={f.onBlur}
-                                                                        placeholder="Qty"
-                                                                    />
-                                                                )}
-                                                            />
-                                                        </td>
-                                                        <td className="py-2 px-2 w-32">
-                                                            <Controller
-                                                                name={`items.${index}.unitPrice`}
-                                                                control={control}
-                                                                render={({ field: f }) => (
-                                                                    <TextInput
-                                                                        name={f.name}
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="1"
-                                                                        preventNegative
-                                                                        value={f.value !== undefined && f.value !== "" ? f.value : (rowUnitPrice > 0 ? String(rowUnitPrice) : "")}
-                                                                        onChange={f.onChange}
-                                                                        onBlur={f.onBlur}
-                                                                        placeholder={rowUnitPrice > 0 ? String(rowUnitPrice) : "0.00"}
-                                                                    />
-                                                                )}
-                                                            />
-                                                        </td>
-                                                        <td className="py-3 px-2 text-right font-semibold text-ink">
-                                                            {rowSubtotal > 0 ? `₹${rowSubtotal.toFixed(2)}` : "—"}
-                                                        </td>
-                                                        {gstEnabled && (
-                                                            <td className="py-2 px-2 min-w-[7rem]">
-                                                                <Controller
-                                                                    name={`items.${index}.gstRate`}
-                                                                    control={control}
-                                                                    render={({ field: f }) => (
-                                                                        <TextInput
-                                                                            name={f.name}
-                                                                            type="number"
-                                                                            value={f.value !== undefined && f.value !== "" ? f.value : "18"}
-                                                                            onChange={f.onChange}
-                                                                            min={0}
-                                                                            max={100}
-                                                                            step={0.01}
-                                                                            placeholder="0"
+
+                                {errors.items?.root && (
+                                    <div className="text-red-500 text-sm mb-2">{errors.items.root.message}</div>
+                                )}
+
+                                {/* Add button when no sales order selected */}
+                                {!selectedPrevOrderId && !isEditMode && (
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-sm font-semibold text-ink">Quotation Items</span>
+                                        <CustomButton
+                                            text="Add Sales Product"
+                                            variant="secondary"
+                                            onClick={() => append({ salesProductId: "", orderQuantity: "1", unitPrice: "", gstRate: "", components: [] })}
+                                        />
+                                    </div>
+                                )}
+
+                                {fields.length > 0 && (
+                                    <div className="border border-line-soft rounded-xl overflow-hidden bg-card">
+                                        <table className="min-w-full text-sm">
+                                            <thead>
+                                                <tr className="bg-card-2 border-b border-line-soft">
+                                                    <th className="py-2 pl-3 pr-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-8">#</th>
+                                                    <th className="py-2 px-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide">Sales Product</th>
+                                                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">Qty</th>
+                                                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Unit Price</th>
+                                                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">GST %</th>
+                                                    <th className="py-2 px-1 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Total</th>
+                                                    {!selectedPrevOrderId && !isEditMode && (
+                                                        <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
+                                                    )}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {fields.map((field, index) => {
+                                                    const itemValue = items?.[index];
+                                                    const rowCalc = calculateItemDisplay(itemValue);
+                                                    const components: ComponentItem[] = itemValue?.components || [];
+                                                    const spName = salesProducts.find((s: any) => String(s.id) === itemValue?.salesProductId)?.salesProductName || "";
+                                                    const hasOrder = !!selectedPrevOrderId || isEditMode;
+
+                                                    const handleOrderQtyChange = (qty: string) => {
+                                                        setValue(`items.${index}.orderQuantity`, qty);
+                                                        const numQty = Math.max(1, Number(qty) || 1);
+                                                        const updated = components.map(c => ({
+                                                            ...c,
+                                                            quantity: String(c.perUnit * numQty),
+                                                        }));
+                                                        setValue(`items.${index}.components`, updated);
+                                                    };
+
+                                                    const handleSalesProductChange = (e: any) => {
+                                                        const spId = (e as any).target ? (e as any).target.value : String(e);
+                                                        const sp = salesProducts.find((s: any) => String(s.id) === spId);
+                                                        setValue(`items.${index}.salesProductId`, spId);
+                                                        setValue(`items.${index}.orderQuantity`, "1");
+                                                        setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
+                                                        const autoPrice = sp ? computeSalesProductUnitPrice(sp, products) : 0;
+                                                        setValue(`items.${index}.unitPrice`, autoPrice > 0 ? String(autoPrice) : "");
+                                                        setValue(`items.${index}.gstRate`, "");
+                                                    };
+
+                                                    return (
+                                                        <React.Fragment key={field.id}>
+                                                            <tr className="border-b border-line-soft bg-card hover:bg-card-2/40">
+                                                                <td className="py-2 pl-3 pr-1 text-ink-subtle font-medium">{index + 1}</td>
+                                                                <td className="py-1 px-1 text-ink font-medium">
+                                                                    {hasOrder ? (
+                                                                        <span className="flex items-center gap-1 py-1">
+                                                                            {components.length > 0 && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setExpandedItemIndex(expandedItemIndex === index ? null : index)}
+                                                                                    className="p-0.5 rounded text-ink-subtle hover:text-primary transition-colors"
+                                                                                >
+                                                                                    {expandedItemIndex === index ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                                                </button>
+                                                                            )}
+                                                                            {spName || "—"}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <SelectInput
+                                                                            hideLabel
+                                                                            label=""
+                                                                            name={`items.${index}.salesProductId`}
+                                                                            value={itemValue?.salesProductId || ""}
+                                                                            options={salesProductOptions}
+                                                                            onChange={handleSalesProductChange}
+                                                                            defaultOptionLabel="Select sales product"
+                                                                            error={(errors.items as any)?.[index]?.salesProductId?.message}
+                                                                            searchable
                                                                         />
                                                                     )}
-                                                                />
-                                                            </td>
-                                                        )}
-                                                        <td className="py-3 px-2 text-right font-bold text-ink whitespace-nowrap">
-                                                            {rowSubtotal > 0 ? (
-                                                                <div>
-                                                                    <span className="text-emerald-500 font-semibold">
-                                                                        ₹{rowTotalWithGst.toFixed(2)}
-                                                                    </span>
-                                                                    {gstEnabled && rowGstAmount > 0 && (
-                                                                        <span className="block text-[10px] text-ink-subtle font-normal">
-                                                                            (+₹{rowGstAmount.toFixed(2)} GST)
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                "—"
+                                                                </td>
+                                                                <td className="py-1 px-1 w-20">
+                                                                    <TextInput
+                                                                        name={`items.${index}.orderQuantity`}
+                                                                        type="number"
+                                                                        value={itemValue?.orderQuantity ?? "1"}
+                                                                        min="1"
+                                                                        preventNegative
+                                                                        onChange={e => handleOrderQtyChange(e.target.value)}
+                                                                    />
+                                                                </td>
+                                                                <td className="py-1 px-1 w-28">
+                                                                    <Controller
+                                                                        name={`items.${index}.unitPrice`}
+                                                                        control={control}
+                                                                        render={({ field: f }) => (
+                                                                            <TextInput
+                                                                                name={f.name}
+                                                                                type="number"
+                                                                                min="0"
+                                                                                step="1"
+                                                                                preventNegative
+                                                                                value={f.value ?? ""}
+                                                                                onChange={f.onChange}
+                                                                                onBlur={f.onBlur}
+                                                                                placeholder="0"
+                                                                            />
+                                                                        )}
+                                                                    />
+                                                                </td>
+                                                                <td className="py-1 px-1 w-20">
+                                                                    <Controller
+                                                                        name={`items.${index}.gstRate`}
+                                                                        control={control}
+                                                                        render={({ field: f }) => (
+                                                                            <TextInput
+                                                                                name={f.name}
+                                                                                type="number"
+                                                                                value={f.value ?? ""}
+                                                                                onChange={f.onChange}
+                                                                                min={0}
+                                                                                max={100}
+                                                                                step={0.01}
+                                                                                placeholder="0"
+                                                                            />
+                                                                        )}
+                                                                    />
+                                                                </td>
+                                                                <td className="py-2 px-1 text-right font-bold whitespace-nowrap">
+                                                                    {rowCalc.subtotal > 0 ? (
+                                                                        <div>
+                                                                            <span className="text-emerald-500 text-sm">₹{rowCalc.totalWithGst.toFixed(2)}</span>
+                                                                            {rowCalc.gstAmount > 0 && (
+                                                                                <span className="block text-[10px] text-ink-subtle">(+₹{rowCalc.gstAmount.toFixed(2)})</span>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : "—"}
+                                                                </td>
+                                                                {!hasOrder && (
+                                                                    <td className="py-1 px-1 w-10 text-center">
+                                                                        <DeleteButton
+                                                                            onClick={() => remove(index)}
+                                                                            disabled={fields.length <= 1}
+                                                                            disabledMessage="At least one item is required."
+                                                                        />
+                                                                    </td>
+                                                                )}
+                                                            </tr>
+                                                            {/* Component sub-rows (toggle) */}
+                                                            {components.length > 0 && expandedItemIndex === index && (
+                                                                <tr className="bg-card-2/30">
+                                                                    <td></td>
+                                                                    <td colSpan={hasOrder ? 5 : 6} className="py-1 px-1">
+                                                                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink-subtle">
+                                                                            {components.map(comp => (
+                                                                                <span key={comp.componentProductId} className={comp.included ? "" : "line-through opacity-50"}>
+                                                                                    {comp.productName} <span className="font-medium text-ink">{comp.included ? comp.quantity : "0"}</span>
+                                                                                    {!comp.included && <span className="text-[10px] text-red-400 ml-0.5">(Excluded)</span>}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
                                                             )}
-                                                        </td>
-                                                        <td className="py-2 px-2 text-center">
-                                                            <DeleteButton
-                                                                onClick={() => remove(index)}
-                                                                disabled={fields.length <= 1}
-                                                                disabledMessage="At least one item is required."
-                                                            />
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {/* ── Additional Charges + Discount + Totals ── */}
-                                {fields.length > 0 && (
-                                    <div className="flex flex-row gap-4 mb-4 items-start">
-                                        {/* ── Left: Additional Charges Table ── */}
-                                        <AdditionalChargesTable
-                                            rows={chargeRows}
-                                            onChange={setChargeRows}
-                                        />
-
-                                        {/* ── Right: Discount + Totals Summary ── */}
-                                        <div className="w-80 shrink-0 border border-line rounded-xl p-4 bg-card-2 self-start">
-                                            <div className="flex items-center justify-between gap-4 mb-3">
-                                                <span className="text-xs font-bold text-ink uppercase tracking-wide">Discount (%)</span>
-                                                <div className="w-32">
-                                                    <Controller
-                                                        name="orderDiscountValue"
-                                                        control={control}
-                                                        render={({ field: f }) => (
-                                                            <TextInput
-                                                                name={f.name}
-                                                                type="number"
-                                                                value={String(f.value ?? "")}
-                                                                onChange={f.onChange}
-                                                                onBlur={f.onBlur}
-                                                                placeholder="0"
-                                                                min={0}
-                                                                max={100}
-                                                                step={1}
-                                                                inputClassName="!bg-card !border !border-line hover:!border-primary/60 focus:!border-primary text-ink font-bold text-right px-3 py-1.5 shadow-sm rounded-lg"
-                                                                error={errors.orderDiscountValue?.message}
-                                                            />
-                                                        )}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-1.5 text-sm border-t border-line-soft pt-3">
-                                                <div className="flex justify-between text-ink-subtle">
-                                                    <span>Subtotal</span>
-                                                    <span className="text-ink font-medium">₹{totals.subtotal.toFixed(2)}</span>
-                                                </div>
-
-                                                {totals.totalDiscount > 0 && (
-                                                    <>
-                                                        <div className="flex justify-between text-red-600 font-medium">
-                                                            <span>Discount ({orderDiscountValue || 0}%)</span>
-                                                            <span>- ₹{totals.totalDiscount.toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-ink-subtle text-xs">
-                                                            <span>Taxable Amount</span>
-                                                            <span className="text-ink font-medium">₹{(totals.subtotal - totals.totalDiscount).toFixed(2)}</span>
-                                                        </div>
-                                                    </>
-                                                )}
-
-                                                {gstEnabled && (isInterState ? (
-                                                    <div className="flex justify-between text-ink-subtle">
-                                                        <span>IGST</span>
-                                                        <span className="text-ink font-medium">+ ₹{totals.totalGst.toFixed(2)}</span>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <div className="flex justify-between text-ink-subtle">
-                                                            <span>CGST</span>
-                                                            <span className="text-ink font-medium">+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-ink-subtle">
-                                                            <span>SGST</span>
-                                                            <span className="text-ink font-medium">+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
-                                                        </div>
-                                                    </>
-                                                ))}
-
-                                                {/* ── Active charge row summaries ── */}
-                                                {chargeRows.filter(r => Number(r.amount) > 0).map(row => {
-                                                    const opt = CHARGE_OPTIONS.find(o => o.value === row.type);
-                                                    const isAdd = opt?.sign === 1;
-                                                    return (
-                                                        <div key={row.id} className={`flex justify-between text-xs ${isAdd ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                            <span>{opt?.label ?? row.type}</span>
-                                                            <span>{isAdd ? '+ ' : '- '}₹{Number(row.amount).toFixed(2)}</span>
-                                                        </div>
+                                                        </React.Fragment>
                                                     );
                                                 })}
-
-                                                <div className="flex justify-between pt-2 border-t border-line mt-2 text-ink">
-                                                    <span className="text-base font-bold">Net Amount</span>
-                                                    <span className="text-base font-bold text-blue-600">₹{totals.netAmount.toFixed(2)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 )}
 
-                                {/* ── Form Actions ── */}
-                                <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
-                                    <CustomButton
-                                        text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
-                                        variant="secondary"
-                                        type="submit"
-                                        disabled={isSubmitting || isConfirming}
-                                    />
-                                    <CustomButton
-                                        text={isConfirming ? "Confirming..." : "Confirm Order"}
-                                        variant="primary"
-                                        type="button"
-                                        onClick={handleSubmit((data) => onSubmit(data, true))}
-                                        disabled={isSubmitting || isConfirming}
-                                    />
+
+                        </div>{/* end left column */}
+
+                        {/* ── Right: Bill Summary (25%) ── */}
+                        <div className="w-full lg:w-1/4">
+                            <div className="border border-line rounded-xl p-4 bg-card-2 lg:sticky lg:top-4">
+                                <div className="flex items-center justify-between gap-3 mb-3">
+                                    <span className="text-xs font-bold text-ink uppercase tracking-wide whitespace-nowrap">Discount (%)</span>
+                                    <div className="w-24">
+                                        <Controller
+                                            name="orderDiscountValue"
+                                            control={control}
+                                            render={({ field: f }) => (
+                                                <TextInput
+                                                    name={f.name}
+                                                    type="number"
+                                                    value={String(f.value ?? "")}
+                                                    onChange={f.onChange}
+                                                    onBlur={f.onBlur}
+                                                    placeholder="0"
+                                                    min={0}
+                                                    max={100}
+                                                    step={1}
+                                                    inputClassName="!bg-card !border !border-line hover:!border-primary/60 focus:!border-primary text-ink font-bold text-right px-3 py-1.5 shadow-sm rounded-lg"
+                                                    error={errors.orderDiscountValue?.message}
+                                                />
+                                            )}
+                                        />
+                                    </div>
                                 </div>
-                            </>
-                        )}
+                                <div className="space-y-1.5 text-sm border-t border-line-soft pt-3">
+                                    <div className="flex justify-between text-ink-subtle">
+                                        <span>Subtotal</span>
+                                        <span className="text-ink font-medium">₹{totals.subtotal.toFixed(2)}</span>
+                                    </div>
+
+                                    {totals.totalDiscount > 0 && (
+                                        <>
+                                            <div className="flex justify-between text-red-600 font-medium">
+                                                <span>Discount ({orderDiscountValue || 0}%)</span>
+                                                <span>- ₹{totals.totalDiscount.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-ink-subtle text-xs">
+                                                <span>Taxable Amount</span>
+                                                <span className="text-ink font-medium">₹{(totals.subtotal - totals.totalDiscount).toFixed(2)}</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {isInterState ? (
+                                        <div className="flex justify-between text-ink-subtle">
+                                            <span>IGST</span>
+                                            <span className="text-ink font-medium">+ ₹{totals.totalGst.toFixed(2)}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex justify-between text-ink-subtle">
+                                                <span>CGST</span>
+                                                <span className="text-ink font-medium">+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-ink-subtle">
+                                                <span>SGST</span>
+                                                <span className="text-ink font-medium">+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="flex justify-between pt-2 border-t border-line mt-2 text-ink">
+                                        <span className="text-base font-bold">Net Amount</span>
+                                        <span className="text-base font-bold text-blue-600">₹{totals.netAmount.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>{/* end right column */}
+
+                        </div>{/* end flex row */}
+
+                        {/* ── Form Actions ── */}
+                        <div className="mt-auto flex justify-end gap-3 pt-4">
+                            <CustomButton
+                                text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
+                                variant="secondary"
+                                type="submit"
+                                disabled={isSubmitting || isConfirming}
+                            />
+                            <CustomButton
+                                text={isConfirming ? "Confirming..." : "Confirm Order"}
+                                variant="primary"
+                                type="button"
+                                onClick={handleSubmit((data) => onSubmit(data, true))}
+                                disabled={isSubmitting || isConfirming}
+                            />
+                        </div>
 
                     </form>
 

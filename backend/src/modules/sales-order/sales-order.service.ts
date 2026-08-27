@@ -29,7 +29,7 @@ const INCLUDE_GST = {
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type IncomingItem = { productId: string | number | bigint; quantity: number | string };
+type IncomingItem = { productId: string | number | bigint; quantity: number | string; salesProductId?: number | null };
 
 interface GstItemInput {
     cgstRate?:     number | null;
@@ -61,7 +61,9 @@ class SalesOrderService {
         const seen = new Map<string, number>();
         const dupes = new Set<string>();
         items.forEach(item => {
-            const key = String(item.productId);
+            const key = item.salesProductId
+                ? `${item.productId}:${item.salesProductId}`
+                : String(item.productId);
             if (seen.has(key)) dupes.add(key);
             else seen.set(key, 0);
         });
@@ -70,8 +72,8 @@ class SalesOrderService {
         }
     }
 
-    private async computeLineTotals(
-        items: { productId: bigint; quantity: Prisma.Decimal; unitPrice?: Prisma.Decimal | number | string | null }[],
+      private async computeLineTotals(
+          items: { productId: bigint; quantity: Prisma.Decimal; unitPrice?: Prisma.Decimal | number | string | null; quotationUnitPrice?: Prisma.Decimal | number | string | null }[],
         customerGradeName?: string | null,
     ) {
         const uniqueIds = [...new Set(items.map(i => i.productId.toString()))];
@@ -100,8 +102,9 @@ class SalesOrderService {
 
         return items.map(item => {
             let rate: Prisma.Decimal;
-            if (item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== "" && !isNaN(Number(item.unitPrice))) {
-                rate = new Prisma.Decimal(item.unitPrice);
+            const requestedPrice = item.quotationUnitPrice ?? item.unitPrice;
+            if (requestedPrice !== undefined && requestedPrice !== null && requestedPrice !== "" && !isNaN(Number(requestedPrice))) {
+                rate = new Prisma.Decimal(requestedPrice);
             } else {
                 rate = rateMap.get(item.productId.toString()) ?? ZERO;
             }
@@ -123,9 +126,7 @@ class SalesOrderService {
         if (hasExplicit) {
             return { cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
         }
-        return isInterState
-            ? { igstRate: 18 }
-            : { cgstRate: 9, sgstRate: 9 };
+        return { cgstRate: 0, sgstRate: 0, igstRate: 0 };
     }
 
     private computeGstAmounts(lineTotal: Prisma.Decimal, gst: GstItemInput, isInterState: boolean) {
@@ -163,8 +164,14 @@ class SalesOrderService {
         const existingCheck = await prisma.salesOrder.findUnique({ where: { orderNo: data.orderNo } });
         if (existingCheck) throw new ApiError(409, `Order No "${data.orderNo}" already exists`);
 
-        const lineItems = await this.computeLineTotals(
-            data.items.map(i => ({ productId: BigInt(i.productId), quantity: new Prisma.Decimal(i.quantity), unitPrice: (i as any).unitPrice })),
+                const isQuotation = data.items.some((i: any) => i.quotationUnitPrice !== undefined && i.quotationUnitPrice !== null);
+                const lineItems = await this.computeLineTotals(
+                        data.items.map(i => ({
+                            productId: BigInt(i.productId),
+                            quantity: new Prisma.Decimal(i.quantity),
+                            unitPrice: isQuotation ? undefined : (i as any).unitPrice,
+                            quotationUnitPrice: isQuotation ? (i as any).quotationUnitPrice : undefined,
+                        })),
             (customer as any).customerGrade?.name ?? null,
         );
 
@@ -227,10 +234,12 @@ class SalesOrderService {
                 totalSgst: createTotalSgst,
                 totalIgst: createTotalIgst,
                 items: {
-                    create: itemsWithGst.map(l => ({
+                    create: itemsWithGst.map((l, idx) => ({
                         productId:     l.productId,
+                        salesProductId: data.items[idx]?.salesProductId ? BigInt(data.items[idx].salesProductId!) : null,
                         quantity:      l.quantity,
-                        unitPrice:     l.rate,
+                        unitPrice:     isQuotation ? ZERO : l.rate,
+                        quotationUnitPrice: isQuotation ? l.rate : null,
                         lineTotal:     l.lineTotal,
                         taxableAmount: l.taxableAmount,
                         cgstRate:      l.cgstRate,
@@ -244,6 +253,14 @@ class SalesOrderService {
             },
             include: INCLUDE_GST,
         });
+
+        // If this order has quotation prices and a source SO, mark the source as QUOTED
+        if ((data as any).sourceSalesOrderId && data.status === "CONFIRMED" && isQuotation) {
+            await prisma.salesOrder.update({
+                where: { id: Number((data as any).sourceSalesOrderId) },
+                data: { status: "QUOTED" as any },
+            });
+        }
 
         return gstOrder;
     }
@@ -269,24 +286,18 @@ class SalesOrderService {
             } }
             : {};
 
-        const docTypeFilter = (query as any).docType === "SO"
-            ? { orderNo: { startsWith: "SO-" } }
-            : (query as any).docType === "QT"
-            ? { orderNo: { startsWith: "QT-" } }
-            : {};
-
         const customerFilter: any = {};
         if (query.customerId) customerFilter.id = query.customerId;
         if (query.customerGradeId) customerFilter.customerGradeId = Number(query.customerGradeId);
         if ((query as any).customerTypeId) customerFilter.customerTypeId = Number((query as any).customerTypeId);
 
         const gstWhere = {
+            ...((query as any).quotationOnly && { items: { some: { quotationUnitPrice: { not: null } } } }),
             ...(Object.keys(customerFilter).length > 0 && { customer: customerFilter }),
             ...(query.status?.length && { status: { in: query.status as SalesOrderStatus[] } }),
             ...(query.orderType     && { orderType: query.orderType }),
             ...((query as any).orderSource     && { orderSource: (query as any).orderSource }),
             ...((query as any).sourceEmployeeId && { sourceEmployeeId: BigInt((query as any).sourceEmployeeId) }),
-            ...docTypeFilter,
             ...searchFilter,
             ...dateFilter,
         };
@@ -337,7 +348,7 @@ class SalesOrderService {
         const existing = await this.findById(id, permissions);
         const existingStatus = (existing as any).status as string;
 
-        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
+        if (!["DRAFT", "CONFIRMED", "QUOTED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
             throw new ApiError(409, `Cannot edit order in status ${existingStatus}.`);
         }
 
@@ -360,12 +371,27 @@ class SalesOrderService {
             this.assertNoDuplicateProducts(data.items);
             await this.assertProductsExist(data.items.map(i => BigInt(i.productId)));
 
+            const isQuotation = data.items.some((item: any) => item.quotationUnitPrice !== undefined && item.quotationUnitPrice !== null);
+
+            // Preserve original unitPrice from existing items (only needed for quotations)
+            const existingUnitPrices = isQuotation
+                ? new Map((existing.items as any[]).map((item: any) => [item.productId.toString(), item.unitPrice ?? ZERO]))
+                : new Map<string, any>();
+
+            // Fetch customer grade for grade-based pricing
+            const customer = await prisma.customer.findUnique({
+                where: { id: existing.customerId },
+                include: { customerGrade: { select: { name: true } } },
+            });
+
             const lineItems = await this.computeLineTotals(
                 data.items.map(i => ({
                     productId: BigInt(i.productId),
-                    quantity:  new Prisma.Decimal(i.quantity),
-                    unitPrice: (i as any).unitPrice,
+                    quantity: new Prisma.Decimal(i.quantity),
+                    unitPrice: isQuotation ? undefined : (i as any).unitPrice,
+                    quotationUnitPrice: isQuotation ? (i as any).quotationUnitPrice : undefined,
                 })),
+                (customer as any)?.customerGrade?.name ?? null,
             );
 
             const isInterState = data.isInterState ?? (existing as any).isInterState ?? false;
@@ -405,10 +431,14 @@ class SalesOrderService {
             updateData.totalIgst = updTotalIgst;
             updateData.totalTax  = updTotalTax;
             updateData.items = {
-                create: itemsWithGst.map(l => ({
+                create: itemsWithGst.map((l, idx) => ({
                     productId:     l.productId,
+                    salesProductId: data.items![idx]?.salesProductId ? BigInt((data.items![idx] as any).salesProductId) : null,
                     quantity:      l.quantity,
-                    unitPrice:     l.rate,
+                    unitPrice:     isQuotation
+                        ? (existingUnitPrices.get(l.productId.toString()) ?? ZERO)
+                        : l.rate,
+                    quotationUnitPrice: isQuotation ? l.rate : null,
                     lineTotal:     l.lineTotal,
                     taxableAmount: l.taxableAmount,
                     cgstRate:      l.cgstRate,
@@ -422,6 +452,19 @@ class SalesOrderService {
         }
 
         const updated = await prisma.salesOrder.update({ where: { id }, data: updateData, include: INCLUDE_GST });
+
+        // If a quotation is being confirmed and has a source SO, mark the source as QUOTED
+        if (data.status === "CONFIRMED" && (existing as any).sourceSalesOrderId) {
+            const hasQuotationPrices = data.items?.some((item: any) => item.quotationUnitPrice !== undefined && item.quotationUnitPrice !== null)
+                || (existing.items as any[]).some((item: any) => item.quotationUnitPrice != null && Number(item.quotationUnitPrice) > 0);
+            if (hasQuotationPrices) {
+                await prisma.salesOrder.update({
+                    where: { id: Number((existing as any).sourceSalesOrderId) },
+                    data: { status: "QUOTED" as any },
+                });
+            }
+        }
+
         return updated;
     }
 
@@ -455,18 +498,30 @@ class SalesOrderService {
     // ─── Workflow (status transitions) ───────────────────────────────────────
 
     private async updateStatus(id: number, newStatus: SalesOrderStatus, _permissions: string[]) {
+        const order = await prisma.salesOrder.findUnique({
+            where: { id },
+            select: { totalDiscount: true, orderDiscountType: true, orderDiscountValue: true },
+        });
         const items = await prisma.salesOrderItem.findMany({ where: { salesOrderId: id } });
         const subtotal  = items.reduce((s, l) => s.add(l.lineTotal),              ZERO);
         const totalCgst = items.reduce((s, l) => s.add((l as any).cgstAmount ?? ZERO), ZERO);
         const totalSgst = items.reduce((s, l) => s.add((l as any).sgstAmount ?? ZERO), ZERO);
         const totalIgst = items.reduce((s, l) => s.add((l as any).igstAmount ?? ZERO), ZERO);
         const totalTax  = totalCgst.add(totalSgst).add(totalIgst);
+
+        // Apply existing discount so netAmount stays correct
+        const discount   = order?.totalDiscount ?? ZERO;
+        const taxable    = subtotal.sub(discount);
+        const discRatio  = subtotal.gt(ZERO) ? taxable.div(subtotal) : new Prisma.Decimal(1);
+        const adjustedTax = totalTax.mul(discRatio);
+
         const updated = await prisma.salesOrder.update({
             where: { id },
             data: {
                 status:    newStatus as any,
                 subtotal,
-                netAmount: subtotal.add(totalTax),
+                netAmount: taxable.add(adjustedTax),
+                totalDiscount: discount,
                 totalCgst,
                 totalSgst,
                 totalIgst,
@@ -491,6 +546,18 @@ class SalesOrderService {
         const currentStatus = (existing as any).status as string;
         if (!["CUSTOMER_APPROVED", "CONFIRMED"].includes(currentStatus)) {
             throw new ApiError(409, `Cannot convert order with status ${currentStatus} to sales order`);
+        }
+        const quoteItems = await prisma.salesOrderItem.findMany({
+            where: { salesOrderId: id },
+            select: { id: true, quotationUnitPrice: true, unitPrice: true },
+        });
+        for (const item of quoteItems) {
+            if (item.quotationUnitPrice !== null) {
+                await prisma.salesOrderItem.update({
+                    where: { id: item.id },
+                    data: { unitPrice: item.quotationUnitPrice },
+                });
+            }
         }
         return this.updateStatus(id, "QUOTATION_COMPLETED", permissions);
     }
@@ -561,6 +628,19 @@ class SalesOrderService {
 
         const maxNum = extractNum(lastGst?.orderNo);
         return `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
+    }
+
+    async getNextQuotationCode(_permissions: string[] = []) {
+        const year = new Date().getFullYear();
+        const prefix = `QT-${year}-`;
+        const lastQuotation = await prisma.salesOrder.findFirst({
+            where: { orderNo: { startsWith: prefix } },
+            orderBy: { id: "desc" },
+            select: { orderNo: true },
+        });
+        const match = lastQuotation?.orderNo?.match(/QT-\d{4}-(\d+)/);
+        const nextNumber = (match ? parseInt(match[1], 10) : 0) + 1;
+        return `${prefix}${String(nextNumber).padStart(3, "0")}`;
     }
 
     async getOrderStatus(id: number, permissions: string[] = []) {

@@ -80,6 +80,15 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     SCHEDULE_DELETED: { bg: '#fee2e2', text: '#b91c1c' }, // Light red background with dark red text
 
 
+    // ========== SALES ORDER WORKFLOW ==========
+    QUOTED: { bg: '#e0e7ff', text: '#4338ca' },                    // Indigo - quotation created
+    INVOICED: { bg: '#d1fae5', text: '#065f46' },                  // Green - invoice generated
+
+    // ========== INVOICE PAYMENT STATUSES ==========
+    UNPAID: { bg: '#fee2e2', text: '#b91c1c' },                    // Red - not paid
+    PARTIALLY_PAID: { bg: '#fef3c7', text: '#b45309' },            // Amber - partially paid
+    PAID: { bg: '#d1fae5', text: '#065f46' },                      // Green - fully paid
+
     // Priorities
     HIGH: { bg: '#fce8e6', text: '#d93025' },
     URGENT: { bg: '#fce8e6', text: '#d93025' },

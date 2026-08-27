@@ -7,6 +7,7 @@ import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { salesProductService } from "../../../services/salesProductService";
+import { parseChargeRowsFromNarration, DEFAULT_CHARGE_OPTIONS as CHARGE_OPTIONS } from "../../../components/sales/AdditionalChargesTable";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -195,19 +196,30 @@ const SalesOrderDetail: React.FC = () => {
         }> = [];
         const processedItemIds = new Set<any>();
 
-        salesProducts.forEach(sp => {
+        // Group order items by salesProductId for exact matching
+        const groupedBySp = new Map<string, any[]>();
+        orderItems.forEach(oi => {
+            const spId = oi.salesProductId ? String(oi.salesProductId) : null;
+            if (spId) {
+                if (!groupedBySp.has(spId)) groupedBySp.set(spId, []);
+                groupedBySp.get(spId)!.push(oi);
+            }
+        });
+
+        // Process items grouped by salesProductId first
+        groupedBySp.forEach((items, spIdStr) => {
+            const sp = salesProducts.find(s => String(s.id) === spIdStr);
+            if (!sp) return;
+
             const spComps = (sp?.components || []).filter(
                 (comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION"
             );
-
             if (spComps.length === 0) return;
 
-            const matchingOrderItems = orderItems.filter(oi =>
-                spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
-            );
+            items.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+            const matchingOrderItems = items;
 
-            if (matchingOrderItems.length > 0) {
-                matchingOrderItems.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+            {
 
                 const calcOrderQty = Math.max(...matchingOrderItems.map(oi => {
                     const matchingSpComp = spComps.find((c: any) => String(c.componentProductId) === String(oi.productId));
@@ -236,6 +248,72 @@ const SalesOrderDetail: React.FC = () => {
                         perUnit: compPerUnit,
                         totalQty,
                         included,
+                    };
+                });
+
+                result.push({
+                    id: `sp-${sp.id}`,
+                    productName: sp.salesProductName || sp.salesProductCode,
+                    productCode: sp.salesProductCode,
+                    quantity: calcOrderQty,
+                    unitPrice: itemUnitPrice,
+                    subtotal: itemSubtotal,
+                    cgstAmount: itemCgst > 0 ? itemCgst : (itemGstAmount > 0 && !isInterState ? itemGstAmount / 2 : 0),
+                    sgstAmount: itemSgst > 0 ? itemSgst : (itemGstAmount > 0 && !isInterState ? itemGstAmount / 2 : 0),
+                    igstAmount: itemIgst > 0 ? itemIgst : (itemGstAmount > 0 && isInterState ? itemGstAmount : 0),
+                    cgstRate: itemCgst > 0 && itemSubtotal > 0 ? (itemCgst / itemSubtotal) * 100 : (maxGstRate / 2),
+                    sgstRate: itemSgst > 0 && itemSubtotal > 0 ? (itemSgst / itemSubtotal) * 100 : (maxGstRate / 2),
+                    igstRate: itemIgst > 0 && itemSubtotal > 0 ? (itemIgst / itemSubtotal) * 100 : maxGstRate,
+                    gstRate: maxGstRate,
+                    gstAmount: itemGstAmount,
+                    totalAmount: itemSubtotal + itemGstAmount,
+                    components,
+                });
+            }
+        });
+
+        // Fallback: match remaining items without salesProductId using old component-matching logic
+        salesProducts.forEach(sp => {
+            const spComps = (sp?.components || []).filter(
+                (comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION"
+            );
+            if (spComps.length === 0) return;
+
+            const matchingOrderItems = orderItems.filter(oi =>
+                !processedItemIds.has(oi.id || oi.productId) &&
+                !oi.salesProductId &&
+                spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
+            );
+
+            if (matchingOrderItems.length > 0) {
+                matchingOrderItems.forEach(oi => processedItemIds.add(oi.id || oi.productId));
+
+                const calcOrderQty = Math.max(...matchingOrderItems.map(oi => {
+                    const matchingSpComp = spComps.find((c: any) => String(c.componentProductId) === String(oi.productId));
+                    const perUnit = Number(matchingSpComp?.quantity || 1);
+                    return Math.round(Number(oi.quantity || 1) / perUnit);
+                }), 1);
+
+                const itemSubtotal = matchingOrderItems.reduce((s, oi) => s + Number(oi.lineTotal ?? oi.taxableAmount ?? (Number(oi.quantity || 0) * Number(oi.unitPrice ?? oi.rate ?? 0))), 0);
+                const itemCgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.cgstAmount || 0), 0);
+                const itemSgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.sgstAmount || 0), 0);
+                const itemIgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.igstAmount || 0), 0);
+                const itemGstAmount = itemIgst > 0 ? itemIgst : (itemCgst + itemSgst);
+                const itemUnitPrice = calcOrderQty > 0 ? (itemSubtotal / calcOrderQty) : 0;
+                const maxGstRate = Math.max(...matchingOrderItems.map(oi => Number(oi.igstRate || (Number(oi.cgstRate || 0) + Number(oi.sgstRate || 0)) || 0)), 0);
+
+                const components = spComps.map((c: any) => {
+                    const compPerUnit = Number(c.quantity || 1);
+                    const oi = matchingOrderItems.find(
+                        item => String(item.productId) === String(c.componentProductId)
+                    );
+                    const totalQty = oi ? Number(oi.quantity || 0) : 0;
+                    return {
+                        name: c.componentProduct?.productName || c.componentProduct?.productCode || `Product #${c.componentProductId}`,
+                        code: c.componentProduct?.productCode,
+                        perUnit: compPerUnit,
+                        totalQty,
+                        included: Boolean(oi && totalQty > 0),
                     };
                 });
 
@@ -295,107 +373,26 @@ const SalesOrderDetail: React.FC = () => {
     }, [order?.items, salesProducts, isInterState]);
 
     // ── Financial Totals ────────────────────────────────────────────────
-    const calcSubtotal = useMemo(() => {
-        if (!order) return 0;
-        if (Number(order.subtotal || 0) > 0) return Number(order.subtotal);
-        return (order.items || []).reduce((acc: number, it: any) => {
-            return acc + Number(it.lineTotal ?? it.taxableAmount ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
-        }, 0);
-    }, [order]);
-
+    // ── All totals read directly from backend — no frontend recalculation ──
+    const calcSubtotal = Number(order?.subtotal || 0);
+    const calcDiscount = Number(order?.totalDiscount || 0);
     const discValue = Number((order as any)?.orderDiscountValue || 0);
     const discType = (order as any)?.orderDiscountType || "PERCENT";
-    const calcDiscount = useMemo(() => {
-        if (!order) return 0;
-        if (Number(order.totalDiscount || 0) > 0) return Number(order.totalDiscount);
-        if (discValue > 0) {
-            return discType === "FLAT" ? discValue : (calcSubtotal * discValue / 100);
-        }
-        return 0;
-    }, [order, calcSubtotal, discValue, discType]);
-
     const taxableAmount = Math.max(0, calcSubtotal - calcDiscount);
+    const calcCgst = Number(order?.totalCgst || 0);
+    const calcSgst = Number(order?.totalSgst || 0);
+    const calcIgst = Number(order?.totalIgst || 0);
+    const calcTotalTax = Number(order?.totalTax || 0);
+    const calcNetAmount = Number(order?.netAmount || 0);
+    const hasGst = calcTotalTax > 0;
 
-    // ── GST recalculated on the POST-DISCOUNT taxable base ─────────────────────
-    // Raw item cgstAmount/sgstAmount are stored PRE-discount; we recompute from
-    // each item's GST rate applied proportionally to the discounted subtotal so
-    // the detail view matches the create-page preview exactly.
+    // Parse extra charges from narration (display only)
+    const chargeRows = useMemo(() => {
+        if (!order) return [];
+        return parseChargeRowsFromNarration((order as any).narration);
+    }, [order]);
 
-    const calcCgst = useMemo(() => {
-        if (!order || isInterState) return 0;
-        const rawItems = order.items || [];
-        const discountRatio = calcSubtotal > 0 ? Math.max(0, calcSubtotal - calcDiscount) / calcSubtotal : 1;
-        const fromRates = rawItems.reduce((acc: number, it: any) => {
-            const lineTotal  = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
-            const gstRate    = Number(it.gstRate ?? 0);
-            const cgstRate   = Number(it.cgstRate ?? (gstRate / 2));
-            return acc + lineTotal * discountRatio * (cgstRate / 100);
-        }, 0);
-        if (fromRates > 0) return fromRates;
-        // Fallback to stored value if items lack rate info
-        if (Number(order.totalCgst || 0) > 0) return Number(order.totalCgst);
-        return rawItems.reduce((acc: number, it: any) => acc + Number(it.cgstAmount || 0), 0);
-    }, [order, isInterState, calcSubtotal, calcDiscount]);
-
-    const calcSgst = useMemo(() => {
-        if (!order || isInterState) return 0;
-        const rawItems = order.items || [];
-        const discountRatio = calcSubtotal > 0 ? Math.max(0, calcSubtotal - calcDiscount) / calcSubtotal : 1;
-        const fromRates = rawItems.reduce((acc: number, it: any) => {
-            const lineTotal  = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
-            const gstRate    = Number(it.gstRate ?? 0);
-            const sgstRate   = Number(it.sgstRate ?? (gstRate / 2));
-            return acc + lineTotal * discountRatio * (sgstRate / 100);
-        }, 0);
-        if (fromRates > 0) return fromRates;
-        if (Number(order.totalSgst || 0) > 0) return Number(order.totalSgst);
-        return rawItems.reduce((acc: number, it: any) => acc + Number(it.sgstAmount || 0), 0);
-    }, [order, isInterState, calcSubtotal, calcDiscount]);
-
-    const calcIgst = useMemo(() => {
-        if (!order || !isInterState) return 0;
-        const rawItems = order.items || [];
-        const discountRatio = calcSubtotal > 0 ? Math.max(0, calcSubtotal - calcDiscount) / calcSubtotal : 1;
-        const fromRates = rawItems.reduce((acc: number, it: any) => {
-            const lineTotal  = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? it.rate ?? 0)));
-            const gstRate    = Number(it.igstRate ?? it.gstRate ?? 0);
-            return acc + lineTotal * discountRatio * (gstRate / 100);
-        }, 0);
-        if (fromRates > 0) return fromRates;
-        if (Number(order.totalIgst || 0) > 0) return Number(order.totalIgst);
-        return rawItems.reduce((acc: number, it: any) => acc + Number(it.igstAmount || 0), 0);
-    }, [order, isInterState, calcSubtotal, calcDiscount]);
-
-    const calcTotalTax = useMemo(() => calcCgst + calcSgst + calcIgst,
-        [calcCgst, calcSgst, calcIgst]);
-
-    const hasGst = Boolean(
-        calcTotalTax > 0 ||
-        (order?.items || []).some((it: any) => Number(it.cgstRate || it.sgstRate || it.igstRate || 0) > 0)
-    );
-
-    // Always derive net amount from recalculated values (never use stored netAmount
-    // directly, as it may reflect pre-discount GST)
-    const calcNetAmount = useMemo(() => {
-        if (!order) return 0;
-        const computed = taxableAmount + calcTotalTax;
-        return computed > 0 ? computed : Math.max(0, Number(order.netAmount || 0));
-    }, [order, taxableAmount, calcTotalTax]);
-
-    const isQuotation = Boolean(
-        order?.orderNo?.startsWith("QT") ||
-        order?.status === "QUOTATION_IN_PROGRESS" ||
-        order?.status === "MD_APPROVED" ||
-        order?.status === "MD_REJECTED" ||
-        order?.status === "CUSTOMER_APPROVED" ||
-        order?.status === "CUSTOMER_REJECTED"
-    );
-
-    const hasAnyPricing = isQuotation && (
-        calcSubtotal > 0 ||
-        calcNetAmount > 0 ||
-        (order?.items || []).some((it: any) => Number(it.unitPrice || it.rate || 0) > 0)
-    );
+    const hasAnyPricing = calcSubtotal > 0 || calcNetAmount > 0;
 
     if (loading || !order) {
         return <CommonLoader text="Loading order details..." fullScreen={false} />;
@@ -438,11 +435,11 @@ const SalesOrderDetail: React.FC = () => {
         : customer?.shippingPincode || customer?.addresses?.[1]?.address?.pincode || "";
 
     return (
-        <div className="w-full mx-auto space-y-6">
+        <div className="w-full mx-auto space-y-3">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* ── Page Header ── */}
-                <div className="px-6 py-4 border-b border-line bg-card-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="px-4 py-3 border-b border-line bg-card-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-3 flex-wrap">
                             <h2 className="text-2xl font-bold text-ink m-0">
                                 {order.orderNo}
@@ -455,7 +452,7 @@ const SalesOrderDetail: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-6 space-y-5">
+                <div className="p-4 space-y-3">
 
                     {/* ── Customer Rejection banner ── */}
                     {order.status === "CUSTOMER_REJECTED" && order.customerRejectionReason && (
@@ -465,12 +462,12 @@ const SalesOrderDetail: React.FC = () => {
                         </div>
                     )}
 
-                    {/* ── Order Information, Customer Details & Addresses (Single Unified Box) ── */}
-                    <div className="bg-card-2 p-5 rounded-xl border border-line-soft space-y-6">
+                    {/* ── Order Information, Customer Details & Addresses ── */}
+                    <div className="bg-card-2 p-3 rounded-xl border border-line-soft space-y-3">
                         {/* ── 1. Order Information ── */}
                         <div>
-                            <h3 className="text-base font-semibold text-ink mb-4">Order Information</h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <h3 className="text-sm font-semibold text-ink mb-2">Order Information</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                                 <DetailBox label="Order No" value={order.orderNo} />
                                 <DetailBox label="Order Date" value={formatDate(order.orderDate)} />
                                 <DetailBox label="Order Source" value={getOrderSourceLabel((order as any).orderSource, order.orderType)} />
@@ -492,8 +489,8 @@ const SalesOrderDetail: React.FC = () => {
 
                         {/* ── 2. Customer Details ── */}
                         <div>
-                            <h3 className="text-base font-semibold text-ink mb-4">Customer Details</h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <h3 className="text-sm font-semibold text-ink mb-2">Customer Details</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                                 <DetailBox label="Firm / Legal Name" value={customer?.firmName || customer?.displayName || "—"} />
                                 <DetailBox label="Display Name" value={customer?.displayName || "—"} />
                                 <DetailBox label="Customer Grade" value={customer?.customerGrade?.name || "—"} />
@@ -517,9 +514,9 @@ const SalesOrderDetail: React.FC = () => {
 
                         {/* ── 3. Addresses ── */}
                         <div>
-                            <h3 className="text-base font-semibold text-ink mb-4">Addresses</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="p-4 bg-card rounded-lg border border-line-soft">
+                            <h3 className="text-sm font-semibold text-ink mb-2">Addresses</h3>
+                            <div className={`grid grid-cols-1 ${["QUOTED", "INVOICED"].includes(order.status || "") ? "sm:grid-cols-2" : ""} gap-3`}>
+                                <div className="p-3 bg-card rounded-lg border border-line-soft">
                                     <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-2">Billing Address</div>
                                     <div className="text-sm font-semibold text-ink">{billingLine}</div>
                                     {(billingCity || billingState || billingPincode) && (
@@ -528,26 +525,28 @@ const SalesOrderDetail: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                                <div className="p-4 bg-card rounded-lg border border-line-soft">
-                                    <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-2">Shipping Address</div>
-                                    {shippingLine ? (
-                                        <>
-                                             <div className="text-sm font-semibold text-ink">{shippingLine}</div>
-                                            <div className="text-xs text-ink-muted mt-1">
-                                                {[shippingCity, shippingState].filter(Boolean).join(", ")}{shippingPincode ? ` — ${shippingPincode}` : ""}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="text-xs text-ink-subtle italic">Same as Billing Address</div>
-                                    )}
-                                </div>
+                                {["QUOTED", "INVOICED"].includes(order.status || "") && (
+                                    <div className="p-3 bg-card rounded-lg border border-line-soft">
+                                        <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1">Shipping Address</div>
+                                        {shippingLine ? (
+                                            <>
+                                                <div className="text-sm font-semibold text-ink">{shippingLine}</div>
+                                                <div className="text-xs text-ink-muted mt-1">
+                                                    {[shippingCity, shippingState].filter(Boolean).join(", ")}{shippingPincode ? ` — ${shippingPincode}` : ""}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="text-xs text-ink-subtle italic">Same as Billing Address</div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
                     {/* ── Order Items ── */}
-                    <div className="bg-card-2 p-5 rounded-xl border border-line-soft">
-                        <h3 className="text-base font-semibold text-ink mb-4">Order Items</h3>
+                    <div className="bg-card-2 p-3 rounded-xl border border-line-soft">
+                        <h3 className="text-sm font-semibold text-ink mb-2">Order Items</h3>
                         <div className="border border-line rounded-lg overflow-hidden">
                             <table className="min-w-full text-sm">
                                 <thead>
@@ -672,7 +671,7 @@ const SalesOrderDetail: React.FC = () => {
                             <div className="flex justify-end mt-5">
                                 <div className="w-full max-w-sm border border-line rounded-xl p-4 bg-card shadow-xs">
                                     <h4 className="text-xs font-bold text-ink uppercase tracking-wide mb-3 pb-2 border-b border-line-soft">
-                                        {order.orderNo?.startsWith("QT") || order.status === "QUOTATION_IN_PROGRESS" ? "Quotation Summary" : "Sales Order Summary"}
+                                        {order.status === "QUOTED" ? "Quotation Summary" : "Sales Order Summary"}
                                     </h4>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between text-ink-subtle">
@@ -710,6 +709,17 @@ const SalesOrderDetail: React.FC = () => {
                                                 </div>
                                             </>
                                         ))}
+
+                                        {chargeRows.filter(r => Number(r.amount) > 0).map(row => {
+                                            const opt = CHARGE_OPTIONS.find(o => o.value === row.type);
+                                            const isAdd = opt?.sign === 1;
+                                            return (
+                                                <div key={row.id} className={`flex justify-between text-xs ${isAdd ? "text-emerald-600" : "text-red-600"}`}>
+                                                    <span>{opt?.label ?? row.type}</span>
+                                                    <span>{isAdd ? "+ " : "- "}{formatMoney(Number(row.amount))}</span>
+                                                </div>
+                                            );
+                                        })}
 
                                         <div className="flex justify-between pt-3 border-t border-line mt-2 text-ink items-center">
                                             <span className="text-base font-bold">Net Amount</span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaArrowLeft, FaUser, FaInfoCircle, FaFileInvoiceDollar, FaPlus } from "react-icons/fa";
+import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -116,17 +116,6 @@ const CtrlText = ({ field, label, placeholder, required, type, disabled, error, 
   />
 );
 
-// Groups a set of fields under a labeled heading so related inputs read as one unit.
-const FieldGroup = ({ title, children }: { icon?: React.ElementType; title: string; children: React.ReactNode }) => (
-  <div className="space-y-4">
-    <h5 className="font-bold text-ink flex items-center gap-2">
-      {title}
-    </h5>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
-      {children}
-    </div>
-  </div>
-);
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -256,9 +245,9 @@ const CustomerFormPage: React.FC = () => {
   return (
     <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
       <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible flex-1 flex flex-col">
-        <div className="px-6 py-4 border-b border-line-soft">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 className="text-xl font-bold text-ink flex items-start">
+        <div className="px-4 py-3 border-b border-line-soft">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-lg font-bold text-ink flex items-start">
               {isEditMode ? 'Edit Customer' : 'Create Customer'}
               <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("customerId")}</span>
             </h3>
@@ -271,10 +260,9 @@ const CustomerFormPage: React.FC = () => {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-4 space-y-6 flex-1 flex flex-col" noValidate>
+        <form onSubmit={handleSubmit(onSubmit)} className="px-4 py-3 space-y-4 flex-1 flex flex-col" noValidate>
 
-          {/* Basic Details */}
-          <FieldGroup icon={FaUser} title="Basic Details">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <Controller name="firmName" control={control} render={({ field }) => (
               <CtrlText field={field} label="Firm / Legal Name" placeholder="e.g. Murugan Plastics" required error={errors.firmName?.message} />
             )} />
@@ -343,10 +331,6 @@ const CustomerFormPage: React.FC = () => {
                 error={errors.isActive?.message}
               />
             )} />
-          </FieldGroup>
-
-          {/* Contact & Tax Details */}
-          <FieldGroup icon={FaInfoCircle} title="Contact & Tax Details">
             <Controller name="phones" control={control} render={({ field }) => (
               <IndiaPhoneInput
                 multi
@@ -364,10 +348,6 @@ const CustomerFormPage: React.FC = () => {
             <Controller name="gstin" control={control} render={({ field }) => (
               <CtrlText field={field} label="GSTIN (15 CHAR)" placeholder="33AABC1234D1Z5" error={errors.gstin?.message} />
             )} />
-          </FieldGroup>
-
-          {/* Financial Details */}
-          <FieldGroup icon={FaFileInvoiceDollar} title="Financial Details">
             <Controller name="openingBalance" control={control} render={({ field }) => (
               <CtrlText field={field} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative error={errors.openingBalance?.message} disabled={isEditMode} />
             )} />
@@ -389,10 +369,10 @@ const CustomerFormPage: React.FC = () => {
             <Controller name="creditLimit" control={control} render={({ field }) => (
               <CtrlText field={field} label="Credit Limit ₹" type="number" placeholder="30000" preventNegative error={errors.creditLimit?.message} />
             )} />
-          </FieldGroup>
+          </div>
 
           {/* Billing Address */}
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               
               <CustomButton
@@ -405,7 +385,7 @@ const CustomerFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-4 col-span-full">
+          <div className="space-y-3 col-span-full">
 
 
             {fields.map((field, index) => {
@@ -450,7 +430,7 @@ const CustomerFormPage: React.FC = () => {
             })}
           </div>
 
-          <div className="mt-auto flex justify-end gap-3 pt-6">
+          <div className="mt-auto flex justify-end gap-3 pt-4">
             {!isEditMode && (
               <CustomButton
                 text="Clear Form"

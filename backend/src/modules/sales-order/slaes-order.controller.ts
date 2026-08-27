@@ -42,7 +42,7 @@ class SalesOrderController {
             pageSize: req.query.pageSize ? Number(req.query.pageSize) : 20,
             customerId: req.query.customerId as string,
             orderNo: req.query.orderNo as string,
-            docType: req.query.docType ? (req.query.docType as string).toUpperCase() : undefined,
+            quotationOnly: req.query.quotationOnly === "true",
             customerGradeId: req.query.customerGradeId ? Number(req.query.customerGradeId) : undefined,
             customerTypeId: req.query.customerTypeId ? Number(req.query.customerTypeId) : undefined,
             orderType: req.query.orderType as string | undefined,
@@ -81,6 +81,11 @@ class SalesOrderController {
     getNextCode = asyncHandler(async (req: Request, res: Response) => {
         const nextCode = await salesOrderService.getNextSalesOrderCode(getPerms(req));
         return res.status(200).json(new ApiResponse("Next sales order code fetched successfully", { nextCode }));
+    });
+
+    getNextQuotationCode = asyncHandler(async (req: Request, res: Response) => {
+        const nextCode = await salesOrderService.getNextQuotationCode(getPerms(req));
+        return res.status(200).json(new ApiResponse("Next quotation code fetched successfully", { nextCode }));
     });
 
 
