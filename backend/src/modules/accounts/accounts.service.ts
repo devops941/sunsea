@@ -531,10 +531,32 @@ class AccountsService {
       if (ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE) hasAsset = true;
     }
 
-    // Choose which side to render the opening row on. If every party ledger is
-    // a credit-natural type (all suppliers / Sundry Creditors), render as credit.
-    // Otherwise (all customers / Sundry Debtors, or mixed), render as debit.
-    const openingIsCredit = hasLiability && !hasAsset;
+    // The "natural" side for this aggregate:
+    //   all suppliers / Sundry Creditors → CREDIT natural
+    //   all customers / Sundry Debtors   → DEBIT natural
+    //   mixed → DEBIT (default)
+    const naturalSideIsCredit = hasLiability && !hasAsset;
+
+    // Rendering rule for opening row:
+    //   • If `openingBalance` sign matches the natural side → put full amount there
+    //   • If it doesn't → put on the OPPOSITE side (advance / reversed position)
+    //
+    // Concretely, for Sundry Debtors (natural=DEBIT):
+    //   openingBalance = +6,800 → Dr 6,800 (customers owe us net)
+    //   openingBalance = −6,800 → Cr 6,800 (customers gave us net advance)
+    // The `runningBalance` keeps the signed value so subsequent items apply
+    // math consistently.
+    let openingDebit = 0;
+    let openingCredit = 0;
+    if (openingBalance > 0) {
+      // Positive number sits on the natural side
+      if (naturalSideIsCredit) openingCredit = openingBalance;
+      else openingDebit = openingBalance;
+    } else if (openingBalance < 0) {
+      // Negative means the balance is on the OPPOSITE of natural
+      if (naturalSideIsCredit) openingDebit = -openingBalance;
+      else openingCredit = -openingBalance;
+    }
 
     const selectedIds = new Set(ids);
     let runningBalance = openingBalance;
@@ -546,10 +568,12 @@ class AccountsService {
         voucherNo: "-",
         voucherType: "OPENING",
         date: options.startDate || (journalItems.length > 0 ? journalItems[0].voucher.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
-        narration: "Combined Opening Balance",
+        narration: openingBalance < 0
+          ? (naturalSideIsCredit ? "Net advance paid to suppliers" : "Net advance received from customers")
+          : "Combined Opening Balance",
         particulars: `Opening Balance (${ids.length} accounts)`,
-        debit: openingIsCredit ? 0 : openingBalance,
-        credit: openingIsCredit ? openingBalance : 0,
+        debit: openingDebit,
+        credit: openingCredit,
         runningBalance: openingBalance,
       });
     }
