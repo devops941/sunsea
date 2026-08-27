@@ -46,10 +46,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     "INVOICE NO",
     "DATE",
     "DUE DATE",
-    "INVOICE AMOUNT",
-    "PAID AMOUNT",
-    "OUTSTANDING",
-    "STATUS"
+    "INVOICE AMOUNT"
   ];
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -148,9 +145,6 @@ export const CustomerBreakdownPage: React.FC = () => {
           { header: "Date", accessor: (item: any) => item.date },
           { header: "Due Date", accessor: (item: any) => item.dueDate || "-" },
           { header: "Invoice Amount", accessor: (item: any) => item.amount },
-          { header: "Paid Amount", accessor: (item: any) => item.paidAmount },
-          { header: "Outstanding", accessor: (item: any) => item.balance },
-          { header: "Status", accessor: (item: any) => item.status },
         ],
         csvFilename: `${firmName}_Invoices_${new Date().toISOString().split("T")[0]}.csv`,
       };
@@ -207,40 +201,6 @@ export const CustomerBreakdownPage: React.FC = () => {
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-ink">
           ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      header: "PAID AMOUNT",
-      render: (item: any) => (
-        <div className="text-right font-mono font-semibold text-emerald-600">
-          ₹ {item.paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      header: "OUTSTANDING",
-      render: (item: any) => (
-        <div className="text-right font-mono font-semibold text-blue-600">
-          ₹ {item.balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      header: "STATUS",
-      render: (item: any) => (
-        <div className="text-center">
-          <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-              item.status === "PAID"
-                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                : item.status === "PARTIAL"
-                ? "bg-amber-100 text-amber-800 border border-amber-300"
-                : "bg-red-100 text-red-800 border border-red-300"
-            }`}
-          >
-            {item.status}
-          </span>
         </div>
       ),
     },

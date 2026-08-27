@@ -103,7 +103,8 @@ export const AmountPayablePage: React.FC = () => {
         endDate,
         supplierId,
         search,
-        limit: 10,
+        page: 1,
+        limit: 10000,
       });
       if (reqId === requestIdRef.current) {
         const list = Array.isArray(res) ? res : res.data || [];
@@ -342,21 +343,6 @@ export const AmountPayablePage: React.FC = () => {
     },
   ];
 
-  // Pagination state (10 items per page)
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 10;
-
-  // Reset to page 1 when filters or data change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [asOnDate, startDate, endDate, supplierId, search]);
-
-  const totalPages = Math.ceil(filteredSuppliers.length / pageSize) || 1;
-  const paginatedSuppliers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredSuppliers.slice(start, start + pageSize);
-  }, [filteredSuppliers, currentPage]);
-
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
       {/* COMPACT HEADER + FILTERS */}
@@ -546,15 +532,10 @@ export const AmountPayablePage: React.FC = () => {
 
         <DataTable
           columns={tableColumns.filter(c => visibleColumns.includes(c.id))}
-          data={paginatedSuppliers}
+          data={filteredSuppliers}
           rowKey={(item: any) => item.supplierId}
           loading={loading}
           emptyMessage="No supplier payables matching the selected filter criteria."
-          pagination={{
-            currentPage,
-            totalPages,
-            onPageChange: setCurrentPage,
-          }}
         />
       </div>
     </div>

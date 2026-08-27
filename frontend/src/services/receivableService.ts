@@ -71,7 +71,7 @@ export interface CustomerReceivableDetail {
 }
 
 export const receivableService = {
-  getReceivables: async (params?: { asOnDate?: string; startDate?: string; endDate?: string; customerId?: string; search?: string }): Promise<CustomerReceivableSummary[]> => {
+  getReceivables: async (params?: { asOnDate?: string; startDate?: string; endDate?: string; customerId?: string; search?: string; page?: number; limit?: number }): Promise<CustomerReceivableSummary[]> => {
     const res = await apiClient.get("/accounts/receivable", { params });
     return res.data.data;
   },

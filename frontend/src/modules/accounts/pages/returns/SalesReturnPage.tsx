@@ -5,8 +5,6 @@ import {
   FaPlus,
   FaTimes,
   FaSearch,
-  FaChevronLeft,
-  FaChevronRight,
   FaEye,
   FaEdit,
 } from "react-icons/fa";
@@ -17,8 +15,6 @@ import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useCustomerGrades } from "../../../../hooks/useCustomerGrades";
 import { formatStockQty } from "../../../../utils/uomConversion";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
-
-const ITEMS_PER_PAGE = 10;
 
 interface FilterState {
   customerGradeId: string;
@@ -40,7 +36,6 @@ export const SalesReturnPage: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const loadData = async () => {
     setLoading(true);
@@ -66,12 +61,10 @@ export const SalesReturnPage: React.FC = () => {
 
   const handleClearFilters = useCallback(() => {
     setAppliedFilters(DEFAULT_FILTERS);
-    setCurrentPage(1);
   }, []);
 
   const handleRemoveFilter = useCallback((key: keyof FilterState) => {
     setAppliedFilters((prev) => ({ ...prev, [key]: "" }));
-    setCurrentPage(1);
   }, []);
 
   const filteredReturns = returns.filter((r) => {
@@ -100,11 +93,7 @@ export const SalesReturnPage: React.FC = () => {
     return true;
   });
 
-  const totalPages = Math.ceil(filteredReturns.length / ITEMS_PER_PAGE) || 1;
-  const paginatedReturns = filteredReturns.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const paginatedReturns = filteredReturns;
 
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen">
@@ -129,7 +118,6 @@ export const SalesReturnPage: React.FC = () => {
               value={appliedFilters.customerGradeId}
               onChange={(e) => {
                 setAppliedFilters((prev) => ({ ...prev, customerGradeId: e.target.value }));
-                setCurrentPage(1);
               }}
               className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
             >
@@ -146,7 +134,6 @@ export const SalesReturnPage: React.FC = () => {
               value={appliedFilters.status}
               onChange={(e) => {
                 setAppliedFilters((prev) => ({ ...prev, status: e.target.value }));
-                setCurrentPage(1);
               }}
               className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
             >
@@ -165,7 +152,6 @@ export const SalesReturnPage: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
                 }}
                 className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
               />
@@ -252,7 +238,7 @@ export const SalesReturnPage: React.FC = () => {
                   return (
                     <tr key={item.id} className="hover:bg-card-2 transition-colors">
                       <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
-                        {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                        {index + 1}
                       </td>
                       <td className="px-3 py-1.5">
                         <button
@@ -322,29 +308,6 @@ export const SalesReturnPage: React.FC = () => {
                 </tr>
               </tfoot>
             </table>
-          </div>
-        )}
-        {totalPages > 1 && (
-          <div className="px-3 py-2 border-t border-line bg-card-2 flex items-center justify-between">
-            <span className="text-[11px] text-ink-subtle">
-              Page {currentPage} of {totalPages} ({filteredReturns.length} records)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronLeft className="w-2.5 h-2.5" />
-              </button>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="p-1.5 border border-line rounded text-ink-muted hover:bg-card disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <FaChevronRight className="w-2.5 h-2.5" />
-              </button>
-            </div>
           </div>
         )}
       </div>

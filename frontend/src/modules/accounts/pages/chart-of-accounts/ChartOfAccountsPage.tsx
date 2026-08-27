@@ -8,8 +8,6 @@ import {
   FaTimesCircle,
   FaTimes,
   FaFolder,
-  FaChevronLeft,
-  FaChevronRight,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
@@ -44,7 +42,7 @@ export const ChartOfAccountsPage: React.FC = () => {
   const loadLedgers = async () => {
     setLoading(true);
     try {
-      const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
+      const res = await accountService.fetchLedgers({ page: 1, limit: 10000 });
       setLedgers(res.ledgers || []);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load Chart of Accounts");
@@ -153,19 +151,7 @@ export const ChartOfAccountsPage: React.FC = () => {
     };
   }, [filteredLedgers]);
 
-  // Pagination state (15 items per page - denser)
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 15;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedType]);
-
-  const totalPages = Math.ceil(filteredLedgers.length / pageSize) || 1;
-  const paginatedLedgers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredLedgers.slice(start, start + pageSize);
-  }, [filteredLedgers, currentPage]);
+  const paginatedLedgers = filteredLedgers;
 
   return (
     <div className="w-full p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
@@ -286,7 +272,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                 paginatedLedgers.map((item, index) => (
                   <tr key={item.id} className="hover:bg-card-2/50 transition-colors">
                     <td className="px-3 py-1.5 text-xs text-ink-subtle">
-                      {(currentPage - 1) * pageSize + index + 1}
+                      {index + 1}
                     </td>
                     <td className="px-3 py-1.5 text-xs font-mono font-bold text-ink whitespace-nowrap">
                       {item.code}
@@ -333,33 +319,6 @@ export const ChartOfAccountsPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Compact Pagination */}
-        {!loading && filteredLedgers.length > 0 && (
-          <div className="px-3 py-2 border-t border-line flex items-center justify-between bg-card-2">
-            <span className="text-[11px] text-ink-subtle">
-              Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredLedgers.length)} of {filteredLedgers.length}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-1.5 text-ink-muted hover:text-ink hover:bg-card rounded border border-line disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <FaChevronLeft className="text-[10px]" />
-              </button>
-              <span className="text-[11px] text-ink-muted px-2">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-1.5 text-ink-muted hover:text-ink hover:bg-card rounded border border-line disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <FaChevronRight className="text-[10px]" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* CREATE LEDGER MODAL - compact */}
