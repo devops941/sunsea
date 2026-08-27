@@ -477,15 +477,38 @@ class AccountsService {
       orderBy: [{ voucher: { date: "asc" } }, { voucher: { id: "asc" } }],
     });
 
-    // Aggregate opening balance from party ledgers
+    // Aggregate opening balance from party ledgers.
+    //
+    // IMPORTANT SIGN CONVENTION:
+    // Each subsequent journal item updates `runningBalance` using ITS OWN
+    // ledger-type formula:  Asset/Expense → debit − credit, Liability/Income/Equity → credit − debit.
+    // Both formulas produce a POSITIVE number when the balance grows in the
+    // ledger's natural direction (asset debit grows / liability credit grows).
+    //
+    // Therefore the opening must also be added in its NATURAL direction — i.e.
+    // as a plain positive number — otherwise the initial balance would go into
+    // the aggregate "backwards" and every subsequent purchase (which correctly
+    // adds +credit for a supplier liability) would then look like the opening
+    // was being CANCELLED OUT.  The earlier `-opening` for non-asset ledgers
+    // was the bug the user reported: opening ₹2,000 for a supplier appeared as
+    // −₹2,000 in Sundry Creditors, then a ₹110 purchase moved it to −₹1,890
+    // instead of the correct ₹2,110.
     let openingBalance = 0;
+    let hasLiability = false;
+    let hasAsset = false;
     for (const ledger of ledgers) {
-      const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
       let opening = 0;
       if (ledger.customer) opening = Number((ledger.customer as any).openingBalance || 0);
       else if (ledger.supplier) opening = Number((ledger.supplier as any).openingBalance || 0);
-      openingBalance += isAssetOrExpense ? opening : -opening;
+      openingBalance += opening;
+      if (ledger.type === LedgerType.LIABILITY || ledger.type === LedgerType.INCOME || ledger.type === LedgerType.EQUITY) hasLiability = true;
+      if (ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE) hasAsset = true;
     }
+
+    // Choose which side to render the opening row on. If every party ledger is
+    // a credit-natural type (all suppliers / Sundry Creditors), render as credit.
+    // Otherwise (all customers / Sundry Debtors, or mixed), render as debit.
+    const openingIsCredit = hasLiability && !hasAsset;
 
     const selectedIds = new Set(ids);
     let runningBalance = openingBalance;
@@ -499,8 +522,8 @@ class AccountsService {
         date: options.startDate || (journalItems.length > 0 ? journalItems[0].voucher.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
         narration: "Combined Opening Balance",
         particulars: `Opening Balance (${ids.length} accounts)`,
-        debit: openingBalance > 0 ? openingBalance : 0,
-        credit: openingBalance < 0 ? -openingBalance : 0,
+        debit: openingIsCredit ? 0 : openingBalance,
+        credit: openingIsCredit ? openingBalance : 0,
         runningBalance: openingBalance,
       });
     }
