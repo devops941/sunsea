@@ -30,6 +30,8 @@ const BankAccountsPage: React.FC = () => {
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
   const [newGroup, setNewGroup] = useState("Bank Accounts");
+  const [newOpeningBalance, setNewOpeningBalance] = useState<string>("");
+  const [newOpeningType, setNewOpeningType] = useState<"DEBIT" | "CREDIT">("DEBIT");
 
   const cacheKey = `accounts:bank-accounts`;
 
@@ -52,10 +54,23 @@ const BankAccountsPage: React.FC = () => {
 
   const data: BankAccountsData = cachedList[0] || { accounts: [], totalBalance: 0 };
 
+  const resetForm = () => {
+    setNewName("");
+    setNewCode("");
+    setNewGroup("Bank Accounts");
+    setNewOpeningBalance("");
+    setNewOpeningType("DEBIT");
+  };
+
   const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newCode) {
       toast.error("Account name and code are required");
+      return;
+    }
+    const openingBalance = parseFloat(newOpeningBalance) || 0;
+    if (openingBalance < 0) {
+      toast.error("Opening balance cannot be negative — use the type dropdown instead");
       return;
     }
     setSubmitting(true);
@@ -65,11 +80,16 @@ const BankAccountsPage: React.FC = () => {
         name: newName,
         type: "ASSET",
         group: newGroup,
+        openingBalance,
+        openingBalanceType: newOpeningType,
       });
-      toast.success(`Bank account "${newName}" created`);
+      toast.success(
+        openingBalance > 0
+          ? `Bank account "${newName}" created with opening balance ₹${openingBalance.toLocaleString("en-IN")}`
+          : `Bank account "${newName}" created`
+      );
       setShowAddForm(false);
-      setNewName("");
-      setNewCode("");
+      resetForm();
       refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create");
@@ -95,73 +115,13 @@ const BankAccountsPage: React.FC = () => {
               <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={() => setShowAddForm(true)}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition cursor-pointer"
             >
-              {showAddForm ? <FaTimes className="text-[10px]" /> : <FaPlus className="text-[10px]" />}
-              {showAddForm ? "Close" : "Add Bank Account"}
+              <FaPlus className="text-[10px]" /> Add Bank Account
             </button>
           </div>
         </div>
-
-        {/* Add Form - inline compact */}
-        {showAddForm && (
-          <form onSubmit={handleAddBank} className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2 border-b border-line">
-            <div className="flex-1 min-w-[180px]">
-              <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                Account Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. TMB SUN-SEA A/C"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
-                required
-              />
-            </div>
-            <div className="w-[150px]">
-              <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                Account Code <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. TMB-001"
-                value={newCode}
-                onChange={(e) => setNewCode(e.target.value)}
-                className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
-                required
-              />
-            </div>
-            <div className="w-[150px]">
-              <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Type</label>
-              <select
-                value={newGroup}
-                onChange={(e) => setNewGroup(e.target.value)}
-                className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
-              >
-                <option value="Bank Accounts">Bank Account</option>
-                <option value="Cash in Hand">Cash in Hand</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded transition-colors border border-line cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {submitting ? "Creating..." : "Create Account"}
-              </button>
-            </div>
-          </form>
-        )}
 
         {/* Total Balance summary bar */}
         <div className="px-3 py-2 bg-card-2 flex items-center justify-between gap-2">
@@ -226,6 +186,121 @@ const BankAccountsPage: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Add Bank Account Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-line rounded-lg shadow-2xl w-[520px] max-w-[95vw] overflow-hidden">
+            <div className="px-4 py-2.5 bg-blue-600 text-white flex items-center gap-2">
+              <FaUniversity className="text-sm" />
+              <h2 className="text-sm font-bold flex-1">Add Bank / Cash Account</h2>
+              <button
+                onClick={() => { setShowAddForm(false); resetForm(); }}
+                className="text-white/80 hover:text-white"
+              >
+                <FaTimes className="text-sm" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddBank} className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Account Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. TMB SUN-SEA A/C"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Account Code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. TMB-001"
+                    value={newCode}
+                    onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Type</label>
+                  <select
+                    value={newGroup}
+                    onChange={(e) => setNewGroup(e.target.value)}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  >
+                    <option value="Bank Accounts">Bank Account</option>
+                    <option value="Cash in Hand">Cash in Hand</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Opening Balance (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={newOpeningBalance}
+                    onChange={(e) => setNewOpeningBalance(e.target.value)}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Opening Type
+                  </label>
+                  <select
+                    value={newOpeningType}
+                    onChange={(e) => setNewOpeningType(e.target.value as "DEBIT" | "CREDIT")}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  >
+                    <option value="DEBIT">Debit (Money in account)</option>
+                    <option value="CREDIT">Credit (Overdraft / Owed)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
+                💡 <b>Tip:</b> Enter the actual bank balance shown in your bank statement/passbook.
+                A JV will auto-post: <b>Debit</b> {newName || "this account"} ₹{parseFloat(newOpeningBalance) || 0}
+                {" · "}<b>Credit</b> Opening Balance Equity. Every subsequent transaction updates from this starting balance.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddForm(false); resetForm(); }}
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {submitting ? <><FaSync className="animate-spin text-[10px]" /> Creating...</> : <><FaPlus className="text-[10px]" /> Create Account</>}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

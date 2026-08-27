@@ -1350,6 +1350,63 @@ class VoucherPostingService {
   }
 
   /**
+   * Post a formal double-entry Opening Balance Voucher for a generic ledger
+   * (bank account, cash account, petty cash, or any manually created ledger).
+   *
+   * The contra side always hits EQ-001 (Opening Balance Equity).
+   *
+   *   type=DEBIT  → this ledger is DEBITED  (asset ↑, or paid an advance)
+   *   type=CREDIT → this ledger is CREDITED (liability ↑, or advance received)
+   *
+   * For a new bank account with ₹1,50,000 already sitting in it, the user
+   * enters opening = 150000, type = DEBIT: Dr Bank Ledger, Cr Opening Equity.
+   */
+  async postGenericLedgerOpeningBalanceVoucher(
+    ledger: { id: number; code: string; name: string },
+    amount: number,
+    type: "DEBIT" | "CREDIT" = "DEBIT",
+    txClient?: Prisma.TransactionClient
+  ) {
+    const db = txClient || prisma;
+    await accountsService.ensureSystemLedgersExist(db);
+    const eqLedger = await db.accountLedger.findUnique({ where: { code: "EQ-001" } });
+    if (!eqLedger) return null;
+
+    const opBal = new Prisma.Decimal(amount);
+    const isDebit = type === "DEBIT";
+
+    return safeCreateVoucher(
+      db,
+      {
+        voucherNo: `JV-LEDG-OP-${ledger.code}`,
+        type: VoucherType.JOURNAL,
+        date: getFinancialYearStart(),
+        narration: `Opening balance for ${ledger.name} (${type} ₹${amount})`,
+        refDocType: "LEDGER_OPENING_BALANCE",
+        refDocId: String(ledger.id),
+        items: {
+          create: [
+            {
+              debitLedgerId: isDebit ? ledger.id : eqLedger.id,
+              debitAmount: opBal,
+              creditAmount: new Prisma.Decimal(0),
+              narration: `${ledger.name} opening balance debit`,
+            },
+            {
+              creditLedgerId: isDebit ? eqLedger.id : ledger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: opBal,
+              narration: `${ledger.name} opening balance credit`,
+            },
+          ],
+        },
+      },
+      "LEDGER_OPENING_BALANCE",
+      String(ledger.id)
+    );
+  }
+
+  /**
    * Automatically scan for and post missing double-entry opening balance vouchers
    * for any customers and suppliers who have an opening balance in the database.
    */

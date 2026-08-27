@@ -9,6 +9,8 @@ export const createLedgerSchema = z.object({
   isActive: z.boolean().optional().default(true),
   customerId: z.string().uuid().optional().nullable(),
   supplierId: z.number().int().optional().nullable(),
+  openingBalance: z.number().optional().default(0),
+  openingBalanceType: z.enum(["DEBIT", "CREDIT"]).optional().default("DEBIT"),
 });
 
 export const updateLedgerSchema = createLedgerSchema.partial();
