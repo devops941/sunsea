@@ -79,22 +79,7 @@ class SalesInvoiceService {
 
     const grandTotal = subTotal + taxTotal;
 
-    const isDraft = (data as any).status === "DRAFT";
-
-    const rawPayments = (data as any).payments || [];
-    const processedPayments = rawPayments.map((p: any) => ({
-      id: p.id || crypto.randomUUID(),
-      amount: Math.round(Number(p.amount) * 100) / 100,
-      paymentMethod: p.paymentMethod,
-      referenceNumber: p.referenceNumber || "",
-      paymentDate: p.paymentDate,
-      recordedBy: currentUser.userId,
-      createdAt: new Date().toISOString()
-    }));
-    const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
-    const computedStatus = isDraft
-      ? "DRAFT"
-      : (totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID"));
+    const computedStatus = "CONFIRMED";
 
     const invoice = await prisma.$transaction(async (tx) => {
       // Increment invoice sequence number
@@ -132,7 +117,7 @@ class SalesInvoiceService {
           companyId: currentUser.companyId,
           createdBy: currentUser.userId,
           status: computedStatus,
-          payments: processedPayments as any,
+          payments: [] as any,
           items: { create: invoiceItems },
         },
         include: {
@@ -145,17 +130,14 @@ class SalesInvoiceService {
         },
       });
 
-      // DRAFT invoices: skip accounting, stock and outstanding updates
-      if (isDraft) return invoice;
-
       // Update customer outstandingAmount
-      const unpaidPortion = Math.max(0, Math.round((grandTotal - totalPaid) * 100) / 100);
+      const unpaidPortion = Math.max(0, Math.round(grandTotal * 100) / 100);
       await tx.customer.update({
         where: { id: data.customerId },
         data: { outstandingAmount: { increment: unpaidPortion } },
       });
 
-      // Update invoicedQty on SalesOrderItems
+      // Update invoicedQty on SalesOrderItems and mark source SO as INVOICED
       if (data.salesOrderId) {
         for (const item of data.items) {
           const qty = Number(item.qty);
@@ -165,6 +147,20 @@ class SalesInvoiceService {
             data: { invoicedQty: { increment: qty } },
           });
         }
+        // Mark the source sales order as INVOICED and save shipping address
+        const shippingAddr = (data as any).shippingAddress;
+        await tx.salesOrder.update({
+          where: { id: data.salesOrderId },
+          data: {
+            status: "INVOICED" as any,
+            ...(shippingAddr && {
+              shippingAddressLine1: shippingAddr.line1 || null,
+              shippingCity: shippingAddr.city || null,
+              shippingState: shippingAddr.state || null,
+              shippingPincode: shippingAddr.pincode || null,
+            }),
+          },
+        });
       }
 
       // Create stock adjustment for dispatched items
@@ -253,8 +249,8 @@ class SalesInvoiceService {
       return invoice;
     }, { maxWait: 10000, timeout: 30000 });
 
-    // Auto-post SALES Voucher only for confirmed invoices
-    if (!isDraft) {
+    // Auto-post SALES Voucher
+    {
       try {
         const { voucherPostingService } = require("../accounts/voucherPosting.service");
         await voucherPostingService.postSalesVoucher(invoice.id);
@@ -428,15 +424,9 @@ class SalesInvoiceService {
         throw new ApiError(400, "Fully paid invoices cannot be edited");
       }
 
-      const isDraft = (data as any).status === "DRAFT";
-      const wasAlreadyDraft = existing.status === "DRAFT";
-
-      // Revert old accounting/stock only if the existing invoice was NOT a draft
-      if (!wasAlreadyDraft) {
-        // 2. Revert old customer outstanding balance
-        const oldPayments = existing.payments ? (typeof existing.payments === "string" ? JSON.parse(existing.payments) : existing.payments) as any[] : [];
-        const oldTotalPaid = oldPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-        const oldUnpaidPortion = Math.max(0, Math.round((Number(existing.grandTotal) - oldTotalPaid) * 100) / 100);
+      // Revert old accounting/stock
+      {
+        const oldUnpaidPortion = Math.max(0, Math.round(Number(existing.grandTotal) * 100) / 100);
 
         await tx.customer.update({
           where: { id: existing.customerId },
@@ -538,20 +528,7 @@ class SalesInvoiceService {
 
       const grandTotal = subTotal + taxTotal;
 
-      const rawPayments = (data as any).payments || [];
-      const processedPayments = rawPayments.map((p: any) => ({
-        id: p.id || crypto.randomUUID(),
-        amount: Math.round(Number(p.amount) * 100) / 100,
-        paymentMethod: p.paymentMethod,
-        referenceNumber: p.referenceNumber || "",
-        paymentDate: p.paymentDate,
-        recordedBy: currentUser.userId,
-        createdAt: new Date().toISOString()
-      }));
-      const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
-      const computedStatus = isDraft
-        ? "DRAFT"
-        : (totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID"));
+      const computedStatus = "CONFIRMED";
 
       // 6. Delete old invoice items and update record
       await tx.salesInvoiceItem.deleteMany({ where: { salesInvoiceId: id } });
@@ -569,7 +546,7 @@ class SalesInvoiceService {
           taxTotal,
           grandTotal,
           status: computedStatus,
-          payments: processedPayments as any,
+          payments: [] as any,
           items: { create: invoiceItems },
         },
         include: {
@@ -582,10 +559,9 @@ class SalesInvoiceService {
         },
       });
 
-      // Apply accounting/stock only for confirmed invoices
-      if (!isDraft) {
-        // 8. Apply new customer outstanding balance
-        const newUnpaidPortion = Math.max(0, Math.round((grandTotal - totalPaid) * 100) / 100);
+      // Apply accounting/stock
+      {
+        const newUnpaidPortion = Math.max(0, Math.round(grandTotal * 100) / 100);
         await tx.customer.update({
           where: { id: data.customerId },
           data: { outstandingAmount: { increment: newUnpaidPortion } },

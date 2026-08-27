@@ -289,7 +289,6 @@ const QuotationForm: React.FC = () => {
     const location = useLocation();
     const { id: idParam } = useParams<{ id: string }>();
     const { can } = usePermission();
-    const docNoPrefix = "QT";
 
     // ─── State ──────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -513,14 +512,13 @@ const QuotationForm: React.FC = () => {
                 try {
                     const order = await salesOrderService.fetchById(reuseId);
                     populateFormFromOrder(order);
-                    // Reset to create mode with fresh quotation number
+                    // Reset to create mode with the same SO number
                     setIsEditMode(false);
                     setQuotationId(null);
-                    const orderNo = await salesOrderService.getNextOrderNo();
-                    const qtNo = orderNo.replace('SO', docNoPrefix);
-                    setValue("quotationNo", qtNo);
+                    setValue("quotationNo", order.orderNo);
                     setValue("quotationDate", new Date().toISOString().split("T")[0]);
-                    toast.info(`Quotation details reused from ${order.orderNo}`);
+                    setSelectedPrevOrderId(reuseId);
+                    toast.info(`Quotation details loaded from ${order.orderNo}`);
                 } catch (error) {
                     toast.error("Failed to load quotation for reuse");
                 } finally {
@@ -648,16 +646,6 @@ const QuotationForm: React.FC = () => {
         fetchPrevOrders();
     }, [customerId, isEditMode]);
 
-    // ─── Get Next Quotation Number (Create Mode) ──────────────
-    useEffect(() => {
-        const state = location.state as any;
-        if (state?.id || isEditMode) return;
-
-        salesOrderService.getNextQuotationNo().then((quotationNo) => {
-            setValue("quotationNo", quotationNo);
-        });
-    }, [location, setValue, isEditMode, docNoPrefix]);
-
     const computedIsInterState = useMemo(() => {
         if (!companyState || !billingState) return false;
         return companyState.toLowerCase().trim() !== billingState.toLowerCase().trim();
@@ -757,9 +745,6 @@ const QuotationForm: React.FC = () => {
             setTransportName(null);
             setMobile(null);
             reset(defaultValues);
-            salesOrderService.getNextQuotationNo().then((quotationNo) => {
-                setValue("quotationNo", quotationNo);
-            });
             return;
         }
 
@@ -830,28 +815,34 @@ const QuotationForm: React.FC = () => {
                 const orderQty = Number(item.orderQuantity) || 1;
                 const unitPricePerOrder = Number(item.unitPrice) || 0;
 
-                (item.components || [])
-                    .filter(c => c.included && Number(c.quantity) > 0)
-                    .forEach(c => {
-                        // Distribute the unit price proportionally across components
-                        const sp = salesProducts.find(s => String(s.id) === item.salesProductId);
-                        const spComps = (sp?.components || []).filter((comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION");
-                        const compDef = spComps.find((comp: any) => String(comp.componentProductId) === c.componentProductId);
-                        const compRate = compDef?.componentProduct?.rate ?? 0;
-                        const totalCompRate = spComps.reduce((sum: number, comp: any) => sum + (Number(comp.componentProduct?.rate ?? 0) * Number(comp.quantity || 1)), 0);
-                        const share = totalCompRate > 0 ? (Number(compRate) * Number(compDef?.quantity || 1)) / totalCompRate : 1 / spComps.length;
-                        const compUnitPrice = unitPricePerOrder > 0 ? (unitPricePerOrder * share) / (Number(compDef?.quantity || 1)) : undefined;
+                const includedComps = (item.components || []).filter(c => c.included && Number(c.quantity) > 0);
+                const sp = salesProducts.find(s => String(s.id) === item.salesProductId);
+                const spComps = (sp?.components || []).filter((comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION");
 
-                        transformedItems.push({
-                            productId: Number(c.componentProductId),
-                            salesProductId: spId,
-                            quantity: Number(c.quantity),
-                            quotationUnitPrice: compUnitPrice && compUnitPrice > 0 ? Math.round(compUnitPrice * 100) / 100 : undefined,
-                            cgstRate: data.isInterState ? 0 : totalRate / 2,
-                            sgstRate: data.isInterState ? 0 : totalRate / 2,
-                            igstRate: data.isInterState ? totalRate : 0,
-                        });
+                // Calculate total rate across INCLUDED components only for proportional distribution
+                const includedCompDefs = includedComps.map(c => {
+                    const def = spComps.find((comp: any) => String(comp.componentProductId) === c.componentProductId);
+                    const rate = Number(def?.componentProduct?.rate ?? 0);
+                    const perUnit = Number(def?.quantity || 1);
+                    return { c, def, rate, perUnit, rateWeight: rate * perUnit };
+                });
+                const totalWeight = includedCompDefs.reduce((sum, d) => sum + d.rateWeight, 0);
+
+                includedCompDefs.forEach(({ c, def, perUnit, rateWeight }) => {
+                    // Distribute unit price proportionally across included components
+                    const share = totalWeight > 0 ? rateWeight / totalWeight : 1 / includedCompDefs.length;
+                    const compUnitPrice = unitPricePerOrder > 0 ? (unitPricePerOrder * share) / perUnit : undefined;
+
+                    transformedItems.push({
+                        productId: Number(c.componentProductId),
+                        salesProductId: spId,
+                        quantity: Number(c.quantity),
+                        quotationUnitPrice: compUnitPrice && compUnitPrice > 0 ? Math.round(compUnitPrice * 100) / 100 : undefined,
+                        cgstRate: data.isInterState ? 0 : totalRate / 2,
+                        sgstRate: data.isInterState ? 0 : totalRate / 2,
+                        igstRate: data.isInterState ? totalRate : 0,
                     });
+                });
             });
 
             // Use URL param first (survives refresh), fall back to refs
@@ -893,7 +884,7 @@ const QuotationForm: React.FC = () => {
                 items: transformedItems,
                 orderDiscountType: data.orderDiscountType,
                 orderDiscountValue: data.orderDiscountValue,
-                status: confirm ? "CONFIRMED" : "DRAFT",
+                status: confirm ? "QUOTED" : "DRAFT",
             };
 
             let response;
@@ -943,11 +934,11 @@ const QuotationForm: React.FC = () => {
 
 
     return (
-        <div className="w-full mx-auto">
+        <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
             {isLoading ? (
                 <CommonLoader text="Loading data..." fullScreen={false} />
             ) : (
-                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden flex-1 flex flex-col">
 
                     {/* Page Header */}
                     <div className="px-4 py-3 border-b border-line bg-card-2">
@@ -960,7 +951,7 @@ const QuotationForm: React.FC = () => {
                         </div>
                     </div>
 
-                    <form className="p-4" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
+                    <form className="p-4 flex-1 flex flex-col" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
                         <div className="flex flex-col lg:flex-row gap-4">
                         {/* ── Left: Form (75%) ── */}
                         <div className="w-full lg:w-3/4 space-y-4">
@@ -1208,22 +1199,6 @@ const QuotationForm: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* ── Form Actions ── */}
-                                <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
-                                    <CustomButton
-                                        text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
-                                        variant="secondary"
-                                        type="submit"
-                                        disabled={isSubmitting || isConfirming}
-                                    />
-                                    <CustomButton
-                                        text={isConfirming ? "Confirming..." : "Confirm Order"}
-                                        variant="primary"
-                                        type="button"
-                                        onClick={handleSubmit((data) => onSubmit(data, true))}
-                                        disabled={isSubmitting || isConfirming}
-                                    />
-                                </div>
 
                         </div>{/* end left column */}
 
@@ -1300,6 +1275,23 @@ const QuotationForm: React.FC = () => {
                         </div>{/* end right column */}
 
                         </div>{/* end flex row */}
+
+                        {/* ── Form Actions ── */}
+                        <div className="mt-auto flex justify-end gap-3 pt-4">
+                            <CustomButton
+                                text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
+                                variant="secondary"
+                                type="submit"
+                                disabled={isSubmitting || isConfirming}
+                            />
+                            <CustomButton
+                                text={isConfirming ? "Confirming..." : "Confirm Order"}
+                                variant="primary"
+                                type="button"
+                                onClick={handleSubmit((data) => onSubmit(data, true))}
+                                disabled={isSubmitting || isConfirming}
+                            />
+                        </div>
 
                     </form>
 

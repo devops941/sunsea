@@ -43,7 +43,7 @@ const salesOrderSchema = z
         orderDate: z.string().min(1, "Order Date is required"),
         customerId: z.string().min(1, "Customer is required"),
         mobile: z.string().optional().nullable(),
-        orderSource: z.string().optional(),
+        orderSource: z.string().min(1, "Order source is required"),
         sourceEmployeeId: z.string().optional().nullable(),   // Employee BigInt as string
         referredByCustomerId: z.string().optional().nullable(),
         referredByName: z.string().optional().nullable(),
@@ -356,7 +356,7 @@ const ItemRow: React.FC<ItemRowProps> = ({
                     <DeleteButton
                         onClick={() => remove(index)}
                         disabled={!canRemove}
-                        disabledMessage="At least one item is required."
+                      
                     />
                 </td>
             </tr>
@@ -667,8 +667,8 @@ const SalesOrderForm: React.FC = () => {
 
     // ─── Render ──────────────────────────────────────────────────────
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-xl border border-line-soft shadow-xs">
+        <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
+            <div className="bg-card rounded-xl border border-line-soft shadow-xs flex-1 flex flex-col">
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -680,7 +680,7 @@ const SalesOrderForm: React.FC = () => {
                     </div>
                 </div>
 
-                <form className="px-4 py-3 space-y-4" noValidate>
+                <form className="px-4 py-3 space-y-4 flex-1 flex flex-col" noValidate>
                     {/* ── Main Fields ── */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                         <div>
@@ -704,7 +704,7 @@ const SalesOrderForm: React.FC = () => {
 
                         <div>
                             <Controller name="orderSource" control={control} render={({ field }) => (
-                                <SelectInput label="Order Source" name={field.name} value={field.value ?? ""} options={ORDER_SOURCE_OPTIONS} defaultOptionLabel="Select Order Source" onChange={field.onChange} />
+                                <SelectInput label="Order Source" name={field.name} value={field.value ?? ""} options={ORDER_SOURCE_OPTIONS} defaultOptionLabel="Select Order Source" onChange={field.onChange} required error={errors.orderSource?.message} />
                             )} />
                         </div>
 
@@ -764,7 +764,7 @@ const SalesOrderForm: React.FC = () => {
                     </div>
 
                     {/* ── Order Items ── */}
-                    <div>
+                    <div className="lg:max-w-[1000px]">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-semibold text-ink">Order Items</span>
                             <CustomButton
@@ -809,16 +809,14 @@ const SalesOrderForm: React.FC = () => {
                     </div>
 
                     {/* ── Narration ── */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                        <div>
-                            <Controller name="narration" control={control} render={({ field }) => (
-                                <TextArea label="Narration" name="narration" value={field.value ?? ""} placeholder="Enter narration..." rows={3} onChange={field.onChange} />
-                            )} />
-                        </div>
+                    <div className="w-full sm:w-1/2 mt-3">
+                        <Controller name="narration" control={control} render={({ field }) => (
+                            <TextArea label="Narration" name="narration" value={field.value ?? ""} placeholder="Enter narration..." rows={2} onChange={field.onChange} />
+                        )} />
                     </div>
 
                     {/* ── Actions ── */}
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
+                    <div className="mt-auto flex justify-end gap-3 pt-4">
                         <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
                         <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
                         <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "order"))} disabled={isSubmitting} />

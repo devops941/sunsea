@@ -279,7 +279,7 @@ const SalesInvoiceList: React.FC = () => {
         },
         {
             header: "STATUS",
-            render: (item) => <StatusBadge status={item.status} />,
+            render: () => <StatusBadge status="INVOICED" />,
         },
         {
             header: "ACTIONS",

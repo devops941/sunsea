@@ -164,7 +164,7 @@ class SalesOrderService {
         const existingCheck = await prisma.salesOrder.findUnique({ where: { orderNo: data.orderNo } });
         if (existingCheck) throw new ApiError(409, `Order No "${data.orderNo}" already exists`);
 
-                const isQuotation = data.orderNo.startsWith("QT-");
+                const isQuotation = data.items.some((i: any) => i.quotationUnitPrice !== undefined && i.quotationUnitPrice !== null);
                 const lineItems = await this.computeLineTotals(
                         data.items.map(i => ({
                             productId: BigInt(i.productId),
@@ -254,11 +254,11 @@ class SalesOrderService {
             include: INCLUDE_GST,
         });
 
-        // If this is a quotation created from a confirmed SO, mark the source SO as QUOTED
-        if (isQuotation && (data as any).sourceSalesOrderId) {
+        // If this order has quotation prices and a source SO, mark the source as QUOTED
+        if ((data as any).sourceSalesOrderId && data.status === "CONFIRMED" && isQuotation) {
             await prisma.salesOrder.update({
                 where: { id: Number((data as any).sourceSalesOrderId) },
-                data: { status: "QUOTED" },
+                data: { status: "QUOTED" as any },
             });
         }
 
@@ -348,7 +348,7 @@ class SalesOrderService {
         const existing = await this.findById(id, permissions);
         const existingStatus = (existing as any).status as string;
 
-        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
+        if (!["DRAFT", "CONFIRMED", "QUOTED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
             throw new ApiError(409, `Cannot edit order in status ${existingStatus}.`);
         }
 
@@ -371,12 +371,18 @@ class SalesOrderService {
             this.assertNoDuplicateProducts(data.items);
             await this.assertProductsExist(data.items.map(i => BigInt(i.productId)));
 
-            const isQuotation = existing.orderNo.startsWith("QT-") || data.items.some((item: any) => item.quotationUnitPrice !== undefined);
+            const isQuotation = data.items.some((item: any) => item.quotationUnitPrice !== undefined && item.quotationUnitPrice !== null);
 
             // Preserve original unitPrice from existing items (only needed for quotations)
             const existingUnitPrices = isQuotation
                 ? new Map((existing.items as any[]).map((item: any) => [item.productId.toString(), item.unitPrice ?? ZERO]))
                 : new Map<string, any>();
+
+            // Fetch customer grade for grade-based pricing
+            const customer = await prisma.customer.findUnique({
+                where: { id: existing.customerId },
+                include: { customerGrade: { select: { name: true } } },
+            });
 
             const lineItems = await this.computeLineTotals(
                 data.items.map(i => ({
@@ -385,6 +391,7 @@ class SalesOrderService {
                     unitPrice: isQuotation ? undefined : (i as any).unitPrice,
                     quotationUnitPrice: isQuotation ? (i as any).quotationUnitPrice : undefined,
                 })),
+                (customer as any)?.customerGrade?.name ?? null,
             );
 
             const isInterState = data.isInterState ?? (existing as any).isInterState ?? false;
@@ -445,6 +452,19 @@ class SalesOrderService {
         }
 
         const updated = await prisma.salesOrder.update({ where: { id }, data: updateData, include: INCLUDE_GST });
+
+        // If a quotation is being confirmed and has a source SO, mark the source as QUOTED
+        if (data.status === "CONFIRMED" && (existing as any).sourceSalesOrderId) {
+            const hasQuotationPrices = data.items?.some((item: any) => item.quotationUnitPrice !== undefined && item.quotationUnitPrice !== null)
+                || (existing.items as any[]).some((item: any) => item.quotationUnitPrice != null && Number(item.quotationUnitPrice) > 0);
+            if (hasQuotationPrices) {
+                await prisma.salesOrder.update({
+                    where: { id: Number((existing as any).sourceSalesOrderId) },
+                    data: { status: "QUOTED" as any },
+                });
+            }
+        }
+
         return updated;
     }
 

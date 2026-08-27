@@ -91,6 +91,7 @@ export interface SalesOrderItem {
     id: number;
     salesOrderId: number;
     productId: number;
+    salesProductId?: number | null;
     product?: {
         id: number;
         productCode: string;
@@ -100,11 +101,22 @@ export interface SalesOrderItem {
 
     // ─── Pricing + discount (per line) ──────────────────────────────────
     unitPrice: number;
-    discountType: DiscountType;
-    discountValue: number;
-    discountAmount: number;
-    lineSubtotal: number;
-    lineTotal: number;
+    quotationUnitPrice?: number | null;
+    discountType?: DiscountType;
+    discountValue?: number;
+    discountAmount?: number;
+    lineSubtotal?: number;
+    lineTotal?: number;
+    taxableAmount?: number;
+    rate?: number;
+
+    // ─── GST (per line) ──────────────────────────────────
+    cgstRate?: number;
+    cgstAmount?: number;
+    sgstRate?: number;
+    sgstAmount?: number;
+    igstRate?: number;
+    igstAmount?: number;
 }
 
 export interface CreateSalesOrderDto {
