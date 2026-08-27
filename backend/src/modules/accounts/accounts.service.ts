@@ -180,7 +180,7 @@ class AccountsService {
       throw new ApiError(409, `Ledger with code '${data.code}' already exists`);
     }
 
-    return prisma.accountLedger.create({
+    const ledger = await prisma.accountLedger.create({
       data: {
         code: data.code,
         name: data.name,
@@ -191,6 +191,28 @@ class AccountsService {
         supplierId: data.supplierId || null,
       },
     });
+
+    // Auto-post opening balance voucher when user creates a bank/cash/generic
+    // ledger with a non-zero opening balance. This is what makes the entered
+    // "current bank balance" appear immediately on the Ledger Statement and
+    // roll into Trial Balance / Balance Sheet without a manual journal entry.
+    const openingBalance = Number(data.openingBalance || 0);
+    if (openingBalance > 0) {
+      try {
+        const { voucherPostingService } = require("./voucherPosting.service");
+        const opType = String(data.openingBalanceType || "DEBIT").toUpperCase() === "CREDIT" ? "CREDIT" : "DEBIT";
+        await voucherPostingService.postGenericLedgerOpeningBalanceVoucher(
+          { id: ledger.id, code: ledger.code, name: ledger.name },
+          openingBalance,
+          opType as "DEBIT" | "CREDIT"
+        );
+      } catch (err) {
+        console.error("[AccountsService] Auto-post opening balance failed:", err);
+        // Do not throw — the ledger is already created; the user can add a JV manually if needed.
+      }
+    }
+
+    return ledger;
   }
 
   async updateLedger(id: number, data: UpdateLedgerInput) {
@@ -398,9 +420,11 @@ class AccountsService {
 
       entries.push({
         id: item.id.toString(),
+        voucherId: item.voucher.id,
         voucherNo: item.voucher.voucherNo,
         voucherType: item.voucher.type,
         refDocType: item.voucher.refDocType,
+        refDocId: item.voucher.refDocId,
         date: item.voucher.date.toISOString().split("T")[0],
         narration: item.narration || item.voucher.narration || "",
         particulars: getParticularsLabel(item, isDebit),
@@ -604,9 +628,11 @@ class AccountsService {
 
       entries.push({
         id: item.id.toString(),
+        voucherId: item.voucher.id,
         voucherNo: item.voucher.voucherNo,
         voucherType: item.voucher.type,
         refDocType: item.voucher.refDocType,
+        refDocId: item.voucher.refDocId,
         date: item.voucher.date.toISOString().split("T")[0],
         narration: item.narration || item.voucher.narration || "",
         particulars: opposingLedger?.name || (isSelectedDebit ? "Debit Entry" : "Credit Entry"),

@@ -22,12 +22,17 @@ export interface CreateLedgerDto {
   type: "ASSET" | "LIABILITY" | "INCOME" | "EXPENSE" | "EQUITY";
   group: string;
   isActive?: boolean;
+  openingBalance?: number;
+  openingBalanceType?: "DEBIT" | "CREDIT";
 }
 
 export interface LedgerStatementEntry {
   id: string;
+  voucherId?: number | string;
   voucherNo: string;
   voucherType: string;
+  refDocType?: string | null;
+  refDocId?: string | null;
   date: string;
   narration: string;
   particulars: string;

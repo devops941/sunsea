@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaBook,
   FaSync,
@@ -12,6 +13,7 @@ import {
   FaGlobe,
   FaCheckSquare,
   FaPlay,
+  FaExternalLinkAlt,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
@@ -32,7 +34,63 @@ type AnyStatement =
   | (LedgerStatementResult & { mode?: "one" })
   | (MultiLedgerStatementResult & { mode: "multi" });
 
+/**
+ * Resolve the source-document URL for a ledger statement row so the user can
+ * click a voucher number and jump straight to the underlying GRN / Sales Invoice
+ * / Purchase Return / Sales Return / voucher list. Returns `null` if no
+ * navigation makes sense (e.g. system-generated opening balance rows).
+ */
+/**
+ * Extract the parent document id from a payment refDocId hash.
+ * The backend derives payment ref ids as `${parentId}_${prefix}_${hash}`
+ * (see deriveStablePaymentRefId in voucherPosting.service.ts). So the
+ * substring before the FIRST `_${prefix}_` marker is the source GRN /
+ * Sales Invoice UUID we want to navigate to.
+ */
+function extractSourceDocId(refDocId: string | null | undefined, prefix: "pay" | "rcpt"): string | null {
+  if (!refDocId) return null;
+  const marker = `_${prefix}_`;
+  const idx = refDocId.indexOf(marker);
+  if (idx > 0) return refDocId.substring(0, idx);
+  // If the id doesn't follow the hash pattern, assume it IS the source id
+  return refDocId;
+}
+
+function resolveDrillTarget(entry: {
+  voucherType: string;
+  refDocType?: string | null;
+  refDocId?: string | null;
+}): string | null {
+  const rt = (entry.refDocType || "").toUpperCase();
+  const vt = (entry.voucherType || "").toUpperCase();
+
+  if (rt === "GRN_INVOICE" && entry.refDocId) return `/invoice/details/${entry.refDocId}`;
+  if (rt === "SALES_INVOICE" && entry.refDocId) return `/sales-invoices/details/${entry.refDocId}`;
+  if (rt === "PURCHASE_RETURN") return `/purchase-returns`;
+  if (rt === "SALES_RETURN") return `/sales-returns`;
+  if (rt === "GRN_PAYMENT") {
+    const grnId = extractSourceDocId(entry.refDocId, "pay");
+    return grnId ? `/invoice/details/${grnId}` : "/invoice";
+  }
+  if (rt === "SALES_PAYMENT") {
+    const siId = extractSourceDocId(entry.refDocId, "rcpt");
+    return siId ? `/sales-invoices/details/${siId}` : "/sales-invoices";
+  }
+
+  // Manual vouchers (no refDoc) — route to the appropriate voucher list
+  switch (vt) {
+    case "PAYMENT":  return "/accounts/payment-voucher";
+    case "RECEIPT":  return "/accounts/receipt-voucher";
+    case "JOURNAL":  return "/accounts/journal-entry";
+    case "CONTRA":   return "/accounts/contra-entry";
+    case "SALES":    return "/sales-invoices";
+    case "PURCHASE": return "/invoice";
+    default: return null;
+  }
+}
+
 export const LedgerStatementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [ledgers, setLedgers] = useState<AccountLedger[]>([]);
   const [groupedLedgers, setGroupedLedgers] = useState<Array<{ group: string; ledgers: AccountLedger[] }>>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("one");
@@ -600,8 +658,23 @@ export const LedgerStatementPage: React.FC = () => {
                     filteredEntries.map((row) => (
                       <tr key={row.id} className="hover:bg-card-2/50 transition-colors">
                         <td className="py-1.5 px-3 font-mono text-[11px] whitespace-nowrap">{row.date}</td>
-                        <td className="py-1.5 px-3 font-mono font-bold text-ink whitespace-nowrap">
-                          {row.voucherNo}
+                        <td className="py-1.5 px-3 font-mono font-bold whitespace-nowrap">
+                          {(() => {
+                            const target = resolveDrillTarget(row);
+                            if (!target || row.voucherNo === "-" || row.voucherType === "OPENING") {
+                              return <span className="text-ink">{row.voucherNo}</span>;
+                            }
+                            return (
+                              <button
+                                onClick={() => navigate(target)}
+                                className="text-blue-500 hover:text-blue-400 hover:underline flex items-center gap-1"
+                                title={`Open source document (${row.voucherType})`}
+                              >
+                                {row.voucherNo}
+                                <FaExternalLinkAlt className="text-[8px] opacity-60" />
+                              </button>
+                            );
+                          })()}
                         </td>
                         <td className="py-1.5 px-3 whitespace-nowrap">
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
