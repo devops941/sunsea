@@ -21,6 +21,7 @@ router.get("/receivable/:customerId", (req, res, next) => accountsController.get
 router.get("/balance-sheet", (req, res, next) => accountsController.getBalanceSheet(req, res, next));
 router.get("/trial-balance", (req, res, next) => accountsController.getTrialBalance(req, res, next));
 router.get("/profit-loss", (req, res, next) => accountsController.getProfitAndLoss(req, res, next));
+router.get("/profit-loss/by-period", (req, res, next) => accountsController.getProfitAndLossByPeriod(req, res, next));
 
 // Accounting Periods
 router.get("/periods", (req, res, next) => accountsController.listPeriods(req, res, next));

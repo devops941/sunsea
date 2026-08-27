@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   FaSearch,
   FaPlus,
@@ -13,13 +13,9 @@ import { toast } from "react-toastify";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
-
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 export const ChartOfAccountsPage: React.FC = () => {
-  const [ledgers, setLedgers] = useState<AccountLedger[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
   // Applied Filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("ALL");
@@ -39,23 +35,24 @@ export const ChartOfAccountsPage: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const loadLedgers = async () => {
-    setLoading(true);
+  const cacheKey = `accounts:chart-of-accounts`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
     try {
       const res = await accountService.fetchLedgers({ page: 1, limit: 10000 });
-      setLedgers(res.ledgers || []);
+      const list = res.ledgers || [];
+      return { data: list, total: list.length };
     } catch (err: any) {
       toast.error(err?.message || "Failed to load Chart of Accounts");
-    } finally {
-      setLoading(false);
+      throw err;
     }
-  };
-
-  useEffect(() => {
-    loadLedgers();
   }, []);
 
-  useSocketSync("accountLedger", undefined, loadLedgers);
+  const { data: ledgers, loading, refreshing, refresh } = useListCache<AccountLedger>({
+    cacheKey,
+    socketModule: "accountLedger",
+    fetcher,
+  });
 
   const handleApplyFilters = () => {
     setSearchTerm(draftSearchTerm);
@@ -100,7 +97,7 @@ export const ChartOfAccountsPage: React.FC = () => {
       toast.success("Account ledger created successfully");
       setShowModal(false);
       setFormData({ code: "", name: "", type: "ASSET", group: "" });
-      loadLedgers();
+      refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create ledger");
     } finally {
@@ -161,14 +158,15 @@ export const ChartOfAccountsPage: React.FC = () => {
         <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaSitemap className="text-slate-500 text-sm" /> Chart of Accounts
+            {refreshing && <FaSync className="animate-spin text-slate-500 text-[10px]" />}
           </h2>
           <div className="flex items-center gap-1.5">
             <button
-              onClick={loadLedgers}
+              onClick={refresh}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-slate-500" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-slate-500" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}

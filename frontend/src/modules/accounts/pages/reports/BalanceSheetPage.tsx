@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FaBalanceScale,
   FaSync,
@@ -6,6 +6,15 @@ import {
   FaExclamationTriangle,
   FaPrint,
   FaDownload,
+  FaPlay,
+  FaChevronRight,
+  FaChevronDown,
+  FaFolderOpen,
+  FaListUl,
+  FaColumns,
+  FaTh,
+  FaFileAlt,
+  FaSitemap,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
@@ -28,6 +37,23 @@ interface BalanceSheetData {
   isBalanced: boolean;
 }
 
+type BSVariant =
+  | "horizontal-summary"
+  | "horizontal-detailed"
+  | "vertical-summary"
+  | "vertical-detailed"
+  | "grouped-hierarchical"
+  | "flat-alphabetical";
+
+const VARIANT_MAP: Record<BSVariant, { label: string; layout: "horizontal" | "vertical" | "hierarchical" | "flat"; detailed: boolean }> = {
+  "horizontal-summary": { label: "Horizontal · Summary", layout: "horizontal", detailed: false },
+  "horizontal-detailed": { label: "Horizontal · Detailed", layout: "horizontal", detailed: true },
+  "vertical-summary": { label: "Vertical · Summary", layout: "vertical", detailed: false },
+  "vertical-detailed": { label: "Vertical · Detailed", layout: "vertical", detailed: true },
+  "grouped-hierarchical": { label: "Hierarchical · Grouped", layout: "hierarchical", detailed: true },
+  "flat-alphabetical": { label: "Flat · Alphabetical", layout: "flat", detailed: true },
+};
+
 const fmt = (n: number) =>
   Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -35,10 +61,22 @@ const BalanceSheetPage: React.FC = () => {
   const [data, setData] = useState<BalanceSheetData | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const today = new Date().toISOString().split("T")[0];
+  const [asOnDate, setAsOnDate] = useState<string>(today);
+  const [showZeroBalance, setShowZeroBalance] = useState<boolean>(false);
+  const [variant, setVariant] = useState<BSVariant>("horizontal-summary");
+  const [expandSection, setExpandSection] = useState(true);
+  const activeConfig = VARIANT_MAP[variant];
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get("/accounts/balance-sheet");
+      const params = new URLSearchParams({
+        ...(asOnDate ? { asOnDate } : {}),
+        showZeroBalance: String(showZeroBalance),
+        groupByCategory: String(groupByCategory),
+      });
+      const res = await apiClient.get(`/accounts/balance-sheet?${params.toString()}`);
       setData(res.data.data);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Failed to load balance sheet");
@@ -47,218 +85,371 @@ const BalanceSheetPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const handleVariantClick = (v: BSVariant) => {
+    setVariant(v);
+    if (!data) fetchData();
+  };
+
+  const filterItems = (items: BSItem[]) =>
+    showZeroBalance ? items : items.filter((i) => Math.abs(i.balance) > 0.01);
+
+  const view = useMemo(() => {
+    if (!data) return null;
+    const assets = filterItems(data.assets);
+    const liabilities = filterItems(data.liabilities);
+    const equity = filterItems(data.equity);
+    const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
+    const totalLiabilities = liabilities.reduce((s, l) => s + l.balance, 0);
+    const totalEquity = equity.reduce((s, e) => s + e.balance, 0);
+    return {
+      assets,
+      liabilities,
+      equity,
+      totalAssets,
+      totalLiabilities,
+      totalEquity,
+      totalLiabilitiesAndEquity: totalLiabilities + totalEquity,
+      isBalanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01,
+    };
+  }, [data, showZeroBalance]);
+
+  const groupItems = (items: BSItem[]): Record<string, BSItem[]> => {
+    const buckets: Record<string, BSItem[]> = {};
+    items.forEach((it) => {
+      const g = it.group || "Others";
+      if (!buckets[g]) buckets[g] = [];
+      buckets[g].push(it);
+    });
+    return buckets;
+  };
 
   const handlePrint = () => window.print();
 
   const exportCSV = () => {
-    if (!data) return;
+    if (!view) return;
     const lines: string[][] = [];
-    lines.push(["Balance Sheet"]);
+    lines.push(["Balance Sheet - " + activeConfig.label]);
+    lines.push(["As on:", asOnDate]);
     lines.push([]);
-    lines.push(["ASSETS"]);
-    lines.push(["Code", "Name", "Group", "Amount"]);
-    data.assets.forEach((a) => lines.push([a.code, a.name, a.group, a.balance.toFixed(2)]));
-    lines.push(["", "Total Assets", "", data.totalAssets.toFixed(2)]);
-    lines.push([]);
-    lines.push(["LIABILITIES"]);
-    lines.push(["Code", "Name", "Group", "Amount"]);
-    data.liabilities.forEach((l) => lines.push([l.code, l.name, l.group, l.balance.toFixed(2)]));
-    lines.push(["", "Total Liabilities", "", data.totalLiabilities.toFixed(2)]);
-    lines.push([]);
-    lines.push(["EQUITY"]);
-    lines.push(["Code", "Name", "Group", "Amount"]);
-    data.equity.forEach((e) => lines.push([e.code, e.name, e.group, e.balance.toFixed(2)]));
-    lines.push(["", "Total Equity", "", data.totalEquity.toFixed(2)]);
-    lines.push([]);
-    lines.push([
-      "",
-      "Total Liabilities + Equity",
-      "",
-      data.totalLiabilitiesAndEquity.toFixed(2),
-    ]);
-
+    ["Assets", "Liabilities", "Equity"].forEach((section) => {
+      const items = section === "Assets" ? view.assets : section === "Liabilities" ? view.liabilities : view.equity;
+      const total = section === "Assets" ? view.totalAssets : section === "Liabilities" ? view.totalLiabilities : view.totalEquity;
+      lines.push([section.toUpperCase()]);
+      lines.push(["Name", "Group", "Amount"]);
+      items.forEach((it) => lines.push([it.name, it.group, it.balance.toFixed(2)]));
+      lines.push(["", `Total ${section}`, total.toFixed(2)]);
+      lines.push([]);
+    });
+    lines.push(["", "Total Liabilities + Equity", view.totalLiabilitiesAndEquity.toFixed(2)]);
     const csv = lines.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `balance-sheet-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `balance-sheet-${variant}-${asOnDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const renderSection = (title: string, items: BSItem[], total: number) => (
-    <div className="bg-card border border-line rounded-lg overflow-hidden">
-      <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wide text-ink">{title}</h3>
-        <span className="text-sm font-mono font-bold text-teal-500">₹{fmt(total)}</span>
-      </div>
-      {items.length === 0 ? (
-        <div className="p-8 text-center text-xs text-ink-subtle">No entries</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b border-line">
-              <tr>
-                <th className="px-3 py-1.5 text-xs">Account</th>
-                <th className="px-3 py-1.5 text-xs">Group</th>
-                <th className="px-3 py-1.5 text-xs text-right">Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line-soft">
-              {items.map((item) => (
-                <tr key={item.code} className="hover:bg-card-2 transition-colors">
-                  <td className="px-3 py-1.5 text-xs font-semibold text-ink">{item.name}</td>
-                  <td className="px-3 py-1.5 text-xs text-ink-muted">{item.group}</td>
-                  <td className="px-3 py-1.5 text-xs text-right font-mono text-ink">
-                    ₹{fmt(item.balance)}
-                  </td>
+  const menuItem = (v: BSVariant, icon: React.ReactNode) => (
+    <button
+      key={v}
+      onClick={() => handleVariantClick(v)}
+      className={`w-full text-left px-2 py-1 text-[11px] flex items-center gap-2 rounded transition-colors ${
+        variant === v ? "bg-teal-500/15 text-teal-400 font-semibold" : "text-ink-muted hover:bg-card-2/60"
+      }`}
+    >
+      <span className="text-[9px] opacity-70">{icon}</span>
+      {VARIANT_MAP[v].label}
+    </button>
+  );
+
+  const renderSectionTable = (title: string, items: BSItem[], total: number, accentColor: string) => {
+    if (activeConfig.detailed) {
+      const groups = groupItems(items);
+      return (
+        <div className="bg-card border border-line rounded-lg overflow-hidden">
+          <div className={`px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wide ${accentColor}`}>{title}</h3>
+            <span className={`text-sm font-mono font-bold ${accentColor}`}>₹{fmt(total)}</span>
+          </div>
+          {items.length === 0 ? (
+            <div className="p-6 text-center text-xs text-ink-subtle">No entries</div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b border-line">
+                <tr>
+                  <th className="px-3 py-1.5">Account</th>
+                  <th className="px-3 py-1.5 text-right w-[140px]">Amount (₹)</th>
                 </tr>
-              ))}
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([gname, gitems]) => {
+                  const gtotal = gitems.reduce((s, i) => s + i.balance, 0);
+                  return (
+                    <React.Fragment key={gname}>
+                      {activeConfig.layout === "hierarchical" && (
+                        <tr className="bg-card-2/60">
+                          <td className="px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-ink">{gname}</td>
+                          <td className="px-3 py-1 text-right text-[11px] font-mono font-bold text-ink">₹{fmt(gtotal)}</td>
+                        </tr>
+                      )}
+                      {gitems.map((it) => (
+                        <tr key={it.code} className="hover:bg-card-2 transition-colors">
+                          <td className={`py-1 text-xs text-ink ${activeConfig.layout === "hierarchical" ? "pl-6 pr-3" : "px-3"}`}>{it.name}</td>
+                          <td className="px-3 py-1 text-right text-xs font-mono text-ink">₹{fmt(it.balance)}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-card-2 border-t-2 border-line font-bold">
+                  <td className="px-3 py-1.5 text-xs uppercase tracking-wide text-ink">Total {title}</td>
+                  <td className={`px-3 py-1.5 text-right text-sm font-mono ${accentColor}`}>₹{fmt(total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      );
+    }
+
+    // Summary mode — only show group totals (not individual accounts)
+    const groups = groupItems(items);
+    return (
+      <div className="bg-card border border-line rounded-lg overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
+          <h3 className={`text-xs font-bold uppercase tracking-wide ${accentColor}`}>{title}</h3>
+          <span className={`text-sm font-mono font-bold ${accentColor}`}>₹{fmt(total)}</span>
+        </div>
+        {items.length === 0 ? (
+          <div className="p-6 text-center text-xs text-ink-subtle">No entries</div>
+        ) : (
+          <table className="w-full text-left border-collapse">
+            <tbody className="divide-y divide-line-soft">
+              {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([gname, gitems]) => {
+                const gtotal = gitems.reduce((s, i) => s + i.balance, 0);
+                return (
+                  <tr key={gname} className="hover:bg-card-2 transition-colors">
+                    <td className="px-3 py-1.5 text-xs font-semibold text-ink">{gname}</td>
+                    <td className="px-3 py-1.5 text-right text-xs font-mono text-ink">₹{fmt(gtotal)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
-              <tr className="bg-card-2 border-t-2 border-line font-bold text-sm font-mono">
-                <td colSpan={2} className="px-3 py-1.5 text-xs uppercase tracking-wide text-ink">
-                  Total {title}
-                </td>
-                <td className="px-3 py-1.5 text-right text-ink">₹{fmt(total)}</td>
+              <tr className="bg-card-2 border-t-2 border-line font-bold">
+                <td className="px-3 py-1.5 text-xs uppercase tracking-wide text-ink">Total {title}</td>
+                <td className={`px-3 py-1.5 text-right text-sm font-mono ${accentColor}`}>₹{fmt(total)}</td>
               </tr>
             </tfoot>
           </table>
+        )}
+      </div>
+    );
+  };
+
+  const renderFlatAlphabetical = (v: NonNullable<typeof view>) => {
+    const all = [
+      ...v.assets.map((i) => ({ ...i, section: "Asset" })),
+      ...v.liabilities.map((i) => ({ ...i, section: "Liability" })),
+      ...v.equity.map((i) => ({ ...i, section: "Equity" })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
+
+    return (
+      <div className="bg-card border border-line rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 200px)" }}>
+        <div className="px-3 py-1.5 border-b border-line bg-card-2/50 text-[11px] shrink-0 flex items-center justify-between">
+          <span className="text-ink-subtle">Flat alphabetical view · {all.length} accounts</span>
         </div>
-      )}
-    </div>
-  );
+        <div className="overflow-auto flex-1 min-h-0">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b-2 border-line sticky top-0 z-10">
+              <tr>
+                <th className="px-3 py-1.5 bg-head">Account</th>
+                <th className="px-3 py-1.5 bg-head">Section</th>
+                <th className="px-3 py-1.5 bg-head">Group</th>
+                <th className="px-3 py-1.5 bg-head text-right w-[140px]">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {all.map((it) => (
+                <tr key={`${it.section}-${it.code}`} className="hover:bg-card-2/50 border-b border-line-soft">
+                  <td className="px-3 py-1 text-xs text-ink">{it.name}</td>
+                  <td className="px-3 py-1 text-[11px]">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                      it.section === "Asset" ? "bg-blue-500/10 text-blue-500" :
+                      it.section === "Liability" ? "bg-red-500/10 text-red-500" :
+                      "bg-purple-500/10 text-purple-500"
+                    }`}>{it.section}</span>
+                  </td>
+                  <td className="px-3 py-1 text-[11px] text-ink-muted">{it.group}</td>
+                  <td className="px-3 py-1 text-right text-xs font-mono text-ink">₹{fmt(it.balance)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
-      {/* Merged Header + KPI Container */}
-      <div className="bg-card rounded-lg border border-line">
-        {/* Header Row */}
-        <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaBalanceScale className="text-teal-500 text-sm" /> Balance Sheet
-          </h2>
-          <div className="flex items-center gap-2">
+    <div className="p-3 bg-card-2 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
+      {/* LEFT SIDEBAR */}
+      <aside className="w-[240px] shrink-0 bg-card rounded-lg border border-line overflow-hidden">
+        <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2">
+          <FaBalanceScale className="text-teal-500 text-xs" />
+          <h2 className="text-xs font-bold text-ink">Balance Sheet</h2>
+        </div>
+        <div className="p-2 space-y-2 text-xs overflow-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
+          <div>
             <button
-              onClick={handlePrint}
-              disabled={!data}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line disabled:opacity-50"
-              title="Print"
+              onClick={() => setExpandSection((x) => !x)}
+              className="w-full flex items-center gap-1.5 text-[11px] font-bold text-ink px-1 py-1 hover:bg-card-2/60 rounded"
             >
+              {expandSection ? <FaChevronDown className="text-[9px] text-ink-subtle" /> : <FaChevronRight className="text-[9px] text-ink-subtle" />}
+              <FaFolderOpen className="text-[10px] text-teal-400" />
+              Report Variants
+            </button>
+            {expandSection && (
+              <div className="ml-2 mt-1 space-y-0.5 border-l border-line-soft pl-2">
+                {menuItem("horizontal-summary", <FaColumns />)}
+                {menuItem("horizontal-detailed", <FaListUl />)}
+                {menuItem("vertical-summary", <FaTh />)}
+                {menuItem("vertical-detailed", <FaListUl />)}
+                {menuItem("grouped-hierarchical", <FaSitemap />)}
+                {menuItem("flat-alphabetical", <FaFileAlt />)}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-line-soft my-2"></div>
+
+          <div className="text-[10px] text-ink-subtle italic px-1">
+            <FaFileAlt className="inline mr-1" /> Click a variant to switch layout
+          </div>
+        </div>
+      </aside>
+
+      {/* RIGHT PANEL */}
+      <div className="flex-1 min-w-0 space-y-3">
+        {/* Options bar */}
+        <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-3 sticky top-0 z-20">
+          <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+            <FaBalanceScale className="text-teal-500 text-sm" /> Balance Sheet
+            <span className="text-[10px] font-medium text-ink-subtle uppercase tracking-wide">
+              · {activeConfig.label}
+            </span>
+          </h3>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">As on Date</label>
+            <input
+              type="date"
+              value={asOnDate}
+              onChange={(e) => setAsOnDate(e.target.value)}
+              className="w-[130px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500 focus:outline-none"
+            />
+          </div>
+
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={showZeroBalance} onChange={(e) => setShowZeroBalance(e.target.checked)}
+              className="w-3.5 h-3.5 accent-teal-500" />
+            <span className="text-xs text-ink-muted">Show Zero Balance</span>
+          </label>
+
+          <button onClick={fetchData} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-semibold disabled:opacity-50">
+            <FaPlay className="text-[10px]" /> {loading ? "Loading..." : data ? "Reload" : "Show Report"}
+          </button>
+
+          <div className="flex items-center gap-1.5 ml-auto">
+            <button onClick={handlePrint} disabled={!data}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaPrint /> Print
             </button>
-            <button
-              onClick={exportCSV}
-              disabled={!data}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line disabled:opacity-50"
-              title="Export"
-            >
+            <button onClick={exportCSV} disabled={!data}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaDownload /> Export
             </button>
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line disabled:opacity-50"
-              title="Refresh"
-            >
+            <button onClick={fetchData} disabled={loading}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaSync className={loading ? "animate-spin text-teal-500" : ""} /> Refresh
             </button>
           </div>
         </div>
 
-        {/* KPI Row */}
-        {data && (
-          <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-            <div className="flex-1 min-w-[150px] bg-card border border-line rounded p-3">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                Total Assets
-              </div>
-              <div className="text-lg font-mono font-bold text-blue-500">
-                ₹{fmt(data.totalAssets)}
-              </div>
-            </div>
-            <div className="flex-1 min-w-[150px] bg-card border border-line rounded p-3">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                Total Liabilities
-              </div>
-              <div className="text-lg font-mono font-bold text-red-500">
-                ₹{fmt(data.totalLiabilities)}
-              </div>
-            </div>
-            <div className="flex-1 min-w-[150px] bg-card border border-line rounded p-3">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                Total Equity
-              </div>
-              <div className="text-lg font-mono font-bold text-purple-500">
-                ₹{fmt(data.totalEquity)}
-              </div>
-            </div>
-            <div className="flex-1 min-w-[170px] bg-card border border-line rounded p-3">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                Status
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {data.isBalanced ? (
-                  <>
-                    <FaCheckCircle className="text-teal-500 text-xs" />
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-teal-500/10 text-teal-500 border border-teal-500/20">
-                      Balanced
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <FaExclamationTriangle className="text-red-500 text-xs" />
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
-                      Diff ₹{fmt(Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity))}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
+        {/* Report body */}
+        {loading && (
+          <div className="bg-card border border-line rounded-lg p-8 text-center text-xs text-ink-subtle">
+            <FaSync className="animate-spin text-teal-500 text-lg mx-auto mb-1" />
+            Loading balance sheet...
           </div>
         )}
-      </div>
 
-      {/* Report Body */}
-      {loading && !data && (
-        <div className="bg-card border border-line rounded-lg p-8 text-center text-xs text-ink-subtle">
-          <FaSync className="animate-spin text-teal-500 text-lg mx-auto mb-1" />
-          Loading balance sheet...
-        </div>
-      )}
-
-      {!loading && !data && (
-        <div className="bg-card border border-line rounded-lg p-8 text-center text-xs text-ink-subtle">
-          No data available
-        </div>
-      )}
-
-      {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* Left: Assets */}
-          <div className="space-y-3">
-            {renderSection("Assets", data.assets, data.totalAssets)}
+        {!loading && !view && (
+          <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
+            <FaBalanceScale className="text-teal-500/40 text-3xl mx-auto mb-2" />
+            <div className="text-sm text-ink-muted font-semibold mb-1">Choose a variant from the sidebar and click "Show Report"</div>
+            <div className="text-[11px]">Selected: <b>{activeConfig.label}</b></div>
           </div>
-          {/* Right: Liabilities + Equity */}
-          <div className="space-y-3">
-            {renderSection("Liabilities", data.liabilities, data.totalLiabilities)}
-            {renderSection("Equity", data.equity, data.totalEquity)}
-            {/* Combined Total */}
-            <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-ink">
-                Total Liabilities + Equity
-              </span>
-              <span className="text-sm font-mono font-bold text-ink">
-                ₹{fmt(data.totalLiabilitiesAndEquity)}
-              </span>
+        )}
+
+        {!loading && view && (
+          <>
+            {/* Meta banner */}
+            <div className="text-[11px] text-ink-muted px-1">
+              As on <b className="text-ink">{new Date(asOnDate).toLocaleDateString("en-IN")}</b> · <b className="text-ink">{activeConfig.label}</b>
             </div>
-          </div>
-        </div>
-      )}
+
+            {/* Body renders based on layout */}
+            {activeConfig.layout === "flat" ? (
+              renderFlatAlphabetical(view)
+            ) : activeConfig.layout === "vertical" ? (
+              <div className="space-y-3">
+                {renderSectionTable("Assets", view.assets, view.totalAssets, "text-blue-500")}
+                {renderSectionTable("Liabilities", view.liabilities, view.totalLiabilities, "text-red-500")}
+                {renderSectionTable("Equity", view.equity, view.totalEquity, "text-purple-500")}
+                <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wide text-ink">Total Liabilities + Equity</span>
+                  <span className="text-sm font-mono font-bold text-ink">₹{fmt(view.totalLiabilitiesAndEquity)}</span>
+                </div>
+              </div>
+            ) : (
+              // horizontal or hierarchical
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="space-y-3">
+                  {renderSectionTable("Assets", view.assets, view.totalAssets, "text-blue-500")}
+                </div>
+                <div className="space-y-3">
+                  {renderSectionTable("Liabilities", view.liabilities, view.totalLiabilities, "text-red-500")}
+                  {renderSectionTable("Equity", view.equity, view.totalEquity, "text-purple-500")}
+                  <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wide text-ink">Total Liabilities + Equity</span>
+                    <span className="text-sm font-mono font-bold text-ink">₹{fmt(view.totalLiabilitiesAndEquity)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Balance status footer */}
+            <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-ink">Balance Check</span>
+              {view.isBalanced ? (
+                <span className="flex items-center gap-1.5 text-[11px] text-teal-500 font-semibold">
+                  <FaCheckCircle /> Balanced — Assets = Liabilities + Equity (₹{fmt(view.totalAssets)})
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] text-red-500 font-semibold">
+                  <FaExclamationTriangle /> Not balanced · Diff: ₹{fmt(Math.abs(view.totalAssets - view.totalLiabilitiesAndEquity))}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

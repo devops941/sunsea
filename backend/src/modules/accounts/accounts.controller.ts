@@ -13,6 +13,7 @@ export class AccountsController {
       res.json({
         success: true,
         data: result.ledgers,
+        grouped: result.grouped,
         pagination: {
           totalItems: result.total,
           currentPage: result.page,
@@ -168,7 +169,12 @@ export class AccountsController {
 
   async getBalanceSheet(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await accountsService.getBalanceSheet();
+      const { asOnDate, showZeroBalance, groupByCategory } = req.query;
+      const data = await accountsService.getBalanceSheet({
+        asOnDate: asOnDate as string | undefined,
+        showZeroBalance: showZeroBalance === "true",
+        groupByCategory: groupByCategory === "true",
+      });
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -177,7 +183,13 @@ export class AccountsController {
 
   async getTrialBalance(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await accountsService.getTrialBalance();
+      const { asOnDate, showZeroBalance, sortBy, groupByCategory } = req.query;
+      const data = await accountsService.getTrialBalance({
+        asOnDate: asOnDate as string | undefined,
+        showZeroBalance: showZeroBalance === "true",
+        sortBy: sortBy === "name" ? "name" : "code",
+        groupByCategory: groupByCategory === "true",
+      });
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -186,10 +198,30 @@ export class AccountsController {
 
   async getProfitAndLoss(req: Request, res: Response, next: NextFunction) {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, showZeroBalance } = req.query;
       const data = await accountsService.getProfitAndLoss({
         startDate: startDate as string | undefined,
         endDate: endDate as string | undefined,
+        showZeroBalance: showZeroBalance === "true",
+      });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getProfitAndLossByPeriod(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { startDate, endDate, groupBy } = req.query;
+      if (!startDate || !endDate) {
+        res.status(400).json({ success: false, message: "startDate and endDate are required" });
+        return;
+      }
+      const gb = (groupBy === "quarter" ? "quarter" : "month") as "month" | "quarter";
+      const data = await accountsService.getProfitAndLossByPeriod({
+        startDate: startDate as string,
+        endDate: endDate as string,
+        groupBy: gb,
       });
       res.json({ success: true, data });
     } catch (error) {

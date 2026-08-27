@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -20,8 +20,7 @@ import type { DataTableColumn } from "../../../../components/ui/table/DataTable"
 import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableDetail } from "../../../../services/payableService";
-
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 export const SupplierBreakdownPage: React.FC = () => {
   const { supplierId } = useParams<{ supplierId: string }>();
@@ -36,8 +35,6 @@ export const SupplierBreakdownPage: React.FC = () => {
   const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
   const [dateRangePreset, setDateRangePreset] = useState<string>("custom");
 
-  const [supplierDetail, setSupplierDetail] = useState<SupplierPayableDetail | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"invoices" | "payments" | "statement">("invoices");
 
   // Columns & Column Toggle for Invoices tab
@@ -65,30 +62,38 @@ export const SupplierBreakdownPage: React.FC = () => {
     localStorage.setItem("supplierBreakdownVisibleColumns", JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
-  const loadData = async () => {
-    if (!supplierId) return;
-    setLoading(true);
-    try {
-      const data = await payableService.getSupplierPayableDetail(parseInt(supplierId, 10), {
-        startDate,
-        endDate,
-      });
-      setSupplierDetail(data);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load supplier breakdown statement");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cacheKey = `accounts:supplier-breakdown-${supplierId || "none"}:${startDate}:${endDate}`;
 
-  useEffect(() => {
-    loadData();
-  }, [supplierId, startDate, endDate]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      if (!supplierId) return { data: [], total: 0 };
+      try {
+        const data = await payableService.getSupplierPayableDetail(parseInt(supplierId, 10), {
+          startDate,
+          endDate,
+        });
+        return { data: data ? [data] : [], total: data ? 1 : 0 };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load supplier breakdown statement");
+        throw err;
+      }
+    },
+    [supplierId, startDate, endDate]
+  );
 
-  useSocketSync("voucher", undefined, loadData);
-  useSocketSync("grnInvoice", undefined, loadData);
-  useSocketSync("purchaseReturn", undefined, loadData);
-  useSocketSync("supplier", undefined, loadData);
+  const { data: supplierDetailList, loading, refreshing, refresh } = useListCache<SupplierPayableDetail>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+    enabled: !!supplierId,
+  });
+
+  const supplierDetail: SupplierPayableDetail | null = supplierDetailList[0] || null;
+
+  // Only show the table loader on the very first fetch (no detail yet).
+  // Once the detail has loaded, silent refreshes should not blank the tables —
+  // the `refreshing` badge in the header already indicates background work.
+  const tableLoading = loading && !supplierDetail;
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -320,6 +325,7 @@ export const SupplierBreakdownPage: React.FC = () => {
             <h1 className="text-sm font-bold text-ink flex items-center gap-2 min-w-0 truncate">
               <FaBuilding className="text-orange-600 text-sm shrink-0" />
               <span className="truncate">{supplierDetail?.supplier.legalName || "Supplier Breakdown"}</span>
+              {refreshing && <FaSync className="animate-spin text-orange-600 text-[10px]" />}
             </h1>
             {supplierDetail?.supplier.supplierCode && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded font-mono uppercase tracking-wide shrink-0">
@@ -330,11 +336,11 @@ export const SupplierBreakdownPage: React.FC = () => {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={loadData}
+              onClick={refresh}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-orange-600" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-orange-600" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}
@@ -491,7 +497,7 @@ export const SupplierBreakdownPage: React.FC = () => {
             columns={invoiceColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
             data={invoices}
             rowKey={(item: any) => item.id}
-            loading={loading}
+            loading={tableLoading}
             emptyMessage="No purchase invoices recorded for this supplier."
           />
         )}
@@ -501,7 +507,7 @@ export const SupplierBreakdownPage: React.FC = () => {
             columns={paymentColumns}
             data={payments}
             rowKey={(item: any) => item.id}
-            loading={loading}
+            loading={tableLoading}
             emptyMessage="No payment vouchers recorded for this supplier."
           />
         )}
@@ -511,7 +517,7 @@ export const SupplierBreakdownPage: React.FC = () => {
             columns={statementColumns}
             data={statements}
             rowKey={(item: any) => item.id}
-            loading={loading}
+            loading={tableLoading}
             emptyMessage="No ledger statement entries recorded for this supplier."
           />
         )}

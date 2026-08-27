@@ -1,26 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   FaCoins,
   FaArrowDown,
   FaArrowUp,
   FaPlus,
   FaSearch,
+  FaSync,
   FaWallet,
   FaTimes,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { pettyCashService, type PettyCashEntry, type PettyCashSummary } from "../../../../services/pettyCashService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 export const PettyCashPage: React.FC = () => {
-  const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [summary, setSummary] = useState<PettyCashSummary>({
     totalIn: 0,
     totalOut: 0,
     currentBalance: 0,
   });
-  const [loading, setLoading] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -41,29 +40,33 @@ export const PettyCashPage: React.FC = () => {
   const [receiptNo, setReceiptNo] = useState<string>("");
   const [entryDate, setEntryDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const res = await pettyCashService.fetchEntries({
-        companyId: company?.id,
-        type: typeFilter === "ALL" ? undefined : typeFilter,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-      });
-      setEntries(res.entries || []);
-      setSummary(res.summary || { totalIn: 0, totalOut: 0, currentBalance: 0 });
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load petty cash entries");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cacheKey = `accounts:petty-cash-entries:${company?.id ?? ""}:${typeFilter}:${startDate}:${endDate}`;
 
-  useEffect(() => {
-    loadData();
-  }, [typeFilter, startDate, endDate, company?.id]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      try {
+        const res = await pettyCashService.fetchEntries({
+          companyId: company?.id,
+          type: typeFilter === "ALL" ? undefined : typeFilter,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        });
+        const list = res.entries || [];
+        setSummary(res.summary || { totalIn: 0, totalOut: 0, currentBalance: 0 });
+        return { data: list, total: list.length };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load petty cash entries");
+        throw err;
+      }
+    },
+    [company?.id, typeFilter, startDate, endDate]
+  );
 
-  useSocketSync("pettyCash", undefined, loadData);
+  const { data: entries, loading, refreshing, refresh } = useListCache<PettyCashEntry>({
+    cacheKey,
+    socketModule: "pettyCashEntry",
+    fetcher,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +90,7 @@ export const PettyCashPage: React.FC = () => {
       toast.success("Petty Cash entry recorded successfully!");
       setShowModal(false);
       resetForm();
-      loadData();
+      refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create entry");
     } finally {
@@ -173,16 +176,25 @@ export const PettyCashPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
           <h1 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaCoins className="text-amber-500 text-sm" /> Petty Cash Register
+            {refreshing && <FaSync className="animate-spin text-amber-500 text-[10px]" />}
           </h1>
-          <button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-semibold transition cursor-pointer"
-          >
-            <FaPlus className="text-[10px]" /> Record Cash Entry
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            >
+              <FaSync className={refreshing ? "animate-spin text-amber-500" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-semibold transition cursor-pointer"
+            >
+              <FaPlus className="text-[10px]" /> Record Cash Entry
+            </button>
+          </div>
         </div>
 
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">

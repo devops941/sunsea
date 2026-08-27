@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -20,8 +20,7 @@ import type { DataTableColumn } from "../../../../components/ui/table/DataTable"
 import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableDetail } from "../../../../services/receivableService";
-
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 export const CustomerBreakdownPage: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
@@ -36,8 +35,6 @@ export const CustomerBreakdownPage: React.FC = () => {
   const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
   const [dateRangePreset, setDateRangePreset] = useState<string>("custom");
 
-  const [customerDetail, setCustomerDetail] = useState<CustomerReceivableDetail | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"invoices" | "collections" | "statement">("invoices");
 
   // Columns & Column Toggle for Invoices tab
@@ -65,30 +62,38 @@ export const CustomerBreakdownPage: React.FC = () => {
     localStorage.setItem("customerBreakdownVisibleColumns", JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
-  const loadData = async () => {
-    if (!customerId) return;
-    setLoading(true);
-    try {
-      const data = await receivableService.getCustomerDetail(customerId, {
-        startDate,
-        endDate,
-      });
-      setCustomerDetail(data);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load customer breakdown statement");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cacheKey = `accounts:customer-breakdown-${customerId || "none"}:${startDate}:${endDate}`;
 
-  useEffect(() => {
-    loadData();
-  }, [customerId, startDate, endDate]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      if (!customerId) return { data: [], total: 0 };
+      try {
+        const data = await receivableService.getCustomerDetail(customerId, {
+          startDate,
+          endDate,
+        });
+        return { data: data ? [data] : [], total: data ? 1 : 0 };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load customer breakdown statement");
+        throw err;
+      }
+    },
+    [customerId, startDate, endDate]
+  );
 
-  useSocketSync("voucher", undefined, loadData);
-  useSocketSync("salesInvoice", undefined, loadData);
-  useSocketSync("salesReturn", undefined, loadData);
-  useSocketSync("customer", undefined, loadData);
+  const { data: customerDetailList, loading, refreshing, refresh } = useListCache<CustomerReceivableDetail>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+    enabled: !!customerId,
+  });
+
+  const customerDetail: CustomerReceivableDetail | null = customerDetailList[0] || null;
+
+  // Only show the table loader on the very first fetch (no detail yet).
+  // Once the detail has loaded, silent refreshes should not blank the tables —
+  // the `refreshing` badge in the header already indicates background work.
+  const tableLoading = loading && !customerDetail;
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -312,6 +317,7 @@ export const CustomerBreakdownPage: React.FC = () => {
             <h1 className="text-sm font-bold text-ink flex items-center gap-2 min-w-0 truncate">
               <FaUserFriends className="text-blue-600 text-sm shrink-0" />
               <span className="truncate">{customerDetail?.customer.firmName || "Customer Breakdown"}</span>
+              {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
             </h1>
             {customerDetail?.customer.customerCode && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono uppercase tracking-wide shrink-0">
@@ -322,11 +328,11 @@ export const CustomerBreakdownPage: React.FC = () => {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={loadData}
+              onClick={refresh}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
               title="Refresh"
             >
-              <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}
@@ -494,7 +500,7 @@ export const CustomerBreakdownPage: React.FC = () => {
             columns={invoiceColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
             data={customerDetail?.invoices || []}
             rowKey={(item: any) => item.id}
-            loading={loading}
+            loading={tableLoading}
             emptyMessage="No sales invoices recorded for this customer."
           />
         )}
@@ -504,7 +510,7 @@ export const CustomerBreakdownPage: React.FC = () => {
             columns={collectionColumns}
             data={customerDetail?.collectionHistory || []}
             rowKey={(item: any) => item.id}
-            loading={loading}
+            loading={tableLoading}
             emptyMessage="No receipt collection vouchers recorded for this customer."
           />
         )}
@@ -514,7 +520,7 @@ export const CustomerBreakdownPage: React.FC = () => {
             columns={statementColumns}
             data={customerDetail?.statementEntries || []}
             rowKey={(item: any) => item.id}
-            loading={loading}
+            loading={tableLoading}
             emptyMessage="No ledger statement entries recorded for this customer."
           />
         )}

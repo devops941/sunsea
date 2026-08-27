@@ -5,6 +5,17 @@ import { extractPaymentsArray } from "../../utils/payments";
 import crypto from "crypto";
 
 /**
+ * Returns the start date of the current financial year (India: April 1).
+ * Used to date system-generated opening balance vouchers so they show correctly
+ * in "as on" reports for any date within the financial year.
+ */
+function getFinancialYearStart(): Date {
+  const now = new Date();
+  const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  return new Date(year, 3, 1);
+}
+
+/**
  * Generates a stable payment reference ID based on payment properties and array index if p.id is missing.
  * Including the index prevents hash collisions between multiple identical payments in the same parent document.
  */
@@ -1259,7 +1270,8 @@ class VoucherPostingService {
       {
         voucherNo: `JV-SUP-OP-${supplier.supplierCode || String(supplier.id).slice(-6)}`,
         type: VoucherType.JOURNAL,
-        date: new Date(),
+        // Opening balances belong to the start of the financial year, not "today".
+        date: getFinancialYearStart(),
         narration: `Opening balance for supplier ${supplier.legalName} (${type})`,
         refDocType: "SUPPLIER_OPENING_BALANCE",
         refDocId: String(supplier.id),
@@ -1309,7 +1321,9 @@ class VoucherPostingService {
       {
         voucherNo: `JV-CUST-OP-${customer.customerCode || String(customer.id).slice(-6)}`,
         type: VoucherType.JOURNAL,
-        date: new Date(),
+        // Opening balances belong to the start of the financial year, not "today".
+        // Otherwise a trial balance "as on" any earlier date would omit them.
+        date: getFinancialYearStart(),
         narration: `Opening balance for customer ${customer.firmName} (${type})`,
         refDocType: "CUSTOMER_OPENING_BALANCE",
         refDocId: String(customer.id),
@@ -1343,23 +1357,30 @@ class VoucherPostingService {
     const db = txClient || prisma;
     await accountsService.ensureSystemLedgersExist(db);
 
-    // 1. Sync Customer Opening Balance Vouchers
+    // Fast-path: bulk-check existing opening balance vouchers in TWO queries instead of N per party.
+    const existingCustomerVouchers = await db.voucher.findMany({
+      where: { refDocType: "CUSTOMER_OPENING_BALANCE" },
+      select: { refDocId: true },
+    });
+    const existingCustIds = new Set(existingCustomerVouchers.map((v) => v.refDocId));
+
+    const existingSupplierVouchers = await db.voucher.findMany({
+      where: { refDocType: "SUPPLIER_OPENING_BALANCE" },
+      select: { refDocId: true },
+    });
+    const existingSupIds = new Set(existingSupplierVouchers.map((v) => v.refDocId));
+
+    // Customers needing opening balance vouchers
     const customers = await db.customer.findMany({
       where: { openingBalance: { gt: 0 } },
     });
-
-    for (const cust of customers) {
-      const opBal = Number(cust.openingBalance || 0);
-      if (opBal <= 0) continue;
-
-      const existingVoucher = await db.voucher.findFirst({
-        where: {
-          refDocType: "CUSTOMER_OPENING_BALANCE",
-          refDocId: String(cust.id),
-        },
-      });
-
-      if (!existingVoucher) {
+    const missingCustomers = customers.filter((c) => !existingCustIds.has(String(c.id)));
+    if (missingCustomers.length === 0 && customers.length > 0) {
+      // All good, skip loop entirely
+    } else {
+      for (const cust of missingCustomers) {
+        const opBal = Number(cust.openingBalance || 0);
+        if (opBal <= 0) continue;
         const opType = ((cust as any).openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
         await this.postCustomerOpeningBalanceVoucher(
           { id: cust.id, customerCode: cust.customerCode, firmName: cust.firmName },
@@ -1370,31 +1391,21 @@ class VoucherPostingService {
       }
     }
 
-    // 2. Sync Supplier Opening Balance Vouchers
+    // Suppliers needing opening balance vouchers
     const suppliers = await db.supplier.findMany({
       where: { openingBalance: { gt: 0 } },
     });
-
-    for (const supp of suppliers) {
+    const missingSuppliers = suppliers.filter((s) => !existingSupIds.has(String(s.id)));
+    for (const supp of missingSuppliers) {
       const opBal = Number(supp.openingBalance || 0);
       if (opBal <= 0) continue;
-
-      const existingVoucher = await db.voucher.findFirst({
-        where: {
-          refDocType: "SUPPLIER_OPENING_BALANCE",
-          refDocId: String(supp.id),
-        },
-      });
-
-      if (!existingVoucher) {
-        const opType = ((supp as any).openingBalanceType || "CREDIT").toUpperCase() as "DEBIT" | "CREDIT";
-        await this.postSupplierOpeningBalanceVoucher(
-          { id: supp.id, supplierCode: supp.supplierCode, legalName: supp.legalName },
-          opBal,
-          opType,
-          db
-        );
-      }
+      const opType = ((supp as any).openingBalanceType || "CREDIT").toUpperCase() as "DEBIT" | "CREDIT";
+      await this.postSupplierOpeningBalanceVoucher(
+        { id: supp.id, supplierCode: supp.supplierCode, legalName: supp.legalName },
+        opBal,
+        opType,
+        db
+      );
     }
   }
 }

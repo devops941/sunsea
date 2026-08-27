@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUniversity, FaPlus, FaArrowRight, FaWallet, FaTimes } from "react-icons/fa";
+import { FaUniversity, FaPlus, FaArrowRight, FaWallet, FaTimes, FaSync } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
 import { accountService } from "../../../../services/accountService";
+import { useListCache } from "../../../../hooks/useListCache";
 
 interface BankAccount {
   id: number;
@@ -22,8 +23,6 @@ interface BankAccountsData {
 
 const BankAccountsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [data, setData] = useState<BankAccountsData>({ accounts: [], totalBalance: 0 });
-  const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,21 +31,26 @@ const BankAccountsPage: React.FC = () => {
   const [newCode, setNewCode] = useState("");
   const [newGroup, setNewGroup] = useState("Bank Accounts");
 
-  const loadData = async () => {
-    setLoading(true);
+  const cacheKey = `accounts:bank-accounts`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
     try {
       const res = await apiClient.get("/accounts/bank-accounts");
-      setData(res.data?.data || { accounts: [], totalBalance: 0 });
+      const payload: BankAccountsData = res.data?.data || { accounts: [], totalBalance: 0 };
+      return { data: [payload], total: payload.accounts.length };
     } catch (err: any) {
       toast.error(err?.message || "Failed to load bank accounts");
-    } finally {
-      setLoading(false);
+      throw err;
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
+
+  const { data: cachedList, loading, refreshing, refresh } = useListCache<BankAccountsData>({
+    cacheKey,
+    socketModule: "accountLedger",
+    fetcher,
+  });
+
+  const data: BankAccountsData = cachedList[0] || { accounts: [], totalBalance: 0 };
 
   const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +70,7 @@ const BankAccountsPage: React.FC = () => {
       setShowAddForm(false);
       setNewName("");
       setNewCode("");
-      loadData();
+      refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create");
     } finally {
@@ -81,14 +85,23 @@ const BankAccountsPage: React.FC = () => {
         <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaUniversity className="text-blue-600 text-sm" /> Bank & Cash Accounts
+            {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
           </h2>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition cursor-pointer"
-          >
-            {showAddForm ? <FaTimes className="text-[10px]" /> : <FaPlus className="text-[10px]" />}
-            {showAddForm ? "Close" : "Add Bank Account"}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            >
+              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition cursor-pointer"
+            >
+              {showAddForm ? <FaTimes className="text-[10px]" /> : <FaPlus className="text-[10px]" />}
+              {showAddForm ? "Close" : "Add Bank Account"}
+            </button>
+          </div>
         </div>
 
         {/* Add Form - inline compact */}

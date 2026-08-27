@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { FaBoxes, FaPlus, FaTimes, FaTrash, FaSearch, FaEye } from "react-icons/fa";
+import React, { useState, useEffect, useCallback } from "react";
+import { FaBoxes, FaPlus, FaSync, FaTimes, FaTrash, FaSearch, FaEye } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
 import { supplierService } from "../../../../services/supplierService";
@@ -7,6 +7,7 @@ import { rawMaterialService } from "../../../../services/rawMaterialService";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { storeService } from "../../../../services/storeService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
+import { useListCache } from "../../../../hooks/useListCache";
 
 interface FormReturnRow {
   rawMaterialId: string;
@@ -23,11 +24,9 @@ interface FormReturnRow {
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 export const PurchaseReturnPage: React.FC = () => {
-  const [returns, setReturns] = useState<PurchaseReturn[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [selectedViewReturn, setSelectedViewReturn] = useState<PurchaseReturn | null>(null);
@@ -48,8 +47,9 @@ export const PurchaseReturnPage: React.FC = () => {
   const [narration, setNarration] = useState<string>("");
   const [returnRows, setReturnRows] = useState<FormReturnRow[]>([]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const cacheKey = `accounts:purchase-returns`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
     try {
       const [rData, sRes, mRes, stRes] = await Promise.all([
         returnService.fetchPurchaseReturns(),
@@ -57,28 +57,29 @@ export const PurchaseReturnPage: React.FC = () => {
         rawMaterialService.fetchAll(),
         storeService.fetchAll({ storeCategory: "RAW_MATERIAL", limit: 100 }),
       ]);
-      setReturns(rData || []);
+      const list = rData || [];
       const sList = Array.isArray(sRes) ? sRes : sRes?.suppliers || [];
       setSuppliers(sList);
       const mList = Array.isArray(mRes) ? mRes : (mRes?.rawMaterials ?? []);
       setMaterials(mList);
       const stList = Array.isArray(stRes) ? stRes : stRes?.stores || stRes?.data || [];
       setStores(stList);
+      return { data: list, total: list.length };
     } catch (err: any) {
       toast.error(err?.message || "Failed to load purchase returns");
-    } finally {
-      setLoading(false);
+      throw err;
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
 
-  useSocketSync("purchaseReturn", undefined, loadData);
-  useSocketSync("grnInvoice", undefined, loadData);
-  useSocketSync("supplier", undefined, loadData);
-  useSocketSync("rawMaterial", undefined, loadData);
+  const { data: returns, loading, refreshing, refresh } = useListCache<PurchaseReturn>({
+    cacheKey,
+    socketModule: "purchaseReturn",
+    fetcher,
+  });
+
+  useSocketSync("grnInvoice", undefined, refresh);
+  useSocketSync("supplier", undefined, refresh);
+  useSocketSync("rawMaterial", undefined, refresh);
 
   // When Supplier changes, fetch GRN Invoices
   useEffect(() => {
@@ -264,7 +265,7 @@ export const PurchaseReturnPage: React.FC = () => {
       toast.success("Purchase Return processed & stock deducted!");
       setShowModal(false);
       resetForm();
-      loadData();
+      refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create Purchase Return");
     } finally {
@@ -303,16 +304,25 @@ export const PurchaseReturnPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
           <h1 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaBoxes className="text-orange-500 text-sm" /> Purchase Returns (Debit Note)
+            {refreshing && <FaSync className="animate-spin text-orange-500 text-[10px]" />}
           </h1>
-          <button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-semibold transition cursor-pointer"
-          >
-            <FaPlus className="text-[10px]" /> Process Purchase Return
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            >
+              <FaSync className={refreshing ? "animate-spin text-orange-500" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-semibold transition cursor-pointer"
+            >
+              <FaPlus className="text-[10px]" /> Process Purchase Return
+            </button>
+          </div>
         </div>
 
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">

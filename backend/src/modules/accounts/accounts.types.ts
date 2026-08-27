@@ -19,11 +19,13 @@ export const getLedgersQuerySchema = z.object({
   search: z.string().optional(),
   type: z.nativeEnum(LedgerType).optional(),
   group: z.string().optional(),
+  grouped: z.string().optional().transform((val) => val === "true"),
 });
 
 export const ledgerStatementQuerySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  search: z.string().optional(),
 });
 
 export type CreateLedgerInput = z.infer<typeof createLedgerSchema>;

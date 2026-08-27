@@ -1,30 +1,42 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaReceipt, FaPlus, FaSearch } from "react-icons/fa";
+import { FaReceipt, FaPlus, FaSearch, FaSync } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService, type Voucher } from "../../../../services/voucherService";
+import { useListCache } from "../../../../hooks/useListCache";
 
 const ReceiptVoucherPage: React.FC = () => {
   const navigate = useNavigate();
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterDate, setFilterDate] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [total, setTotal] = useState(0);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await voucherService.fetchVouchers({
-        type: "RECEIPT", startDate: filterDate || undefined, endDate: filterDate || undefined,
-        search: searchTerm || undefined, page: 1, limit: 10000,
-      });
-      setVouchers(res.vouchers || []); setTotal(res.total || res.vouchers?.length || 0);
-    } catch (err: any) { toast.error(err?.message || "Failed to load"); }
-    finally { setLoading(false); }
-  }, [filterDate, searchTerm]);
+  const cacheKey = `accounts:receipt-vouchers:${filterDate}:${searchTerm}`;
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const fetcher = useCallback(
+    async (_signal: AbortSignal) => {
+      try {
+        const res = await voucherService.fetchVouchers({
+          type: "RECEIPT",
+          startDate: filterDate || undefined,
+          endDate: filterDate || undefined,
+          search: searchTerm || undefined,
+          page: 1,
+          limit: 10000,
+        });
+        return { data: res.vouchers || [], total: res.total || res.vouchers?.length || 0 };
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load receipt vouchers");
+        throw err;
+      }
+    },
+    [filterDate, searchTerm]
+  );
+
+  const { data: vouchers, total, loading, refreshing, refresh } = useListCache<Voucher>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
 
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen">
@@ -33,11 +45,20 @@ const ReceiptVoucherPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
           <h1 className="text-sm font-bold text-ink flex items-center gap-2">
             <FaReceipt className="text-green-500 text-sm" /> Receipt Voucher
+            {refreshing && <FaSync className="animate-spin text-green-500 text-[10px]" />}
           </h1>
-          <button onClick={() => navigate("/accounts/receipt-voucher/add")}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition cursor-pointer">
-            <FaPlus className="text-[10px]" /> New Receipt
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            >
+              <FaSync className={refreshing ? "animate-spin text-green-500" : ""} /> Refresh
+            </button>
+            <button onClick={() => navigate("/accounts/receipt-voucher/add")}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition cursor-pointer">
+              <FaPlus className="text-[10px]" /> New Receipt
+            </button>
+          </div>
         </div>
 
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
@@ -69,7 +90,10 @@ const ReceiptVoucherPage: React.FC = () => {
           <span className="text-[11px] text-ink-subtle font-mono">Total: {total}</span>
         </div>
         {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted">Loading...</div>
+          <div className="p-6 text-center text-xs text-ink-muted">
+            <FaSync className="animate-spin text-green-500 text-lg mx-auto mb-1" />
+            Loading...
+          </div>
         ) : vouchers.length === 0 ? (
           <div className="p-8 text-center text-xs text-ink-subtle">No receipt vouchers found.</div>
         ) : (
