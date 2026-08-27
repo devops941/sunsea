@@ -1019,17 +1019,14 @@ const QuotationForm: React.FC = () => {
                                     <div className="text-red-500 text-sm mb-2">{errors.items.root.message}</div>
                                 )}
 
-                                {/* Add button when no sales order selected */}
-                                {!selectedPrevOrderId && !isEditMode && (
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm font-semibold text-ink">Quotation Items</span>
-                                        <CustomButton
-                                            text="Add Sales Product"
-                                            variant="secondary"
-                                            onClick={() => append({ salesProductId: "", orderQuantity: "1", unitPrice: "", gstRate: "", components: [] })}
-                                        />
-                                    </div>
-                                )}
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-semibold text-ink">Quotation Items</span>
+                                    <CustomButton
+                                        text="Add Sales Product"
+                                        variant="secondary"
+                                        onClick={() => append({ salesProductId: "", orderQuantity: "1", unitPrice: "", gstRate: "", components: [] })}
+                                    />
+                                </div>
 
                                 {fields.length > 0 && (
                                     <div className="border border-line-soft rounded-xl overflow-hidden bg-card">
@@ -1042,9 +1039,7 @@ const QuotationForm: React.FC = () => {
                                                     <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Unit Price</th>
                                                     <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">GST %</th>
                                                     <th className="py-2 px-1 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Total</th>
-                                                    {!selectedPrevOrderId && !isEditMode && (
-                                                        <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
-                                                    )}
+                                                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1081,7 +1076,7 @@ const QuotationForm: React.FC = () => {
                                                             <tr className="border-b border-line-soft bg-card hover:bg-card-2/40">
                                                                 <td className="py-2 pl-3 pr-1 text-ink-subtle font-medium">{index + 1}</td>
                                                                 <td className="py-1 px-1 text-ink font-medium">
-                                                                    {hasOrder ? (
+                                                                    {hasOrder && itemValue?.salesProductId ? (
                                                                         <span className="flex items-center gap-1 py-1">
                                                                             {components.length > 0 && (
                                                                                 <button
@@ -1095,17 +1090,32 @@ const QuotationForm: React.FC = () => {
                                                                             {spName || "—"}
                                                                         </span>
                                                                     ) : (
-                                                                        <SelectInput
-                                                                            hideLabel
-                                                                            label=""
-                                                                            name={`items.${index}.salesProductId`}
-                                                                            value={itemValue?.salesProductId || ""}
-                                                                            options={salesProductOptions}
-                                                                            onChange={handleSalesProductChange}
-                                                                            defaultOptionLabel="Select sales product"
-                                                                            error={(errors.items as any)?.[index]?.salesProductId?.message}
-                                                                            searchable
-                                                                        />
+                                                                        <div className="flex items-center gap-1">
+                                                                            {components.length > 0 && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setExpandedItemIndex(expandedItemIndex === index ? null : index)}
+                                                                                    className="p-0.5 rounded text-ink-subtle hover:text-primary transition-colors flex-shrink-0"
+                                                                                >
+                                                                                    {expandedItemIndex === index ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                                                </button>
+                                                                            )}
+                                                                            <SelectInput
+                                                                                hideLabel
+                                                                                label=""
+                                                                                name={`items.${index}.salesProductId`}
+                                                                                value={itemValue?.salesProductId || ""}
+                                                                                options={salesProductOptions.map(opt => {
+                                                                                    if (!opt.value) return opt;
+                                                                                    const usedByOther = (items || []).some((it: any, i: number) => i !== index && it?.salesProductId === opt.value);
+                                                                                    return { ...opt, disabled: usedByOther };
+                                                                                })}
+                                                                                onChange={handleSalesProductChange}
+                                                                                defaultOptionLabel="Select sales product"
+                                                                                error={(errors.items as any)?.[index]?.salesProductId?.message}
+                                                                                searchable
+                                                                            />
+                                                                        </div>
                                                                     )}
                                                                 </td>
                                                                 <td className="py-1 px-1 w-20">
@@ -1165,27 +1175,50 @@ const QuotationForm: React.FC = () => {
                                                                         </div>
                                                                     ) : "—"}
                                                                 </td>
-                                                                {!hasOrder && (
-                                                                    <td className="py-1 px-1 w-10 text-center">
-                                                                        <DeleteButton
-                                                                            onClick={() => remove(index)}
-                                                                            disabled={fields.length <= 1}
-                                                                            disabledMessage="At least one item is required."
-                                                                        />
-                                                                    </td>
-                                                                )}
+                                                                <td className="py-1 px-1 w-10 text-center">
+                                                                    <DeleteButton
+                                                                        onClick={() => remove(index)}
+                                                                        disabled={fields.length <= 1}
+                                                                        disabledMessage="At least one item is required."
+                                                                    />
+                                                                </td>
                                                             </tr>
-                                                            {/* Component sub-rows (toggle) */}
+                                                            {/* Component sub-rows with checkboxes */}
                                                             {components.length > 0 && expandedItemIndex === index && (
-                                                                <tr className="bg-card-2/30">
+                                                                <tr className="bg-card-2/50">
                                                                     <td></td>
-                                                                    <td colSpan={hasOrder ? 5 : 6} className="py-1 px-1">
-                                                                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink-subtle">
-                                                                            {components.map(comp => (
-                                                                                <span key={comp.componentProductId} className={comp.included ? "" : "line-through opacity-50"}>
-                                                                                    {comp.productName} <span className="font-medium text-ink">{comp.included ? comp.quantity : "0"}</span>
-                                                                                    {!comp.included && <span className="text-[10px] text-red-400 ml-0.5">(Excluded)</span>}
-                                                                                </span>
+                                                                    <td colSpan={7} className="px-3 py-2">
+                                                                        <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
+                                                                            <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
+                                                                                <div className="w-4" />
+                                                                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+                                                                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+                                                                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
+                                                                            </div>
+                                                                            {components.map((comp, compIdx) => (
+                                                                                <div
+                                                                                    key={comp.componentProductId}
+                                                                                    className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
+                                                                                >
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={comp.included}
+                                                                                        onChange={() => {
+                                                                                            const updated = components.map((c, i) =>
+                                                                                                i === compIdx ? { ...c, included: !c.included } : c
+                                                                                            );
+                                                                                            setValue(`items.${index}.components`, updated);
+                                                                                        }}
+                                                                                        className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
+                                                                                    />
+                                                                                    <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
+                                                                                        {comp.productName}
+                                                                                    </span>
+                                                                                    <span className="text-[11px] text-ink-subtle text-center w-12">x{comp.perUnit}</span>
+                                                                                    <span className="text-xs text-ink font-medium text-center">
+                                                                                        {comp.included ? comp.quantity : "0"}
+                                                                                    </span>
+                                                                                </div>
                                                                             ))}
                                                                         </div>
                                                                     </td>

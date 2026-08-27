@@ -49,17 +49,20 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
     };
 
     const customerState: string = invoice.customer?.addresses?.[0]?.address?.state || '';
-    const isInterState = customerState && company?.state && customerState !== company.state;
+    // Detect inter-state from actual item data (more reliable than address comparison)
+    const hasIgst = (invoice.items || []).some((i: any) => Number(i.igstRate || 0) > 0 || Number(i.igstAmount || 0) > 0);
+    const hasCgstSgst = (invoice.items || []).some((i: any) => Number(i.cgstRate || 0) > 0 || Number(i.sgstRate || 0) > 0);
+    const isInterState = hasIgst && !hasCgstSgst ? true : (customerState && company?.state && customerState !== company.state);
 
     // ── Parse additional charges from narration ───────────────────────────────
     const CHARGE_META: Record<string, { label: string; sign: 1 | -1 }> = {
-        LORRY_FREIGHT:       { label: 'Lorry Freight',               sign:  1 },
-        LORRY_FREIGHT_MINUS: { label: 'Lorry Freight',               sign: -1 },
-        OTHERS_PLUS:         { label: 'Others',                      sign:  1 },
-        OTHERS_MINUS:        { label: 'Others',                      sign: -1 },
-        ROUND_OFF_PLUS:      { label: 'Round Off',                   sign:  1 },
-        ROUND_OFF_MINUS:     { label: 'Round Off',                   sign: -1 },
-        TDS:                 { label: 'TDS on Pymt./Purc. of Goods', sign: -1 },
+        LORRY_FREIGHT: { label: 'Lorry Freight', sign: 1 },
+        LORRY_FREIGHT_MINUS: { label: 'Lorry Freight', sign: -1 },
+        OTHERS_PLUS: { label: 'Others', sign: 1 },
+        OTHERS_MINUS: { label: 'Others', sign: -1 },
+        ROUND_OFF_PLUS: { label: 'Round Off', sign: 1 },
+        ROUND_OFF_MINUS: { label: 'Round Off', sign: -1 },
+        TDS: { label: 'TDS on Pymt./Purc. of Goods', sign: -1 },
     };
 
     let chargeRows: { label: string; sign: 1 | -1; amount: number }[] = [];
@@ -72,7 +75,7 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     .filter(r => Number(r.amount) > 0)
                     .map(r => ({
                         label: CHARGE_META[r.type]?.label || r.type,
-                        sign:  CHARGE_META[r.type]?.sign  ?? 1,
+                        sign: CHARGE_META[r.type]?.sign ?? 1,
                         amount: Number(r.amount),
                     }));
             }
@@ -114,7 +117,11 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
     const totalSgst = itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0);
     const totalIgst = itemsWithTax.reduce((s: number, i: any) => s + i.igstAmount, 0);
     const totalTaxable = itemsWithTax.reduce((s: number, i: any) => s + i.amount, 0);
-    const itemsSubTotal = totalTaxable + totalCgst + totalSgst + totalIgst;
+    const totalTax = totalCgst + totalSgst + totalIgst;
+    const invoiceDiscount = Number(invoice.totalDiscount || 0);
+    const discountValue = Number(invoice.discountValue || 0);
+    const discountType = invoice.discountType || "";
+    const itemsSubTotal = totalTaxable + totalTax;
     const grandTotal = Number(invoice.grandTotal ?? itemsSubTotal);
 
     const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; igstAmt: number; totalTax: number }>();
@@ -185,11 +192,11 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     <tr>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 60px;">Tax Rate</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">Taxable Amt.</th>
-                        ${isInterState ? 
-                            `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">IGST Amt.</th>` :
-                            `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">CGST Amt.</th>
+                        ${isInterState ?
+                `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">IGST Amt.</th>` :
+                `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">CGST Amt.</th>
                              <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">SGST Amt.</th>`
-                        }
+            }
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right">Total Tax</th>
                     </tr>
                 </thead>
@@ -200,11 +207,11 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                 <tr>
                     <td class="border border-black px-2 py-1 align-middle text-center">${row.taxRate}%</td>
                     <td class="border border-black px-2 py-1 align-middle text-right">${row.taxableAmt.toFixed(2)}</td>
-                    ${isInterState ? 
-                        `<td class="border border-black px-2 py-1 align-middle text-right">${row.igstAmt.toFixed(2)}</td>` :
-                        `<td class="border border-black px-2 py-1 align-middle text-right">${row.cgstAmt.toFixed(2)}</td>
+                    ${isInterState ?
+                    `<td class="border border-black px-2 py-1 align-middle text-right">${row.igstAmt.toFixed(2)}</td>` :
+                    `<td class="border border-black px-2 py-1 align-middle text-right">${row.cgstAmt.toFixed(2)}</td>
                          <td class="border border-black px-2 py-1 align-middle text-right">${row.sgstAmt.toFixed(2)}</td>`
-                    }
+                }
                     <td class="border border-black px-2 py-1 align-middle text-right">${row.totalTax.toFixed(2)}</td>
                 </tr>
             `;
@@ -299,14 +306,14 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 55px;">Qty.</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 45px;">Unit</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 60px;">Price</th>
-                        ${isInterState ? 
-                            `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 50px;">IGST Rate</th>
+                        ${isInterState ?
+            `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 50px;">IGST Rate</th>
                              <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 65px;">IGST Amt</th>` :
-                            `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 50px;">CGST Rate</th>
+            `<th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 50px;">CGST Rate</th>
                              <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 65px;">CGST Amt</th>
                              <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 50px;">SGST Rate</th>
                              <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 65px;">SGST Amt</th>`
-                        }
+        }
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 70px;">Amount(Rs.)</th>
                     </tr>
                 </thead>
@@ -314,11 +321,37 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     ${itemsHtml}
                 </tbody>
                 <tfoot>
-                    ${chargeRows.length > 0 ? `
                     <tr>
                         <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right font-bold">Sub Total</td>
-                        <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(itemsSubTotal)}</td>
+                        <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(totalTaxable)}</td>
                     </tr>
+                    ${invoiceDiscount > 0 ? `
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px] text-red-600">
+                            Discount ${discountValue > 0 ? `(${discountValue}${discountType === "PERCENT" ? '%' : ' Flat'})` : ''} (-)
+                        </td>
+                        <td class="border border-black px-2 py-1 text-right text-[13px] text-red-600">- ${formatMoney(invoiceDiscount)}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">Taxable Amount</td>
+                        <td class="border border-black px-2 py-1 text-right text-[13px]">${formatMoney(totalTaxable - invoiceDiscount)}</td>
+                    </tr>
+                    ` : ''}
+                    ${totalTax > 0 ? (isInterState ? `
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">IGST</td>
+                        <td class="border border-black px-2 py-1 text-right text-[13px]">+ ${formatMoney(totalIgst)}</td>
+                    </tr>
+                    ` : `
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">CGST</td>
+                        <td class="border border-black px-2 py-1 text-right text-[13px]">+ ${formatMoney(totalCgst)}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">SGST</td>
+                        <td class="border border-black px-2 py-1 text-right text-[13px]">+ ${formatMoney(totalSgst)}</td>
+                    </tr>
+                    `) : ''}
                     ${chargeRows.map(cr => `
                     <tr>
                         <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">
@@ -328,7 +361,6 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                             ${cr.sign === 1 ? '+' : '-'}&nbsp;${formatMoney(cr.amount)}
                         </td>
                     </tr>`).join('')}
-                    ` : ''}
                     <tr>
                         <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
                         <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(grandTotal)}</td>

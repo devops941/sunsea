@@ -36,12 +36,15 @@ class CustomerService {
         openingBalance: openingBalance ?? 0,
         ...(addresses && addresses.length > 0 && {
           addresses: {
-            create: addresses.map((addr: any, index: number) => ({
-              address: addr,
-              is_default: index === 0,
-              label: `Address ${index + 1}`,
-              state_code: addr.state.toLowerCase(),
-            }))
+            create: addresses.map((addr: any, index: number) => {
+              const { _label, ...cleanAddr } = addr;
+              return {
+                address: cleanAddr,
+                is_default: index === 0,
+                label: _label || `Address ${index + 1}`,
+                state_code: addr.state.toLowerCase(),
+              };
+            })
           }
         })
       },
@@ -302,12 +305,15 @@ class CustomerService {
         ...(addresses && {
           addresses: {
             deleteMany: {},
-            create: addresses.map((addr: any, index: number) => ({
-              address: addr,
-              is_default: index === 0,
-              label: `Address ${index + 1}`,
-              state_code: addr.state.toLowerCase(),
-            }))
+            create: addresses.map((addr: any, index: number) => {
+              const { _label, ...cleanAddr } = addr;
+              return {
+                address: cleanAddr,
+                is_default: index === 0,
+                label: _label || `Address ${index + 1}`,
+                state_code: addr.state.toLowerCase(),
+              };
+            })
           }
         })
       },

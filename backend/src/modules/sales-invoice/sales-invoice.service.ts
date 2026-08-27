@@ -17,17 +17,30 @@ function serializeInvoice(invoice: any) {
 
 class SalesInvoiceService {
   async createSalesInvoice(data: CreateSalesInvoiceInput, currentUser: { userId: string; companyId: string }) {
-    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
+    const customer = await prisma.customer.findUnique({
+      where: { id: data.customerId },
+      include: { addresses: true },
+    });
     if (!customer) throw new ApiError(404, "Customer not found");
 
     const company = await prisma.company.findUnique({ where: { id: currentUser.companyId } });
     if (!company) throw new ApiError(404, "Company not found");
 
-    const isInterState = company.state?.toLowerCase().trim() !== (customer as any).billingState?.toLowerCase().trim();
+    const billingAddress = (customer as any).addresses?.find((a: any) => a.is_default) || (customer as any).addresses?.[0];
+    const customerState = billingAddress?.state_code || (billingAddress?.address as any)?.state?.toLowerCase()?.trim() || "";
+    const isInterState = company.state?.toLowerCase().trim() !== customerState;
 
     // Calculate items and totals
     let subTotal = 0;
     let taxTotal = 0;
+
+    // Look up sales product names for invoice item descriptions
+    const spIds = [...new Set(data.items.map(i => String(i.productId)))];
+    const salesProductsForDesc = await prisma.salesProduct.findMany({
+      where: { id: { in: spIds.map(id => BigInt(id)) } },
+      select: { id: true, salesProductName: true, salesProductCode: true },
+    }).catch(() => []);
+    const spNameMap = new Map(salesProductsForDesc.map((sp: any) => [sp.id.toString(), sp.salesProductName || sp.salesProductCode || ""]));
 
     const invoiceItems = data.items.map((item) => {
       const qty = Number(item.qty);
@@ -62,6 +75,7 @@ class SalesInvoiceService {
 
       return {
         productId: BigInt(item.productId),
+        description: spNameMap.get(String(item.productId)) || null,
         quantity: qty,
         unitPrice: rate,
         discountAmount: discount,
@@ -77,7 +91,39 @@ class SalesInvoiceService {
       };
     });
 
-    const grandTotal = subTotal + taxTotal;
+    // Discount
+    const d = data as any;
+    const totalDiscount = Number(d.totalDiscount) || 0;
+    const taxableAmount = subTotal - totalDiscount;
+
+    // Recalculate tax on discounted amount
+    if (totalDiscount > 0 && subTotal > 0) {
+      taxTotal = 0;
+      invoiceItems.forEach((item) => {
+        const lineAmount = Number(item.quantity) * Number(item.unitPrice);
+        const share = lineAmount / subTotal;
+        const lineTaxable = lineAmount - (totalDiscount * share);
+        const lineTax = (lineTaxable * Number(item.tax)) / 100;
+        taxTotal += lineTax;
+      });
+    }
+
+    // Parse extra charges from narration
+    let chargeAdditions = 0;
+    let chargeDeductions = 0;
+    if ((data as any).narration) {
+      try {
+        const parsed = JSON.parse((data as any).narration);
+        const chargeRows = parsed?.__chargeRows__ || [];
+        for (const row of chargeRows) {
+          const amt = Number(row.amount) || 0;
+          if (amt <= 0) continue;
+          if (String(row.type || "").includes("MINUS")) chargeDeductions += amt;
+          else chargeAdditions += amt;
+        }
+      } catch { /* ignore bad JSON */ }
+    }
+    const grandTotal = taxableAmount + taxTotal + chargeAdditions - chargeDeductions;
 
     const computedStatus = "CONFIRMED";
 
@@ -112,6 +158,9 @@ class SalesInvoiceService {
           narration: (data as any).narration || null,
           salesOrderId: data.salesOrderId || null,
           subTotal,
+          discountType: d.discountType || null,
+          discountValue: Number(d.discountValue) || 0,
+          totalDiscount,
           taxTotal,
           grandTotal,
           companyId: currentUser.companyId,
@@ -139,31 +188,52 @@ class SalesInvoiceService {
 
       // Update invoicedQty on SalesOrderItems and mark source SO as INVOICED
       if (data.salesOrderId) {
+        // Fetch the sales order items to match by salesProductId
+        const soItems = await tx.salesOrderItem.findMany({
+          where: { salesOrderId: data.salesOrderId },
+        });
+
         for (const item of data.items) {
-          const qty = Number(item.qty);
-          if (qty <= 0) continue;
-          await tx.salesOrderItem.updateMany({
-            where: { salesOrderId: data.salesOrderId, productId: BigInt(item.productId) },
-            data: { invoicedQty: { increment: qty } },
-          });
+          const invoiceQty = Number(item.qty);
+          if (invoiceQty <= 0) continue;
+          const excludedComps = new Set(((item as any).excludedComponents || []).map(String));
+
+          // Find SO items that belong to this sales product
+          const matchingItems = soItems.filter(
+            soi => String(soi.salesProductId) === String(item.productId)
+          );
+
+          if (matchingItems.length > 0) {
+            // Update each component product's invoicedQty (skip excluded ones)
+            for (const soi of matchingItems) {
+              if (excludedComps.has(String(soi.productId))) continue;
+              const compPerUnit = Number(soi.quantity) / Math.max(1, invoiceQty);
+              const compQty = compPerUnit * invoiceQty;
+              await tx.salesOrderItem.update({
+                where: { id: soi.id },
+                data: { invoicedQty: { increment: compQty } },
+              });
+            }
+          } else {
+            // Fallback: direct productId match
+            await tx.salesOrderItem.updateMany({
+              where: { salesOrderId: data.salesOrderId, productId: BigInt(item.productId) },
+              data: { invoicedQty: { increment: invoiceQty } },
+            });
+          }
         }
-        // Mark the source sales order as INVOICED and save shipping address
-        const shippingAddr = (data as any).shippingAddress;
+
+        // Mark the source sales order as INVOICED
         await tx.salesOrder.update({
           where: { id: data.salesOrderId },
           data: {
             status: "INVOICED" as any,
-            ...(shippingAddr && {
-              shippingAddressLine1: shippingAddr.line1 || null,
-              shippingCity: shippingAddr.city || null,
-              shippingState: shippingAddr.state || null,
-              shippingPincode: shippingAddr.pincode || null,
-            }),
           },
         });
       }
 
       // Create stock adjustment for dispatched items
+      // Resolve component products from SalesProduct so stock is deducted per component
       const adjustmentPrefix = `ADJ-${new Date().getFullYear()}-`;
       const lastAdj = await tx.stockAdjustment.findFirst({
         where: { adjustmentNumber: { startsWith: adjustmentPrefix } },
@@ -181,70 +251,91 @@ class SalesInvoiceService {
       let stockAdjustmentId: bigint | null = null;
 
       for (const item of data.items) {
-        const qty = Number(item.qty);
-        if (qty <= 0) continue;
+        const invoiceQty = Number(item.qty);
+        if (invoiceQty <= 0) continue;
+        const excludedComps = new Set(((item as any).excludedComponents || []).map(String));
 
-        const fgStocks = await tx.finishedGoodsStock.findMany({
-          where: { productItemId: BigInt(item.productId) },
-          orderBy: { onHandQty: 'desc' },
-        });
-        if (fgStocks.length === 0) continue;
+        // Look up SalesProduct components to deduct stock per component
+        const salesProduct = await tx.salesProduct.findUnique({
+          where: { id: BigInt(item.productId) },
+          include: { components: true },
+        }).catch(() => null);
 
-        const targetStoreId = fgStocks[0].storeId;
-        const fgStock = fgStocks[0];
-
-        if (!stockAdjustmentCreated) {
-          const newAdj = await tx.stockAdjustment.create({
-            data: {
-              adjustmentNumber,
-              adjustmentDate: new Date(data.invoiceDate),
-              adjustmentType: "SALES_INVOICE_DISPATCH",
-              reason: `Sales Invoice ${data.invoiceNo}`,
-              status: "APPROVED",
-              createdBy: currentUser.userId,
-              updatedBy: currentUser.userId,
-              approvedBy: currentUser.userId,
-              approvedAt: new Date(),
-              autoGenerated: true,
-              sourceDocument: "SALES_INVOICE",
-              sourceDocId: invoice.id,
-            },
-          });
-          stockAdjustmentId = newAdj.id;
-          stockAdjustmentCreated = true;
+        // Build list of products to deduct: components if SalesProduct found, else direct productId
+        const productsToDeduct: { productId: bigint; qty: number }[] = [];
+        if (salesProduct && salesProduct.components.length > 0) {
+          for (const comp of salesProduct.components) {
+            if (excludedComps.has(String(comp.componentProductId))) continue;
+            const compQty = Number(comp.quantity || 1) * invoiceQty;
+            productsToDeduct.push({ productId: comp.componentProductId, qty: compQty });
+          }
+        } else {
+          productsToDeduct.push({ productId: BigInt(item.productId), qty: invoiceQty });
         }
 
-        await tx.finishedGoodsStock.update({
-          where: { storeId_productItemId: { storeId: targetStoreId, productItemId: BigInt(item.productId) } },
-          data: { onHandQty: { decrement: qty } },
-        });
+        for (const { productId: pid, qty } of productsToDeduct) {
+          const fgStocks = await tx.finishedGoodsStock.findMany({
+            where: { productItemId: pid },
+            orderBy: { onHandQty: 'desc' },
+          });
+          if (fgStocks.length === 0) continue;
 
-        await tx.stockAdjustmentItem.create({
-          data: {
-            stockAdjustmentId: stockAdjustmentId!,
-            itemType: "FINISHED_GOODS",
-            productItemId: BigInt(item.productId),
-            storeId: targetStoreId,
-            currentQty: fgStock.onHandQty,
-            adjustedQty: Number(fgStock.onHandQty) - qty,
-            difference: -qty,
-            remarks: `Invoice ${data.invoiceNo}`,
-          },
-        });
+          const targetStoreId = fgStocks[0].storeId;
+          const fgStock = fgStocks[0];
 
-        await tx.finishedGoodsTransaction.create({
-          data: {
-            txnDateTime: new Date(),
-            storeId: targetStoreId,
-            productItemId: BigInt(item.productId),
-            txnType: "STOCK_ADJUSTMENT_OUT",
-            qty: new (require('decimal.js').Decimal)(qty),
-            relatedDocNo: adjustmentNumber,
-            remarks: `Invoice ${data.invoiceNo}`,
-            createdBy: currentUser.userId,
-          },
-        });
-      }
+          if (!stockAdjustmentCreated) {
+            const newAdj = await tx.stockAdjustment.create({
+              data: {
+                adjustmentNumber,
+                adjustmentDate: new Date(data.invoiceDate),
+                adjustmentType: "SALES_INVOICE_DISPATCH",
+                reason: `Sales Invoice ${data.invoiceNo}`,
+                status: "APPROVED",
+                createdBy: currentUser.userId,
+                updatedBy: currentUser.userId,
+                approvedBy: currentUser.userId,
+                approvedAt: new Date(),
+                autoGenerated: true,
+                sourceDocument: "SALES_INVOICE",
+                sourceDocId: invoice.id,
+              },
+            });
+            stockAdjustmentId = newAdj.id;
+            stockAdjustmentCreated = true;
+          }
+
+          await tx.finishedGoodsStock.update({
+            where: { storeId_productItemId: { storeId: targetStoreId, productItemId: pid } },
+            data: { onHandQty: { decrement: qty } },
+          });
+
+          await tx.stockAdjustmentItem.create({
+            data: {
+              stockAdjustmentId: stockAdjustmentId!,
+              itemType: "FINISHED_GOODS",
+              productItemId: pid,
+              storeId: targetStoreId,
+              currentQty: fgStock.onHandQty,
+              adjustedQty: Number(fgStock.onHandQty) - qty,
+              difference: -qty,
+              remarks: `Invoice ${data.invoiceNo}`,
+            },
+          });
+
+          await tx.finishedGoodsTransaction.create({
+            data: {
+              txnDateTime: new Date(),
+              storeId: targetStoreId,
+              productItemId: pid,
+              txnType: "STOCK_ADJUSTMENT_OUT",
+              qty: new (require('decimal.js').Decimal)(qty),
+              relatedDocNo: adjustmentNumber,
+              remarks: `Invoice ${data.invoiceNo}`,
+              createdBy: currentUser.userId,
+            },
+          });
+        } // end productsToDeduct loop
+      } // end items loop
 
       return invoice;
     }, { maxWait: 10000, timeout: 30000 });
@@ -467,13 +558,18 @@ class SalesInvoiceService {
       }
 
       // 5. Calculate new items and totals
-      const customer = await tx.customer.findUnique({ where: { id: data.customerId } });
+      const customer = await tx.customer.findUnique({
+        where: { id: data.customerId },
+        include: { addresses: true },
+      });
       if (!customer) throw new ApiError(404, "Customer not found");
 
       const company = await tx.company.findUnique({ where: { id: currentUser.companyId } });
       if (!company) throw new ApiError(404, "Company not found");
 
-      const isInterState = company.state?.toLowerCase().trim() !== (customer as any).billingState?.toLowerCase().trim();
+      const billingAddr = (customer as any).addresses?.find((a: any) => a.is_default) || (customer as any).addresses?.[0];
+      const custState = billingAddr?.state_code || (billingAddr?.address as any)?.state?.toLowerCase()?.trim() || "";
+      const isInterState = company.state?.toLowerCase().trim() !== custState;
 
       let subTotal = 0;
       let taxTotal = 0;
@@ -526,7 +622,36 @@ class SalesInvoiceService {
         };
       });
 
-      const grandTotal = subTotal + taxTotal;
+      const du = data as any;
+      const updTotalDiscount = Number(du.totalDiscount) || 0;
+      const updTaxableAmount = subTotal - updTotalDiscount;
+
+      if (updTotalDiscount > 0 && subTotal > 0) {
+        taxTotal = 0;
+        invoiceItems.forEach((item) => {
+          const lineAmount = Number(item.quantity) * Number(item.unitPrice);
+          const share = lineAmount / subTotal;
+          const lineTaxable = lineAmount - (updTotalDiscount * share);
+          const lineTax = (lineTaxable * Number(item.tax)) / 100;
+          taxTotal += lineTax;
+        });
+      }
+
+      let updChargeAdditions = 0;
+      let updChargeDeductions = 0;
+      if ((data as any).narration) {
+        try {
+          const parsed = JSON.parse((data as any).narration);
+          const chargeRows = parsed?.__chargeRows__ || [];
+          for (const row of chargeRows) {
+            const amt = Number(row.amount) || 0;
+            if (amt <= 0) continue;
+            if (String(row.type || "").includes("MINUS")) updChargeDeductions += amt;
+            else updChargeAdditions += amt;
+          }
+        } catch { /* ignore bad JSON */ }
+      }
+      const grandTotal = updTaxableAmount + taxTotal + updChargeAdditions - updChargeDeductions;
 
       const computedStatus = "CONFIRMED";
 
@@ -543,6 +668,9 @@ class SalesInvoiceService {
           narration: (data as any).narration || null,
           salesOrderId: data.salesOrderId || null,
           subTotal,
+          discountType: du.discountType || null,
+          discountValue: Number(du.discountValue) || 0,
+          totalDiscount: updTotalDiscount,
           taxTotal,
           grandTotal,
           status: computedStatus,

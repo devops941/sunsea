@@ -143,7 +143,19 @@ const SalesOrderDetail: React.FC = () => {
 
     const groupedItems = useMemo(() => {
         if (!order?.items || order.items.length === 0) return [];
+        const invoiceData = (order as any)?.salesInvoices?.[0] || null;
+        const invoiceItems: any[] = invoiceData?.items || [];
+        const useInvoice = invoiceData && ["INVOICED", "COMPLETED", "DISPATCHED"].includes(order?.status || "");
         const orderItems = order.items;
+
+        // Parse excluded components from invoice narration
+        let invoiceExcludedComps: Record<string, string[]> = {};
+        if (useInvoice && invoiceData?.narration) {
+            try {
+                const parsed = JSON.parse(invoiceData.narration);
+                invoiceExcludedComps = parsed?.__excludedComponents__ || {};
+            } catch { /* ignore */ }
+        }
 
         if (!salesProducts || salesProducts.length === 0) {
             return orderItems.map((item: any) => {
@@ -227,21 +239,33 @@ const SalesOrderDetail: React.FC = () => {
                     return Math.round(Number(oi.quantity || 1) / perUnit);
                 }), 1);
 
-                const itemSubtotal = matchingOrderItems.reduce((s, oi) => s + Number(oi.lineTotal ?? oi.taxableAmount ?? (Number(oi.quantity || 0) * Number(oi.unitPrice ?? oi.rate ?? 0))), 0);
-                const itemCgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.cgstAmount || 0), 0);
-                const itemSgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.sgstAmount || 0), 0);
-                const itemIgst = matchingOrderItems.reduce((s, oi) => s + Number(oi.igstAmount || 0), 0);
-                const itemGstAmount = itemIgst > 0 ? itemIgst : (itemCgst + itemSgst);
-                const itemUnitPrice = calcOrderQty > 0 ? (itemSubtotal / calcOrderQty) : 0;
-                const maxGstRate = Math.max(...matchingOrderItems.map(oi => Number(oi.igstRate || (Number(oi.cgstRate || 0) + Number(oi.sgstRate || 0)) || 0)), 0);
+                // Use invoice item data when available for prices and GST
+                const matchedInvItems = useInvoice
+                    ? invoiceItems.filter((ii: any) => matchingOrderItems.some(oi => String(oi.productId) === String(ii.productId)))
+                    : [];
+                const srcItems = matchedInvItems.length > 0 ? matchedInvItems : matchingOrderItems;
 
+                const itemSubtotal = matchedInvItems.length > 0
+                    ? srcItems.reduce((s: number, ii: any) => s + Number(ii.taxableAmount ?? (Number(ii.quantity || 0) * Number(ii.unitPrice || 0))), 0)
+                    : matchingOrderItems.reduce((s, oi) => s + Number(oi.lineTotal ?? oi.taxableAmount ?? (Number(oi.quantity || 0) * Number(oi.unitPrice ?? oi.rate ?? 0))), 0);
+                const itemCgst = srcItems.reduce((s: number, i: any) => s + Number(i.cgstAmount || 0), 0);
+                const itemSgst = srcItems.reduce((s: number, i: any) => s + Number(i.sgstAmount || 0), 0);
+                const itemIgst = srcItems.reduce((s: number, i: any) => s + Number(i.igstAmount || 0), 0);
+                const itemGstAmount = itemIgst > 0 ? itemIgst : (itemCgst + itemSgst);
+                const itemUnitPrice = matchedInvItems.length > 0
+                    ? (calcOrderQty > 0 ? srcItems.reduce((s: number, ii: any) => s + Number(ii.quantity || 0) * Number(ii.unitPrice || 0), 0) / calcOrderQty : 0)
+                    : (calcOrderQty > 0 ? (itemSubtotal / calcOrderQty) : 0);
+                const maxGstRate = Math.max(...srcItems.map((i: any) => Number(i.igstRate || (Number(i.cgstRate || 0) + Number(i.sgstRate || 0)) || 0)), 0);
+
+                const excludedForSp = invoiceExcludedComps[spIdStr] || [];
                 const components = spComps.map((c: any) => {
                     const compPerUnit = Number(c.quantity || 1);
                     const oi = matchingOrderItems.find(
                         item => String(item.productId) === String(c.componentProductId)
                     );
-                    const totalQty = oi ? Number(oi.quantity || 0) : 0;
-                    const included = Boolean(oi && totalQty > 0);
+                    const isExcludedByInvoice = excludedForSp.includes(String(c.componentProductId));
+                    const totalQty = isExcludedByInvoice ? 0 : (oi ? Number(oi.quantity || 0) : 0);
+                    const included = !isExcludedByInvoice && Boolean(oi && Number(oi.quantity || 0) > 0);
                     return {
                         name: c.componentProduct?.productName || c.componentProduct?.productCode || `Product #${c.componentProductId}`,
                         code: c.componentProduct?.productCode,
@@ -373,24 +397,37 @@ const SalesOrderDetail: React.FC = () => {
     }, [order?.items, salesProducts, isInterState]);
 
     // ── Financial Totals ────────────────────────────────────────────────
-    // ── All totals read directly from backend — no frontend recalculation ──
-    const calcSubtotal = Number(order?.subtotal || 0);
-    const calcDiscount = Number(order?.totalDiscount || 0);
-    const discValue = Number((order as any)?.orderDiscountValue || 0);
-    const discType = (order as any)?.orderDiscountType || "PERCENT";
+    // When the order has been invoiced, show invoice totals instead of order totals
+    const linkedInvoice = (order as any)?.salesInvoices?.[0] || null;
+    const useInvoiceTotals = linkedInvoice && ["INVOICED", "COMPLETED", "DISPATCHED"].includes(order?.status || "");
+
+    const calcSubtotal = useInvoiceTotals ? Number(linkedInvoice.subTotal || 0) : Number(order?.subtotal || 0);
+    const calcDiscount = useInvoiceTotals ? Number(linkedInvoice.totalDiscount || 0) : Number(order?.totalDiscount || 0);
+    const discValue = useInvoiceTotals ? Number(linkedInvoice.discountValue || 0) : Number((order as any)?.orderDiscountValue || 0);
+    const discType = useInvoiceTotals ? (linkedInvoice.discountType || "PERCENT") : ((order as any)?.orderDiscountType || "PERCENT");
     const taxableAmount = Math.max(0, calcSubtotal - calcDiscount);
-    const calcCgst = Number(order?.totalCgst || 0);
-    const calcSgst = Number(order?.totalSgst || 0);
-    const calcIgst = Number(order?.totalIgst || 0);
-    const calcTotalTax = Number(order?.totalTax || 0);
-    const calcNetAmount = Number(order?.netAmount || 0);
+
+    // Compute invoice-level GST from invoice items
+    const invoiceCgst = linkedInvoice?.items?.reduce((s: number, i: any) => s + Number(i.cgstAmount || 0), 0) || 0;
+    const invoiceSgst = linkedInvoice?.items?.reduce((s: number, i: any) => s + Number(i.sgstAmount || 0), 0) || 0;
+    const invoiceIgst = linkedInvoice?.items?.reduce((s: number, i: any) => s + Number(i.igstAmount || 0), 0) || 0;
+    const invoiceTotalTax = invoiceCgst + invoiceSgst + invoiceIgst;
+
+    const calcCgst = useInvoiceTotals ? invoiceCgst : Number(order?.totalCgst || 0);
+    const calcSgst = useInvoiceTotals ? invoiceSgst : Number(order?.totalSgst || 0);
+    const calcIgst = useInvoiceTotals ? invoiceIgst : Number(order?.totalIgst || 0);
+    const calcTotalTax = useInvoiceTotals ? invoiceTotalTax : Number(order?.totalTax || 0);
+    const calcNetAmount = useInvoiceTotals ? Number(linkedInvoice.grandTotal || 0) : Number(order?.netAmount || 0);
     const hasGst = calcTotalTax > 0;
 
-    // Parse extra charges from narration (display only)
+    // Parse extra charges from narration (use invoice narration if invoiced)
     const chargeRows = useMemo(() => {
+        if (useInvoiceTotals && linkedInvoice?.narration) {
+            return parseChargeRowsFromNarration(linkedInvoice.narration);
+        }
         if (!order) return [];
         return parseChargeRowsFromNarration((order as any).narration);
-    }, [order]);
+    }, [order, useInvoiceTotals, linkedInvoice]);
 
     const hasAnyPricing = calcSubtotal > 0 || calcNetAmount > 0;
 
@@ -671,7 +708,9 @@ const SalesOrderDetail: React.FC = () => {
                             <div className="flex justify-end mt-5">
                                 <div className="w-full max-w-sm border border-line rounded-xl p-4 bg-card shadow-xs">
                                     <h4 className="text-xs font-bold text-ink uppercase tracking-wide mb-3 pb-2 border-b border-line-soft">
-                                        {order.status === "QUOTED" ? "Quotation Summary" : "Sales Order Summary"}
+                                        {useInvoiceTotals
+                                            ? `Invoice Summary (${linkedInvoice.invoiceNo})`
+                                            : order.status === "QUOTED" ? "Quotation Summary" : "Sales Order Summary"}
                                     </h4>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between text-ink-subtle">
