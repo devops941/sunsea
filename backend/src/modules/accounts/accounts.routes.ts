@@ -7,6 +7,7 @@ router.get("/ledgers", (req, res, next) => accountsController.getLedgers(req, re
 router.post("/ledgers", (req, res, next) => accountsController.createLedger(req, res, next));
 router.get("/ledgers/:id", (req, res, next) => accountsController.getLedgerById(req, res, next));
 router.patch("/ledgers/:id", (req, res, next) => accountsController.updateLedger(req, res, next));
+router.get("/ledger-statement/multi", (req, res, next) => accountsController.getMultiLedgerStatement(req, res, next));
 router.get("/ledgers/:id/statement", (req, res, next) => accountsController.getLedgerStatement(req, res, next));
 
 router.get("/bank-accounts", (req, res, next) => accountsController.getBankAccounts(req, res, next));

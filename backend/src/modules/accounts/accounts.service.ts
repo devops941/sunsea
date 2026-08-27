@@ -239,6 +239,21 @@ class AccountsService {
 
     const ledger = await this.getLedgerById(id);
 
+    // Aggregate expansion — if this ledger is a standard "Sundry Debtors" or
+    // "Sundry Creditors" parent, expand to include ALL child party ledgers so
+    // the statement shows combined activity from every customer/supplier.
+    const { AGGREGATE_LEDGER_CODES, expandAggregateLedger } = require("./standardLedgers");
+    if (AGGREGATE_LEDGER_CODES.has(ledger.code)) {
+      const expansion = await expandAggregateLedger(ledger, prisma);
+      const multi = await this.getMultiLedgerStatement(expansion.ledgerIds, {
+        ...options,
+        label: expansion.label,
+      });
+      // Return with the parent ledger attached so the frontend "One Account" mode
+      // still recognises the response and renders the same UI.
+      return { ...multi, ledger, mode: "one" as const };
+    }
+
     const dateFilter: Prisma.VoucherWhereInput = {};
     if (options.startDate || options.endDate) {
       dateFilter.date = {
@@ -394,6 +409,160 @@ class AccountsService {
 
     return {
       ledger,
+      mode: "one" as const,
+      startDate: options.startDate || null,
+      endDate: options.endDate || null,
+      openingBalance,
+      closingBalance: runningBalance,
+      entries: filteredEntries,
+    };
+  }
+
+  /**
+   * Combined ledger statement for multiple ledgers.
+   * Used by Busy-style "All Accounts", "Group of Accounts", "Selected Accounts" modes.
+   * Returns a chronologically-merged voucher list with a single running balance
+   * (net across all selected ledgers, treating Asset+Expense = Dr side).
+   */
+  async getMultiLedgerStatement(
+    ids: number[],
+    options: { startDate?: string; endDate?: string; search?: string; label?: string }
+  ) {
+    if (!ids || ids.length === 0) {
+      throw new ApiError(400, "At least one ledger id is required");
+    }
+
+    try {
+      const { voucherPostingService } = require("./voucherPosting.service");
+      await voucherPostingService.syncUnpostedVouchers();
+    } catch (err) {
+      console.error("[AccountsService] Sync unposted vouchers failed:", err);
+    }
+
+    const ledgers = await prisma.accountLedger.findMany({
+      where: { id: { in: ids } },
+      include: { customer: true, supplier: true },
+    });
+    if (ledgers.length === 0) {
+      throw new ApiError(404, "No matching ledgers found");
+    }
+
+    const dateFilter: Prisma.VoucherWhereInput = {};
+    if (options.startDate || options.endDate) {
+      dateFilter.date = {
+        ...(options.startDate && { gte: new Date(options.startDate) }),
+        ...(options.endDate && { lte: new Date(options.endDate) }),
+      };
+    }
+
+    const journalItems = await prisma.journalItem.findMany({
+      where: {
+        OR: [
+          { debitLedgerId: { in: ids } },
+          { creditLedgerId: { in: ids } },
+        ],
+        voucher: {
+          ...dateFilter,
+          OR: [
+            { refDocType: null },
+            { refDocType: { notIn: ["SUPPLIER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE"] } },
+          ],
+        },
+      },
+      include: {
+        voucher: true,
+        debitLedger: { select: { id: true, name: true, code: true, type: true } },
+        creditLedger: { select: { id: true, name: true, code: true, type: true } },
+      },
+      orderBy: [{ voucher: { date: "asc" } }, { voucher: { id: "asc" } }],
+    });
+
+    // Aggregate opening balance from party ledgers
+    let openingBalance = 0;
+    for (const ledger of ledgers) {
+      const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
+      let opening = 0;
+      if (ledger.customer) opening = Number((ledger.customer as any).openingBalance || 0);
+      else if (ledger.supplier) opening = Number((ledger.supplier as any).openingBalance || 0);
+      openingBalance += isAssetOrExpense ? opening : -opening;
+    }
+
+    const selectedIds = new Set(ids);
+    let runningBalance = openingBalance;
+    const entries: any[] = [];
+
+    if (Math.abs(openingBalance) > 0.01) {
+      entries.push({
+        id: `opening-multi`,
+        voucherNo: "-",
+        voucherType: "OPENING",
+        date: options.startDate || (journalItems.length > 0 ? journalItems[0].voucher.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
+        narration: "Combined Opening Balance",
+        particulars: `Opening Balance (${ids.length} accounts)`,
+        debit: openingBalance > 0 ? openingBalance : 0,
+        credit: openingBalance < 0 ? -openingBalance : 0,
+        runningBalance: openingBalance,
+      });
+    }
+
+    for (const item of journalItems) {
+      const isSelectedDebit = item.debitLedgerId && selectedIds.has(item.debitLedgerId);
+      const isSelectedCredit = item.creditLedgerId && selectedIds.has(item.creditLedgerId);
+      // If both sides are within the selected set, the entry is internal — skip
+      if (isSelectedDebit && isSelectedCredit) continue;
+
+      const rawDebit = Number(item.debitAmount);
+      const rawCredit = Number(item.creditAmount);
+      const amt = rawDebit > 0 ? rawDebit : rawCredit > 0 ? rawCredit : 0;
+
+      // Determine which side of the selected set the entry falls on
+      const selectedLedger = isSelectedDebit ? item.debitLedger : item.creditLedger;
+      const opposingLedger = isSelectedDebit ? item.creditLedger : item.debitLedger;
+      const isAssetOrExpense = selectedLedger?.type === LedgerType.ASSET || selectedLedger?.type === LedgerType.EXPENSE;
+
+      const debit = isSelectedDebit ? amt : 0;
+      const credit = isSelectedCredit ? amt : 0;
+
+      if (isAssetOrExpense) {
+        runningBalance += debit - credit;
+      } else {
+        runningBalance += credit - debit;
+      }
+
+      entries.push({
+        id: item.id.toString(),
+        voucherNo: item.voucher.voucherNo,
+        voucherType: item.voucher.type,
+        refDocType: item.voucher.refDocType,
+        date: item.voucher.date.toISOString().split("T")[0],
+        narration: item.narration || item.voucher.narration || "",
+        particulars: opposingLedger?.name || (isSelectedDebit ? "Debit Entry" : "Credit Entry"),
+        accountName: selectedLedger?.name || "-",
+        debit,
+        credit,
+        runningBalance,
+      });
+    }
+
+    // Search filter
+    let filteredEntries = entries;
+    if (options.search && options.search.trim()) {
+      const q = options.search.toLowerCase();
+      filteredEntries = entries.filter(
+        (e) =>
+          (e.voucherNo || "").toString().toLowerCase().includes(q) ||
+          (e.particulars || "").toString().toLowerCase().includes(q) ||
+          (e.accountName || "").toString().toLowerCase().includes(q) ||
+          (e.narration || "").toString().toLowerCase().includes(q) ||
+          (e.voucherType || "").toString().toLowerCase().includes(q)
+      );
+    }
+
+    return {
+      mode: "multi" as const,
+      label: options.label || `${ledgers.length} accounts`,
+      ledgerIds: ids,
+      ledgerCount: ledgers.length,
       startDate: options.startDate || null,
       endDate: options.endDate || null,
       openingBalance,

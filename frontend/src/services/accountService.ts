@@ -31,6 +31,7 @@ export interface LedgerStatementEntry {
   date: string;
   narration: string;
   particulars: string;
+  accountName?: string;
   debit: number;
   credit: number;
   runningBalance: number;
@@ -38,6 +39,19 @@ export interface LedgerStatementEntry {
 
 export interface LedgerStatementResult {
   ledger: AccountLedger;
+  mode?: "one";
+  startDate?: string | null;
+  endDate?: string | null;
+  openingBalance: number;
+  closingBalance: number;
+  entries: LedgerStatementEntry[];
+}
+
+export interface MultiLedgerStatementResult {
+  mode: "multi";
+  label: string;
+  ledgerIds: number[];
+  ledgerCount: number;
   startDate?: string | null;
   endDate?: string | null;
   openingBalance: number;
@@ -96,6 +110,30 @@ export const accountService = {
     params?: { startDate?: string; endDate?: string; search?: string }
   ): Promise<LedgerStatementResult> => {
     const response = await apiClient.get(`/accounts/ledgers/${id}/statement`, { params });
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Combined ledger statement for multiple accounts.
+   * Pass EITHER `ids` (comma-separated ledger ids) OR `group` (group name = all ledgers in that group).
+   * Omit both to get "All Accounts" combined view.
+   */
+  fetchMultiStatement: async (params?: {
+    ids?: number[];
+    group?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    label?: string;
+  }): Promise<MultiLedgerStatementResult> => {
+    const query: Record<string, string> = {};
+    if (params?.ids && params.ids.length > 0) query.ids = params.ids.join(",");
+    if (params?.group) query.group = params.group;
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.search) query.search = params.search;
+    if (params?.label) query.label = params.label;
+    const response = await apiClient.get(`/accounts/ledger-statement/multi`, { params: query });
     return response.data?.data || response.data;
   },
 };

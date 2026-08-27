@@ -326,7 +326,7 @@ export const ProfitLossPage: React.FC = () => {
             <span className="text-xs text-ink-muted">Show Zero Balance</span>
           </label>
 
-          <button onClick={fetchData} disabled={loading}
+          <button onClick={() => fetchData()} disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold disabled:opacity-50">
             <FaPlay className="text-[10px]" /> {loading ? "Loading..." : data ? "Reload" : "Show Report"}
           </button>
@@ -340,7 +340,7 @@ export const ProfitLossPage: React.FC = () => {
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaDownload /> Export
             </button>
-            <button onClick={fetchData} disabled={loading}
+            <button onClick={() => fetchData()} disabled={loading}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaSync className={loading ? "animate-spin text-emerald-500" : ""} /> Refresh
             </button>

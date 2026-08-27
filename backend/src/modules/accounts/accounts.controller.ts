@@ -81,6 +81,51 @@ export class AccountsController {
     }
   }
 
+  /**
+   * Combined ledger statement (Busy-style All/Group/Selected modes).
+   * Accepts either `ids` (comma-separated) or `group` (all ledgers in the group)
+   * as query parameters.
+   */
+  async getMultiLedgerStatement(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids, group, startDate, endDate, search, label } = req.query;
+
+      let ledgerIds: number[] = [];
+      let derivedLabel = (label as string) || undefined;
+
+      if (group) {
+        // Group of Accounts mode — look up all ledger ids in the group
+        const groupLedgers = await accountsService.getLedgers({
+          page: 1,
+          limit: 10000,
+          group: group as string,
+        });
+        ledgerIds = groupLedgers.ledgers.map((l) => l.id);
+        derivedLabel = derivedLabel || `${group}`;
+      } else if (ids) {
+        ledgerIds = (ids as string)
+          .split(",")
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !isNaN(n));
+      } else {
+        // No filter → all accounts
+        const all = await accountsService.getLedgers({ page: 1, limit: 10000 });
+        ledgerIds = all.ledgers.map((l) => l.id);
+        derivedLabel = derivedLabel || `All Accounts (${ledgerIds.length})`;
+      }
+
+      const statement = await accountsService.getMultiLedgerStatement(ledgerIds, {
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        search: search as string | undefined,
+        label: derivedLabel,
+      });
+      res.json({ success: true, data: statement });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getPayableSummaries(req: Request, res: Response, next: NextFunction) {
     try {
       const { asOnDate, startDate, endDate, supplierId, search, page, limit } = req.query;
