@@ -1,5 +1,4 @@
-import React, { useState, useMemo } from "react";
-import { toast } from "react-toastify";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   FaSync,
   FaDownload,
@@ -7,7 +6,6 @@ import {
   FaExclamationTriangle,
   FaBalanceScale,
   FaPrint,
-  FaPlay,
   FaChevronRight,
   FaChevronDown,
   FaFileAlt,
@@ -17,6 +15,7 @@ import {
   FaSortAlphaDown,
 } from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
+import { useDetailCache } from "../../../../hooks/useDetailCache";
 
 interface TrialBalanceRow {
   ledgerId: number;
@@ -80,9 +79,6 @@ const getFYStartDate = () => {
 };
 
 export const TrialBalancePage: React.FC = () => {
-  const [data, setData] = useState<TrialBalanceData | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const today = new Date().toISOString().split("T")[0];
   const [asOnDate, setAsOnDate] = useState<string>(today);
   const [showZeroBalance, setShowZeroBalance] = useState<boolean>(false);
@@ -91,30 +87,31 @@ export const TrialBalancePage: React.FC = () => {
   const [expandOpening, setExpandOpening] = useState(true);
   const activeConfig = VARIANT_MAP[variant];
 
-  const fetchData = async (v: ReportVariant = variant) => {
-    setLoading(true);
-    try {
-      const cfg = VARIANT_MAP[v];
-      const dateParam = cfg.category === "opening" ? getFYStartDate() : asOnDate;
+  const dateParam = activeConfig.category === "opening" ? getFYStartDate() : asOnDate;
+  const groupByCategoryParam = activeConfig.layout !== "alpha";
+  const cacheKey = `accounts:trial-balance:${dateParam}:${showZeroBalance}:${groupByCategoryParam}`;
+
+  const fetcher = useCallback(
+    async (signal: AbortSignal): Promise<TrialBalanceData> => {
       const params = new URLSearchParams({
         asOnDate: dateParam,
         showZeroBalance: String(showZeroBalance),
         sortBy: "name",
-        groupByCategory: String(cfg.layout !== "alpha"),
+        groupByCategory: String(groupByCategoryParam),
       });
-      const res = await apiClient.get(`/accounts/trial-balance?${params.toString()}`);
-      setData(res.data.data);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to load trial balance");
-    } finally {
-      setLoading(false);
-    }
-  };
+      const res = await apiClient.get(`/accounts/trial-balance?${params.toString()}`, { signal });
+      return res.data.data as TrialBalanceData;
+    },
+    [dateParam, showZeroBalance, groupByCategoryParam]
+  );
 
-  const handleVariantClick = (v: ReportVariant) => {
-    setVariant(v);
-    fetchData(v);
-  };
+  const { data, loading, refreshing, refresh } = useDetailCache<TrialBalanceData>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
+
+  const handleVariantClick = (v: ReportVariant) => setVariant(v);
 
   const filteredRows = useMemo(() => {
     if (!data) return [];
@@ -187,7 +184,7 @@ export const TrialBalancePage: React.FC = () => {
   );
 
   return (
-    <div className="p-3 bg-card-2 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div className="p-3 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* LEFT SIDEBAR — Busy-style report menu */}
       <aside className="w-[240px] shrink-0 bg-card rounded-lg border border-line overflow-hidden">
         <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2">
@@ -280,10 +277,11 @@ export const TrialBalancePage: React.FC = () => {
             <span className="text-xs text-ink-muted">Show Zero Balance</span>
           </label>
 
-          <button onClick={() => fetchData()} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold disabled:opacity-50">
-            <FaPlay className="text-[10px]" /> {loading ? "Loading..." : data ? "Reload" : "Show Report"}
-          </button>
+          {refreshing && (
+            <span className="flex items-center gap-1 text-[10px] text-indigo-400">
+              <FaSync className="animate-spin" /> Syncing…
+            </span>
+          )}
 
           <div className="flex items-center gap-1.5 ml-auto">
             <button onClick={handlePrint} disabled={!data}
@@ -294,9 +292,9 @@ export const TrialBalancePage: React.FC = () => {
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaDownload /> Export
             </button>
-            <button onClick={() => fetchData()} disabled={loading}
+            <button onClick={refresh} disabled={refreshing}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaSync className={loading ? "animate-spin text-indigo-500" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-indigo-500" : ""} /> Refresh
             </button>
           </div>
         </div>

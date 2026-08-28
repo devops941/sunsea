@@ -151,7 +151,7 @@ export const ChartOfAccountsPage: React.FC = () => {
   const paginatedLedgers = filteredLedgers;
 
   return (
-    <div className="w-full p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
+    <div className="w-full p-3 space-y-3 min-h-screen font-sans text-ink">
       {/* COMPACT HEADER + FILTERS */}
       <div className="bg-card rounded-lg border border-line">
         {/* Title Bar */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaBook,
@@ -27,6 +27,7 @@ import {
   type MultiLedgerStatementResult,
 } from "../../../../services/accountService";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useDetailCache, invalidateDetailCache } from "../../../../hooks/useDetailCache";
 
 type ViewMode = "one" | "group" | "all" | "selected";
 
@@ -118,8 +119,6 @@ export const LedgerStatementPage: React.FC = () => {
   const [endDate, setEndDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [dateRangePreset, setDateRangePreset] = useState<string>("custom");
-  const [statement, setStatement] = useState<AnyStatement | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
   const [sidebarSearch, setSidebarSearch] = useState<string>("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -145,55 +144,66 @@ export const LedgerStatementPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidebarSearch]);
 
-  const loadStatement = async () => {
-    setLoading(true);
-    try {
+  const sortedSelectedIds = useMemo(
+    () => Array.from(selectedLedgerIds).sort((a, b) => a - b).join(","),
+    [selectedLedgerIds]
+  );
+
+  const cacheEnabled =
+    !showModeDialog &&
+    !showOptionsDialog &&
+    !(viewMode === "one" && !selectedLedgerId) &&
+    !(viewMode === "group" && !selectedGroup) &&
+    !(viewMode === "selected" && selectedLedgerIds.size === 0);
+
+  const cacheKey = `accounts:ledger-statement:${viewMode}:${selectedLedgerId ?? ""}:${selectedGroup ?? ""}:${sortedSelectedIds}:${startDate}:${endDate}:${searchTerm}`;
+
+  const fetcher = useCallback(
+    async (_signal: AbortSignal): Promise<AnyStatement> => {
       const common = {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         search: searchTerm || undefined,
       };
       if (viewMode === "one") {
-        if (!selectedLedgerId) { setLoading(false); return; }
-        const res = await accountService.fetchStatement(selectedLedgerId, common);
-        setStatement({ ...res, mode: "one" });
-      } else if (viewMode === "group") {
-        if (!selectedGroup) { setLoading(false); return; }
-        const res = await accountService.fetchMultiStatement({ ...common, group: selectedGroup, label: selectedGroup });
-        setStatement(res);
-      } else if (viewMode === "all") {
-        const res = await accountService.fetchMultiStatement({ ...common, label: "All Accounts" });
-        setStatement(res);
-      } else if (viewMode === "selected") {
-        if (selectedLedgerIds.size === 0) { setLoading(false); setStatement(null); return; }
-        const res = await accountService.fetchMultiStatement({
-          ...common,
-          ids: Array.from(selectedLedgerIds),
-          label: `Selected (${selectedLedgerIds.size} accounts)`,
-        });
-        setStatement(res);
+        const res = await accountService.fetchStatement(selectedLedgerId!, common);
+        return { ...res, mode: "one" };
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load ledger statement");
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (viewMode === "group") {
+        return accountService.fetchMultiStatement({ ...common, group: selectedGroup!, label: selectedGroup! });
+      }
+      if (viewMode === "all") {
+        return accountService.fetchMultiStatement({ ...common, label: "All Accounts" });
+      }
+      // selected
+      return accountService.fetchMultiStatement({
+        ...common,
+        ids: Array.from(selectedLedgerIds),
+        label: `Selected (${selectedLedgerIds.size} accounts)`,
+      });
+    },
+    [viewMode, selectedLedgerId, selectedGroup, sortedSelectedIds, startDate, endDate, searchTerm]
+  );
 
-  useEffect(() => {
-    // Don't auto-load until the user has picked a view mode AND filled in options
-    if (showModeDialog || showOptionsDialog) return;
-    loadStatement();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, selectedLedgerId, selectedGroup, startDate, endDate, searchTerm, showModeDialog, showOptionsDialog]);
+  const { data: statement, loading, refreshing, refresh } = useDetailCache<AnyStatement>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+    enabled: cacheEnabled,
+  });
 
-  useSocketSync("voucher", undefined, loadStatement);
-  useSocketSync("accountLedger", undefined, loadStatement);
-  useSocketSync("journalItem", undefined, loadStatement);
-  useSocketSync("payment", undefined, loadStatement);
-  useSocketSync("grnInvoice", undefined, loadStatement);
-  useSocketSync("salesInvoice", undefined, loadStatement);
-  useSocketSync("expense", undefined, loadStatement);
+  // Real-time revalidation from every source that can mutate ledger balances.
+  // useDetailCache only listens to `voucher`; these extra modules cover the rest.
+  const invalidateAndRefresh = useCallback(() => {
+    invalidateDetailCache(cacheKey);
+    refresh();
+  }, [cacheKey, refresh]);
+  useSocketSync("accountLedger", undefined, invalidateAndRefresh);
+  useSocketSync("journalItem", undefined, invalidateAndRefresh);
+  useSocketSync("payment", undefined, invalidateAndRefresh);
+  useSocketSync("grnInvoice", undefined, invalidateAndRefresh);
+  useSocketSync("salesInvoice", undefined, invalidateAndRefresh);
+  useSocketSync("expense", undefined, invalidateAndRefresh);
 
   const handleDateRangeChange = (val: string) => {
     setDateRangePreset(val);
@@ -250,7 +260,7 @@ export const LedgerStatementPage: React.FC = () => {
   }, [statement, filteredEntries]);
 
   return (
-    <div className="p-3 bg-card-2 font-sans text-ink relative" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div className="p-3 font-sans text-ink relative" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* Busy-style initial mode selection modal */}
       {showModeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -277,7 +287,6 @@ export const LedgerStatementPage: React.FC = () => {
                     onClick={() => {
                       setViewMode(m.key);
                       setShowModeDialog(false);
-                      setStatement(null);
                       // Prepare draft state for Step-2 options dialog
                       setDraftLedgerId(selectedLedgerId);
                       setDraftGroup(selectedGroup);
@@ -562,7 +571,6 @@ export const LedgerStatementPage: React.FC = () => {
                 key={m.key}
                 onClick={() => {
                   setViewMode(m.key);
-                  setStatement(null);
                 }}
                 className={`px-2 py-1 text-[10px] font-semibold rounded flex items-center justify-center gap-1 border transition-colors ${
                   viewMode === m.key
@@ -578,21 +586,21 @@ export const LedgerStatementPage: React.FC = () => {
           {/* Show extra actions for All/Selected modes */}
           {viewMode === "all" && (
             <button
-              onClick={loadStatement}
-              disabled={loading}
+              onClick={refresh}
+              disabled={refreshing}
               className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-semibold disabled:opacity-50"
             >
-              <FaPlay className="text-[9px]" /> {loading ? "Loading..." : "Show Combined Statement"}
+              <FaPlay className="text-[9px]" /> {refreshing ? "Refreshing..." : "Reload Combined Statement"}
             </button>
           )}
           {viewMode === "selected" && selectedLedgerIds.size > 0 && (
             <div className="mt-2 flex items-center gap-1.5">
               <button
-                onClick={loadStatement}
-                disabled={loading}
+                onClick={refresh}
+                disabled={refreshing}
                 className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-semibold disabled:opacity-50"
               >
-                <FaPlay className="text-[9px]" /> Show ({selectedLedgerIds.size})
+                <FaPlay className="text-[9px]" /> Reload ({selectedLedgerIds.size})
               </button>
               <button
                 onClick={() => setSelectedLedgerIds(new Set())}
@@ -820,11 +828,11 @@ export const LedgerStatementPage: React.FC = () => {
 
           <div className="flex items-center gap-1.5 ml-auto">
             <button
-              onClick={loadStatement}
-              disabled={loading}
+              onClick={refresh}
+              disabled={refreshing}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50"
             >
-              <FaSync className={loading ? "animate-spin text-blue-500" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-blue-500" : ""} /> Refresh
             </button>
             <ExportCSVButton
               data={csvData}

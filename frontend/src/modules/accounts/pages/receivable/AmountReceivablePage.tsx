@@ -286,13 +286,19 @@ export const AmountReceivablePage: React.FC = () => {
     },
     {
       header: "NET BALANCE",
-      render: (item: any) => (
-        <div className="text-right font-mono font-semibold text-ink">
-          ₹{item.balanceAsOnDate > 0
-            ? item.balanceAsOnDate.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : "0.00"}
-        </div>
-      ),
+      render: (item: any) => {
+        const bal = Number(item.balanceAsOnDate || 0);
+        const abs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (Math.abs(bal) < 0.005) {
+          return <div className="text-right font-mono font-semibold text-ink">₹0.00</div>;
+        }
+        if (bal > 0) {
+          // Customer owes us — receivable
+          return <div className="text-right font-mono font-semibold text-ink">₹{abs} <span className="text-[10px] text-ink-subtle">Dr</span></div>;
+        }
+        // Customer has advance / we owe them — credit balance
+        return <div className="text-right font-mono font-semibold text-emerald-500">₹{abs} <span className="text-[10px] text-emerald-500/70">Cr</span></div>;
+      },
     },
     {
       header: "ACTION",
@@ -308,7 +314,7 @@ export const AmountReceivablePage: React.FC = () => {
   ];
 
   return (
-    <div className="p-3 space-y-3 bg-card-2 min-h-screen font-sans text-ink">
+    <div className="p-3 space-y-3 min-h-screen font-sans text-ink">
       {/* COMPACT HEADER + FILTERS */}
       <div className="bg-card rounded-lg border border-line">
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
@@ -415,9 +421,18 @@ export const AmountReceivablePage: React.FC = () => {
             <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Receivable</span>
             <FaMoneyBillWave className="text-blue-600 text-xs" />
           </div>
-          <div className="text-lg font-mono font-bold text-ink mt-1">
-            ₹ {totals.totalNetBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
+          {(() => {
+            const bal = Number(totals.totalNetBalance || 0);
+            const abs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (Math.abs(bal) < 0.005) {
+              return <div className="text-lg font-mono font-bold text-ink mt-1">₹ 0.00</div>;
+            }
+            return (
+              <div className={`text-lg font-mono font-bold mt-1 ${bal >= 0 ? "text-ink" : "text-emerald-500"}`}>
+                ₹ {abs} <span className="text-[10px]">{bal >= 0 ? "Dr" : "Cr"}</span>
+              </div>
+            );
+          })()}
           <div className="text-[10px] text-ink-subtle mt-0.5">
             {filteredCustomers.length} customers
           </div>

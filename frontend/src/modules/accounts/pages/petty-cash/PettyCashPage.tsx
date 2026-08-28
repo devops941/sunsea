@@ -137,7 +137,7 @@ export const PettyCashPage: React.FC = () => {
   }, [entries]);
 
   return (
-    <div className="p-3 gap-3 bg-card-2 flex flex-col h-full min-h-0" style={{ height: "calc(100vh - 100px)" }}>
+    <div className="p-3 gap-3 flex flex-col h-full min-h-0" style={{ height: "calc(100vh - 100px)" }}>
       {/* Compact KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 shrink-0">
         <div className="bg-card border border-line rounded-lg p-3 flex items-center justify-between">

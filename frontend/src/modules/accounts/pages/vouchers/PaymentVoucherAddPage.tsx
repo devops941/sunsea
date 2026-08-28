@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMoneyBillWave, FaPlus, FaTrash, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
+import { useListCache } from "../../../../hooks/useListCache";
 
 interface PaymentRow {
   id: number;
@@ -17,9 +18,7 @@ let rowCounter = 1;
 
 const PaymentVoucherAddPage: React.FC = () => {
   const navigate = useNavigate();
-  const [ledgers, setLedgers] = useState<AccountLedger[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [creditLedgerId, setCreditLedgerId] = useState("");
@@ -28,15 +27,17 @@ const PaymentVoucherAddPage: React.FC = () => {
     { id: rowCounter++, debitLedgerId: "", amount: "", narration: "" },
   ]);
 
-  useEffect(() => {
-    accountService.fetchLedgers({ limit: 1000 }).then((res) => {
-      setLedgers(res.ledgers || []);
-      setLoading(false);
-    }).catch(() => {
-      toast.error("Failed to load accounts");
-      setLoading(false);
-    });
+  const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await accountService.fetchLedgers({ limit: 1000 });
+    const list = res.ledgers || [];
+    return { data: list, total: list.length };
   }, []);
+
+  const { data: ledgers } = useListCache<AccountLedger>({
+    cacheKey: "accounts:ledgers:all",
+    socketModule: "accountLedger",
+    fetcher: ledgersFetcher,
+  });
 
   const addRow = () => {
     setRows((prev) => [...prev, { id: rowCounter++, debitLedgerId: "", amount: "", narration: "" }]);
@@ -97,10 +98,8 @@ const PaymentVoucherAddPage: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="p-6 text-center text-xs text-ink-muted">Loading accounts...</div>;
-
   return (
-    <div className="p-3 space-y-3 bg-card-2 min-h-screen">
+    <div className="p-3 space-y-3 min-h-screen">
       {/* Compact Header */}
       <div className="bg-card rounded-lg border border-line flex items-center justify-between gap-2 px-3 py-2">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2">
