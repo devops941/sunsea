@@ -4,7 +4,7 @@ import { FaReceipt, FaPlus, FaTrash, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
-import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
+import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import { useListCache } from "../../../../hooks/useListCache";
 
 interface ReceiptRow {
@@ -116,6 +116,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
                 onChange={setDebitLedgerId}
                 placeholder="Search bank / cash account..."
                 required
+                filterFn={isBankOrCashLedger}
                 accentColor="green-500"
               />
             </div>
@@ -151,7 +152,8 @@ const ReceiptVoucherAddPage: React.FC = () => {
                         value={row.creditLedgerId}
                         ledgers={ledgers}
                         onChange={(val) => updateRow(row.id, "creditLedgerId", val)}
-                        placeholder="Search account..."
+                        placeholder="Search customer / income account..."
+                        filterFn={(l) => !isBankOrCashLedger(l)}
                         accentColor="green-500"
                       />
                     </td>
