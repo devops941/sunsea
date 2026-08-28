@@ -280,7 +280,7 @@ const LoginPage = () => {
                                 variant="primary"
                                 width="100%"
                                 disabled={loading}
-                                className="shadow-md"
+                                className="!bg-gradient-to-r !from-blue-700 !to-blue-500 hover:!from-blue-800 hover:!to-blue-600 !shadow-md !shadow-blue-500/20"
                             />
                         </div>
                     </form>
