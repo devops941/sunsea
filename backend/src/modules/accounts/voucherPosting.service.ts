@@ -117,12 +117,15 @@ class VoucherPostingService {
   private static readonly SYNC_MIN_INTERVAL_MS: number = 60_000; // 1 minute
 
   // ─── syncMissingOpeningBalanceVouchers throttling ──────────────────────────
-  // Same pattern as _inFlightSync — this runs on every trial-balance / balance-sheet
-  // request. 4 baseline findMany calls per invocation × N concurrent report loads
-  // was saturating Neon's 13-conn pool.
+  // This is a SAFETY-NET sweep — new customers/suppliers already post their
+  // opening balance voucher inline at creation time (see customer.service.ts and
+  // supplier.service.ts). The sweep only catches edge cases: migrations, direct
+  // DB inserts, or transient failures during create. 15 min is plenty because
+  // there's no correctness cost to lag — the parties still show correctly in
+  // party-owned ledgers, only the aggregate report catches up on next sweep.
   private static _lastOpBalSyncAt: number = 0;
   private static _inFlightOpBalSync: Promise<any> | null = null;
-  private static readonly OPBAL_SYNC_MIN_INTERVAL_MS: number = 60_000;
+  private static readonly OPBAL_SYNC_MIN_INTERVAL_MS: number = 15 * 60_000;
 
   /**
    * Post a formal double-entry PURCHASE Voucher for a GRN Purchase Invoice.
@@ -1529,45 +1532,46 @@ class VoucherPostingService {
     const db = txClient || prisma;
     await accountsService.ensureSystemLedgersExist(db);
 
-    // Fast-path: bulk-check existing opening balance vouchers in TWO queries instead of N per party.
-    const existingCustomerVouchers = await db.voucher.findMany({
-      where: { refDocType: "CUSTOMER_OPENING_BALANCE" },
-      select: { refDocId: true },
-    });
-    const existingCustIds = new Set(existingCustomerVouchers.map((v) => v.refDocId));
+    // ── Discovery phase: 4 reads run in ONE $transaction so they share a single
+    // pooled connection instead of grabbing 4 separately (was P2024 under load).
+    const [existingCustomerVouchers, existingSupplierVouchers, customers, suppliers] =
+      txClient
+        ? await Promise.all([
+            db.voucher.findMany({ where: { refDocType: "CUSTOMER_OPENING_BALANCE" }, select: { refDocId: true } }),
+            db.voucher.findMany({ where: { refDocType: "SUPPLIER_OPENING_BALANCE" }, select: { refDocId: true } }),
+            db.customer.findMany({ where: { openingBalance: { gt: 0 } } }),
+            db.supplier.findMany({ where: { openingBalance: { gt: 0 } } }),
+          ])
+        : await prisma.$transaction([
+            prisma.voucher.findMany({ where: { refDocType: "CUSTOMER_OPENING_BALANCE" }, select: { refDocId: true } }),
+            prisma.voucher.findMany({ where: { refDocType: "SUPPLIER_OPENING_BALANCE" }, select: { refDocId: true } }),
+            prisma.customer.findMany({ where: { openingBalance: { gt: 0 } } }),
+            prisma.supplier.findMany({ where: { openingBalance: { gt: 0 } } }),
+          ]);
 
-    const existingSupplierVouchers = await db.voucher.findMany({
-      where: { refDocType: "SUPPLIER_OPENING_BALANCE" },
-      select: { refDocId: true },
-    });
+    const existingCustIds = new Set(existingCustomerVouchers.map((v) => v.refDocId));
     const existingSupIds = new Set(existingSupplierVouchers.map((v) => v.refDocId));
 
-    // Customers needing opening balance vouchers
-    const customers = await db.customer.findMany({
-      where: { openingBalance: { gt: 0 } },
-    });
+    // Fast-exit if nothing needs posting — avoids acquiring another connection.
     const missingCustomers = customers.filter((c) => !existingCustIds.has(String(c.id)));
-    if (missingCustomers.length === 0 && customers.length > 0) {
-      // All good, skip loop entirely
-    } else {
-      for (const cust of missingCustomers) {
-        const opBal = Number(cust.openingBalance || 0);
-        if (opBal <= 0) continue;
-        const opType = ((cust as any).openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
-        await this.postCustomerOpeningBalanceVoucher(
-          { id: cust.id, customerCode: cust.customerCode, firmName: cust.firmName },
-          opBal,
-          opType,
-          db
-        );
-      }
+    const missingSuppliers = suppliers.filter((s) => !existingSupIds.has(String(s.id)));
+    if (missingCustomers.length === 0 && missingSuppliers.length === 0) {
+      return { ok: true, skipped: "all-posted" };
     }
 
-    // Suppliers needing opening balance vouchers
-    const suppliers = await db.supplier.findMany({
-      where: { openingBalance: { gt: 0 } },
-    });
-    const missingSuppliers = suppliers.filter((s) => !existingSupIds.has(String(s.id)));
+    // Post-phase: sequential (each post is itself a small tx). This only runs
+    // when actual gaps exist — the steady-state hot path never reaches here.
+    for (const cust of missingCustomers) {
+      const opBal = Number(cust.openingBalance || 0);
+      if (opBal <= 0) continue;
+      const opType = ((cust as any).openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
+      await this.postCustomerOpeningBalanceVoucher(
+        { id: cust.id, customerCode: cust.customerCode, firmName: cust.firmName },
+        opBal,
+        opType,
+        db
+      );
+    }
     for (const supp of missingSuppliers) {
       const opBal = Number(supp.openingBalance || 0);
       if (opBal <= 0) continue;

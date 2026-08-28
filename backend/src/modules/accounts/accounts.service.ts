@@ -182,32 +182,50 @@ class AccountsService {
       },
       orderBy: { name: "asc" },
     });
+    if (ledgers.length === 0) return { accounts: [], totalBalance: 0 };
 
-    const results = await Promise.all(
-      ledgers.map(async (ledger) => {
-        const debitSum = await prisma.journalItem.aggregate({
+    const ledgerIds = ledgers.map((l) => l.id);
+
+    // Old code fired 2 aggregate queries PER ledger (up to 20+ parallel queries
+    // saturating the Neon pool). Now: 2 groupBy queries total, regardless of
+    // ledger count. Runs in an interactive $transaction so both share one
+    // connection.
+    const { debitRows, creditRows } = await prisma.$transaction(async (tx) => {
+      const [debitRows, creditRows] = await Promise.all([
+        tx.journalItem.groupBy({
+          by: ["debitLedgerId"],
+          where: { debitLedgerId: { in: ledgerIds } },
           _sum: { debitAmount: true },
-          where: { debitLedgerId: ledger.id },
-        });
-        const creditSum = await prisma.journalItem.aggregate({
+        }),
+        tx.journalItem.groupBy({
+          by: ["creditLedgerId"],
+          where: { creditLedgerId: { in: ledgerIds } },
           _sum: { creditAmount: true },
-          where: { creditLedgerId: ledger.id },
-        });
-        const totalDebit = Number(debitSum._sum.debitAmount || 0);
-        const totalCredit = Number(creditSum._sum.creditAmount || 0);
-        const currentBalance = totalDebit - totalCredit;
+        }),
+      ]);
+      return { debitRows, creditRows };
+    });
 
-        return {
-          id: ledger.id,
-          code: ledger.code,
-          name: ledger.name,
-          group: ledger.group,
-          currentBalance,
-          totalDebit,
-          totalCredit,
-        };
-      })
+    const debitMap = new Map<number, number>(
+      debitRows.map((r) => [r.debitLedgerId as number, Number(r._sum?.debitAmount || 0)])
     );
+    const creditMap = new Map<number, number>(
+      creditRows.map((r) => [r.creditLedgerId as number, Number(r._sum?.creditAmount || 0)])
+    );
+
+    const results = ledgers.map((ledger) => {
+      const totalDebit = debitMap.get(ledger.id) || 0;
+      const totalCredit = creditMap.get(ledger.id) || 0;
+      return {
+        id: ledger.id,
+        code: ledger.code,
+        name: ledger.name,
+        group: ledger.group,
+        currentBalance: totalDebit - totalCredit,
+        totalDebit,
+        totalCredit,
+      };
+    });
 
     const totalBalance = results.reduce((sum, r) => sum + r.currentBalance, 0);
     return { accounts: results, totalBalance };

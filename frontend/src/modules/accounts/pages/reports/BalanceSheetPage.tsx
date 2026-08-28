@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   FaBalanceScale,
   FaSync,
@@ -6,7 +6,6 @@ import {
   FaExclamationTriangle,
   FaPrint,
   FaDownload,
-  FaPlay,
   FaChevronRight,
   FaChevronDown,
   FaFolderOpen,
@@ -16,8 +15,8 @@ import {
   FaFileAlt,
   FaSitemap,
 } from "react-icons/fa";
-import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
+import { useDetailCache } from "../../../../hooks/useDetailCache";
 
 interface BSItem {
   code: string;
@@ -58,9 +57,6 @@ const fmt = (n: number) =>
   Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const BalanceSheetPage: React.FC = () => {
-  const [data, setData] = useState<BalanceSheetData | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const today = new Date().toISOString().split("T")[0];
   const [asOnDate, setAsOnDate] = useState<string>(today);
   const [showZeroBalance, setShowZeroBalance] = useState<boolean>(false);
@@ -68,28 +64,29 @@ const BalanceSheetPage: React.FC = () => {
   const [expandSection, setExpandSection] = useState(true);
   const activeConfig = VARIANT_MAP[variant];
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const groupByCategory = activeConfig.layout !== "flat";
+  const groupByCategoryParam = activeConfig.layout !== "flat";
+  const cacheKey = `accounts:balance-sheet:${asOnDate}:${showZeroBalance}:${groupByCategoryParam}`;
+
+  const fetcher = useCallback(
+    async (signal: AbortSignal): Promise<BalanceSheetData> => {
       const params = new URLSearchParams({
         ...(asOnDate ? { asOnDate } : {}),
         showZeroBalance: String(showZeroBalance),
-        groupByCategory: String(groupByCategory),
+        groupByCategory: String(groupByCategoryParam),
       });
-      const res = await apiClient.get(`/accounts/balance-sheet?${params.toString()}`);
-      setData(res.data.data);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to load balance sheet");
-    } finally {
-      setLoading(false);
-    }
-  };
+      const res = await apiClient.get(`/accounts/balance-sheet?${params.toString()}`, { signal });
+      return res.data.data as BalanceSheetData;
+    },
+    [asOnDate, showZeroBalance, groupByCategoryParam]
+  );
 
-  const handleVariantClick = (v: BSVariant) => {
-    setVariant(v);
-    if (!data) fetchData();
-  };
+  const { data, loading, refreshing, refresh } = useDetailCache<BalanceSheetData>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
+
+  const handleVariantClick = (v: BSVariant) => setVariant(v);
 
   const filterItems = (items: BSItem[]) =>
     showZeroBalance ? items : items.filter((i) => Math.abs(i.balance) > 0.01);
@@ -297,7 +294,7 @@ const BalanceSheetPage: React.FC = () => {
   };
 
   return (
-    <div className="p-3 bg-card-2 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div className="p-3 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* LEFT SIDEBAR */}
       <aside className="w-[240px] shrink-0 bg-card rounded-lg border border-line overflow-hidden">
         <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2">
@@ -361,10 +358,11 @@ const BalanceSheetPage: React.FC = () => {
             <span className="text-xs text-ink-muted">Show Zero Balance</span>
           </label>
 
-          <button onClick={() => fetchData()} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-semibold disabled:opacity-50">
-            <FaPlay className="text-[10px]" /> {loading ? "Loading..." : data ? "Reload" : "Show Report"}
-          </button>
+          {refreshing && (
+            <span className="flex items-center gap-1 text-[10px] text-teal-400">
+              <FaSync className="animate-spin" /> Syncing…
+            </span>
+          )}
 
           <div className="flex items-center gap-1.5 ml-auto">
             <button onClick={handlePrint} disabled={!data}
@@ -375,9 +373,9 @@ const BalanceSheetPage: React.FC = () => {
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaDownload /> Export
             </button>
-            <button onClick={() => fetchData()} disabled={loading}
+            <button onClick={refresh} disabled={refreshing}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaSync className={loading ? "animate-spin text-teal-500" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-teal-500" : ""} /> Refresh
             </button>
           </div>
         </div>
@@ -393,7 +391,7 @@ const BalanceSheetPage: React.FC = () => {
         {!loading && !view && (
           <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
             <FaBalanceScale className="text-teal-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">Choose a variant from the sidebar and click "Show Report"</div>
+            <div className="text-sm text-ink-muted font-semibold mb-1">No data for the selected variant</div>
             <div className="text-[11px]">Selected: <b>{activeConfig.label}</b></div>
           </div>
         )}

@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { toast } from "react-toastify";
 import {
   FaSync,
   FaDownload,
@@ -7,7 +6,6 @@ import {
   FaArrowDown,
   FaChartLine,
   FaPrint,
-  FaPlay,
   FaChevronRight,
   FaChevronDown,
   FaFolderOpen,
@@ -19,6 +17,7 @@ import {
 } from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { useDetailCache } from "../../../../hooks/useDetailCache";
 
 interface PLAccount {
   ledgerId: number;
@@ -89,10 +88,6 @@ const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const ProfitLossPage: React.FC = () => {
-  const [data, setData] = useState<PLData | null>(null);
-  const [periodData, setPeriodData] = useState<PLPeriodData | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const currentYear = new Date().getFullYear();
   const fyStart = `${currentYear}-04-01`;
   const today = new Date().toISOString().split("T")[0];
@@ -103,36 +98,41 @@ export const ProfitLossPage: React.FC = () => {
   const [expandSection, setExpandSection] = useState(true);
   const activeConfig = VARIANT_MAP[variant];
 
-  const fetchData = useCallback(async (v: PLVariant = variant) => {
-    const cfg = VARIANT_MAP[v];
-    setLoading(true);
-    try {
-      if (cfg.layout === "monthly" || cfg.layout === "quarterly") {
+  const isPeriodMode = activeConfig.layout === "monthly" || activeConfig.layout === "quarterly";
+  const cacheKey = isPeriodMode
+    ? `accounts:profit-loss:period:${startDate}:${endDate}:${activeConfig.layout}`
+    : `accounts:profit-loss:${startDate}:${endDate}:${showZeroBalance}`;
+
+  const fetcher = useCallback(
+    async (signal: AbortSignal): Promise<PLData | PLPeriodData> => {
+      if (isPeriodMode) {
         const params = new URLSearchParams();
         params.set("startDate", startDate);
         params.set("endDate", endDate);
-        params.set("groupBy", cfg.layout === "monthly" ? "month" : "quarter");
-        const res = await apiClient.get(`/accounts/profit-loss/by-period?${params.toString()}`);
-        setPeriodData(res.data.data);
-      } else {
-        const params = new URLSearchParams();
-        if (startDate) params.set("startDate", startDate);
-        if (endDate) params.set("endDate", endDate);
-        params.set("showZeroBalance", String(showZeroBalance));
-        const res = await apiClient.get(`/accounts/profit-loss?${params.toString()}`);
-        setData(res.data.data);
+        params.set("groupBy", activeConfig.layout === "monthly" ? "month" : "quarter");
+        const res = await apiClient.get(`/accounts/profit-loss/by-period?${params.toString()}`, { signal });
+        return res.data.data as PLPeriodData;
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to load P&L statement");
-    } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate, variant, showZeroBalance]);
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      params.set("showZeroBalance", String(showZeroBalance));
+      const res = await apiClient.get(`/accounts/profit-loss?${params.toString()}`, { signal });
+      return res.data.data as PLData;
+    },
+    [isPeriodMode, startDate, endDate, showZeroBalance, activeConfig.layout]
+  );
 
-  const handleVariantClick = (v: PLVariant) => {
-    setVariant(v);
-    fetchData(v);
-  };
+  const { data: cached, loading, refreshing, refresh } = useDetailCache<PLData | PLPeriodData>({
+    cacheKey,
+    socketModule: "voucher",
+    fetcher,
+  });
+
+  const data = !isPeriodMode ? (cached as PLData | null) : null;
+  const periodData = isPeriodMode ? (cached as PLPeriodData | null) : null;
+
+  const handleVariantClick = (v: PLVariant) => setVariant(v);
 
   const filteredData = useMemo(() => {
     if (!data) return null;
@@ -246,7 +246,7 @@ export const ProfitLossPage: React.FC = () => {
   };
 
   return (
-    <div className="p-3 bg-card-2 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div className="p-3 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* LEFT SIDEBAR */}
       <aside className="w-[240px] shrink-0 bg-card rounded-lg border border-line overflow-hidden">
         <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2">
@@ -326,23 +326,24 @@ export const ProfitLossPage: React.FC = () => {
             <span className="text-xs text-ink-muted">Show Zero Balance</span>
           </label>
 
-          <button onClick={() => fetchData()} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold disabled:opacity-50">
-            <FaPlay className="text-[10px]" /> {loading ? "Loading..." : data ? "Reload" : "Show Report"}
-          </button>
+          {refreshing && (
+            <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+              <FaSync className="animate-spin" /> Syncing…
+            </span>
+          )}
 
           <div className="flex items-center gap-1.5 ml-auto">
-            <button onClick={handlePrint} disabled={!data}
+            <button onClick={handlePrint} disabled={!cached}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaPrint /> Print
             </button>
-            <button onClick={exportCSV} disabled={!data}
+            <button onClick={exportCSV} disabled={!cached}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
               <FaDownload /> Export
             </button>
-            <button onClick={() => fetchData()} disabled={loading}
+            <button onClick={refresh} disabled={refreshing}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaSync className={loading ? "animate-spin text-emerald-500" : ""} /> Refresh
+              <FaSync className={refreshing ? "animate-spin text-emerald-500" : ""} /> Refresh
             </button>
           </div>
         </div>
