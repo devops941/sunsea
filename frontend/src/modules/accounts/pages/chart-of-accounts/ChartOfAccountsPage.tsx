@@ -253,14 +253,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-line font-medium text-ink-muted">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8 text-xs text-ink-subtle">
-                    <FaSync className="animate-spin text-lg mx-auto mb-1 text-slate-500" />
-                    Loading ledgers...
-                  </td>
-                </tr>
-              ) : paginatedLedgers.length === 0 ? (
+              {paginatedLedgers.length === 0 && loading ? null : paginatedLedgers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-xs text-ink-subtle">
                     No account ledgers found matching criteria.

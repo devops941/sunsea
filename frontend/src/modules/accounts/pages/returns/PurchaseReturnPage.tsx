@@ -360,10 +360,8 @@ export const PurchaseReturnPage: React.FC = () => {
           <h2 className="text-xs font-semibold text-ink">Purchase Returns</h2>
           <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredReturns.length}</span>
         </div>
-        {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted">Loading...</div>
-        ) : paginatedReturns.length === 0 ? (
-          <div className="p-8 text-center text-xs text-ink-subtle">No purchase return records found.</div>
+        {paginatedReturns.length === 0 ? (
+          loading ? null : <div className="p-8 text-center text-xs text-ink-subtle">No purchase return records found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-ink-muted">

@@ -261,10 +261,8 @@ export const PettyCashPage: React.FC = () => {
           <h2 className="text-xs font-semibold text-ink">Petty Cash Transactions</h2>
           <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredEntries.length}</span>
         </div>
-        {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted flex-1">Loading...</div>
-        ) : paginatedEntries.length === 0 ? (
-          <div className="p-8 text-center text-xs text-ink-subtle flex-1">No petty cash transactions found.</div>
+        {paginatedEntries.length === 0 ? (
+          loading ? <div className="flex-1" /> : <div className="p-8 text-center text-xs text-ink-subtle flex-1">No petty cash transactions found.</div>
         ) : (
           <>
             <div className="overflow-auto flex-1 min-h-0">

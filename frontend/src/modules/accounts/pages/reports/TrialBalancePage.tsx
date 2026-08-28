@@ -299,23 +299,17 @@ export const TrialBalancePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Body */}
-        {loading && (
-          <div className="bg-card border border-line rounded-lg p-8 text-center text-xs text-ink-subtle">
-            <FaSync className="animate-spin text-indigo-500 text-lg mx-auto mb-1" />
-            Loading trial balance...
-          </div>
-        )}
-
-        {!loading && !data && (
+        {/* Body — cache-first render: if data exists (fresh or stale) show it
+            instantly; only show empty-state after fetch has completed with no data. */}
+        {!data && !loading && (
           <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
             <FaBalanceScale className="text-indigo-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">Choose a report variant from the sidebar</div>
+            <div className="text-sm text-ink-muted font-semibold mb-1">No data for the selected variant</div>
             <div className="text-[11px]">Selected: <b>{activeConfig.label}</b></div>
           </div>
         )}
 
-        {!loading && data && (
+        {data && (
           <div className="bg-card border border-line rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 180px)" }}>
             {/* Meta bar */}
             <div className="px-3 py-1.5 border-b border-line bg-card-2/50 flex items-center justify-between text-[11px] shrink-0">

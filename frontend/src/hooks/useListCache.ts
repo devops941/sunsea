@@ -242,9 +242,55 @@ export function useListCache<T = any>({
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
+/** Read a cache entry synchronously (memory first, then sessionStorage). Returns undefined if not cached. */
+export function readCacheEntry<T = any>(key: string): { data: T[]; total: number; timestamp: number } | undefined {
+  return readCache<T>(key, Infinity);
+}
+
+/** Write an entry directly to cache (memory + sessionStorage). Use when you already have the data. */
+export function writeCacheEntry<T = any>(key: string, data: T[], total?: number): void {
+  writeCache(key, { data, total: total ?? data.length, timestamp: Date.now() });
+}
+
 export function invalidateCache(key: string): void {
   cache.delete(key);
   try { sessionStorage.removeItem(SESSION_PREFIX + key); } catch {}
+}
+
+/**
+ * Mark all cache entries under `prefix` as STALE (timestamp = 0) — but keep the
+ * data. Pages that mount later will render cached data instantly (no spinner)
+ * and trigger a silent background refetch. Prefer this over invalidateCacheByPrefix
+ * for realtime sync — deleting entries makes navigation look like a first-load.
+ */
+export function markStaleByPrefix(prefix: string): void {
+  for (const [key, entry] of cache.entries()) {
+    if (key.startsWith(prefix)) {
+      const stale = { ...entry, timestamp: 0 };
+      cache.set(key, stale);
+      try {
+        sessionStorage.setItem(
+          SESSION_PREFIX + key,
+          JSON.stringify({ data: stale.data, total: stale.total, timestamp: 0 })
+        );
+      } catch { /* ignore */ }
+    }
+  }
+  // Also mark sessionStorage-only entries stale
+  try {
+    const ssKeys = Object.keys(sessionStorage).filter(
+      (k) => k.startsWith(SESSION_PREFIX + prefix)
+    );
+    ssKeys.forEach((k) => {
+      try {
+        const raw = sessionStorage.getItem(k);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        parsed.timestamp = 0;
+        sessionStorage.setItem(k, JSON.stringify(parsed));
+      } catch { /* ignore */ }
+    });
+  } catch { /* ignore */ }
 }
 
 export function invalidateCacheByPrefix(prefix: string): void {

@@ -4,7 +4,8 @@ import { FaUniversity, FaPlus, FaArrowRight, FaWallet, FaTimes, FaSync } from "r
 import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
 import { accountService } from "../../../../services/accountService";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, invalidateCache, prefetchCache } from "../../../../hooks/useListCache";
+import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 interface BankAccount {
   id: number;
@@ -46,11 +47,39 @@ const BankAccountsPage: React.FC = () => {
     }
   }, []);
 
+  // Prefetch each bank's statement in the background when the list loads.
+  // By the time the user clicks a card, the detail cache is already warm →
+  // BankStatementPage renders instantly with no "Loading..." flash.
+  const onListSuccess = useCallback((list: BankAccountsData[]) => {
+    const payload = list[0];
+    if (!payload?.accounts) return;
+    for (const acc of payload.accounts) {
+      const detailKey = `accounts:bank-statement-${acc.id}::`;
+      prefetchCache(detailKey, async () => {
+        const stmt = await accountService.fetchStatement(acc.id, {});
+        return { data: stmt ? [stmt] : [], total: stmt?.entries?.length || 0 };
+      });
+    }
+  }, []);
+
   const { data: cachedList, loading, refreshing, refresh } = useListCache<BankAccountsData>({
     cacheKey,
     socketModule: "accountLedger",
     fetcher,
+    onSuccess: onListSuccess,
   });
+
+  // useListCache only listens to ONE module. Bank balances change on ANY voucher
+  // (payment/receipt/journal/contra), petty-cash entry, or expense posting — none
+  // of which fire an `accountLedger:*` event. Add extra listeners so the cards
+  // don't go stale after new activity elsewhere in the app.
+  const invalidateAndRefresh = useCallback(() => {
+    invalidateCache(cacheKey);
+    refresh();
+  }, [cacheKey, refresh]);
+  useSocketSync("voucher", undefined, invalidateAndRefresh);
+  useSocketSync("pettyCashEntry", undefined, invalidateAndRefresh);
+  useSocketSync("expense", undefined, invalidateAndRefresh);
 
   const data: BankAccountsData = cachedList[0] || { accounts: [], totalBalance: 0 };
 
@@ -137,15 +166,15 @@ const BankAccountsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Account Cards - compact grid */}
-      {loading ? (
-        <div className="bg-card rounded-lg border border-line p-8 text-center text-xs text-ink-subtle">
-          Loading bank accounts...
-        </div>
-      ) : data.accounts.length === 0 ? (
+      {/* Account Cards - compact grid. No full-page "Loading..." blocker —
+          useListCache returns cached data instantly on repeat visits, and the
+          empty state only shows once the fetch actually completes with 0 rows. */}
+      {data.accounts.length === 0 && !loading ? (
         <div className="bg-card rounded-lg border border-line p-8 text-center text-xs text-ink-subtle">
           No bank or cash accounts found. Click "Add Bank Account" to create one.
         </div>
+      ) : data.accounts.length === 0 ? (
+        null
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
           {data.accounts.map((acc) => (

@@ -18,7 +18,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableSummary } from "../../../../services/payableService";
 import { supplierService } from "../../../../services/supplierService";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, prefetchCache } from "../../../../hooks/useListCache";
 
 export const AmountPayablePage: React.FC = () => {
   const navigate = useNavigate();
@@ -113,10 +113,26 @@ export const AmountPayablePage: React.FC = () => {
     [asOnDate, startDate, endDate, supplierId, search]
   );
 
+  // Prefetch each supplier's breakdown in the background when the list loads.
+  // Detail cache is warm by the time user clicks "View" → no loading flash.
+  const onListSuccess = useCallback((list: SupplierPayableSummary[]) => {
+    for (const s of list) {
+      const detailKey = `accounts:supplier-breakdown-${s.supplierId}::`;
+      prefetchCache(detailKey, async () => {
+        const data = await payableService.getSupplierPayableDetail(
+          typeof s.supplierId === "string" ? parseInt(s.supplierId, 10) : s.supplierId,
+          { startDate: "", endDate: "" }
+        );
+        return { data: data ? [data] : [], total: data ? 1 : 0 };
+      });
+    }
+  }, []);
+
   const { data: payables, loading, refreshing, refresh } = useListCache<SupplierPayableSummary>({
     cacheKey,
     socketModule: "voucher",
     fetcher,
+    onSuccess: onListSuccess,
   });
 
   // Date range preset handler
