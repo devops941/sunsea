@@ -843,12 +843,22 @@ export const LedgerStatementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Statement */}
-        {!statement && !loading && (
+        {/* Statement — always show placeholder when no data, whether fetching
+            or genuinely empty. Footer progress bar communicates load state so
+            users see "something happening" instead of a blank page. */}
+        {!statement && (
           <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
-            <FaBook className="text-blue-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">Select a ledger from the sidebar</div>
-            <div className="text-[11px]">Statement will load automatically</div>
+            <FaBook className={`text-blue-500/40 text-3xl mx-auto mb-2 ${loading ? "animate-pulse" : ""}`} />
+            <div className="text-sm text-ink-muted font-semibold mb-1">
+              {loading ? "Fetching statement…" : "Select a ledger from the sidebar"}
+            </div>
+            <div className="text-[11px]">
+              {loading
+                ? viewMode === "all"
+                  ? "Combining every ledger — this can take a moment on first load"
+                  : "Statement is loading, please wait"
+                : "Statement will load automatically"}
+            </div>
           </div>
         )}
 

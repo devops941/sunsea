@@ -1,16 +1,23 @@
 /**
- * accountsPrefetchList — the single source of truth for what to prefetch in
- * the accounts module and how.
+ * accountsPrefetchList — single source of truth for accounts prefetch.
  *
- * Exports TWO functions:
- *   • prefetchHotAccountsCaches   — 4 top-level pages + all their detail pages
- *                                    (bank statements, customer/supplier
- *                                    breakdowns). Runs on every accounts write
- *                                    event via AccountsRealtimeSync.
- *   • prefetchAllAccountsCaches   — full set: hot + every other list/report
- *                                    endpoint. Runs ONCE at boot.
+ * Design philosophy (matches Tally / Busy / QuickBooks):
  *
- * Cache keys MUST match exactly what each page's useListCache constructs.
+ *   1. On boot, prefetch ONLY master data + top-level lists (≤ 20 requests).
+ *      Never iterate large child collections (500 customers, 50 suppliers) on
+ *      boot — that floods the pool and shows huge counters.
+ *
+ *   2. Detail pages (per-customer breakdown, per-supplier breakdown, per-bank
+ *      statement) are prefetched by their PARENT LIST's `onSuccess` — but only
+ *      when the user actually visits that list. If they never open the
+ *      Receivable page, we never fetch 500 customer detail pages.
+ *
+ *   3. On write events, `AccountsRealtimeSync` refreshes only the SPECIFIC
+ *      affected customer/supplier/bank via its `surgicalRefresh` function.
+ *      Not every entity.
+ *
+ * Result: boot fires ≤ 20 requests. A write event fires ~8. The progress bar
+ * counters stay small and honest.
  */
 
 import apiClient from "../api/apiClient";
@@ -21,28 +28,33 @@ import { payableService } from "../services/payableService";
 import { voucherService } from "../services/voucherService";
 import { returnService } from "../services/returnService";
 import { pettyCashService } from "../services/pettyCashService";
+import { trackPrefetch } from "./PrefetchProgressTracker";
+
+// Note: `prefetchCache` auto-tracks any key starting with "accounts:", so we
+// don't need to wrap it here. The 3 direct apiClient/service calls in
+// prefetchHotAccountsCaches below use trackPrefetch() explicitly since they
+// bypass the prefetchCache wrapper.
 
 /**
- * HOT set — 4 top-level pages + cascade into every detail page they open.
+ * HOT set — 4 top-level aggregate endpoints that change on ANY write.
  *
- * After fetching bank accounts, receivables, and payables, we know the exact
- * IDs to prefetch — so we fan out into BankStatement / CustomerBreakdown /
- * SupplierBreakdown caches too. All detail prefetches are fire-and-forget so
- * they don't block the top-level fetches. Neon's 13-conn pool handles the
- * burst over a few rounds; the save is already done by the time this runs
- * (700 ms debounce in AccountsRealtimeSync).
+ * NO customer/supplier detail cascade here. Those are prefetched by the
+ * parent list page's `onSuccess` only when the user actually visits.
+ * Bank statements are also skipped — the BankAccountsPage does that on mount.
+ *
+ * Total requests: 4 (was 500+).
  */
 export async function prefetchHotAccountsCaches(): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
 
-  // ─── Round 1: 4 top-level fetches in parallel ──────────────────
+  // 4 top-level fetches in parallel. Everything else stays cached / lazy.
   const [bankRes, receivables, payablesRes] = await Promise.allSettled([
-    apiClient.get("/accounts/bank-accounts"),
-    receivableService.getReceivables({ asOnDate: today }),
-    payableService.getPayableSummaries({ asOnDate: today }),
+    trackPrefetch(apiClient.get("/accounts/bank-accounts")),
+    trackPrefetch(receivableService.getReceivables({ asOnDate: today })),
+    trackPrefetch(payableService.getPayableSummaries({ asOnDate: today })),
   ]);
 
-  // Trial balance runs in parallel with the details fan-out below.
+  // Trial balance in parallel (independent, small thanks to groupBy optimization)
   prefetchCache(`accounts:trial-balance:${today}:false:true`, async () => {
     const params = new URLSearchParams({
       asOnDate: today,
@@ -54,78 +66,49 @@ export async function prefetchHotAccountsCaches(): Promise<void> {
     return { data: [res.data.data], total: 1 };
   });
 
-  // ─── Write top-level results to cache ──────────────────────────
-  let bankAccounts: any[] = [];
+  // Write results to cache directly (we already fetched them above; don't refetch)
   if (bankRes.status === "fulfilled") {
     const payload = bankRes.value.data?.data || { accounts: [], totalBalance: 0 };
-    bankAccounts = payload.accounts || [];
-    writeCacheEntry("accounts:bank-accounts", [payload], bankAccounts.length);
+    writeCacheEntry("accounts:bank-accounts", [payload], payload.accounts?.length || 0);
   }
-
-  let customerList: any[] = [];
   if (receivables.status === "fulfilled") {
-    customerList = receivables.value || [];
-    writeCacheEntry(`accounts:amount-receivable:${today}::::`, customerList);
+    const list = receivables.value || [];
+    writeCacheEntry(`accounts:amount-receivable:${today}::::`, list);
   }
-
-  let supplierList: any[] = [];
   if (payablesRes.status === "fulfilled") {
-    supplierList = Array.isArray(payablesRes.value)
+    const list = Array.isArray(payablesRes.value)
       ? payablesRes.value
       : payablesRes.value?.data || [];
-    writeCacheEntry(`accounts:amount-payable:${today}::::`, supplierList);
-  }
-
-  // ─── Round 2: detail page prefetches (fire-and-forget) ─────────
-  // BankStatementPage — one per bank
-  for (const bank of bankAccounts) {
-    prefetchCache(`accounts:bank-statement-${bank.id}::`, async () => {
-      const stmt = await accountService.fetchStatement(bank.id, {});
-      return { data: stmt ? [stmt] : [], total: stmt?.entries?.length || 0 };
-    });
-  }
-
-  // CustomerBreakdownPage — one per customer
-  for (const c of customerList) {
-    prefetchCache(`accounts:customer-breakdown-${c.customerId}::`, async () => {
-      const data = await receivableService.getCustomerDetail(c.customerId, { startDate: "", endDate: "" });
-      return { data: data ? [data] : [], total: data ? 1 : 0 };
-    });
-  }
-
-  // SupplierBreakdownPage — one per supplier
-  for (const s of supplierList) {
-    prefetchCache(`accounts:supplier-breakdown-${s.supplierId}::`, async () => {
-      const supplierIdNum = typeof s.supplierId === "string" ? parseInt(s.supplierId, 10) : s.supplierId;
-      const data = await payableService.getSupplierPayableDetail(supplierIdNum, { startDate: "", endDate: "" });
-      return { data: data ? [data] : [], total: data ? 1 : 0 };
-    });
+    writeCacheEntry(`accounts:amount-payable:${today}::::`, list);
   }
 }
 
 /**
- * FULL set — every accounts list/report endpoint + all detail cascades.
- * Runs ONCE at app boot to warm the cache. AccountsRealtimeSync uses the hot
- * variant instead (see above) so writes don't fire 30+ parallel queries.
+ * FULL set — master lookups + every top-level list/report. Runs ONCE at boot.
+ *
+ * Still lean: ~15 requests total. All list pages get their data warmed. Detail
+ * pages (breakdowns, statements) are handled by the parent list's onSuccess
+ * when the user visits.
  */
 export async function prefetchAllAccountsCaches(companyId?: string): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
   const currentYear = new Date().getFullYear();
   const fyStart = `${currentYear}-04-01`;
 
-  // Hot set (top-level + all details)
+  // Hot 4 (fires in parallel)
   const hotPromise = prefetchHotAccountsCaches();
 
-  // Additional list pages (no dependency on hot set — fire in parallel)
-  prefetchCache("accounts:chart-of-accounts", async () => {
-    const res = await accountService.fetchLedgers({ limit: 1000, grouped: true });
-    return { data: res.ledgers || [], total: res.total || 0 };
-  });
-
+  // Master data — ledger list (used by all 4 voucher Add pages + surgical refresh)
   prefetchCache("accounts:ledgers:all", async () => {
     const res = await accountService.fetchLedgers({ limit: 1000 });
     const list = res.ledgers || [];
     return { data: list, total: list.length };
+  });
+
+  // Chart of accounts (grouped variant used by that page)
+  prefetchCache("accounts:chart-of-accounts", async () => {
+    const res = await accountService.fetchLedgers({ limit: 1000, grouped: true });
+    return { data: res.ledgers || [], total: res.total || 0 };
   });
 
   prefetchCache("accounts:sales-returns", async () => {
@@ -138,7 +121,7 @@ export async function prefetchAllAccountsCaches(companyId?: string): Promise<voi
     return { data: list || [], total: list?.length || 0 };
   });
 
-  // Voucher lists (all 5)
+  // Voucher lists (5 endpoints)
   prefetchCache("accounts:vouchers:all:::", async () => {
     const res = await voucherService.fetchVouchers({});
     return { data: res.vouchers || [], total: res.total || 0 };
