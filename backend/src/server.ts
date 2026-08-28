@@ -8,6 +8,7 @@ import { prisma } from "./config/prisma";
 import { bootstrapAdmin } from "./utils/bootstrapAdmin";
 import { initSocket } from "./socket/socket";
 import { initScheduler } from "./modules/inventory/jobs/scheduler";
+import { accountsService } from "./modules/accounts/accounts.service";
 // Global BigInt serialization for JSON responses (reconnected)
 // This ensures all BigInt values are converted to strings when Express calls JSON.stringify.
 (BigInt.prototype as any).toJSON = function () {
@@ -24,6 +25,16 @@ const startServer = async (): Promise<void> => {
 
     // Automatically create admin user from .env variables
     await bootstrapAdmin(prisma);
+
+    // Seed system ledgers (Cash in Hand, Main Bank Account, Petty Cash, etc.)
+    // so the bank selector on customer/supplier forms is never empty on a fresh DB.
+    // ensureSystemLedgersExist is a no-op when all 17 codes already exist.
+    try {
+      await accountsService.ensureSystemLedgersExist();
+      console.log("✅ System ledgers verified");
+    } catch (err) {
+      console.error("⚠️  System ledger seed failed:", err);
+    }
 
     const server = http.createServer(app);
 

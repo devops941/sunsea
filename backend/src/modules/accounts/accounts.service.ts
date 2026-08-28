@@ -165,6 +165,13 @@ class AccountsService {
   }
 
   async getBankAccounts() {
+    // Safety net: on a fresh DB where the user hasn't triggered any auto-seeding
+    // flow yet (no customer/supplier/report loaded), Cash in Hand / Main Bank
+    // Account / Petty Cash may still be missing. Ensure they exist so the bank
+    // selector on customer & supplier create forms always has these 3 defaults.
+    // Throttled + memoized, so this is effectively free on hot path.
+    await this.ensureSystemLedgersExist();
+
     const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand", "BANK ACCOUNTS", "CASH IN HAND"];
 
     const ledgers = await prisma.accountLedger.findMany({
