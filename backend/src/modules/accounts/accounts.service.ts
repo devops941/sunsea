@@ -732,8 +732,8 @@ class AccountsService {
         tx.accountLedger.findMany({
           select: {
             id: true, code: true, name: true, type: true, group: true,
-            customer: { select: { openingBalance: true } },
-            supplier: { select: { openingBalance: true } },
+            customer: { select: { openingBalance: true, openingBalanceType: true } },
+            supplier: { select: { openingBalance: true, openingBalanceType: true } },
           },
           orderBy: { code: "asc" },
         }),
@@ -764,11 +764,25 @@ class AccountsService {
       const totalDebit = debitMap.get(ledger.id) || 0;
       const totalCredit = creditMap.get(ledger.id) || 0;
 
-      const openingBalance = Number(
+      // Signed opening balance — DEBIT type (natural for ASSET/EXPENSE) is
+      // positive, CREDIT type (natural for LIABILITY/INCOME/EQUITY) is negative
+      // when displayed on the natural side. Sign only affects display (Opening
+      // Dr / Opening Cr columns); closingBalance is derived from journal items
+      // which already include the opening voucher amounts.
+      const rawOp = Number(
         (ledger.customer as any)?.openingBalance ||
         (ledger.supplier as any)?.openingBalance ||
         0
       );
+      // Customer default = DEBIT (they owe us). Supplier default = CREDIT (we owe them).
+      const opTypeStr = ledger.customer
+        ? String((ledger.customer as any)?.openingBalanceType || "DEBIT").toUpperCase()
+        : ledger.supplier
+          ? String((ledger.supplier as any)?.openingBalanceType || "CREDIT").toUpperCase()
+          : "DEBIT";
+      const naturalIsDebit = isAssetOrExpense;
+      const opIsDebit = opTypeStr === "DEBIT";
+      const openingBalance = opIsDebit === naturalIsDebit ? rawOp : -rawOp;
 
       let closingBalance = 0;
       if (isAssetOrExpense) {

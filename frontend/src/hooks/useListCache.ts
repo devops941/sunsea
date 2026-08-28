@@ -316,6 +316,21 @@ export async function prefetchCache<T>(
 ): Promise<void> {
   const existing = readCache<T>(key, ttl);
   if (existing && Date.now() - existing.timestamp < ttl) return;
+  // Auto-track accounts:* prefetches so the footer progress bar counts EVERY
+  // accounts-scoped prefetch (whether fired by boot warmer, write-triggered
+  // surgical refresh, or a page's own onSuccess cascade). Non-accounts modules
+  // don't leak into the accounts progress counter.
+  const shouldTrack = key.startsWith("accounts:");
+  const runFetch = async () => {
+    const ctrl = new AbortController();
+    const result = await fetcher(ctrl.signal);
+    writeCache(key, { data: result.data ?? [], total: result.total ?? 0, timestamp: Date.now() });
+  };
+  if (shouldTrack) {
+    const { trackPrefetch } = await import("../providers/PrefetchProgressTracker");
+    try { await trackPrefetch(runFetch()); } catch {}
+    return;
+  }
   try {
     const ctrl   = new AbortController();
     const result = await fetcher(ctrl.signal);

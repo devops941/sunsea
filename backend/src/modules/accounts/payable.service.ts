@@ -198,7 +198,13 @@ class PayableService {
     }
 
     const data: SupplierPayableSummary[] = suppliers.map((supplier) => {
-      const openingBalance = Number(supplier.openingBalance || 0);
+      // For SUPPLIER: default opening is CREDIT (we owe supplier). DEBIT means
+      // supplier owes us (advance we paid). Sign the opening accordingly so
+      // netLiability math matches the ledger statement. Missing this sign
+      // caused DEBIT-type openings to be double-counted as liabilities.
+      const rawOpBal = Number(supplier.openingBalance || 0);
+      const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+      const openingBalance = opType === "DEBIT" ? -Math.abs(rawOpBal) : Math.abs(rawOpBal);
       const ledger = ledgerMap.get(supplier.id);
       const journalItems = ledger ? itemsByLedger.get(ledger.id) || [] : [];
       const grnInvoices = grnsBySupplier.get(supplier.id) || [];
@@ -442,9 +448,12 @@ class PayableService {
       }
     });
 
-    // BUG-2 FIX: Use only journal-entry-based totals (openingBalance entry already excluded above).
-    // GRN-raw fallback caused double-counting when the opening balance voucher matched the GRN amount.
-    const closingBalance = Number(supplier.openingBalance || 0) + totalBilled - totalPaid - totalReturned;
+    // Same sign convention as the list view — DEBIT opening means supplier
+    // owes us (advance), so closingBalance treats it as a negative liability.
+    const rawOpBalDetail = Number(supplier.openingBalance || 0);
+    const opTypeDetail = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+    const signedOpeningDetail = opTypeDetail === "DEBIT" ? -Math.abs(rawOpBalDetail) : Math.abs(rawOpBalDetail);
+    const closingBalance = signedOpeningDetail + totalBilled - totalPaid - totalReturned;
 
     return {
       supplier: {
@@ -453,11 +462,11 @@ class PayableService {
         legalName: supplier.legalName,
         gstin: supplier.gstin,
         vendorType: (supplier as any).vendorType || "SUPPLIER",
-        openingBalance: Number(supplier.openingBalance || 0),
+        openingBalance: signedOpeningDetail,
       },
       ledger,
       summary: {
-        openingBalance: Number(supplier.openingBalance || 0),
+        openingBalance: signedOpeningDetail,
         totalBilled,
         totalPaid,
         totalReturned,

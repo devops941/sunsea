@@ -422,9 +422,14 @@ class ReceivableService {
       }
     });
 
-    // BUG-2 FIX: Use only journal-entry-based totals (openingBalance entry already excluded above).
-    // Invoice-raw fallback caused double-counting when the opening balance voucher matched the invoice amount.
-    const closingBalance = Number(customer.openingBalance || 0) + totalBilled - totalPaid - totalReturned;
+    // Sign opening balance by openingBalanceType — matches list-view convention.
+    // CUSTOMER default = DEBIT (customer owes us, +). CREDIT = advance/overpaid (−).
+    // Missing this sign made CREDIT openings inflate the closing balance
+    // (mirror of the payable bug we fixed earlier).
+    const rawOpBalDetail = Number(customer.openingBalance || 0);
+    const opTypeDetail = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+    const signedOpeningDetail = opTypeDetail === "CREDIT" ? -Math.abs(rawOpBalDetail) : Math.abs(rawOpBalDetail);
+    const closingBalance = signedOpeningDetail + totalBilled - totalPaid - totalReturned;
 
     return {
       customer: {
@@ -433,11 +438,11 @@ class ReceivableService {
         firmName: customer.firmName,
         gstin: customer.gstin,
         customerType: (customer as any).customerType || "CUSTOMER",
-        openingBalance: Number(customer.openingBalance || 0),
+        openingBalance: signedOpeningDetail,
       },
       ledger,
       summary: {
-        openingBalance: Number(customer.openingBalance || 0),
+        openingBalance: signedOpeningDetail,
         totalBilled,
         totalPaid,
         totalReturned,
