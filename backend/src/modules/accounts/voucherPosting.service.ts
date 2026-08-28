@@ -116,6 +116,14 @@ class VoucherPostingService {
   private static _inFlightSync: Promise<any> | null = null;
   private static readonly SYNC_MIN_INTERVAL_MS: number = 60_000; // 1 minute
 
+  // ─── syncMissingOpeningBalanceVouchers throttling ──────────────────────────
+  // Same pattern as _inFlightSync — this runs on every trial-balance / balance-sheet
+  // request. 4 baseline findMany calls per invocation × N concurrent report loads
+  // was saturating Neon's 13-conn pool.
+  private static _lastOpBalSyncAt: number = 0;
+  private static _inFlightOpBalSync: Promise<any> | null = null;
+  private static readonly OPBAL_SYNC_MIN_INTERVAL_MS: number = 60_000;
+
   /**
    * Post a formal double-entry PURCHASE Voucher for a GRN Purchase Invoice.
    * Debit: Purchase Account (PURCH-001)
@@ -1486,8 +1494,38 @@ class VoucherPostingService {
   /**
    * Automatically scan for and post missing double-entry opening balance vouchers
    * for any customers and suppliers who have an opening balance in the database.
+   *
+   * THROTTLED: See `syncUnpostedVouchers` for the same pattern. When a caller passes
+   * a `txClient` we bypass the throttle (they're inside a transaction and need the
+   * work done inline — that path is not hit from report endpoints).
    */
   async syncMissingOpeningBalanceVouchers(txClient?: Prisma.TransactionClient) {
+    if (txClient) {
+      return this._doSyncMissingOpeningBalanceVouchers(txClient);
+    }
+    const now = Date.now();
+    if (now - VoucherPostingService._lastOpBalSyncAt < VoucherPostingService.OPBAL_SYNC_MIN_INTERVAL_MS) {
+      return { skipped: true };
+    }
+    if (VoucherPostingService._inFlightOpBalSync) {
+      return VoucherPostingService._inFlightOpBalSync;
+    }
+    VoucherPostingService._inFlightOpBalSync = this._doSyncMissingOpeningBalanceVouchers()
+      .then((res) => {
+        VoucherPostingService._lastOpBalSyncAt = Date.now();
+        return res;
+      })
+      .catch((err) => {
+        console.error("[Auto-Post Voucher Error] Syncing opening balance vouchers failed:", err);
+        return { error: String(err) };
+      })
+      .finally(() => {
+        VoucherPostingService._inFlightOpBalSync = null;
+      });
+    return VoucherPostingService._inFlightOpBalSync;
+  }
+
+  private async _doSyncMissingOpeningBalanceVouchers(txClient?: Prisma.TransactionClient) {
     const db = txClient || prisma;
     await accountsService.ensureSystemLedgersExist(db);
 
@@ -1541,6 +1579,7 @@ class VoucherPostingService {
         db
       );
     }
+    return { ok: true };
   }
 }
 

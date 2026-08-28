@@ -137,9 +137,9 @@ export const PettyCashPage: React.FC = () => {
   }, [entries]);
 
   return (
-    <div className="p-3 space-y-3 bg-card-2 min-h-screen">
+    <div className="p-3 gap-3 bg-card-2 flex flex-col h-full min-h-0" style={{ height: "calc(100vh - 100px)" }}>
       {/* Compact KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 shrink-0">
         <div className="bg-card border border-line rounded-lg p-3 flex items-center justify-between">
           <div>
             <div className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wide">Total Cash IN</div>
@@ -172,7 +172,7 @@ export const PettyCashPage: React.FC = () => {
       </div>
 
       {/* Single-row Header + Filters (Busy-style compact) */}
-      <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2">
+      <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2 shrink-0">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
           <FaCoins className="text-amber-500 text-sm" /> Petty Cash Register
           {refreshing && <FaSync className="animate-spin text-amber-500 text-[10px]" />}
@@ -256,80 +256,79 @@ export const PettyCashPage: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
+      <div className="bg-card rounded-lg border border-line overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between shrink-0">
           <h2 className="text-xs font-semibold text-ink">Petty Cash Transactions</h2>
           <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredEntries.length}</span>
         </div>
         {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted">Loading...</div>
+          <div className="p-6 text-center text-xs text-ink-muted flex-1">Loading...</div>
         ) : paginatedEntries.length === 0 ? (
-          <div className="p-8 text-center text-xs text-ink-subtle">No petty cash transactions found.</div>
+          <div className="p-8 text-center text-xs text-ink-subtle flex-1">No petty cash transactions found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-ink-muted">
-              <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
-                <tr>
-                  <th className="px-3 py-2 w-10">#</th>
-                  <th className="px-3 py-2">Entry No</th>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Category</th>
-                  <th className="px-3 py-2">Description</th>
-                  <th className="px-3 py-2">Paid To / From</th>
-                  <th className="px-3 py-2 text-right">Amount (₹)</th>
-                  <th className="px-3 py-2 text-right">Balance (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-soft">
-                {paginatedEntries.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-card-2 transition-colors">
-                    <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
-                      {index + 1}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono font-semibold text-amber-500">{item.entryNo}</td>
-                    <td className="px-3 py-1.5 font-mono text-[11px]">
-                      {new Date(item.entryDate).toLocaleDateString("en-IN")}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <span
-                        className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                          item.type === "IN"
-                            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                            : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                        }`}
-                      >
-                        {item.type === "IN" ? "CASH IN" : "CASH OUT"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5 font-medium text-ink">{item.category}</td>
-                    <td className="px-3 py-1.5 text-ink-muted max-w-xs truncate">{item.description}</td>
-                    <td className="px-3 py-1.5 text-ink-subtle">{item.paidTo || "-"}</td>
-                    <td className="px-3 py-1.5 text-right font-mono font-semibold whitespace-nowrap">
-                      <span className={item.type === "IN" ? "text-emerald-500" : "text-rose-500"}>
-                        {item.type === "IN" ? "+" : "-"}₹
-                        {Number(item.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
-                      ₹{(runningBalances.get(item.id) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
+          <>
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full text-left text-xs text-ink-muted">
+                <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line sticky top-0 z-10">
+                  <tr>
+                    <th className="px-3 py-2 w-10 bg-head">#</th>
+                    <th className="px-3 py-2 bg-head">Entry No</th>
+                    <th className="px-3 py-2 bg-head">Date</th>
+                    <th className="px-3 py-2 bg-head">Type</th>
+                    <th className="px-3 py-2 bg-head">Category</th>
+                    <th className="px-3 py-2 bg-head">Description</th>
+                    <th className="px-3 py-2 bg-head">Paid To / From</th>
+                    <th className="px-3 py-2 text-right bg-head">Amount (₹)</th>
+                    <th className="px-3 py-2 text-right bg-head">Balance (₹)</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t-2 border-line bg-card-2">
-                <tr>
-                  <td colSpan={7} className="px-3 py-2 text-right text-[10px] font-bold text-ink uppercase tracking-wide">
-                    Current Balance:
-                  </td>
-                  <td className="px-3 py-2"></td>
-                  <td className="px-3 py-2 text-right font-bold text-sm text-amber-500 font-mono">
-                    ₹{summary.currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-line-soft">
+                  {paginatedEntries.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-card-2 transition-colors">
+                      <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
+                        {index + 1}
+                      </td>
+                      <td className="px-3 py-1.5 font-mono font-semibold text-amber-500">{item.entryNo}</td>
+                      <td className="px-3 py-1.5 font-mono text-[11px]">
+                        {new Date(item.entryDate).toLocaleDateString("en-IN")}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span
+                          className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                            item.type === "IN"
+                              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                          }`}
+                        >
+                          {item.type === "IN" ? "CASH IN" : "CASH OUT"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 font-medium text-ink">{item.category}</td>
+                      <td className="px-3 py-1.5 text-ink-muted max-w-xs truncate">{item.description}</td>
+                      <td className="px-3 py-1.5 text-ink-subtle">{item.paidTo || "-"}</td>
+                      <td className="px-3 py-1.5 text-right font-mono font-semibold whitespace-nowrap">
+                        <span className={item.type === "IN" ? "text-emerald-500" : "text-rose-500"}>
+                          {item.type === "IN" ? "+" : "-"}₹
+                          {Number(item.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
+                        ₹{(runningBalances.get(item.id) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t-2 border-line bg-card-2 px-3 py-2 flex items-center justify-between shrink-0">
+              <span className="text-[10px] font-bold text-ink uppercase tracking-wide">
+                Current Balance
+              </span>
+              <span className="text-right font-bold text-sm text-amber-500 font-mono">
+                ₹{summary.currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </>
         )}
 
       </div>
