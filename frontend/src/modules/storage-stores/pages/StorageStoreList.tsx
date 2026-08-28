@@ -243,9 +243,7 @@ const StorageStoreList: React.FC = () => {
                             },
                         ]}
                     />
-                    <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
-                        Total: {total} record(s)
-                    </div>
+                   
                 </div>
             </div>
 

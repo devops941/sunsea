@@ -268,27 +268,29 @@ const StorageStoreForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto pb-10">
-            <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
+        <div className="w-full mx-auto flex-1 flex flex-col">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible flex-1 flex flex-col">
                 {/* Page Header */}
-                <div className="px-6 py-4 border-b border-line flex items-center justify-between gap-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-ink">
-                            {isEditMode ? "Edit Storage Store" : "Create Storage Store"}
-                        </h2>
-                        <p className="text-xs text-ink-subtle mt-0.5">
-                            {isEditMode ? `Editing details for Store ID: ${formData.storeId}` : "Enter details to create a new storage store location."}
-                        </p>
+                <div className="px-6 py-5 border-b border-line-soft">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-ink">
+                                {isEditMode ? "Edit Storage Store" : "Create Storage Store"}
+                            </h2>
+                            <p className="text-sm text-ink-subtle mt-1">
+                                {isEditMode ? `Editing details for Store ID: ${formData.storeId}` : "Enter details to create a new storage store location."}
+                            </p>
+                        </div>
+                        <BackButton to="/storage-stores" />
                     </div>
-                    <BackButton to="/storage-stores" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
                     {/* Section 1: Basic Information */}
                     <div>
-                        <h3 className="text-base font-semibold text-ink mb-4 pb-2 border-b border-line-soft">
-                            Basic Store Details
-                        </h3>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
+                            <h3 className="text-lg font-bold text-ink">Basic Store Details</h3>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <TextInput
                                 label="Store ID"
@@ -368,9 +370,9 @@ const StorageStoreForm: React.FC = () => {
 
                     {/* Section 2: Location & Address Information */}
                     <div>
-                        <h3 className="text-base font-semibold text-ink mb-4 pb-2 border-b border-line-soft">
-                            Location & Address Information
-                        </h3>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
+                            <h3 className="text-lg font-bold text-ink">Location & Address Information</h3>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="md:col-span-2 lg:col-span-3">
                                 <TextInput
@@ -407,7 +409,7 @@ const StorageStoreForm: React.FC = () => {
                     </div>
 
                     {/* Form Footer Action Buttons */}
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
+                    <div className="flex flex-wrap justify-end gap-3 mt-auto pt-4 border-t border-line-soft">
                         <Button
                             text="Cancel"
                             icon={FaArrowLeft}

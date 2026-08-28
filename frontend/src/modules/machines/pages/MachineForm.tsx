@@ -191,8 +191,8 @@ const MachineForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
+        <div className="w-full mx-auto flex-1 flex flex-col">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden flex-1 flex flex-col">
                 <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
@@ -200,7 +200,7 @@ const MachineForm: React.FC = () => {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 flex-1 flex flex-col" noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                         <div>
                             <TextInput
@@ -325,7 +325,7 @@ const MachineForm: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-line-soft">
+                    <div className="flex justify-end gap-3 mt-auto pt-5 border-t border-line-soft">
                         {!isEdit && (
                             <CustomButton
                                 text="Clear"

@@ -190,7 +190,7 @@ const WhatsappCreatePage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} noValidate>
-                <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-180px)] flex flex-col">
+                <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-240px)] flex flex-col">
 
                     <div className="flex-1 p-5 lg:p-6 space-y-6">
                         {/* Section: API Setup Credentials */}
