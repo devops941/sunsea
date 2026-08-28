@@ -380,15 +380,8 @@ const BalanceSheetPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Report body */}
-        {loading && (
-          <div className="bg-card border border-line rounded-lg p-8 text-center text-xs text-ink-subtle">
-            <FaSync className="animate-spin text-teal-500 text-lg mx-auto mb-1" />
-            Loading balance sheet...
-          </div>
-        )}
-
-        {!loading && !view && (
+        {/* Report body — cache-first render (no loading blocker). */}
+        {!view && !loading && (
           <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
             <FaBalanceScale className="text-teal-500/40 text-3xl mx-auto mb-2" />
             <div className="text-sm text-ink-muted font-semibold mb-1">No data for the selected variant</div>
@@ -396,7 +389,7 @@ const BalanceSheetPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && view && (
+        {view && (
           <>
             {/* Meta banner */}
             <div className="text-[11px] text-ink-muted px-1">

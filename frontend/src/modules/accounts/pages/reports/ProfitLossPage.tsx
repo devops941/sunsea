@@ -348,23 +348,16 @@ export const ProfitLossPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Body */}
-        {loading && (
-          <div className="bg-card border border-line rounded-lg p-8 text-center text-xs text-ink-subtle">
-            <FaSync className="animate-spin text-emerald-500 text-lg mx-auto mb-1" />
-            Loading P&amp;L statement...
-          </div>
-        )}
-
-        {!loading && !filteredData && (
+        {/* Body — cache-first render (no full-page loading blocker). */}
+        {!filteredData && !periodData && !loading && (
           <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
             <FaChartLine className="text-emerald-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">Choose a variant from the sidebar</div>
+            <div className="text-sm text-ink-muted font-semibold mb-1">No data for the selected variant</div>
             <div className="text-[11px]">Selected: <b>{activeConfig.label}</b> · {startDate} to {endDate}</div>
           </div>
         )}
 
-        {!loading && (activeConfig.layout === "monthly" || activeConfig.layout === "quarterly") && periodData && (
+        {(activeConfig.layout === "monthly" || activeConfig.layout === "quarterly") && periodData && (
           <>
             <div className="text-[11px] text-ink-muted px-1">
               Period: <b className="text-ink">{startDate}</b> to <b className="text-ink">{endDate}</b> · <b className="text-ink">{activeConfig.label}</b> · {periodData.periods.length} periods
@@ -482,15 +475,7 @@ export const ProfitLossPage: React.FC = () => {
           </>
         )}
 
-        {!loading && (activeConfig.layout === "monthly" || activeConfig.layout === "quarterly") && !periodData && (
-          <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
-            <FaCalendarAlt className="text-emerald-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">Click "Show Report" to load {activeConfig.label}</div>
-            <div className="text-[11px]">Period: {startDate} to {endDate}</div>
-          </div>
-        )}
-
-        {!loading && filteredData && (activeConfig.layout !== "monthly" && activeConfig.layout !== "quarterly") && (
+        {filteredData && (activeConfig.layout !== "monthly" && activeConfig.layout !== "quarterly") && (
           <>
             <div className="text-[11px] text-ink-muted px-1">
               Period: <b className="text-ink">{startDate}</b> to <b className="text-ink">{endDate}</b> · <b className="text-ink">{activeConfig.label}</b>

@@ -5,6 +5,26 @@ import { extractPaymentsArray } from "../../utils/payments";
 import crypto from "crypto";
 
 /**
+ * Neon serverless goes idle after ~5 min. First query after idle can fail with
+ * P1001 "Can't reach database server" while the compute wakes up. Retry once
+ * after a short backoff — this is exactly the flakiness pattern Neon docs describe.
+ */
+async function withNeonRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastErr: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+      const isColdStart = err?.code === "P1001" || /Can't reach database server/i.test(String(err?.message || ""));
+      if (!isColdStart || i === attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Returns the start date of the current financial year (India: April 1).
  * Used to date system-generated opening balance vouchers so they show correctly
  * in "as on" reports for any date within the financial year.
@@ -1125,6 +1145,9 @@ class VoucherPostingService {
     const failedPostings: Array<{ id: string | number; docType: string; reason: string }> = [];
 
     try {
+      // Wrapped in withNeonRetry: 11 parallel queries on Neon cold-start would
+      // sometimes fail with P1001 on one arbitrary shard while the others
+      // succeeded. Retry-once handles the wake window cleanly.
       const [
         postedGrnVouchers,
         postedSalesVouchers,
@@ -1137,7 +1160,7 @@ class VoucherPostingService {
         allSalesReturnIds,
         allPettyCashEntries,
         allExpenses,
-      ] = await Promise.all([
+      ] = await withNeonRetry(() => Promise.all([
         prisma.voucher.findMany({
           where: { refDocType: "GRN_INVOICE" },
           select: { refDocId: true },
@@ -1166,7 +1189,7 @@ class VoucherPostingService {
         prisma.expense.findMany({
           include: { supplier: true },
         }),
-      ]);
+      ]));
 
       const postedGrnIds = new Set(postedGrnVouchers.map((v) => v.refDocId).filter(Boolean));
       const postedSalesIds = new Set(postedSalesVouchers.map((v) => v.refDocId).filter(Boolean));

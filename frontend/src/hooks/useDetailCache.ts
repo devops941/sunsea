@@ -291,6 +291,50 @@ export function invalidateDetailCache(key: string): void {
 }
 
 /**
+ * Mark all detail cache entries under `prefix` as STALE (timestamp = 0) — but keep
+ * the data. Same rationale as useListCache.markStaleByPrefix: keeps SWR behaviour
+ * so the next mount shows cached data instantly + refetches silently.
+ */
+export function markDetailStaleByPrefix(prefix: string): void {
+  for (const [key, entry] of detailCache.entries()) {
+    if (key.startsWith(prefix)) {
+      const stale = { ...entry, timestamp: 0 };
+      detailCache.set(key, stale);
+      try {
+        sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify(stale));
+      } catch { /* ignore */ }
+    }
+  }
+  try {
+    const ssKeys = Object.keys(sessionStorage).filter(
+      (k) => k.startsWith(SESSION_PREFIX + prefix)
+    );
+    ssKeys.forEach((k) => {
+      try {
+        const raw = sessionStorage.getItem(k);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        parsed.timestamp = 0;
+        sessionStorage.setItem(k, JSON.stringify(parsed));
+      } catch { /* ignore */ }
+    });
+  } catch { /* ignore */ }
+}
+
+/** Clear all cache entries whose key starts with `prefix` (memory + sessionStorage). */
+export function invalidateDetailCacheByPrefix(prefix: string): void {
+  for (const key of [...detailCache.keys()]) {
+    if (key.startsWith(prefix)) del(key);
+  }
+  try {
+    const ssKeys = Object.keys(sessionStorage).filter(
+      (k) => k.startsWith(SESSION_PREFIX + prefix)
+    );
+    ssKeys.forEach((k) => sessionStorage.removeItem(k));
+  } catch { /* ignore */ }
+}
+
+/**
  * Pre-warm cache for a single record.
  * Call from list's onSuccess to bulk-prefetch all visible rows.
  * If cache is already fresh, does nothing.

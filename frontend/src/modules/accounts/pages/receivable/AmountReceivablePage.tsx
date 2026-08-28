@@ -18,7 +18,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableSummary } from "../../../../services/receivableService";
 import { customerService } from "../../../../services/customerService";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, prefetchCache } from "../../../../hooks/useListCache";
 
 export const AmountReceivablePage: React.FC = () => {
   const navigate = useNavigate();
@@ -107,10 +107,23 @@ export const AmountReceivablePage: React.FC = () => {
     [asOnDate, startDate, endDate, customerId, search]
   );
 
+  // Prefetch each customer's breakdown in the background when the list loads.
+  // When user clicks "View" on any row → detail cache is warm → instant render.
+  const onListSuccess = useCallback((list: CustomerReceivableSummary[]) => {
+    for (const c of list) {
+      const detailKey = `accounts:customer-breakdown-${c.customerId}::`;
+      prefetchCache(detailKey, async () => {
+        const data = await receivableService.getCustomerDetail(c.customerId, { startDate: "", endDate: "" });
+        return { data: data ? [data] : [], total: data ? 1 : 0 };
+      });
+    }
+  }, []);
+
   const { data: receivables, loading, refreshing, refresh } = useListCache<CustomerReceivableSummary>({
     cacheKey,
     socketModule: "voucher",
     fetcher,
+    onSuccess: onListSuccess,
   });
 
   // Date range preset handler

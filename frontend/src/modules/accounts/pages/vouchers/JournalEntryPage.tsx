@@ -99,13 +99,8 @@ const JournalEntryPage: React.FC = () => {
           <h2 className="text-xs font-semibold text-ink">Journal Vouchers</h2>
           <span className="text-[11px] text-ink-subtle font-mono">Total: {total}</span>
         </div>
-        {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted">
-            <FaSync className="animate-spin text-purple-500 text-lg mx-auto mb-1" />
-            Loading...
-          </div>
-        ) : vouchers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-ink-subtle">No journal entries found.</div>
+        {vouchers.length === 0 ? (
+          loading ? null : <div className="p-8 text-center text-xs text-ink-subtle">No journal entries found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-ink-muted">

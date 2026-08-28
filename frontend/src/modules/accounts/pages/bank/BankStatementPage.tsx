@@ -132,8 +132,8 @@ const BankStatementPage: React.FC = () => {
           </span>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-xs text-ink-subtle">Loading statement...</div>
+        {!data && loading ? (
+          null
         ) : !data || data.entries.length === 0 ? (
           <div className="p-8 text-center text-xs text-ink-subtle">No transactions found for this period.</div>
         ) : (

@@ -325,13 +325,8 @@ export const VoucherListPage: React.FC = () => {
           <span className="text-[11px] text-ink-subtle font-mono">Total: {total}</span>
         </div>
 
-        {loading ? (
-          <div className="p-6 text-center text-xs text-ink-muted">
-            <FaSync className="animate-spin text-blue-600 text-lg mx-auto mb-1" />
-            Loading vouchers...
-          </div>
-        ) : vouchers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-ink-subtle">No vouchers matching your filter criteria.</div>
+        {vouchers.length === 0 ? (
+          loading ? null : <div className="p-8 text-center text-xs text-ink-subtle">No vouchers matching your filter criteria.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-ink-muted">

@@ -919,14 +919,7 @@ export const LedgerStatementPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line font-medium text-ink-muted">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={statement.mode === "multi" ? 9 : 8} className="text-center py-8 text-ink-subtle">
-                        <FaSync className="animate-spin text-lg mx-auto mb-1 text-blue-500" />
-                        Loading entries...
-                      </td>
-                    </tr>
-                  ) : filteredEntries.length === 0 ? (
+                  {filteredEntries.length === 0 && loading ? null : filteredEntries.length === 0 ? (
                     <tr>
                       <td colSpan={statement.mode === "multi" ? 9 : 8} className="text-center py-8 text-ink-subtle text-xs">
                         No voucher entries found.
