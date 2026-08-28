@@ -95,9 +95,21 @@ export const LedgerStatementPage: React.FC = () => {
   const [groupedLedgers, setGroupedLedgers] = useState<Array<{ group: string; ledgers: AccountLedger[] }>>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("one");
   const [showModeDialog, setShowModeDialog] = useState<boolean>(true);
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(false);
   const [selectedLedgerId, setSelectedLedgerId] = useState<number | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedLedgerIds, setSelectedLedgerIds] = useState<Set<number>>(new Set());
+  // Busy-style display toggles
+  const [skipOpeningBalance, setSkipOpeningBalance] = useState<boolean>(false);
+  const [showNarration, setShowNarration] = useState<boolean>(true);
+  const [showParticulars, setShowParticulars] = useState<boolean>(true);
+  // Options-dialog draft state (only committed to real state when OK is clicked)
+  const [draftLedgerId, setDraftLedgerId] = useState<number | null>(null);
+  const [draftGroup, setDraftGroup] = useState<string | null>(null);
+  const [draftLedgerIds, setDraftLedgerIds] = useState<Set<number>>(new Set());
+  const [draftStartDate, setDraftStartDate] = useState<string>("");
+  const [draftEndDate, setDraftEndDate] = useState<string>("");
+  const [draftOptionsSearch, setDraftOptionsSearch] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -165,11 +177,11 @@ export const LedgerStatementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    // Don't auto-load until the user has picked a view mode from the initial dialog
-    if (showModeDialog) return;
+    // Don't auto-load until the user has picked a view mode AND filled in options
+    if (showModeDialog || showOptionsDialog) return;
     loadStatement();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, selectedLedgerId, selectedGroup, startDate, endDate, searchTerm, showModeDialog]);
+  }, [viewMode, selectedLedgerId, selectedGroup, startDate, endDate, searchTerm, showModeDialog, showOptionsDialog]);
 
   useSocketSync("voucher", undefined, loadStatement);
   useSocketSync("accountLedger", undefined, loadStatement);
@@ -234,7 +246,7 @@ export const LedgerStatementPage: React.FC = () => {
   }, [statement, filteredEntries]);
 
   return (
-    <div className="p-3 bg-card-2 font-sans text-ink flex gap-3 relative" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div className="p-3 bg-card-2 font-sans text-ink relative" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* Busy-style initial mode selection modal */}
       {showModeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -262,6 +274,14 @@ export const LedgerStatementPage: React.FC = () => {
                       setViewMode(m.key);
                       setShowModeDialog(false);
                       setStatement(null);
+                      // Prepare draft state for Step-2 options dialog
+                      setDraftLedgerId(selectedLedgerId);
+                      setDraftGroup(selectedGroup);
+                      setDraftLedgerIds(new Set(selectedLedgerIds));
+                      setDraftStartDate(startDate);
+                      setDraftEndDate(endDate);
+                      setDraftOptionsSearch("");
+                      setShowOptionsDialog(true);
                     }}
                     className="p-3 rounded border border-line bg-card-2 hover:border-blue-500 hover:bg-blue-500/10 text-left transition-colors group"
                   >
@@ -280,7 +300,244 @@ export const LedgerStatementPage: React.FC = () => {
         </div>
       )}
 
-      {/* LEFT SIDEBAR — Mode selector + Ledger tree */}
+      {/* Step 2: Busy-style Options Dialog (appears after mode is picked) */}
+      {showOptionsDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-line rounded-lg shadow-2xl w-[640px] max-w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-4 py-2.5 bg-blue-600 text-white flex items-center gap-2 shrink-0">
+              <FaBook className="text-sm" />
+              <h2 className="text-sm font-bold flex-1">
+                Account Ledger &middot;{" "}
+                {viewMode === "one" && "One Account"}
+                {viewMode === "group" && "Group of Accounts"}
+                {viewMode === "all" && "All Accounts"}
+                {viewMode === "selected" && "Selected Accounts"}
+              </h2>
+              <button
+                onClick={() => { setShowOptionsDialog(false); setShowModeDialog(true); }}
+                className="text-white/80 hover:text-white text-[11px] px-2 py-0.5 rounded border border-white/30"
+              >
+                ← Back
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 overflow-auto">
+              {/* Mode-specific selector */}
+              {viewMode === "one" && (
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Select Account <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative mb-2">
+                    <input
+                      type="text"
+                      value={draftOptionsSearch}
+                      onChange={(e) => setDraftOptionsSearch(e.target.value)}
+                      placeholder="Type to search..."
+                      className="w-full pl-7 pr-2 py-1.5 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                      autoFocus
+                    />
+                    <FaSearch className="absolute left-2 top-2.5 text-ink-subtle text-[10px]" />
+                  </div>
+                  <div className="border border-line rounded max-h-[240px] overflow-auto bg-card-2/50">
+                    {ledgers
+                      .filter((l) => {
+                        const q = draftOptionsSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q) || (l.group || "").toLowerCase().includes(q);
+                      })
+                      .slice(0, 200)
+                      .map((l) => (
+                        <button
+                          key={l.id}
+                          onClick={() => setDraftLedgerId(l.id)}
+                          className={`w-full text-left px-3 py-1.5 text-xs border-b border-line-soft last:border-b-0 flex items-center gap-2 ${
+                            draftLedgerId === l.id ? "bg-blue-500/20 text-blue-400" : "hover:bg-card-2 text-ink-muted"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate">{l.name}</div>
+                            <div className="text-[9px] text-ink-subtle font-mono">{l.code} · {l.group}</div>
+                          </div>
+                          {draftLedgerId === l.id && <span className="text-blue-400 text-[10px]">✓ Selected</span>}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {viewMode === "group" && (
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Select Group <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={draftGroup || ""}
+                    onChange={(e) => setDraftGroup(e.target.value || null)}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  >
+                    <option value="">— Choose a group —</option>
+                    {groupedLedgers.map((g) => (
+                      <option key={g.group} value={g.group}>{g.group} ({g.ledgers.length} accounts)</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {viewMode === "selected" && (
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Select Accounts ({draftLedgerIds.size} selected)
+                  </label>
+                  <div className="relative mb-2">
+                    <input
+                      type="text"
+                      value={draftOptionsSearch}
+                      onChange={(e) => setDraftOptionsSearch(e.target.value)}
+                      placeholder="Type to search..."
+                      className="w-full pl-7 pr-2 py-1.5 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                      autoFocus
+                    />
+                    <FaSearch className="absolute left-2 top-2.5 text-ink-subtle text-[10px]" />
+                  </div>
+                  <div className="border border-line rounded max-h-[240px] overflow-auto bg-card-2/50">
+                    {ledgers
+                      .filter((l) => {
+                        const q = draftOptionsSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q);
+                      })
+                      .slice(0, 200)
+                      .map((l) => (
+                        <label
+                          key={l.id}
+                          className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-line-soft last:border-b-0 hover:bg-card-2 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={draftLedgerIds.has(l.id)}
+                            onChange={() => {
+                              const next = new Set(draftLedgerIds);
+                              if (next.has(l.id)) next.delete(l.id);
+                              else next.add(l.id);
+                              setDraftLedgerIds(next);
+                            }}
+                            className="w-3.5 h-3.5 accent-blue-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate text-ink-muted">{l.name}</div>
+                            <div className="text-[9px] text-ink-subtle font-mono">{l.code} · {l.group}</div>
+                          </div>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {viewMode === "all" && (
+                <div className="p-4 bg-card-2/50 border border-line rounded text-center">
+                  <FaGlobe className="text-blue-500/60 text-2xl mx-auto mb-2" />
+                  <div className="text-xs font-semibold text-ink">All Accounts Mode</div>
+                  <div className="text-[11px] text-ink-subtle mt-1">Combined statement will be generated across every ledger.</div>
+                </div>
+              )}
+
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Starting Date
+                  </label>
+                  <input
+                    type="date"
+                    value={draftStartDate}
+                    onChange={(e) => setDraftStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                    Ending Date
+                  </label>
+                  <input
+                    type="date"
+                    value={draftEndDate}
+                    onChange={(e) => setDraftEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Display toggles */}
+              <div className="border border-line rounded p-3 bg-card-2/40">
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle mb-2">Display Options</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex items-center gap-2 text-xs text-ink-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={skipOpeningBalance}
+                      onChange={(e) => setSkipOpeningBalance(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-blue-500"
+                    />
+                    Skip Opening Balance
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-ink-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showParticulars}
+                      onChange={(e) => setShowParticulars(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-blue-500"
+                    />
+                    Show Particulars
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-ink-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showNarration}
+                      onChange={(e) => setShowNarration(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-blue-500"
+                    />
+                    Show Narration
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 py-2.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0">
+              <span className="text-[10px] text-ink-subtle italic">Press <b>F2</b> or click OK to load report</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setShowOptionsDialog(false); setShowModeDialog(true); }}
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded border border-line"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Validate selection based on mode
+                    if (viewMode === "one" && !draftLedgerId) { toast.error("Please select an account"); return; }
+                    if (viewMode === "group" && !draftGroup) { toast.error("Please select a group"); return; }
+                    if (viewMode === "selected" && draftLedgerIds.size === 0) { toast.error("Please select at least one account"); return; }
+                    // Commit draft → real state (this triggers loadStatement via useEffect)
+                    setSelectedLedgerId(draftLedgerId);
+                    setSelectedGroup(draftGroup);
+                    setSelectedLedgerIds(new Set(draftLedgerIds));
+                    setStartDate(draftStartDate);
+                    setEndDate(draftEndDate);
+                    setShowOptionsDialog(false);
+                  }}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded flex items-center gap-1.5"
+                >
+                  <FaPlay className="text-[10px]" /> OK (F2)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LEFT SIDEBAR — hidden; ledger selection is handled by the Busy-style options dialog above */}
+      {false && (
       <aside className="w-[280px] shrink-0 bg-card rounded-lg border border-line overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 120px)" }}>
         <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2 shrink-0">
           <FaBook className="text-blue-500 text-xs" />
@@ -486,6 +743,7 @@ export const LedgerStatementPage: React.FC = () => {
           {viewMode === "selected" && `${selectedLedgerIds.size} selected — click Show`}
         </div>
       </aside>
+      )}
 
       {/* RIGHT PANEL */}
       <div className="flex-1 min-w-0 space-y-3">
@@ -499,6 +757,14 @@ export const LedgerStatementPage: React.FC = () => {
               </span>
             )}
           </h3>
+
+          <button
+            onClick={() => setShowModeDialog(true)}
+            className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold"
+            title="Change account / group selection"
+          >
+            <FaBook className="text-[10px]" /> Change Account
+          </button>
 
           <div className="w-[120px]">
             <SelectInput
@@ -537,7 +803,7 @@ export const LedgerStatementPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative flex-1 min-w-[160px]">
+          <div className="relative w-full max-w-[320px]">
             <input
               type="text"
               className="w-full border border-line rounded pl-7 pr-2 py-1 text-xs bg-card text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"

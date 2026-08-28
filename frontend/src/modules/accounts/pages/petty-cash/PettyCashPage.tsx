@@ -171,101 +171,87 @@ export const PettyCashPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Compact Header + Filters */}
-      <div className="bg-card rounded-lg border border-line">
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
-          <h1 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaCoins className="text-amber-500 text-sm" /> Petty Cash Register
-            {refreshing && <FaSync className="animate-spin text-amber-500 text-[10px]" />}
-          </h1>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={refresh}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
-            >
-              <FaSync className={refreshing ? "animate-spin text-amber-500" : ""} /> Refresh
-            </button>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-semibold transition cursor-pointer"
-            >
-              <FaPlus className="text-[10px]" /> Record Cash Entry
-            </button>
-          </div>
+      {/* Single-row Header + Filters (Busy-style compact) */}
+      <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2">
+        <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+          <FaCoins className="text-amber-500 text-sm" /> Petty Cash Register
+          {refreshing && <FaSync className="animate-spin text-amber-500 text-[10px]" />}
+        </h1>
+
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as any)}
+            className="w-[150px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
+          >
+            <option value="ALL">All Entry Types</option>
+            <option value="IN">Cash IN (Receipts)</option>
+            <option value="OUT">Cash OUT (Expenses)</option>
+          </select>
         </div>
 
-        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="w-[160px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Type</label>
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value as any);
-              }}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
-            >
-              <option value="ALL">All Entry Types</option>
-              <option value="IN">Cash IN (Receipts)</option>
-              <option value="OUT">Cash OUT (Expenses)</option>
-            </select>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-[130px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
+          />
+        </div>
 
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-              }}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
-            />
-          </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-[130px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
+          />
+        </div>
 
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-              }}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
-            />
-          </div>
+        <div className="relative w-full max-w-[320px]">
+          <input
+            type="text"
+            placeholder="Search entry no, category, description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-7 pr-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
+          />
+          <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[10px]" />
+        </div>
 
-          <div className="flex-1 min-w-[180px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Entry no, category, description..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                }}
-                className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
-              />
-              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
-            </div>
-          </div>
+        {(searchTerm || startDate || endDate || typeFilter !== "ALL") && (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setStartDate("");
+              setEndDate("");
+              setTypeFilter("ALL");
+            }}
+            className="px-2 py-1 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
+          >
+            Clear
+          </button>
+        )}
 
-          {(searchTerm || startDate || endDate || typeFilter !== "ALL") && (
-            <button
-              onClick={() => {
-                setSearchTerm("");
-                setStartDate("");
-                setEndDate("");
-                setTypeFilter("ALL");
-              }}
-              className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
-            >
-              Clear
-            </button>
-          )}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={refresh}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+          >
+            <FaSync className={refreshing ? "animate-spin text-amber-500" : ""} /> Refresh
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-semibold transition cursor-pointer"
+          >
+            <FaPlus className="text-[10px]" /> Record Cash Entry
+          </button>
         </div>
       </div>
 

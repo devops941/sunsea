@@ -40,46 +40,56 @@ const ReceiptVoucherPage: React.FC = () => {
 
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen">
-      {/* Compact Header + Filters */}
-      <div className="bg-card rounded-lg border border-line">
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
-          <h1 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaReceipt className="text-green-500 text-sm" /> Receipt Voucher
-            {refreshing && <FaSync className="animate-spin text-green-500 text-[10px]" />}
-          </h1>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={refresh}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
-            >
-              <FaSync className={refreshing ? "animate-spin text-green-500" : ""} /> Refresh
-            </button>
-            <button onClick={() => navigate("/accounts/receipt-voucher/add")}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition cursor-pointer">
-              <FaPlus className="text-[10px]" /> New Receipt
-            </button>
-          </div>
+      {/* Single-row Header + Filters (Busy-style compact) */}
+      <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2">
+        <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+          <FaReceipt className="text-green-500 text-sm" /> Receipt Voucher
+          {refreshing && <FaSync className="animate-spin text-green-500 text-[10px]" />}
+        </h1>
+
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Date</label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="w-[130px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-green-500/40 focus:border-green-500 focus:outline-none"
+          />
         </div>
 
-        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="w-[150px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Date</label>
-            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-green-500/40 focus:border-green-500 focus:outline-none" />
-          </div>
-          <div className="flex-1 min-w-[180px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
-            <div className="relative">
-              <input type="text" placeholder="Voucher no or narration..." value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-green-500/40 focus:border-green-500 focus:outline-none" />
-              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
-            </div>
-          </div>
-          {(filterDate || searchTerm) && (
-            <button onClick={() => { setFilterDate(""); setSearchTerm(""); }}
-              className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer">Clear</button>
-          )}
+        <div className="relative w-full max-w-[320px]">
+          <input
+            type="text"
+            placeholder="Search voucher no or narration..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-7 pr-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-green-500/40 focus:border-green-500 focus:outline-none"
+          />
+          <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[10px]" />
+        </div>
+
+        {(filterDate || searchTerm) && (
+          <button
+            onClick={() => { setFilterDate(""); setSearchTerm(""); }}
+            className="px-2 py-1 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
+          >
+            Clear
+          </button>
+        )}
+
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={refresh}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+          >
+            <FaSync className={refreshing ? "animate-spin text-green-500" : ""} /> Refresh
+          </button>
+          <button
+            onClick={() => navigate("/accounts/receipt-voucher/add")}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition cursor-pointer"
+          >
+            <FaPlus className="text-[10px]" /> New Receipt
+          </button>
         </div>
       </div>
 

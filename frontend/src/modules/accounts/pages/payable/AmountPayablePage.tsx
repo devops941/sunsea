@@ -401,7 +401,7 @@ export const AmountPayablePage: React.FC = () => {
             />
           </div>
 
-          <div className="flex-1 min-w-[140px]">
+          <div className="w-full max-w-[320px]">
             <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
             <input
               type="text"

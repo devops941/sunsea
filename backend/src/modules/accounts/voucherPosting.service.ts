@@ -110,6 +110,12 @@ async function safeCreateVoucher(
 }
 
 class VoucherPostingService {
+  // ─── syncUnpostedVouchers throttling ────────────────────────────────────────
+  // See `syncUnpostedVouchers()` for why these exist.
+  private static _lastSyncSuccessAt: number = 0;
+  private static _inFlightSync: Promise<any> | null = null;
+  private static readonly SYNC_MIN_INTERVAL_MS: number = 60_000; // 1 minute
+
   /**
    * Post a formal double-entry PURCHASE Voucher for a GRN Purchase Invoice.
    * Debit: Purchase Account (PURCH-001)
@@ -1069,8 +1075,42 @@ class VoucherPostingService {
   /**
    * Sync unposted GRN Invoices, Sales Invoices, Expenses, and Petty Cash entries to the Voucher table.
    * Uses set-based queries and parallel batches for efficiency.
+   *
+   * THROTTLING: This method is expensive (11+ parallel Prisma queries + N posts) and
+   * used to be called on EVERY voucher-list / ledger-statement request. Under load
+   * that saturated Neon's 13-connection pool → P2024 "Timed out fetching a new
+   * connection". We now:
+   *   1. Skip if a sync ran less than SYNC_MIN_INTERVAL_MS ago (fresh data → no work).
+   *   2. Return the in-flight promise if a sync is currently running (deduplicate
+   *      concurrent callers so N requests fire ONE sync between them).
+   *   3. Update the timestamp AFTER completion so failures don't lock out retries.
    */
   async syncUnpostedVouchers() {
+    const now = Date.now();
+    // Fast-path: recent successful sync — skip entirely
+    if (now - VoucherPostingService._lastSyncSuccessAt < VoucherPostingService.SYNC_MIN_INTERVAL_MS) {
+      return { failedPostings: [], skipped: true };
+    }
+    // Dedupe: piggyback on an in-flight sync from another request
+    if (VoucherPostingService._inFlightSync) {
+      return VoucherPostingService._inFlightSync;
+    }
+    VoucherPostingService._inFlightSync = this._doSyncUnpostedVouchers()
+      .then((res) => {
+        VoucherPostingService._lastSyncSuccessAt = Date.now();
+        return res;
+      })
+      .catch((err) => {
+        console.error("[Auto-Post Voucher Error] Syncing unposted vouchers failed:", err);
+        return { failedPostings: [], error: String(err) };
+      })
+      .finally(() => {
+        VoucherPostingService._inFlightSync = null;
+      });
+    return VoucherPostingService._inFlightSync;
+  }
+
+  private async _doSyncUnpostedVouchers() {
     const failedPostings: Array<{ id: string | number; docType: string; reason: string }> = [];
 
     try {

@@ -185,7 +185,7 @@ export const ChartOfAccountsPage: React.FC = () => {
 
         {/* Filter Row */}
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="flex-1 min-w-[220px]">
+          <div className="w-full max-w-[320px]">
             <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
               Search Ledger
             </label>

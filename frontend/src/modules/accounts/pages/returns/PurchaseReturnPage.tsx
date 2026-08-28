@@ -326,7 +326,7 @@ export const PurchaseReturnPage: React.FC = () => {
         </div>
 
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="flex-1 min-w-[200px]">
+          <div className="w-full max-w-[320px]">
             <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
             <div className="relative">
               <input
