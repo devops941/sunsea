@@ -261,6 +261,40 @@ class VouchersService {
       }
     }
 
+    // PAYMENT/RECEIPT side guard: prevents the classic "swap" bug where a
+    // user picks a supplier in "Paid From" and a bank in "Paid To" (or vice
+    // versa for Receipt). By definition:
+    //   PAYMENT = money OUT of bank/cash → credit side MUST be a Cash/Bank ledger
+    //   RECEIPT = money IN to bank/cash  → debit side  MUST be a Cash/Bank ledger
+    // Backend enforces this even if the frontend filter is bypassed. Without
+    // this guard, a swapped voucher INCREASES the party's balance instead of
+    // reducing it, silently corrupting the ledger.
+    if (data.type === "PAYMENT" || data.type === "RECEIPT") {
+      const partyIds = data.items
+        .map((i) => (data.type === "PAYMENT" ? i.creditLedgerId : i.debitLedgerId))
+        .filter((id): id is number => id != null);
+      if (partyIds.length > 0) {
+        const ledgers = await prisma.accountLedger.findMany({
+          where: { id: { in: partyIds } },
+          select: { id: true, code: true, name: true, group: true },
+        });
+        const bankOrCash = (g: string | null | undefined) => {
+          const gg = (g || "").toLowerCase();
+          return gg.includes("cash") || gg.includes("bank");
+        };
+        const wrongSide = ledgers.find((l) => !bankOrCash(l.group));
+        if (wrongSide) {
+          const side = data.type === "PAYMENT" ? '"Paid From"' : '"Received In"';
+          throw new ApiError(
+            400,
+            `${data.type} voucher's ${side} account must be a Bank or Cash ledger, ` +
+              `but "${wrongSide.name}" (group: ${wrongSide.group || "-"}) was used. ` +
+              `Common mistake: the two ledgers are swapped — check your entry.`
+          );
+        }
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
       const voucher = await tx.voucher.create({
         data: {

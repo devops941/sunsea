@@ -10,7 +10,15 @@ interface LedgerSearchInputProps {
   placeholder?: string;
   required?: boolean;
   filterType?: "ASSET" | "LIABILITY" | "INCOME" | "EXPENSE" | "EQUITY";
+  /** Custom predicate to restrict selectable ledgers (e.g. bank/cash only). */
+  filterFn?: (ledger: AccountLedger) => boolean;
   accentColor?: string; // tailwind ring color class e.g. "red-500"
+}
+
+/** True if a ledger's group looks like a bank or cash account. */
+export function isBankOrCashLedger(l: AccountLedger): boolean {
+  const g = (l.group || "").toLowerCase();
+  return g.includes("cash") || g.includes("bank");
 }
 
 const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
@@ -21,6 +29,7 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
   placeholder = "Search account...",
   required,
   filterType,
+  filterFn,
   accentColor = "primary",
 }) => {
   const [searchText, setSearchText] = useState("");
@@ -34,9 +43,10 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
   // Find selected ledger name for display
   const selectedLedger = ledgers.find((l) => String(l.id) === value);
 
-  // Filter ledgers by search text and optional type
+  // Filter ledgers by search text, optional type, and optional custom predicate
   const filtered = ledgers.filter((l) => {
     if (filterType && l.type !== filterType) return false;
+    if (filterFn && !filterFn(l)) return false;
     if (!searchText) return true;
     const term = searchText.toLowerCase();
     return (

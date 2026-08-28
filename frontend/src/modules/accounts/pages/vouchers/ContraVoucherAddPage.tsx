@@ -4,7 +4,7 @@ import { FaExchangeAlt, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
-import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
+import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import { useListCache } from "../../../../hooks/useListCache";
 
 const ContraVoucherAddPage: React.FC = () => {
@@ -114,6 +114,7 @@ const ContraVoucherAddPage: React.FC = () => {
                 onChange={setCreditLedgerId}
                 placeholder="Search source bank / cash..."
                 required
+                filterFn={isBankOrCashLedger}
                 accentColor="amber-500"
               />
             </div>
@@ -125,6 +126,7 @@ const ContraVoucherAddPage: React.FC = () => {
                 onChange={setDebitLedgerId}
                 placeholder="Search destination bank / cash..."
                 required
+                filterFn={isBankOrCashLedger}
                 accentColor="amber-500"
               />
             </div>
