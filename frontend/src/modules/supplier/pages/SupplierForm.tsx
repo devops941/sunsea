@@ -17,6 +17,7 @@ import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useSocket } from "../../../providers/SocketProvider";
+import apiClient from "../../../api/apiClient";
 
 const supplierFormSchema = z.object({
     companyId: z.string().optional(),
@@ -94,8 +95,24 @@ const SupplierForm: React.FC = () => {
         stateCode: "TN",
         openingBalance: 0,
         openingBalanceType: "CREDIT",
+        openingBalancePaidThroughLedgerId: "",
         status: "Active",
     });
+
+    // Load bank/cash ledgers so the "Deposit / Withdrawal" selector can offer real accounts
+    const [bankAccounts, setBankAccounts] = useState<Array<{ id: number; code: string; name: string; group: string }>>([]);
+    useEffect(() => {
+        let cancelled = false;
+        apiClient
+            .get("/accounts/bank-accounts")
+            .then((res) => {
+                if (cancelled) return;
+                const accounts = res.data?.data?.accounts || res.data?.accounts || [];
+                setBankAccounts(accounts);
+            })
+            .catch(() => { /* silent — dropdown just stays empty, contra falls back to Opening Equity */ });
+        return () => { cancelled = true; };
+    }, []);
 
     const [addresses, setAddresses] = useState<SupplierAddress[]>([
         {
@@ -242,6 +259,7 @@ const SupplierForm: React.FC = () => {
                 stateCode: "TN",
                 openingBalance: 0,
                 openingBalanceType: "CREDIT",
+                openingBalancePaidThroughLedgerId: "",
                 status: "Active",
             });
             setAddresses([{
@@ -416,6 +434,9 @@ const SupplierForm: React.FC = () => {
         if (!isEdit) {
             payload.openingBalance = Number(formData.openingBalance || 0);
             payload.openingBalanceType = formData.openingBalanceType || "CREDIT";
+            if (formData.openingBalancePaidThroughLedgerId) {
+                payload.openingBalancePaidThroughLedgerId = Number(formData.openingBalancePaidThroughLedgerId);
+            }
         }
 
         try {
@@ -726,6 +747,29 @@ const SupplierForm: React.FC = () => {
                                         ]}
                                         onChange={handleChange}
                                     />
+                                    {/*
+                                      Deposit / Withdrawal account for the opening advance.
+                                      Only relevant when actual cash moved:
+                                        • CREDIT (we owe them) → optional; usually just Opening Equity
+                                        • DEBIT  (we PAID them advance) → pick the bank/cash the money left from
+                                      Blank keeps the historical Opening Balance Equity contra.
+                                    */}
+                                    {Number(formData.openingBalance || 0) > 0 && (
+                                        <SelectInput
+                                            searchable
+                                            label={formData.openingBalanceType === "DEBIT" ? "Advance Paid From (Bank / Cash)" : "Related Bank / Cash Account (optional)"}
+                                            name="openingBalancePaidThroughLedgerId"
+                                            value={String(formData.openingBalancePaidThroughLedgerId || "")}
+                                            options={[
+                                                { value: "", label: "— Opening Balance Equity (historical, no bank movement) —" },
+                                                ...bankAccounts.map((b) => ({
+                                                    value: String(b.id),
+                                                    label: `[${b.code}] ${b.name}`,
+                                                })),
+                                            ]}
+                                            onChange={handleChange as any}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         )}

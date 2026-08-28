@@ -76,6 +76,10 @@ function resolveDrillTarget(entry: {
     const siId = extractSourceDocId(entry.refDocId, "rcpt");
     return siId ? `/sales-invoices/details/${siId}` : "/sales-invoices";
   }
+  // System-generated Opening Balance JVs → jump to the Journal Entry list
+  if (rt === "CUSTOMER_OPENING_BALANCE" || rt === "SUPPLIER_OPENING_BALANCE" || rt === "LEDGER_OPENING_BALANCE") {
+    return "/accounts/journal-entry";
+  }
 
   // Manual vouchers (no refDoc) — route to the appropriate voucher list
   switch (vt) {

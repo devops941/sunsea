@@ -44,7 +44,8 @@ class SupplierService {
       );
     }
 
-    const { addresses, userId, materialPrices, phones, openingBalance, ...supplierData } = data as any;
+    // Strip `openingBalancePaidThroughLedgerId` too — workflow-only, not a Supplier column.
+    const { addresses, userId, materialPrices, phones, openingBalance, openingBalancePaidThroughLedgerId: _paidThrough, ...supplierData } = data as any;
 
     const mobileData = phones || supplierData.mobile || null;
 
@@ -73,10 +74,15 @@ class SupplierService {
       const opBal = Number(createdSupplier.openingBalance || 0);
       if (opBal > 0) {
         const opType = (data.openingBalanceType || "CREDIT").toUpperCase() as "DEBIT" | "CREDIT";
+        const paidThroughLedgerId = (data as any).openingBalancePaidThroughLedgerId
+          ? Number((data as any).openingBalancePaidThroughLedgerId)
+          : null;
         await voucherPostingService.postSupplierOpeningBalanceVoucher(
           { id: createdSupplier.id, supplierCode: createdSupplier.supplierCode, legalName: createdSupplier.legalName },
           opBal,
-          opType
+          opType,
+          undefined,
+          paidThroughLedgerId
         );
       }
     } catch (err) {
