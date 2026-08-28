@@ -220,52 +220,29 @@ export const VoucherListPage: React.FC = () => {
 
   return (
     <div className="p-3 space-y-3 bg-card-2 min-h-screen">
-      {/* Compact Header + Tabs + Filters */}
-      <div className="bg-card rounded-lg border border-line">
-        {/* Header row */}
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
-          <h2 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaFileInvoiceDollar className="text-blue-600 text-sm" /> Accounting Vouchers
-            {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={refresh}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
-              title="Refresh Data"
-            >
-              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
-            </button>
-            <ExportCSVButton
-              data={csvData}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
-          </div>
+      {/* Single-row Header + Filters (Busy-style compact) */}
+      <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+          <FaFileInvoiceDollar className="text-blue-600 text-sm" /> Accounting Vouchers
+          {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
+        </h2>
+
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => handleTypeChange(e.target.value)}
+            className="w-[130px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
+          >
+            {["ALL", "PURCHASE", "SALES", "PAYMENT", "RECEIPT", "JOURNAL", "CONTRA"].map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Type tabs - compact */}
-        <div className="px-3 py-1.5 bg-card-2 flex items-center gap-1.5 overflow-x-auto border-b border-line-soft">
-          {["ALL", "PURCHASE", "SALES", "PAYMENT", "RECEIPT", "JOURNAL", "CONTRA"].map((t) => (
-            <button
-              key={t}
-              onClick={() => handleTypeChange(t)}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all whitespace-nowrap ${
-                typeFilter === t
-                  ? "bg-blue-600 text-white"
-                  : "bg-card text-ink-muted hover:bg-card-2 border border-line"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {/* Filter row - single compact row */}
-        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="w-[140px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+          <div className="w-[130px]">
             <SelectInput
               name="dateRangePreset"
               value={dateRangePreset}
@@ -274,53 +251,68 @@ export const VoucherListPage: React.FC = () => {
               onChange={(e) => handleDateRangeChange(e.target.value)}
             />
           </div>
+        </div>
 
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
           <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
             <DatePickerCalendar
               name="draftStartDate"
               value={draftStartDate}
               onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
             />
           </div>
+        </div>
 
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
           <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
             <DatePickerCalendar
               name="draftEndDate"
               value={draftEndDate}
               onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
             />
           </div>
+        </div>
 
-          <div className="flex-1 min-w-[180px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
-            <div className="relative">
-              <input
-                type="text"
-                className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
-                value={draftSearchTerm}
-                onChange={(e) => setDraftSearchTerm(e.target.value)}
-                placeholder="Voucher no or narration..."
-              />
-              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
-            </div>
-          </div>
+        <div className="relative w-full max-w-[320px]">
+          <input
+            type="text"
+            className="w-full pl-7 pr-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
+            value={draftSearchTerm}
+            onChange={(e) => setDraftSearchTerm(e.target.value)}
+            placeholder="Search voucher no or narration..."
+          />
+          <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[10px]" />
+        </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleClearFilters}
-              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
-            >
-              Clear
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded cursor-pointer"
-            >
-              Apply
-            </button>
-          </div>
+        <button
+          onClick={handleClearFilters}
+          className="px-2 py-1 text-xs font-semibold text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
+        >
+          Clear
+        </button>
+        <button
+          onClick={handleApplyFilters}
+          className="px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded cursor-pointer"
+        >
+          Apply
+        </button>
+
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={refresh}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            title="Refresh Data"
+          >
+            <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
+          </button>
+          <ExportCSVButton
+            data={csvData}
+            columns={csvColumns}
+            filename={csvFilename}
+            text="Export"
+          />
         </div>
       </div>
 
