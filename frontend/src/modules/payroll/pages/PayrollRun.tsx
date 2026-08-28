@@ -263,28 +263,28 @@ const Step1: React.FC<Step1Props> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Month</label>
+                  <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Month</label>
                   <select
                     value={weekMonth}
                     onChange={e => { setWeekMonth(Number(e.target.value)); setWeekOfMonth(1); }}
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-card transition-all cursor-pointer"
                   >
                     {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Year</label>
+                  <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Year</label>
                   <select
                     value={year}
                     onChange={e => { setYear(Number(e.target.value)); setWeekOfMonth(1); }}
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-card transition-all cursor-pointer"
                   >
                     {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Week</label>
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Week</label>
                 <div className="grid grid-cols-1 gap-2.5">
                   {weekOptions.map(opt => {
                     const isSelected = weekOfMonth === opt.weekOfMonth;
@@ -293,15 +293,15 @@ const Step1: React.FC<Step1Props> = ({
                         key={opt.weekOfMonth}
                         onClick={() => setWeekOfMonth(opt.weekOfMonth)}
                         className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left cursor-pointer ${isSelected
-                          ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                          ? 'border-primary bg-blue-50/70 text-ink shadow-xs ring-2 ring-primary/20'
+                          : 'border-line-soft bg-card text-ink-muted hover:border-line hover:bg-card-2'
                           }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-slate-300'}`} />
+                          <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-ink-subtle'}`} />
                           <span className="font-bold text-sm">{opt.label}</span>
                         </div>
-                        <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-slate-400 bg-slate-100'}`}>
+                        <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-ink-subtle bg-card-2'}`}>
                           7 days
                         </span>
                       </button>
@@ -310,21 +310,21 @@ const Step1: React.FC<Step1Props> = ({
                 </div>
               </div>
               {selectedWeek && (
-                <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-slate-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
+                <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-card-2 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
                       <CalendarDays size={18} />
                     </div>
                     <div>
                       <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Weekly Period</p>
-                      <p className="text-base font-extrabold text-slate-900">
+                      <p className="text-base font-extrabold text-ink">
                         {selectedWeek.label.replace(/^Week \d+\s*/, '')}
                       </p>
                     </div>
                   </div>
                   <div className="text-right border-l border-blue-200/60 pl-5">
-                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Days</p>
-                    <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-slate-500">days</span></p>
+                    <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">Days</p>
+                    <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-ink-muted">days</span></p>
                   </div>
                 </div>
               )}
@@ -416,10 +416,10 @@ const Step1: React.FC<Step1Props> = ({
               </thead>
               <tbody className="divide-y divide-red-100">
                 {attValidationError.employees.map((e, i) => (
-                  <tr key={i} className="text-slate-700 hover:bg-red-50/40">
+                  <tr key={i} className="text-ink hover:bg-red-50/40">
                     <td className="px-4 py-2.5">
-                      <span className="font-bold text-slate-800">{e.name}</span>
-                      <span className="text-slate-400 font-mono text-[11px] ml-1">({e.code})</span>
+                      <span className="font-bold text-ink">{e.name}</span>
+                      <span className="text-ink-subtle font-mono text-[11px] ml-1">({e.code})</span>
                     </td>
                     <td className="px-4 py-2.5 text-center font-mono text-red-600 font-bold">{e.entered}</td>
                     <td className="px-4 py-2.5 text-center font-mono font-medium">{e.expected}</td>
@@ -434,9 +434,9 @@ const Step1: React.FC<Step1Props> = ({
 
       {/* Action Footer */}
       <div className="flex items-center justify-between pt-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
           <Users size={16} className="text-primary" />
-          <span><strong className="text-slate-900 font-extrabold">{filtered.length}</strong> employees will be processed</span>
+          <span><strong className="text-ink font-extrabold">{filtered.length}</strong> employees will be processed</span>
         </div>
         <Button
           text={loading ? "Checking Attendance..." : "Next: Review Attendance"}
@@ -558,7 +558,7 @@ const EditableAdvanceInput: React.FC<{
           }
         }}
         placeholder="0"
-        className={`w-24 px-2.5 py-1 text-right font-mono text-xs font-bold ${textColorClass} bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs`}
+        className={`w-24 px-2.5 py-1 text-right font-mono text-xs font-bold ${textColorClass} bg-card border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs`}
       />
     </div>
   );
@@ -618,7 +618,7 @@ const Step2: React.FC<{
           </button>
         </div>
         <div className="flex items-center justify-between">
-          <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+          <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-card-2 transition-colors">
             <ChevronLeft size={16} /> Back
           </button>
         </div>
@@ -641,7 +641,7 @@ const Step2: React.FC<{
       headerNode: (
         <span>
           PRESENT <br />
-          <span className="font-normal normal-case text-slate-400">/ {calDays}d</span>
+          <span className="font-normal normal-case text-ink-subtle">/ {calDays}d</span>
         </span>
       ),
       align: "center",
@@ -659,7 +659,7 @@ const Step2: React.FC<{
       align: "center",
       render: (row) => (
         <span
-          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${row.absentDays > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400'
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${row.absentDays > 0 ? 'bg-red-100 text-red-700' : 'bg-card-2 text-ink-subtle'
             }`}
         >
           {row.absentDays > 0 ? row.absentDays : '—'}
@@ -671,13 +671,13 @@ const Step2: React.FC<{
       headerNode: (
         <span>
           HALF <br />
-          <span className="font-normal normal-case text-slate-400">Day</span>
+          <span className="font-normal normal-case text-ink-subtle">Day</span>
         </span>
       ),
       align: "center",
       render: (row) => (
         <span
-          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${row.halfDays > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${row.halfDays > 0 ? 'bg-amber-100 text-amber-700' : 'bg-card-2 text-ink-subtle'
             }`}
         >
           {row.halfDays > 0 ? row.halfDays : '—'}
@@ -689,7 +689,7 @@ const Step2: React.FC<{
       headerNode: (
         <span>
           OT <br />
-          <span className="font-normal normal-case text-slate-400">Hrs</span>
+          <span className="font-normal normal-case text-ink-subtle">Hrs</span>
         </span>
       ),
       align: "center",
@@ -704,7 +704,7 @@ const Step2: React.FC<{
       headerNode: (
         <span>
           LATE <br />
-          <span className="font-normal normal-case text-slate-400">min</span>
+          <span className="font-normal normal-case text-ink-subtle">min</span>
         </span>
       ),
       align: "center",
@@ -719,7 +719,7 @@ const Step2: React.FC<{
       headerNode: (
         <span>
           PERM <br />
-          <span className="font-normal normal-case text-slate-400">min</span>
+          <span className="font-normal normal-case text-ink-subtle">min</span>
         </span>
       ),
       align: "center",
@@ -780,7 +780,7 @@ const Step2: React.FC<{
         </div>
         <button
           onClick={() => navigate('/payroll/attendance')}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border text-text-secondary rounded-lg text-xs font-semibold hover:bg-slate-50 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border text-text-secondary rounded-lg text-xs font-semibold hover:bg-card-2 transition-colors"
         >
           <ClipboardList size={13} /> Edit Attendance
         </button>
@@ -803,7 +803,7 @@ const Step2: React.FC<{
       </div>
 
       {/* Per-employee attendance breakdown using reusable DataTable component */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
         <DataTable
           columns={columns}
           data={rows}
@@ -820,49 +820,49 @@ const Step2: React.FC<{
           density="compact"
         />
         {/* Total Summary Footer — Step 3 Styled Footer */}
-        <div className="bg-white border-t border-slate-200">
+        <div className="bg-card border-t border-line-soft">
           <div className="flex flex-col xl:flex-row items-center justify-between">
             {/* Left side: Total count */}
-            <div className="px-6 py-4 flex items-center xl:border-r border-slate-200 xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
+            <div className="px-6 py-4 flex items-center xl:border-r border-line-soft xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 font-bold">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card-2 text-ink-muted font-bold">
                   <Users size={18} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Employees</p>
-                  <p className="text-sm font-bold text-slate-800">{rows.length}</p>
+                  <p className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest">Total Employees</p>
+                  <p className="text-sm font-bold text-ink">{rows.length}</p>
                 </div>
               </div>
             </div>
 
             {/* Middle: Attendance Breakdown Metrics */}
-            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-slate-200">
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-line-soft">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Present</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Present</span>
                 <span className="font-mono font-bold text-emerald-600">{totals.present} days</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Absent</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Absent</span>
                 <span className="font-mono font-bold text-rose-600">{totals.absent} days</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Half Days</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Half Days</span>
                 <span className="font-mono font-bold text-amber-600">{totals.half} days</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">OT Hours</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">OT Hours</span>
                 <span className="font-mono font-bold text-blue-600">{totals.ot.toFixed(1)} hrs</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Salary Advance</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Salary Advance</span>
                 <span className="font-mono font-bold text-violet-700">
                   {totals.adv > 0 ? `₹${totals.adv.toLocaleString('en-IN')}` : '—'}
                 </span>
@@ -870,7 +870,7 @@ const Step2: React.FC<{
             </div>
 
             {/* Right side: Attendance Rate / Total Tracked */}
-            <div className="flex items-stretch xl:border-l border-slate-200 bg-slate-50 w-full xl:w-auto">
+            <div className="flex items-stretch xl:border-l border-line-soft bg-card-2 w-full xl:w-auto">
               <div className="px-6 py-4 flex flex-col items-end justify-center flex-1 xl:flex-none">
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Total Tracked</span>
                 <span className="font-mono text-xl font-black text-emerald-700">{totals.present + totals.absent + totals.half} days</span>
@@ -887,7 +887,7 @@ const Step2: React.FC<{
       </div>
 
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-card-2 transition-colors">
           <ChevronLeft size={16} /> Back
         </button>
         <button onClick={onNext} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all shadow-md shadow-primary/20 cursor-pointer">
@@ -910,7 +910,7 @@ const ComputingOverlay: React.FC<{ progress: ProgressState }> = ({ progress }) =
   const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 space-y-6 text-center">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 space-y-6 text-center">
         <div className="flex items-center justify-center">
           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
             <Loader2 size={30} className="text-primary animate-spin" />
@@ -925,7 +925,7 @@ const ComputingOverlay: React.FC<{ progress: ProgressState }> = ({ progress }) =
             <span>Processing: <span className="font-semibold text-text-primary">{progress.currentEmployee}</span></span>
             <span>{progress.current} / {progress.total}</span>
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-2.5">
+          <div className="w-full bg-card-2 rounded-full h-2.5">
             <div
               className="bg-primary h-2.5 rounded-full transition-all duration-300"
               style={{ width: `${pct}%` }}
@@ -1195,7 +1195,7 @@ const Step3: React.FC<{
         {/* 
         <button
           onClick={handleExportCSV}
-          className="inline-flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary rounded-lg text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary rounded-lg text-xs font-semibold hover:bg-card-2 transition-colors cursor-pointer"
         >
           <Download size={13} /> Export CSV
         </button>
@@ -1204,7 +1204,7 @@ const Step3: React.FC<{
 
       {/* Cash in Hand Summary - shown when there is cash in hand */}
       {totalCashInHand > 0 && (
-        <div className="rounded-2xl border border-indigo-200 bg-white shadow-sm overflow-hidden my-2">
+        <div className="rounded-2xl border border-indigo-200 bg-card shadow-xs overflow-hidden my-2">
           <div className="flex items-center justify-between px-5 py-3 bg-indigo-600 text-white">
             <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
               <Wallet size={15} /> Cash in Hand Summary
@@ -1213,9 +1213,9 @@ const Step3: React.FC<{
 
           <div className="p-5 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-500">Net Pay (Total)</span>
-                <span className="text-xl font-extrabold text-slate-800 font-mono">{fmtRs(totalOnRecordNet)}</span>
+              <div className="p-4 rounded-xl bg-card-2 border border-line-soft flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-muted">Net Pay (Total)</span>
+                <span className="text-xl font-extrabold text-ink font-mono">{fmtRs(totalOnRecordNet)}</span>
               </div>
               <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 flex flex-col gap-1">
                 <span className="text-xs font-semibold text-indigo-600">Cash in Hand (included in Net)</span>
@@ -1234,7 +1234,7 @@ const Step3: React.FC<{
           { label: 'PF Liability', value: fmtRs(Number(run.totalPfEmployee || 0) + Number(run.totalPfEmployer || 0)), icon: Building2, cls: 'text-violet-600 bg-violet-50' },
           { label: 'ESI Liability', value: fmtRs(Number(run.totalEsiEmployee || 0) + Number(run.totalEsiEmployer || 0)), icon: FileText, cls: 'text-amber-600 bg-amber-50' },
         ].map(c => (
-          <div key={c.label} className="bg-white rounded-xl border border-border p-4 shadow-sm">
+          <div key={c.label} className="bg-card rounded-xl border border-line-soft p-4 shadow-xs">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">{c.label}</p>
               <div className={`p-1.5 rounded-lg ${c.cls}`}><c.icon size={13} /></div>
@@ -1259,7 +1259,7 @@ const Step3: React.FC<{
       )}
 
       {/* Results table using reusable DataTable component */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
         <DataTable
           columns={columns}
           data={results}
@@ -1269,38 +1269,38 @@ const Step3: React.FC<{
           density="compact"
         />
         {/* Total Summary Footer */}
-        <div className="bg-white border-t border-slate-200">
+        <div className="bg-card border-t border-line-soft">
           <div className="flex flex-col xl:flex-row items-center justify-between">
             {/* Left side: Total count */}
-            <div className="px-6 py-4 flex items-center xl:border-r border-slate-200 xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
+            <div className="px-6 py-4 flex items-center xl:border-r border-line-soft xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 font-bold">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card-2 text-ink-muted font-bold">
                   <Users size={18} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Employees</p>
-                  <p className="text-sm font-bold text-slate-800">{results.length}</p>
+                  <p className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest">Total Employees</p>
+                  <p className="text-sm font-bold text-ink">{results.length}</p>
                 </div>
               </div>
             </div>
 
             {/* Middle: Breakdowns */}
-            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-slate-200">
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-line-soft">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Earned</span>
-                <span className="font-mono font-semibold text-slate-700">{fmtRs(results.reduce((s, r) => s + Number(r.earnedSalary), 0))}</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Earned</span>
+                <span className="font-mono font-semibold text-ink">{fmtRs(results.reduce((s, r) => s + Number(r.earnedSalary), 0))}</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">OT</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">OT</span>
                 <span className="font-mono font-semibold text-emerald-600">{fmtRs(results.reduce((s, r) => s + Number(r.otPay), 0))}</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gross</span>
-                <span className="font-mono font-bold text-slate-900">{fmtRs(run.totalGross)}</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Gross</span>
+                <span className="font-mono font-bold text-ink">{fmtRs(run.totalGross)}</span>
               </div>
-              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Deductions</span>
                 <span className="font-mono font-semibold text-rose-600">
@@ -1310,8 +1310,8 @@ const Step3: React.FC<{
             </div>
 
             {/* Right side: Final numbers */}
-            <div className="flex items-stretch xl:border-l border-slate-200 bg-slate-50 w-full xl:w-auto">
-              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-slate-200 flex-1 xl:flex-none">
+            <div className="flex items-stretch xl:border-l border-line-soft bg-card-2 w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-line-soft flex-1 xl:flex-none">
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Net Pay</span>
                 <span className="font-mono text-xl font-black text-emerald-700">{fmtRs(run.totalNetSalary)}</span>
               </div>
@@ -1329,7 +1329,7 @@ const Step3: React.FC<{
 
 
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-card-2 transition-colors">
           <ChevronLeft size={16} /> Back
         </button>
         <button onClick={onNext} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm">
@@ -1386,7 +1386,7 @@ const Step4: React.FC<{
       </div>
 
       {/* Summary */}
-      <div className="bg-white rounded-xl border border-border shadow-sm p-5">
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs p-5">
         <h3 className="text-sm font-bold text-text-primary border-b border-border pb-3 mb-4">Run Summary — {periodLabel}</h3>
         <div className="grid grid-cols-2 gap-3">
           {([
@@ -1400,7 +1400,7 @@ const Step4: React.FC<{
             { label: 'Employee ESI', value: fmtRs(run.totalEsiEmployee) },
             { label: 'Employer ESI', value: fmtRs(run.totalEsiEmployer) },
           ].filter(Boolean) as { label: string; value: string; bold?: boolean }[]).map(item => (
-            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-line-soft">
               <span className="text-sm text-text-secondary">{item.label}</span>
               <span className={`font-semibold ${item.bold ? 'text-primary text-base' : 'text-text-primary text-sm'}`}>{item.value}</span>
             </div>
@@ -1409,8 +1409,8 @@ const Step4: React.FC<{
       </div>
 
       {/* Payment mode list */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-border">
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-hidden">
+        <div className="px-5 py-3 bg-card-2 border-b border-border">
           <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Payment Mode Breakdown</p>
         </div>
         <div className="divide-y divide-border max-h-56 overflow-y-auto">
@@ -1454,7 +1454,7 @@ const Step4: React.FC<{
       )}
 
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-card-2 transition-colors">
           <ChevronLeft size={16} /> Back to Preview
         </button>
         {canEditRun && (
@@ -1642,7 +1642,7 @@ const Step5: React.FC<{
             {run.period} payroll has been finalised for {results.length} employees.
           </p>
         </div>
-        <div className="bg-slate-50 rounded-xl border border-border p-5 text-left space-y-2">
+        <div className="bg-card-2 rounded-xl border border-border p-5 text-left space-y-2">
           <div className="flex justify-between text-sm"><span className="text-text-secondary">Bank Transfers</span><span className="font-semibold text-text-primary">{fmtRs(bankTotal)}</span></div>
           {canViewCash && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash Payments</span><span className="font-semibold text-text-primary">{fmtRs(cashTotal)}</span></div>}
           {totalCashInHand > 0 && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash In Hand (incl. in Net)</span><span className="font-semibold text-text-primary">{fmtRs(totalCashInHand)}</span></div>}
@@ -1672,12 +1672,12 @@ const Step5: React.FC<{
       {/* Disbursal summary */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {([
-          { label: 'Total Net Payroll', value: fmtRs(run.totalNetSalary), icon: IndianRupee, cls: 'text-text-primary bg-slate-100' },
+          { label: 'Total Net Payroll', value: fmtRs(run.totalNetSalary), icon: IndianRupee, cls: 'text-text-primary bg-card-2' },
           { label: 'Bank Transfer', value: fmtRs(bankTotal), icon: Building2, cls: 'text-blue-700 bg-blue-50' },
           canViewCash ? { label: 'Cash Payment', value: fmtRs(cashTotal), icon: Wallet, cls: 'text-emerald-700 bg-emerald-50' } : null,
           totalCashInHand > 0 ? { label: 'Cash In Hand', value: fmtRs(totalCashInHand), icon: Wallet, cls: 'text-amber-700 bg-amber-50' } : null,
         ].filter(Boolean) as { label: string; value: string; icon: any; cls: string }[]).map(c => (
-          <div key={c.label} className="bg-white rounded-xl border border-border p-5 shadow-sm flex items-center gap-4">
+          <div key={c.label} className="bg-card rounded-xl border border-line-soft p-5 shadow-xs flex items-center gap-4">
             <div className={`p-3 rounded-xl ${c.cls}`}><c.icon size={20} /></div>
             <div>
               <p className="text-xs text-text-muted font-semibold">{c.label}</p>
@@ -1689,7 +1689,7 @@ const Step5: React.FC<{
 
       {/* Bank table using reusable DataTable component */}
       {bankRows.length > 0 && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-blue-50/60">
             <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
               Bank Transfers ({bankRows.length})
@@ -1708,7 +1708,7 @@ const Step5: React.FC<{
             emptyMessage="No bank transfer records."
             density="compact"
           />
-          <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
+          <div className="bg-card-2 border-t border-line-soft px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
             <span>TOTAL BANK</span>
             <span className="font-mono text-blue-700 text-sm">{fmtRs(bankTotal)}</span>
           </div>
@@ -1717,7 +1717,7 @@ const Step5: React.FC<{
 
       {/* Cash table using reusable DataTable component */}
       {canViewCash && cashRows.length > 0 && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-emerald-50/60">
             <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
               <Wallet size={12} /> Cash Payments ({cashRows.length})
@@ -1736,7 +1736,7 @@ const Step5: React.FC<{
             emptyMessage="No cash payment records."
             density="compact"
           />
-          <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
+          <div className="bg-card-2 border-t border-line-soft px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
             <span>TOTAL CASH</span>
             <span className="font-mono text-emerald-700 text-sm">{fmtRs(cashTotal)}</span>
           </div>
@@ -1750,11 +1750,11 @@ const Step5: React.FC<{
       )}
 
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-card-2 transition-colors">
           <ChevronLeft size={16} /> Back
         </button>
         <div className="flex gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+          <button className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-card-2 transition-colors">
             <Download size={15} /> Generate Payslips
           </button>
           {canEditRun && (
@@ -1769,7 +1769,7 @@ const Step5: React.FC<{
       {/* Lock confirm modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-amber-100 rounded-xl"><AlertTriangle size={20} className="text-amber-600" /></div>
@@ -1787,7 +1787,7 @@ const Step5: React.FC<{
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-2.5 border border-border text-text-secondary rounded-xl font-semibold text-sm hover:bg-slate-50 transition-colors">
+                className="flex-1 px-4 py-2.5 border border-border text-text-secondary rounded-xl font-semibold text-sm hover:bg-card-2 transition-colors">
                 Cancel
               </button>
               <button onClick={handleLock} disabled={loading}
