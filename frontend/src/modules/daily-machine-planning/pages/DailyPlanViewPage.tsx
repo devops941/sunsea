@@ -245,7 +245,7 @@ const DailyPlanViewPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-card rounded-2xl shadow-sm border border-line p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto bg-card rounded-2xl shadow-xs border border-line-soft p-6 space-y-6">
 
         {/* ── Weekly Production Target Progress ── */}
         {viewPlan.weeklyProgramId && (
@@ -411,7 +411,7 @@ const DailyPlanViewPage: React.FC = () => {
                   ? "bg-emerald-500 text-white"
                   : isActive
                   ? "bg-indigo-600 text-white"
-                  : "bg-slate-300 text-ink-subtle";
+                  : "bg-ink-subtle text-ink-subtle";
 
                 return (
                   <React.Fragment key={step.id || idx}>
@@ -488,7 +488,7 @@ const DailyPlanViewPage: React.FC = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 border border-line rounded-xl bg-card-2 text-center">
-              <FaClipboardList className="text-slate-200 mb-3" size={40} />
+              <FaClipboardList className="text-ink-subtle mb-3" size={40} />
               <span className="text-ink-subtle font-medium text-base">No hourly entries recorded yet for this plan.</span>
             </div>
           )}
@@ -560,7 +560,7 @@ const DailyPlanViewPage: React.FC = () => {
         )}
 
         {/* ── Production Order History ── */}
-        <div className="border border-line rounded-xl overflow-hidden shadow-sm">
+        <div className="border border-line-soft rounded-xl overflow-hidden shadow-xs">
           <div className="px-5 py-4 bg-card-2 border-b border-line flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FaClipboardList className="text-ink-subtle" size={16} />
@@ -610,7 +610,7 @@ const DailyPlanViewPage: React.FC = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 bg-card-2 text-center">
-              <FaCalendarAlt className="text-slate-200 mb-3" size={32} />
+              <FaCalendarAlt className="text-ink-subtle mb-3" size={32} />
               <span className="text-ink-subtle font-medium text-sm">No other daily plans found for this production order.</span>
             </div>
           )}

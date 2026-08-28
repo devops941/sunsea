@@ -225,13 +225,13 @@ const Toggle: React.FC<{ label: string; value: boolean; onChange: (v: boolean) =
   label, value, onChange,
 }) => (
   <div className="flex items-center gap-3">
-    <label className="text-xs font-bold uppercase tracking-[0.5px] text-slate-500">{label}</label>
+    <label className="text-xs font-bold uppercase tracking-[0.5px] text-ink-muted">{label}</label>
     <label className="relative inline-flex cursor-pointer items-center">
       <input type="checkbox" className="sr-only" checked={value} onChange={(e) => onChange(e.target.checked)} />
       <div className={`block w-14 h-8 rounded-full transition-colors duration-300 ${value ? "bg-primary" : "bg-gray-300"}`} />
       <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ${value ? "transform translate-x-6" : ""}`} />
     </label>
-    <span className="text-sm font-medium text-slate-600">{value ? "YES" : "NO"}</span>
+    <span className="text-sm font-medium text-ink-muted">{value ? "YES" : "NO"}</span>
   </div>
 );
 
@@ -783,7 +783,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab0 = () => (
     <div>
       <SectionHeader icon={FaUser} title="Basic Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <TextInput label="Employee Code" name="empCode" value={form.empCode} onChange={handleChange} required error={errors.empCode} placeholder="e.g. EMP001" disabled={isEdit} />
         <TextInput label="Employee Name" name="fullName" value={form.fullName} onChange={handleChange} required error={errors.fullName} placeholder="Full name" />
         <SelectInput label="Gender" name="gender" value={form.gender} onChange={handleChange}
@@ -855,7 +855,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab1 = () => (
     <div>
       <SectionHeader icon={FaPhone} title="Contact Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <IndiaPhoneInput
           label="Personal Mobile Number"
           name="personalMobile"
@@ -891,7 +891,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab2 = () => (
     <div>
       <SectionHeader icon={FaUsers} title="Family Details" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TextInput label="Father Name"           name="fatherName"           value={form.fatherName}           onChange={handleChange} placeholder="Father's name" />
         <TextInput label="Mother Name"           name="motherName"           value={form.motherName}           onChange={handleChange} placeholder="Mother's name" />
         <TextInput label="Husband / Wife Name"   name="spouseName"           value={form.spouseName}           onChange={handleChange} placeholder="Spouse's name" />
@@ -904,7 +904,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab3 = () => (
     <div>
       <SectionHeader icon={FaIdCard} title="Identity Documents" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TextInput label="Aadhaar Number" name="aadhaarNumber" value={form.aadhaarNumber} onChange={handleChange} error={errors.aadhaarNumber} placeholder="12-digit Aadhaar number" maxLength={12} />
         <TextInput label="PAN Number" name="panNumber" value={form.panNumber} onChange={handleChange} error={errors.panNumber} placeholder="e.g. ABCDE1234F" maxLength={10} />
         <TextInput label="Driving License Number" name="drivingLicense" value={form.drivingLicense} onChange={handleChange} error={errors.drivingLicense} placeholder="Driving license number" maxLength={16} />
@@ -916,7 +916,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab4 = () => (
     <div>
       <SectionHeader icon={FaMapMarkerAlt} title="Permanent Address" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TextInput label="Address Line 1" name="permAddress1" value={form.permAddress1} onChange={handleChange} placeholder="Street / Building / Plot" />
         <TextInput label="Address Line 2" name="permAddress2" value={form.permAddress2} onChange={handleChange} placeholder="Area / Locality" />
         <TextInput label="Pincode" name="permPincode" value={form.permPincode} onChange={handleChange} placeholder="6-digit pincode" />
@@ -939,13 +939,13 @@ const EmployeeForm: React.FC = () => {
           onChange={(e) => handleChange({ target: { name: "sameAsPermanent", value: e.target.checked } })}
           className="w-4 h-4 accent-primary cursor-pointer"
         />
-        <label htmlFor="sameAsPermanentForm" className="text-sm font-semibold text-slate-600 cursor-pointer select-none">
+        <label htmlFor="sameAsPermanentForm" className="text-sm font-semibold text-ink-muted cursor-pointer select-none">
           Same as Permanent Address
         </label>
       </div>
 
       <SectionHeader icon={FaMapMarkerAlt} title="Present Address" color="text-emerald-500" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TextInput label="Address Line 1" name="presAddress1" value={form.presAddress1} onChange={handleChange} placeholder="Street / Building / Plot" disabled={form.sameAsPermanent} />
         <TextInput label="Address Line 2" name="presAddress2" value={form.presAddress2} onChange={handleChange} placeholder="Area / Locality" disabled={form.sameAsPermanent} />
         <TextInput label="Pincode" name="presPincode" value={form.presPincode} onChange={handleChange} placeholder="6-digit pincode" disabled={form.sameAsPermanent} />
@@ -965,7 +965,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab5 = () => (
     <div>
       <SectionHeader icon={FaBriefcase} title="Official Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SelectInput label="Department" name="departmentId" value={form.departmentId} onChange={handleChange}
           required error={errors.departmentId}
           defaultOptionLabel="Select Department" options={departmentOptions} searchable />
@@ -988,7 +988,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab6 = () => (
     <div>
       <SectionHeader icon={FaCalendarAlt} title="Joining Details" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <DatePickerCalendar label="Date of Joining" name="dateOfJoining" value={form.dateOfJoining} onChange={handleChange} placeholder="Select joining date" />
         <DatePickerCalendar label="Relieving Date" name="relievingDate" value={form.relievingDate} onChange={handleChange} placeholder="Select relieving date" />
         <TextInput label="Previous Experience" name="previousExperience" value={form.previousExperience} onChange={handleChange} placeholder="e.g. 2 years 3 months" />
@@ -999,7 +999,7 @@ const EmployeeForm: React.FC = () => {
   const renderTab7 = () => (
     <div>
       <SectionHeader icon={FaClock} title="Shift Assignment" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <SelectInput label="Shift" name="shiftId" value={form.shiftId} onChange={handleChange}
           defaultOptionLabel="Select Shift" options={shiftOptions} searchable />
       </div>
@@ -1028,10 +1028,10 @@ const EmployeeForm: React.FC = () => {
 
   const renderTab9 = () => (
     <div>
-      <div className="flex items-center justify-between mb-5 pb-2 border-b border-slate-100">
+      <div className="flex items-center justify-between mb-5 pb-2 border-b border-line-soft">
         <div className="flex items-center gap-2">
           <FaKey className="text-primary text-lg" />
-          <h3 className="text-base font-semibold text-slate-700">Login Account</h3>
+          <h3 className="text-base font-semibold text-ink">Login Account</h3>
         </div>
         <Toggle
           label={isEdit ? (form.createLoginAccount ? "Manage Login Account" : "Create Login Account") : "Create Login Account"}
@@ -1041,12 +1041,12 @@ const EmployeeForm: React.FC = () => {
       </div>
 
       {form.createLoginAccount && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 p-5 bg-slate-50 rounded-xl border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5 bg-card-2 rounded-xl border border-line-soft">
           <div className="flex flex-col gap-1">
             <TextInput label="Username" name="username" value={form.username} onChange={handleChange} required error={errors.username} placeholder="Login username" />
             {!isEdit && form.username.trim().length >= 3 && usernameStatus !== "idle" && (
               <div className={`flex items-center gap-1.5 text-xs font-medium ${
-                usernameStatus === "checking" ? "text-slate-400" :
+                usernameStatus === "checking" ? "text-ink-muted" :
                 usernameStatus === "available" ? "text-emerald-600" : "text-red-500"
               }`}>
                 {usernameStatus === "checking" && <><FaSpinner className="animate-spin" size={11} /> Checking availability...</>}
@@ -1079,7 +1079,7 @@ const EmployeeForm: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  className="text-ink-muted hover:text-ink focus:outline-none cursor-pointer"
                   tabIndex={-1}
                   title={showPassword ? "Hide Password" : "Show Password"}
                 >
@@ -1113,8 +1113,8 @@ const EmployeeForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64 bg-white rounded-lg border border-slate-200">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
+      <div className="flex items-center justify-center h-64 bg-card rounded-xl border border-line-soft shadow-xs">
+        <div className="flex flex-col items-center gap-3 text-ink-muted">
           <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
           <span className="text-sm font-medium">Loading employee data…</span>
         </div>
@@ -1123,38 +1123,40 @@ const EmployeeForm: React.FC = () => {
   }
 
   return (
-    <div className="w-full mx-auto space-y-0">
-      {/* Header */}
-      <div className="bg-white shadow-sm border border-slate-200 rounded-t-lg">
-        <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">{isEdit ? "Edit Employee" : "Create Employee"}</h2>
-            <p className="text-sm text-slate-400 mt-0.5">
-              {isEdit ? (
-                <>
-                  {form.empCode && <span className="font-semibold text-primary">{form.empCode}</span>}
-                  {form.fullName && <span> — {form.fullName}</span>}
-                </>
-              ) : (
-                "Fill in the details across all sections"
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <BackButton />
-            <CustomButton
-              text={isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Employee")}
-              icon={FaSave}
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleSubmit}
-            />
+    <div className="w-full mx-auto">
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-line-soft">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Employee" : "Create Employee"}</h2>
+              <p className="text-sm text-ink-muted mt-0.5">
+                {isEdit ? (
+                  <>
+                    {form.empCode && <span className="font-semibold text-primary">{form.empCode}</span>}
+                    {form.fullName && <span> — {form.fullName}</span>}
+                  </>
+                ) : (
+                  "Fill in the details across all sections"
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <BackButton />
+              <CustomButton
+                text={isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Employee")}
+                icon={FaSave}
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleSubmit}
+              />
+            </div>
           </div>
         </div>
 
         {/* Tab navigation */}
-        <div className="px-6 overflow-x-auto">
-          <div className="flex gap-0 border-b border-slate-200 min-w-max">
+        <div className="px-6 overflow-x-auto border-b border-line-soft">
+          <div className="flex gap-0 min-w-max">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1168,7 +1170,7 @@ const EmployeeForm: React.FC = () => {
                     border-b-2 transition-all duration-200 whitespace-nowrap
                     ${isActive
                       ? "border-primary text-primary bg-primary/5"
-                      : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                      : "border-transparent text-ink-muted hover:text-ink hover:bg-card-2"
                     }
                   `}
                 >
@@ -1179,52 +1181,52 @@ const EmployeeForm: React.FC = () => {
             })}
           </div>
         </div>
-      </div>
 
-      {/* Tab content */}
-      <div className="bg-white border-x border-slate-200 px-6 py-6 min-h-[400px]">
-        {tabRenderers[activeTab]()}
-      </div>
-
-      {/* Footer navigation */}
-      <div className="bg-white border border-slate-200 rounded-b-lg px-6 py-4 flex items-center justify-between">
-        <button
-          type="button"
-          disabled={activeTab === 0}
-          onClick={() => setActiveTab((p) => Math.max(0, p - 1))}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
-            ${activeTab === 0
-              ? "text-slate-300 cursor-not-allowed"
-              : "text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-        >
-          <FaChevronLeft size={12} /> Previous
-        </button>
-
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400 font-medium">
-            {activeTab + 1} / {TABS.length}
-          </span>
-          <CustomButton
-            text={isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Employee")}
-            icon={FaSave}
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubmit}
-          />
+        {/* Tab content */}
+        <div className="px-6 py-6 min-h-[400px]">
+          {tabRenderers[activeTab]()}
         </div>
 
-        {activeTab < TABS.length - 1 ? (
+        {/* Footer navigation */}
+        <div className="border-t border-line-soft px-6 py-4 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => setActiveTab((p) => Math.min(TABS.length - 1, p + 1))}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-all"
+            disabled={activeTab === 0}
+            onClick={() => setActiveTab((p) => Math.max(0, p - 1))}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+              ${activeTab === 0
+                ? "text-ink-subtle cursor-not-allowed"
+                : "text-ink-muted hover:bg-card-2 border border-line-soft"
+              }`}
           >
-            Next <FaChevronRight size={12} />
+            <FaChevronLeft size={12} /> Previous
           </button>
-        ) : (
-          <div className="w-24" />
-        )}
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-ink-muted font-medium">
+              {activeTab + 1} / {TABS.length}
+            </span>
+            <CustomButton
+              text={isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Employee")}
+              icon={FaSave}
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubmit}
+            />
+          </div>
+
+          {activeTab < TABS.length - 1 ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab((p) => Math.min(TABS.length - 1, p + 1))}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-all"
+            >
+              Next <FaChevronRight size={12} />
+            </button>
+          ) : (
+            <div className="w-24" />
+          )}
+        </div>
       </div>
     </div>
   );
