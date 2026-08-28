@@ -29,12 +29,47 @@ const DEFAULT_SEED_LEDGERS = [
 ];
 
 class AccountsService {
+  // Once all system ledgers exist we never need to re-check the DB — they never
+  // get deleted at runtime. Memoized flag avoids the findMany on every report load
+  // that was contributing to Neon pool exhaustion (P2024).
+  private static _systemLedgersReadyAt: number = 0;
+  private static _inFlightSystemLedgerCheck: Promise<void> | null = null;
+  private static readonly SYSTEM_LEDGERS_TTL_MS: number = 5 * 60_000; // 5 min
+
   /**
    * Ensures system ledgers exist (PURCH-001, SALES-001, CASH-001, etc.).
    * Fast path: check all codes in ONE query; only upsert if any are missing.
    * Avoids per-ledger upserts (17 sequential queries) that timeout inside transactions.
+   *
+   * THROTTLED: outside a transaction we skip if the last successful check was
+   * within TTL, and dedupe concurrent callers onto a single in-flight promise.
+   * Transactional callers always run inline (correctness inside the tx boundary).
    */
   async ensureSystemLedgersExist(txClient?: Prisma.TransactionClient) {
+    if (txClient) {
+      return this._doEnsureSystemLedgersExist(txClient);
+    }
+    const now = Date.now();
+    if (now - AccountsService._systemLedgersReadyAt < AccountsService.SYSTEM_LEDGERS_TTL_MS) {
+      return;
+    }
+    if (AccountsService._inFlightSystemLedgerCheck) {
+      return AccountsService._inFlightSystemLedgerCheck;
+    }
+    AccountsService._inFlightSystemLedgerCheck = this._doEnsureSystemLedgersExist()
+      .then(() => {
+        AccountsService._systemLedgersReadyAt = Date.now();
+      })
+      .catch((err) => {
+        console.error("[System Ledgers] ensureSystemLedgersExist failed:", err);
+      })
+      .finally(() => {
+        AccountsService._inFlightSystemLedgerCheck = null;
+      });
+    return AccountsService._inFlightSystemLedgerCheck;
+  }
+
+  private async _doEnsureSystemLedgersExist(txClient?: Prisma.TransactionClient) {
     const db = txClient || prisma;
     const codes = DEFAULT_SEED_LEDGERS.map((l) => l.code);
     const existing = await db.accountLedger.findMany({
