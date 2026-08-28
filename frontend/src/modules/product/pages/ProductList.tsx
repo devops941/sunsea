@@ -286,10 +286,10 @@ const ProductList: React.FC = () => {
         {
             header: "Stock (Min)",
             render: (product) => {
-                const lastStock =
-                    product.finishedGoodsStocks?.[product.finishedGoodsStocks.length - 1];
-                const onHandQty = lastStock?.onHandQty || 0;
-                            const minQty = product.minimumQty || 0;
+                const onHandQty = (product.finishedGoodsStocks || []).reduce(
+                    (sum: number, s: any) => sum + (Number(s.onHandQty) || 0), 0
+                );
+                const minQty = product.minimumQty || 0;
                 return (
                     <div className="flex flex-col items-center">
                         <span className="font-semibold text-ink">{onHandQty}</span>

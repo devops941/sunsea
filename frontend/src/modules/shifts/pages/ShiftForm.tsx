@@ -125,15 +125,15 @@ const ShiftForm: React.FC = () => {
         );
     }
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
+        <div className="w-full mx-auto flex-1 flex flex-col">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible flex-1 flex flex-col">
                 <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Shift" : "Create Shift"}</h2>
                         <BackButton text="Back to List" to="/shifts" />
                     </div>
                 </div>
-                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
                     <div>
                         <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
                             <h3 className="text-lg font-bold text-ink">Shift Details</h3>
@@ -201,7 +201,7 @@ const ShiftForm: React.FC = () => {
                             />
                         </div>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
+                    <div className="flex flex-wrap justify-end gap-3 mt-auto pt-4 border-t border-line-soft">
                         {!isEdit && (
                             <CustomButton
                                 text="Clear"

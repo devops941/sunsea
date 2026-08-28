@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaInfoCircle, FaFileAlt, FaMapMarkerAlt, FaPhoneAlt, FaCogs } from 'react-icons/fa';
+import { FaSave, FaInfoCircle, FaMapMarkerAlt, FaPhoneAlt } from 'react-icons/fa';
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
@@ -172,80 +172,128 @@ const CompanySettings: React.FC = () => {
         <div className="absolute top-4 right-6 z-10">
           <ThemeToggle />
         </div>
-        <div className="w-full max-w-5xl mx-auto">
+        <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-ink pb-2">Welcome to Sunsea ERP</h2>
             <p className="text-ink-muted">Please complete your company onboarding to get started.</p>
           </div>
           <div className="bg-card rounded-xl shadow-lg border border-line-soft">
-            <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
+            <form onSubmit={handleSubmit} noValidate>
+              <div className="flex flex-col lg:flex-row min-h-[calc(100vh-270px)]">
+
+                {/* Left: All Input Fields — 70% */}
+                <div className="lg:w-[70%] px-6 py-6 space-y-8">
+                  {/* General Info */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaInfoCircle className="text-primary text-xl" />
+                      <h6 className="text-lg font-semibold text-ink m-0">General Info</h6>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <TextInput label="Legal Company Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
+                      <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
+                    </div>
+                    <div className="hidden">
+                      <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
+                    </div>
+                  </div>
+
+                  {/* Address Details */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaMapMarkerAlt className="text-primary text-xl" />
+                      <h6 className="text-lg font-semibold text-ink m-0">Address Details</h6>
+                    </div>
+                    <div className="space-y-4">
+                      <TextInput label="Address" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Enter full address" required error={errors.addressLine1} />
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="lg:col-span-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <CityStateSelect
+                              countryLabel="Country"
+                              countryValue={formData.country || "India"}
+                              onCountryChange={handleCountryChange}
+                              countryError={errors.country}
+                              stateLabel="State"
+                              stateValue={formData.state || ""}
+                              onStateChange={handleStateChange}
+                              stateError={errors.state}
+                              cityLabel="City"
+                              cityValue={formData.city || ""}
+                              onCityChange={handleCityChange}
+                              cityError={errors.city}
+                              required
+                            />
+                          </div>
+                        </div>
+                        <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contact Details */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaPhoneAlt className="text-primary text-xl" />
+                      <h6 className="text-lg font-semibold text-ink m-0">Contact Details</h6>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
+                      <IndiaPhoneInput
+                        multi
+                        label="Mobile Numbers"
+                        name="phones"
+                        value={phones}
+                        onChange={(e: any) => {
+                          setPhones(e.target.value);
+                          if (errors.mobile) {
+                            setErrors((prev: any) => ({ ...prev, mobile: undefined }));
+                          }
+                        }}
+                        maxNumbers={5}
+                        error={errors.mobile}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Image Uploads — 30% */}
+                <div className="lg:w-[30%] lg:border-l border-t lg:border-t-0 border-line-soft/50 px-6 py-6 flex lg:flex-col items-center justify-evenly">
+                  <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
+                  <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
+                </div>
+
+              </div>
+
+              <div className="flex justify-end px-6 py-5 border-t border-line-soft">
+                <Button text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal Settings/Edit Screen Design — same as create page
+  return (
+    <div className="w-full">
+      <div className="bg-card rounded-xl shadow-lg border border-line-soft">
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col lg:flex-row min-h-[calc(100vh-240px)]">
+
+            {/* Left: All Input Fields — 70% */}
+            <div className="lg:w-[70%] px-6 py-6 space-y-8">
               {/* General Info */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <FaInfoCircle className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-ink m-0">General Info & Logo</h6>
+                  <h6 className="text-lg font-semibold text-ink m-0">General Info</h6>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <TextInput label="Legal Company Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
-                  </div>
-                  <div className="hidden">
-                    <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
-                  </div>
-                  <div className="md:col-span-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
-                      <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Registration Details */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <FaFileAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-ink m-0">Registration Details</h6>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Address Details */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <FaMapMarkerAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-ink m-0">Address Details</h6>
-                </div>
-                <div>
-                  <TextInput label="Address" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Enter full address" required error={errors.addressLine1} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                  <div className="lg:col-span-3">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <CityStateSelect
-                        countryLabel="Country"
-                        countryValue={formData.country || "India"}
-                        onCountryChange={handleCountryChange}
-                        countryError={errors.country}
-                        stateLabel="State"
-                        stateValue={formData.state || ""}
-                        onStateChange={handleStateChange}
-                        stateError={errors.state}
-                        cityLabel="City"
-                        cityValue={formData.city || ""}
-                        onCityChange={handleCityChange}
-                        cityError={errors.city}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
-                  </div>
+                  <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
+                  <TextInput label="Email" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
+                  <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
                 </div>
               </div>
 
@@ -256,133 +304,79 @@ const CompanySettings: React.FC = () => {
                   <h6 className="text-lg font-semibold text-ink m-0">Contact Details</h6>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
-                  </div>
+                  <TextInput label="Website" name="website" value={formData.website || ""} onChange={handleChange} placeholder="http://www.example.com" />
+                  <IndiaPhoneInput
+                    multi
+                    label="Mobile Numbers"
+                    name="phones"
+                    value={phones}
+                    onChange={(e: any) => {
+                      setPhones(e.target.value);
+                      if (errors.mobile) {
+                        setErrors((prev: any) => ({ ...prev, mobile: undefined }));
+                      }
+                    }}
+                    maxNumbers={5}
+                    error={errors.mobile}
+                  />
+                </div>
+              </div>
 
-                  <div>
-                    <IndiaPhoneInput
-                      multi
-                      label="Mobile Numbers"
-                      name="phones"
-                      value={phones}
-                      onChange={(e: any) => {
-                        setPhones(e.target.value);
-                        if (errors.mobile) {
-                          setErrors((prev: any) => ({ ...prev, mobile: undefined }));
-                        }
-                      }}
-                      maxNumbers={5}
-                      error={errors.mobile}
+              {/* Address Details */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <FaMapMarkerAlt className="text-primary text-xl" />
+                  <h6 className="text-lg font-semibold text-ink m-0">Address Details</h6>
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <TextInput label="Street Address" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Building, street, area" required error={errors.addressLine1} />
+                    <CityStateSelect
+                      countryLabel=""
+                      countryValue={formData.country || "India"}
+                      onCountryChange={handleCountryChange}
+                      countryError={errors.country}
+                      stateLabel=""
+                      stateValue={formData.state || ""}
+                      onStateChange={handleStateChange}
+                      stateError={errors.state}
+                      cityLabel="City"
+                      cityValue={formData.city || ""}
+                      onCityChange={handleCityChange}
+                      cityError={errors.city}
+                      required
+                      renderOnly="city"
                     />
                   </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center mt-8 pt-4 border-t border-line-soft">
-                <Button text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Normal Settings/Edit Screen Design — split-panel layout
-  return (
-    <div className="w-full">
-      {/* Page Header */}
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-ink">
-          {isEditMode ? 'Edit Company Settings' : 'Create Company'}
-        </h2>
-      </div>
-
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-180px)] flex flex-col">
-
-          <div className="flex-1 flex flex-col lg:flex-row">
-            {/* Left: All Input Fields */}
-            <div className="flex-1 p-5 lg:p-6 space-y-5">
-              {/* Row 1: Legal Name, Email, GSTIN */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
-                <TextInput label="Email" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
-                <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
-              </div>
-
-              {/* Row 2: Website, Mobile Numbers */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <TextInput label="Website" name="website" value={formData.website || ""} onChange={handleChange} placeholder="http://www.example.com" />
-                <IndiaPhoneInput
-                  multi
-                  label="Mobile Numbers"
-                  name="phones"
-                  value={phones}
-                  onChange={(e: any) => {
-                    setPhones(e.target.value);
-                    if (errors.mobile) {
-                      setErrors((prev: any) => ({ ...prev, mobile: undefined }));
-                    }
-                  }}
-                  maxNumbers={5}
-                  error={errors.mobile}
-                />
-              </div>
-
-              {/* Row 3: Street Address + City */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <TextInput label="Street Address" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Building, street, area" required error={errors.addressLine1} />
-                <CityStateSelect
-                  countryLabel=""
-                  countryValue={formData.country || "India"}
-                  onCountryChange={handleCountryChange}
-                  countryError={errors.country}
-                  stateLabel=""
-                  stateValue={formData.state || ""}
-                  onStateChange={handleStateChange}
-                  stateError={errors.state}
-                  cityLabel="City"
-                  cityValue={formData.city || ""}
-                  onCityChange={handleCityChange}
-                  cityError={errors.city}
-                  disabled={isEditMode}
-                  required
-                  renderOnly="city"
-                />
-              </div>
-
-              {/* Row 4: State, Country, Zipcode */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <CityStateSelect
-                  countryLabel="Country"
-                  countryValue={formData.country || "India"}
-                  onCountryChange={handleCountryChange}
-                  countryError={errors.country}
-                  stateLabel="State"
-                  stateValue={formData.state || ""}
-                  onStateChange={handleStateChange}
-                  stateError={errors.state}
-                  cityLabel=""
-                  cityValue={formData.city || ""}
-                  onCityChange={handleCityChange}
-                  cityError={errors.city}
-                  disabled={isEditMode}
-                  required
-                  renderOnly="state-country"
-                />
-                <div className="w-full">
-                  <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Zipcode" required error={errors.zipcode} />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <CityStateSelect
+                      countryLabel="Country"
+                      countryValue={formData.country || "India"}
+                      onCountryChange={handleCountryChange}
+                      countryError={errors.country}
+                      stateLabel="State"
+                      stateValue={formData.state || ""}
+                      onStateChange={handleStateChange}
+                      stateError={errors.state}
+                      cityLabel=""
+                      cityValue={formData.city || ""}
+                      onCityChange={handleCityChange}
+                      cityError={errors.city}
+                      required
+                      renderOnly="state-country"
+                    />
+                    <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Zipcode" required error={errors.zipcode} />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Image Uploads */}
-            <div className="lg:w-[240px] lg:border-l border-t lg:border-t-0 border-line-soft/50 p-5 lg:p-6 flex lg:flex-col items-center gap-10">
-              <ImageUpload label="Company logo" name="logoFile" hint="PNG or SVG · min 256×256px" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
+            {/* Right: Image Uploads — 30% */}
+            <div className="lg:w-[30%] lg:border-l border-t lg:border-t-0 border-line-soft/50 px-6 py-6 flex lg:flex-col items-center justify-evenly">
+              <ImageUpload label="Company Logo" name="logoFile" hint="PNG or SVG · min 256×256px" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
               <ImageUpload label="Favicon" name="faviconFile" hint="PNG · min 64×64px" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
             </div>
+
           </div>
 
           <div className="hidden">
@@ -391,13 +385,12 @@ const CompanySettings: React.FC = () => {
 
           {/* Footer */}
           {canEdit && (
-            <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end mt-auto">
+            <div className="flex justify-end px-6 py-5 border-t border-line-soft">
               <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
             </div>
           )}
-
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };
