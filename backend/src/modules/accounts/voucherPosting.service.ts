@@ -1288,12 +1288,17 @@ class VoucherPostingService {
 
   /**
    * Post a formal double-entry Opening Balance Voucher for a Supplier.
+   *
+   * Contra side:
+   *   • Default → EQ-001 "Opening Balance Equity"
+   *   • If `paidThroughLedgerId` supplied → that bank/cash ledger (real advance paid to supplier)
    */
   async postSupplierOpeningBalanceVoucher(
     supplier: { id: number; supplierCode: string; legalName: string },
     amount: number,
     type: "DEBIT" | "CREDIT" = "CREDIT",
-    txClient?: Prisma.TransactionClient
+    txClient?: Prisma.TransactionClient,
+    paidThroughLedgerId?: number | null
   ) {
     const db = txClient || prisma;
     await accountsService.ensureSystemLedgersExist(db);
@@ -1301,6 +1306,16 @@ class VoucherPostingService {
     const eqLedger = await db.accountLedger.findUnique({ where: { code: "EQ-001" } });
 
     if (!supplierLedger || !eqLedger) return null;
+
+    let contraLedgerId = eqLedger.id;
+    let contraName = "Opening Balance Equity";
+    if (paidThroughLedgerId) {
+      const contra = await db.accountLedger.findUnique({ where: { id: paidThroughLedgerId } });
+      if (contra) {
+        contraLedgerId = contra.id;
+        contraName = contra.name;
+      }
+    }
 
     const opBal = new Prisma.Decimal(amount);
     const isCredit = type === "CREDIT";
@@ -1310,24 +1325,25 @@ class VoucherPostingService {
       {
         voucherNo: `JV-SUP-OP-${supplier.supplierCode || String(supplier.id).slice(-6)}`,
         type: VoucherType.JOURNAL,
-        // Opening balances belong to the start of the financial year, not "today".
         date: getFinancialYearStart(),
-        narration: `Opening balance for supplier ${supplier.legalName} (${type})`,
+        narration: paidThroughLedgerId
+          ? `Opening ${isCredit ? "amount owed to" : "advance paid to"} ${supplier.legalName} via ${contraName}`
+          : `Opening balance for supplier ${supplier.legalName} (${type})`,
         refDocType: "SUPPLIER_OPENING_BALANCE",
         refDocId: String(supplier.id),
         items: {
           create: [
             {
-              debitLedgerId: isCredit ? eqLedger.id : supplierLedger.id,
+              debitLedgerId: isCredit ? contraLedgerId : supplierLedger.id,
               debitAmount: opBal,
               creditAmount: new Prisma.Decimal(0),
-              narration: `Supplier opening balance debit`,
+              narration: isCredit ? `From ${contraName}` : `Advance paid to supplier`,
             },
             {
-              creditLedgerId: isCredit ? supplierLedger.id : eqLedger.id,
+              creditLedgerId: isCredit ? supplierLedger.id : contraLedgerId,
               debitAmount: new Prisma.Decimal(0),
               creditAmount: opBal,
-              narration: `Supplier opening balance credit`,
+              narration: isCredit ? `Opening liability to supplier` : `Paid via ${contraName}`,
             },
           ],
         },
@@ -1339,12 +1355,22 @@ class VoucherPostingService {
 
   /**
    * Post a formal double-entry Opening Balance Voucher for a Customer.
+   *
+   * Contra side:
+   *   • Default → EQ-001 "Opening Balance Equity"  (historical opening — no real money movement)
+   *   • If `paidThroughLedgerId` is supplied → that bank/cash ledger  (real advance received, so the money must physically sit in a bank/cash account)
+   *
+   * Example: customer AJITH gave ₹1,000 advance and it went into Main Bank Account.
+   *   User picks: openingBalance=1000, type=CREDIT, paidThroughLedgerId=<BANK-001 id>
+   *   Voucher posts: Dr BANK-001 ₹1,000  /  Cr Customer AJITH ₹1,000
+   *   → Bank balance ↑ ₹1,000 automatically. No manual Receipt Voucher needed.
    */
   async postCustomerOpeningBalanceVoucher(
     customer: { id: string; customerCode: string; firmName: string },
     amount: number,
     type: "DEBIT" | "CREDIT" = "DEBIT",
-    txClient?: Prisma.TransactionClient
+    txClient?: Prisma.TransactionClient,
+    paidThroughLedgerId?: number | null
   ) {
     const db = txClient || prisma;
     await accountsService.ensureSystemLedgersExist(db);
@@ -1352,6 +1378,17 @@ class VoucherPostingService {
     const eqLedger = await db.accountLedger.findUnique({ where: { code: "EQ-001" } });
 
     if (!customerLedger || !eqLedger) return null;
+
+    // Resolve contra ledger — bank/cash if picked, else Opening Equity.
+    let contraLedgerId = eqLedger.id;
+    let contraName = "Opening Balance Equity";
+    if (paidThroughLedgerId) {
+      const contra = await db.accountLedger.findUnique({ where: { id: paidThroughLedgerId } });
+      if (contra) {
+        contraLedgerId = contra.id;
+        contraName = contra.name;
+      }
+    }
 
     const opBal = new Prisma.Decimal(amount);
     const isDebit = type === "DEBIT";
@@ -1361,25 +1398,25 @@ class VoucherPostingService {
       {
         voucherNo: `JV-CUST-OP-${customer.customerCode || String(customer.id).slice(-6)}`,
         type: VoucherType.JOURNAL,
-        // Opening balances belong to the start of the financial year, not "today".
-        // Otherwise a trial balance "as on" any earlier date would omit them.
         date: getFinancialYearStart(),
-        narration: `Opening balance for customer ${customer.firmName} (${type})`,
+        narration: paidThroughLedgerId
+          ? `Opening ${type === "CREDIT" ? "advance received from" : "advance paid to"} ${customer.firmName} via ${contraName}`
+          : `Opening balance for customer ${customer.firmName} (${type})`,
         refDocType: "CUSTOMER_OPENING_BALANCE",
         refDocId: String(customer.id),
         items: {
           create: [
             {
-              debitLedgerId: isDebit ? customerLedger.id : eqLedger.id,
+              debitLedgerId: isDebit ? customerLedger.id : contraLedgerId,
               debitAmount: opBal,
               creditAmount: new Prisma.Decimal(0),
-              narration: `Customer opening balance debit`,
+              narration: isDebit ? `Customer opening balance debit` : `Received advance into ${contraName}`,
             },
             {
-              creditLedgerId: isDebit ? eqLedger.id : customerLedger.id,
+              creditLedgerId: isDebit ? contraLedgerId : customerLedger.id,
               debitAmount: new Prisma.Decimal(0),
               creditAmount: opBal,
-              narration: `Customer opening balance credit`,
+              narration: isDebit ? `Advance/opening from ${contraName}` : `Customer opening balance credit`,
             },
           ],
         },

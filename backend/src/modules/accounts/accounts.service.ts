@@ -284,32 +284,18 @@ class AccountsService {
       };
     }
 
+    // Ledger statement now shows the REAL opening JV voucher (with its
+    // voucher number, clickable → JV detail). No synthetic "Opening Balance
+    // b/f" row is injected anymore — that duplicated the JV and hid the
+    // voucher trail. Just fetch every journal item that touches this ledger.
+    const voucherWhere: Prisma.VoucherWhereInput = {
+      ...dateFilter,
+    };
+
     const journalItems = await prisma.journalItem.findMany({
       where: {
         OR: [{ debitLedgerId: id }, { creditLedgerId: id }],
-        voucher: {
-          ...dateFilter,
-          // BUG FIX (Ledger Statement Integrity):
-          // Exclude opening balance vouchers — they are already represented by the
-          // synthetic "Opening Balance b/f" row built from party.openingBalance field.
-          // Including them here causes the running balance to be doubled.
-          //
-          // IMPORTANT: A bare `refDocType: { notIn: [...] }` filter unintentionally
-          // excludes vouchers with `refDocType = NULL` because in SQL/Prisma
-          // `NULL NOT IN (...)` evaluates to NULL (i.e. "not TRUE"), so the row is
-          // filtered out. All manually-created vouchers (e.g. Payment Voucher created
-          // from the UI via POST /vouchers) have `refDocType = NULL`, which caused
-          // them to be silently missing from the Supplier/Customer Ledger Statement
-          // — while still being counted in Amount Payable / Receivable summaries
-          // (which query journal items without this filter). Result: payment appeared
-          // in Payable page but NOT in the supplier's ledger statement.
-          //
-          // Fix: explicitly allow NULL refDocType through by combining with an OR clause.
-          OR: [
-            { refDocType: null },
-            { refDocType: { notIn: ["SUPPLIER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE"] } },
-          ],
-        },
+        voucher: voucherWhere,
       },
       include: {
         voucher: true,
@@ -340,28 +326,13 @@ class AccountsService {
     }
 
     // The ledger's natural side (Asset/Expense → DEBIT natural, Liability/Income/Equity → CREDIT natural).
-    // If the opening is on the natural side, running balance starts positive; otherwise negative.
+    // Only used to derive the signed "opening balance" number displayed in the
+    // header banner — the row itself now comes from the real JV entry below.
     const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
     const signedOpeningBalance = openingType === naturalSide ? openingBalance : -openingBalance;
 
-    let runningBalance = signedOpeningBalance;
+    let runningBalance = 0;
     const entries: any[] = [];
-
-    if (openingBalance !== 0) {
-      entries.push({
-        id: `opening-${ledger.id}`,
-        voucherNo: "-",
-        voucherType: "OPENING",
-        date: options.startDate || (journalItems.length > 0 ? journalItems[0].voucher.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
-        narration: openingType === naturalSide
-          ? "Opening Balance b/f"
-          : (ledger.customer ? "Opening advance received from customer" : "Opening advance paid to supplier"),
-        particulars: "Opening Balance",
-        debit: openingType === "DEBIT" ? openingBalance : 0,
-        credit: openingType === "CREDIT" ? openingBalance : 0,
-        runningBalance: signedOpeningBalance,
-      });
-    }
 
     const getParticularsLabel = (item: any, isDebit: boolean): string => {
       const vType = item.voucher?.type;
@@ -452,7 +423,11 @@ class AccountsService {
       mode: "one" as const,
       startDate: options.startDate || null,
       endDate: options.endDate || null,
-      openingBalance,
+      // Return the SIGNED opening (negative when the party sits on the opposite
+      // side, e.g. customer with a CREDIT-type opening = advance received).
+      // The running balance is already signed, so keeping both signed makes
+      // the header banner consistent with the row math.
+      openingBalance: signedOpeningBalance,
       closingBalance: runningBalance,
       entries: filteredEntries,
     };

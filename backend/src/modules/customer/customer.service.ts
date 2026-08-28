@@ -22,7 +22,10 @@ class CustomerService {
       throw new Error("Customer code already exists for this company");
     }
 
-    const { phones, addresses, openingBalance, ...restData } = data as any;
+    // Also strip `openingBalancePaidThroughLedgerId` — it's a workflow-only field
+    // used to route the auto-posted opening voucher to a bank/cash ledger; the
+    // Customer table doesn't have (and doesn't need) a column for it.
+    const { phones, addresses, openingBalance, openingBalancePaidThroughLedgerId: _paidThrough, ...restData } = data as any;
     const mobileData = phones || restData.mobile || null;
 
     const newCustomer = await prisma.customer.create({
@@ -56,10 +59,16 @@ class CustomerService {
       const opBal = Number(newCustomer.openingBalance || 0);
       if (opBal > 0) {
         const opType = (data.openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
+        // Optional: user picked a bank/cash account where the advance actually landed
+        const paidThroughLedgerId = (data as any).openingBalancePaidThroughLedgerId
+          ? Number((data as any).openingBalancePaidThroughLedgerId)
+          : null;
         await voucherPostingService.postCustomerOpeningBalanceVoucher(
           { id: newCustomer.id, customerCode: newCustomer.customerCode, firmName: newCustomer.firmName },
           opBal,
-          opType
+          opType,
+          undefined,
+          paidThroughLedgerId
         );
       }
     } catch (err) {
