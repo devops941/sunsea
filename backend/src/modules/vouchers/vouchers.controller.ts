@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { VoucherType } from "@prisma/client";
 import { vouchersService } from "./vouchers.service";
 import { createVoucherSchema, getVouchersQuerySchema } from "./vouchers.types";
 
@@ -24,6 +25,22 @@ class VouchersController {
         success: true,
         data: voucher,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async peekNextVoucherNo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const raw = String(req.query.type || "").toUpperCase();
+      const validTypes = Object.values(VoucherType);
+      if (!validTypes.includes(raw as VoucherType)) {
+        return res
+          .status(400)
+          .json({ success: false, message: `Invalid or missing 'type'. Allowed: ${validTypes.join(", ")}` });
+      }
+      const voucherNo = await vouchersService.peekNextVoucherNo(raw as VoucherType);
+      return res.status(200).json({ success: true, data: { voucherNo } });
     } catch (error) {
       next(error);
     }
