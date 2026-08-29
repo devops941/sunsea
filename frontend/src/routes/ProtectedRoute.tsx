@@ -31,7 +31,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Show loading screen while auth or company details are initializing
     if (!isInitialized || (isAuthenticated && !company)) {
-        return <CommonLoader text="Loading..." image={logo} />;
+        return <CommonLoader text="Loading..." />;
     }
 
     if (!isAuthenticated) {

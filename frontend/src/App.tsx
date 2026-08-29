@@ -16,7 +16,7 @@ const App: React.FC = () => {
 
   if (!isInitialized) {
     return (
-      <CommonLoader text="Loading..." image={Logo} />
+      <CommonLoader text="Loading..." />
     );
   }
 

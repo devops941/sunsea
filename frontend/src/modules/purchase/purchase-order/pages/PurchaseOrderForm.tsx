@@ -1169,7 +1169,7 @@ const PurchaseOrderForm: React.FC = () => {
 
                 {isInterState ? (
                   gstRateBreakdown.length === 0 ? (
-                    <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total IGST:</span><span>+₹{formData.totalIgst.toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
                   ) : (
                     gstRateBreakdown.map((group) => (
                       <div key={`igst-${group.gstRate}`} className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
@@ -1181,8 +1181,8 @@ const PurchaseOrderForm: React.FC = () => {
                 ) : (
                   gstRateBreakdown.length === 0 ? (
                     <>
-                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total CGST:</span><span>+₹{formData.totalCgst.toFixed(2)}</span></div>
-                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total SGST:</span><span>+₹{formData.totalSgst.toFixed(2)}</span></div>
+                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
+                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
                     </>
                   ) : (
                     gstRateBreakdown.map((group) => (

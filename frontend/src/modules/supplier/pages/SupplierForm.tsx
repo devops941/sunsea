@@ -153,6 +153,7 @@ const SupplierForm: React.FC = () => {
             stateCode: supplier.stateCode || "TN",
             openingBalance: Number(supplier.openingBalance) || 0,
             openingBalanceType: supplier.openingBalanceType || "CREDIT",
+            openingBalancePaidThroughLedgerId: supplier.openingBalancePaidThroughLedgerId || "",
             status: supplier.status || "Active",
         });
 

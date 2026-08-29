@@ -43,7 +43,7 @@ const salesOrderSchema = z
         orderDate: z.string().min(1, "Order Date is required"),
         customerId: z.string().min(1, "Customer is required"),
         mobile: z.string().optional().nullable(),
-        orderSource: z.string().min(1, "Order source is required"),
+        orderSource: z.string().optional().default(""),
         sourceEmployeeId: z.string().optional().nullable(),   // Employee BigInt as string
         referredByCustomerId: z.string().optional().nullable(),
         referredByName: z.string().optional().nullable(),
@@ -818,8 +818,8 @@ const SalesOrderForm: React.FC = () => {
                     {/* ── Actions ── */}
                     <div className="mt-auto flex justify-end gap-3 pt-4">
                         <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
-                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
-                        <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
+                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
                     </div>
                 </form>
             </div>

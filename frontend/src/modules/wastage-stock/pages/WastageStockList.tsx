@@ -248,7 +248,7 @@ const WastageStockList: React.FC = () => {
                         {
                             header: "CATEGORY",
                             render: (item) => (
-                                <span className="text-ink-muted">{item.category?.name || item.category?.categoryName || "-"}</span>
+                                <span className="text-ink-muted">{(item as any).category?.name || (item as any).category?.categoryName || "-"}</span>
                             )
                         },
                         {
@@ -261,7 +261,7 @@ const WastageStockList: React.FC = () => {
                             header: "PHYSICAL STOCK",
                             render: (item) => {
                                 const baseUom = item.baseUom || "";
-                                const minStock = Number(item.minimumStock || 0);
+                                const minStock = Number((item as any).minimumStock || 0);
                                 return (
                                     <div className="flex flex-col">
                                         <span className="text-ink">{formatDisplayQty(item.onHandQty, baseUom)}</span>
@@ -281,8 +281,8 @@ const WastageStockList: React.FC = () => {
                             render: (item) => {
                                 const baseUom = item.baseUom || "";
                                 const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
-                                const minStock = Number(item.minimumStock || 0);
-                                const reorderLevel = Number(item.reorderLevel || 0);
+                                const minStock = Number((item as any).minimumStock || 0);
+                                const reorderLevel = Number((item as any).reorderLevel || 0);
 
                                 let availColorClass = "text-green-600";
                                 if (available <= minStock) availColorClass = "text-red-600";

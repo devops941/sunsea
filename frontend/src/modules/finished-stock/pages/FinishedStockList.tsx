@@ -207,7 +207,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                         },
                         {
                             header: "CATEGORY",
-                            render: (item) => <span className="text-ink-muted">{item.product?.category?.name || item.product?.category?.categoryName || "N/A"}</span>
+                            render: (item) => <span className="text-ink-muted">{(item.product?.category as any)?.name || item.product?.category?.categoryName || "N/A"}</span>
                         },
                         {
                             header: "STORE / LOCATION",
