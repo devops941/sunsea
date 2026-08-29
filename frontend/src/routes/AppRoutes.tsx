@@ -202,6 +202,9 @@ const PoInvoicePage = lazy(() => import("../modules/purchase/purchase-order/invo
 // ===========================================================================
 const AmountPayablePage = lazy(() => import("../modules/accounts/pages/payable/AmountPayablePage"));
 const AmountReceivablePage = lazy(() => import("../modules/accounts/pages/receivable/AmountReceivablePage"));
+const OutstandingReceivablePage = lazy(() => import("../modules/accounts/pages/outstanding/OutstandingReceivablePage"));
+const OutstandingPayablePage = lazy(() => import("../modules/accounts/pages/outstanding/OutstandingPayablePage"));
+const OutstandingAgingPage = lazy(() => import("../modules/accounts/pages/outstanding/OutstandingAgingPage"));
 const SupplierBreakdownPage = lazy(() => import("../modules/accounts/pages/payable/SupplierBreakdownPage"));
 const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/receivable/CustomerBreakdownPage"));
 const LedgerStatementPage = lazy(() => import("../modules/accounts/pages/ledger-statement/LedgerStatementPage"));
@@ -441,6 +444,9 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permissionAny={["accounts.view", "payable.view", "receivable.view", "vouchers.view", "petty-cash.view", "chart-of-accounts.view"]} />}>
                 <Route path="/accounts/payable" element={<AmountPayablePage />} />
                 <Route path="/accounts/receivable" element={<AmountReceivablePage />} />
+                <Route path="/accounts/outstanding/receivable" element={<OutstandingReceivablePage />} />
+                <Route path="/accounts/outstanding/payable" element={<OutstandingPayablePage />} />
+                <Route path="/accounts/outstanding/aging" element={<OutstandingAgingPage />} />
                 <Route path="/accounts/ledger-statement" element={<LedgerStatementPage />} />
                 <Route path="/accounts/chart-of-accounts" element={<ChartOfAccountsPage />} />
                 <Route path="/accounts/bank-accounts" element={<BankAccountsPage />} />

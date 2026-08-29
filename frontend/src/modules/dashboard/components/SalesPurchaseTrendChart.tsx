@@ -215,9 +215,17 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
             <YAxis
               axisLine={false}
               tickLine={false}
-              width={65}
-              tickMargin={10}
-              tickFormatter={(value) => `₹${value.toLocaleString()}`}
+              width={55}
+              tickMargin={8}
+              tickFormatter={(value: number) => {
+                // Compact Indian formatting so crores don't blow out the axis width.
+                //   ≥ 1 Cr → ₹1.2Cr, ≥ 1 L → ₹2.5L, ≥ 1 K → ₹75K, else raw.
+                const v = Math.abs(value);
+                if (v >= 1e7) return `₹${(value / 1e7).toFixed(v >= 1e8 ? 0 : 1)}Cr`;
+                if (v >= 1e5) return `₹${(value / 1e5).toFixed(v >= 1e6 ? 0 : 1)}L`;
+                if (v >= 1e3) return `₹${(value / 1e3).toFixed(v >= 1e4 ? 0 : 1)}K`;
+                return `₹${value}`;
+              }}
               tick={{ fontSize: 11, fill: "var(--color-ink-subtle)", fontWeight: 600 }}
             />
 
