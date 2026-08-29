@@ -446,9 +446,6 @@ export const sidebarItems: SidebarItem[] = [
       // ── Overview & Reports ──
       { title: "Amount Payable", path: "/accounts/payable", permission: "payable.view" },
       { title: "Amount Receivable", path: "/accounts/receivable", permission: "receivable.view" },
-      { title: "Outstanding Receivable", path: "/accounts/outstanding/receivable", permission: "receivable.view" },
-      { title: "Outstanding Payable", path: "/accounts/outstanding/payable", permission: "payable.view" },
-      { title: "Aging Matrix", path: "/accounts/outstanding/aging", permission: "receivable.view" },
       { title: "Trial Balance", path: "/accounts/trial-balance", permission: "accounts.view" },
       { title: "Profit & Loss", path: "/accounts/profit-loss", permission: "accounts.view" },
       { title: "Balance Sheet", path: "/accounts/balance-sheet", permission: "accounts.view" },
@@ -456,9 +453,6 @@ export const sidebarItems: SidebarItem[] = [
     activePaths: [
       "/accounts/payable",
       "/accounts/receivable",
-      "/accounts/outstanding/receivable",
-      "/accounts/outstanding/payable",
-      "/accounts/outstanding/aging",
       "/accounts/ledger-statement",
       "/accounts/chart-of-accounts",
       "/accounts/petty-cash",

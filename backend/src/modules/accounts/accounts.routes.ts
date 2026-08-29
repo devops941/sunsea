@@ -1,24 +1,7 @@
 import { Router } from "express";
 import { accountsController } from "./accounts.controller";
-import { outstandingService } from "./outstanding.service";
 
 const router = Router();
-
-// Outstanding (bill-wise + aging) — Receivable & Payable
-router.get("/outstanding/receivable", async (req, res, next) => {
-  try {
-    const asOnDate = typeof req.query.asOnDate === "string" ? req.query.asOnDate : undefined;
-    const data = await outstandingService.getReceivable({ asOnDate });
-    res.json({ success: true, data });
-  } catch (err) { next(err); }
-});
-router.get("/outstanding/payable", async (req, res, next) => {
-  try {
-    const asOnDate = typeof req.query.asOnDate === "string" ? req.query.asOnDate : undefined;
-    const data = await outstandingService.getPayable({ asOnDate });
-    res.json({ success: true, data });
-  } catch (err) { next(err); }
-});
 
 router.get("/ledgers", (req, res, next) => accountsController.getLedgers(req, res, next));
 router.post("/ledgers", (req, res, next) => accountsController.createLedger(req, res, next));
