@@ -176,12 +176,12 @@ const PoInvoicePage: React.FC = () => {
         );
     }
 
-    // Extract supplier address
+    // Extract supplier address (prefer supplier's current address over PO's stored address)
     const supplierAddress = (() => {
-        const line1 = po.billingAddressLine1 || supplier?.billingAddressLine1 || "";
-        const city = po.billingCity || supplier?.billingCity || "";
-        const state = po.billingState || supplier?.billingState || "";
-        const pincode = po.billingPincode || supplier?.billingPincode || "";
+        const line1 = supplier?.billingAddressLine1 || po.billingAddressLine1 || "";
+        const city = supplier?.billingCity || po.billingCity || "";
+        const state = supplier?.billingState || po.billingState || "";
+        const pincode = supplier?.billingPincode || po.billingPincode || "";
         const cityStatePin = [city, state].filter(Boolean).join(", ") + (pincode ? ` - ${pincode}` : "");
         return { line1, cityStatePin };
     })();

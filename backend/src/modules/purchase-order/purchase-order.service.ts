@@ -354,6 +354,10 @@ class PurchaseOrderService {
                         gstin: true,
                         mobile: true,
                         altPhone: true,
+                        billingAddressLine1: true,
+                        billingCity: true,
+                        billingState: true,
+                        billingPincode: true,
                     },
                 },
                 items: true,
@@ -415,6 +419,10 @@ class PurchaseOrderService {
                     gstin: supplier.gstin,
                     mobile: supplier.mobile,
                     altPhone: supplier.altPhone,
+                    billingAddressLine1: supplier.billingAddressLine1,
+                    billingCity: supplier.billingCity,
+                    billingState: supplier.billingState,
+                    billingPincode: supplier.billingPincode,
                 }
                 : null,
         };
