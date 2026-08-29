@@ -18,6 +18,8 @@ export interface DatePickerCalendarProps {
   required?: boolean;
   error?: string;
   disabled?: boolean;
+  /** Place label and input side by side in one row */
+  horizontal?: boolean;
 }
 
 interface DayCell {
@@ -109,6 +111,7 @@ export default function DatePickerCalendar({
   required = false,
   error,
   disabled = false,
+  horizontal = false,
 }: DatePickerCalendarProps) {
   const [open, setOpen] = useState<boolean>(false);
 
@@ -192,16 +195,17 @@ export default function DatePickerCalendar({
   const cells = buildMonthGrid(viewYear, viewMonth);
 
   return (
-    <div ref={containerRef} className="relative w-full group">
+    <div ref={containerRef} className={`relative w-full group ${horizontal ? "flex items-center gap-3" : ""}`}>
       {label && (
         <label
           className={`
-            flex items-center gap-[6px] mb-2
+            flex items-center gap-[6px]
             text-xs font-extrabold uppercase
             tracking-[0.5px]
             transition-colors duration-250
             ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
+            ${horizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}
           `}
         >
           <span>{label}</span>
@@ -211,7 +215,7 @@ export default function DatePickerCalendar({
         </label>
       )}
 
-      <div className="relative">
+      <div className={`relative ${horizontal ? "flex-1" : ""}`}>
         {/* Input trigger */}
         <button
           type="button"

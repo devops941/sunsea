@@ -934,27 +934,25 @@ const QuotationForm: React.FC = () => {
 
 
     return (
-        <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
+        <div className=" xl:mr-auto">
             {isLoading ? (
                 <CommonLoader text="Loading data..." fullScreen={false} />
             ) : (
-                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden flex-1 flex flex-col">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
 
                     {/* Page Header */}
-                    <div className="px-4 py-3 border-b border-line bg-card-2">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <h2 className="text-xl font-bold text-ink flex items-start">
-                                {isEditMode ? "Edit Quotation" : "Create Quotation"}
-                                <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("quotationNo")}</span>
-                            </h2>
-                            <BackButton text="Back to List" />
-                        </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                        <h2 className="text-lg font-bold text-ink flex items-start">
+                            {isEditMode ? "Edit Quotation" : "Create Quotation"}
+                            <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("quotationNo")}</span>
+                        </h2>
+                        <BackButton text="Back to List" />
                     </div>
 
-                    <form className="p-4 flex-1 flex flex-col" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
-                        <div className="flex flex-col lg:flex-row gap-4">
+                    <form className="p-5 space-y-5" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
+                        <div className="flex flex-col lg:flex-row gap-5">
                         {/* ── Left: Form (75%) ── */}
-                        <div className="w-full lg:w-3/4 space-y-4">
+                        <div className="w-full lg:w-3/4 space-y-5">
                         {/* ── Rejection banner (edit mode only) ── */}
                         {isEditMode && rejectionReason && (
                             <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2">
@@ -967,7 +965,7 @@ const QuotationForm: React.FC = () => {
                         )}
 
                                 {/* ── Order Info ── */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
                                     <Controller
                                         name="quotationDate"
                                         control={control}
@@ -1309,25 +1307,25 @@ const QuotationForm: React.FC = () => {
 
                         </div>{/* end flex row */}
 
-                        {/* ── Form Actions ── */}
-                        <div className="mt-auto flex justify-end gap-3 pt-4">
-                            <CustomButton
-                                text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
-                                variant="secondary"
-                                type="submit"
-                                disabled={isSubmitting || isConfirming}
-                            />
-                            <CustomButton
-                                text={isConfirming ? "Confirming..." : "Confirm Order"}
-                                variant="primary"
-                                type="button"
-                                onClick={handleSubmit((data) => onSubmit(data, true))}
-                                disabled={isSubmitting || isConfirming}
-                            />
-                        </div>
-
                     </form>
 
+                    {/* ── Form Actions ── */}
+                    <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+                        <CustomButton
+                            text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
+                            variant="secondary"
+                            type="button"
+                            onClick={handleSubmit((data) => onSubmit(data, false))}
+                            disabled={isSubmitting || isConfirming}
+                        />
+                        <CustomButton
+                            text={isConfirming ? "Confirming..." : "Confirm Order"}
+                            variant="primary"
+                            type="button"
+                            onClick={handleSubmit((data) => onSubmit(data, true))}
+                            disabled={isSubmitting || isConfirming}
+                        />
+                    </div>
 
                 </div>
             )}

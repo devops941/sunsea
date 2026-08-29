@@ -209,22 +209,22 @@ const SalesInvoiceCreate: React.FC = () => {
     }
 
     return (
-        <div className="max-w-[1600px] xl:mr-auto">
+        <div className="max-w-[1024px] xl:mr-auto">
             <form onSubmit={handleSubmit} noValidate>
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
                     {/* Page Header */}
-                    <div className="px-5 py-4 border-b border-line">
-                        <h2 className="text-xl font-bold text-ink">Invoice Configuration</h2>
+                    <div className="px-4 py-3 border-b border-line">
+                        <h2 className="text-base font-bold text-ink">Invoice Configuration</h2>
                     </div>
 
-                    <div className="p-5 lg:p-6 space-y-6">
+                    <div className="p-4 lg:p-5 space-y-5">
 
                         {/* Section 1: Invoice Numbering */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Invoice Numbering</h6>
-                                <p className="text-[11px] text-ink-subtle mt-1">Configure how invoice numbers are generated</p>
+                                <h6 className="text-[10px] font-bold text-ink uppercase tracking-[1.5px]">Invoice Numbering</h6>
+                                <p className="text-[10px] text-ink-subtle mt-0.5">Configure how invoice numbers are generated</p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
@@ -239,7 +239,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                         error={errors.invoicePrefix}
                                         maxLength={3}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">2-3 letter prefix (e.g., IN, INV)</p>
+                                    <p className="text-[9px] text-ink-subtle mt-0.5 ml-[152px]">2-3 letter prefix (e.g., IN, INV)</p>
                                 </div>
                                 <div>
                                     <TextInput
@@ -253,7 +253,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                         horizontal
                                         error={errors.sequenceLength}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">Number of digits (e.g., 4 = 0001)</p>
+                                    <p className="text-[9px] text-ink-subtle mt-0.5 ml-[152px]">Number of digits (e.g., 4 = 0001)</p>
                                 </div>
                                 <div>
                                     <TextInput
@@ -265,7 +265,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                         disabled
                                         horizontal
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">Auto-incremented with each invoice</p>
+                                    <p className="text-[9px] text-ink-subtle mt-0.5 ml-[152px]">Auto-incremented with each invoice</p>
                                 </div>
                             </div>
                         </div>
@@ -274,17 +274,17 @@ const SalesInvoiceCreate: React.FC = () => {
                         <div className="border-t border-line" />
 
                         {/* Section 2: Financial Year */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Financial Year</h6>
-                                <p className="text-[11px] text-ink-subtle mt-1">Configure financial year for invoice numbering</p>
+                                <h6 className="text-[10px] font-bold text-ink uppercase tracking-[1.5px]">Financial Year</h6>
+                                <p className="text-[10px] text-ink-subtle mt-0.5">Configure financial year for invoice numbering</p>
                             </div>
 
                             {/* Auto Toggle */}
-                            <div className="flex items-center justify-between bg-card-2 p-3.5 rounded-xl border border-line-soft">
+                            <div className="flex items-center justify-between bg-card-2 p-3 rounded-lg border border-line-soft">
                                 <div>
-                                    <div className="font-semibold text-sm text-ink">Auto Financial Year</div>
-                                    <div className="text-[11px] text-ink-subtle">
+                                    <div className="font-semibold text-xs text-ink">Auto Financial Year</div>
+                                    <div className="text-[10px] text-ink-subtle">
                                         {formData.autoFinancialYear
                                             ? "System automatically determines the financial year based on today's date"
                                             : "Manually set your financial year start date"}
@@ -309,7 +309,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                         error={errors.financialYearStart}
                                         disabled={formData.autoFinancialYear}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">
+                                    <p className="text-[9px] text-ink-subtle mt-0.5 ml-[152px]">
                                         {formData.autoFinancialYear
                                             ? "Auto-calculated — disabled while Auto Financial Year is on"
                                             : "Start date of your financial year"}
@@ -325,7 +325,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                         disabled
                                         horizontal
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">Auto-calculated as one day before start date (next year)</p>
+                                    <p className="text-[9px] text-ink-subtle mt-0.5 ml-[152px]">Auto-calculated as one day before start date (next year)</p>
                                 </div>
                             </div>
                         </div>
@@ -334,10 +334,10 @@ const SalesInvoiceCreate: React.FC = () => {
                         <div className="border-t border-line" />
 
                         {/* Section 3: Invoice Format */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Invoice Format</h6>
-                                <p className="text-[11px] text-ink-subtle mt-1">Auto-generated invoice number format based on your settings</p>
+                                <h6 className="text-[10px] font-bold text-ink uppercase tracking-[1.5px]">Invoice Format</h6>
+                                <p className="text-[10px] text-ink-subtle mt-0.5">Auto-generated invoice number format based on your settings</p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5 items-start">
@@ -351,13 +351,13 @@ const SalesInvoiceCreate: React.FC = () => {
                                         horizontal
                                         error={errors.formatTemplate}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">
+                                    <p className="text-[9px] text-ink-subtle mt-0.5 ml-[152px]">
                                         Variables: {"{PREFIX}"} - Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <label className="shrink-0 w-[140px] text-xs font-extrabold uppercase tracking-[0.5px] text-ink">Preview</label>
-                                    <div className="flex-1 h-10 px-4 rounded-md border border-primary/30 bg-primary/5 flex items-center justify-center text-lg font-mono font-bold tracking-widest text-ink">
+                                    <label className="shrink-0 w-[140px] text-[10px] font-extrabold uppercase tracking-[0.5px] text-ink">Preview</label>
+                                    <div className="flex-1 h-9 px-3 rounded-md border border-primary/30 bg-primary/5 flex items-center justify-center text-sm font-mono font-bold tracking-widest text-ink">
                                         {livePreview}
                                     </div>
                                 </div>
@@ -366,7 +366,7 @@ const SalesInvoiceCreate: React.FC = () => {
                     </div>
 
                     {canEditInvoice && (
-                        <div className="px-5 py-4 border-t border-line flex justify-end">
+                        <div className="px-4 py-3 border-t border-line flex justify-end">
                             <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
                         </div>
                     )}

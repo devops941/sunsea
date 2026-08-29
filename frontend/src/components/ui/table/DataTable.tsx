@@ -72,8 +72,8 @@ const alignClass: Record<NonNullable<DataTableColumn<any>["align"]>, string> = {
 // internally (keeping the sticky header in view) rather than pushing the
 // footer off-screen. The offset covers the horizontal nav, page padding, card
 // header and footer that surround the table in BaseLayout.
-const TABLE_MIN_HEIGHT_CLASS = "min-h-[calc(100vh-260px)]";
-const TABLE_MAX_HEIGHT_CLASS = "max-h-[calc(100vh-260px)]";
+const TABLE_MIN_HEIGHT_CLASS = "";
+const TABLE_MAX_HEIGHT_CLASS = "";
 
 function DataTable<T>({
   columns,
@@ -89,7 +89,7 @@ function DataTable<T>({
   getRowStyle,
   minHeightClassName = TABLE_MIN_HEIGHT_CLASS,
   maxHeightClassName = TABLE_MAX_HEIGHT_CLASS,
-  density = "default",
+  density = "compact",
 }: DataTableProps<T>) {
   const cellPaddingClass = density === "compact"
     ? "px-2 py-1 sm:px-3 sm:py-1.5"
@@ -105,7 +105,7 @@ function DataTable<T>({
   // with each other regardless of what their cells contain. Without this a row
   // is only as tall as its tallest child, so a table with 40px action buttons
   // renders ~56px rows while a text-only table renders ~37px ones.
-  const rowMinHeightClass = density === "compact" ? "min-h-[40px]" : "min-h-[56px]";
+  const rowMinHeightClass = density === "compact" ? "min-h-[36px]" : "min-h-[48px]";
 
   // By using `minmax(max-content, 1fr)`:
   // 1. `max-content` ensures the column is always wide enough for its content without squishing/wrapping text.

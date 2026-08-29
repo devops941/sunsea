@@ -125,26 +125,24 @@ const ShiftForm: React.FC = () => {
         );
     }
     return (
-        <div className="w-full mx-auto flex-1 flex flex-col">
-            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible flex-1 flex flex-col">
-                <div className="px-6 py-5 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="max-w-[1024px] xl:mr-auto">
+            <form onSubmit={handleSubmit} noValidate>
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
                         <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Shift" : "Create Shift"}</h2>
                         <BackButton text="Back to List" to="/shifts" />
                     </div>
-                </div>
-                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
-                    <div>
-                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
-                            <h3 className="text-lg font-bold text-ink">Shift Details</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    <div className="p-5 lg:p-6 space-y-6">
+                        <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px]">Shift Details</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
                             <TextInput
                                 label="Shift Code"
                                 name="shiftCode"
                                 value={formData.shiftCode}
                                 placeholder="e.g. SHF-001"
                                 required
+                                horizontal
                                 onChange={handleChange}
                                 disabled
                             />
@@ -154,6 +152,7 @@ const ShiftForm: React.FC = () => {
                                 value={formData.shiftName}
                                 placeholder="e.g. Morning Shift"
                                 required
+                                horizontal
                                 onChange={handleChange}
                                 error={errors.shiftName}
                             />
@@ -162,6 +161,7 @@ const ShiftForm: React.FC = () => {
                                 name="startTime"
                                 value={formData.startTime}
                                 required
+                                horizontal
                                 onChange={(val) => {
                                     setFormData(prev => ({ ...prev, startTime: val }));
                                     if (errors.startTime) setErrors(prev => ({ ...prev, startTime: undefined }));
@@ -173,6 +173,7 @@ const ShiftForm: React.FC = () => {
                                 name="endTime"
                                 value={formData.endTime}
                                 required
+                                horizontal
                                 onChange={(val) => {
                                     setFormData(prev => ({ ...prev, endTime: val }));
                                     if (errors.endTime) setErrors(prev => ({ ...prev, endTime: undefined }));
@@ -180,28 +181,31 @@ const ShiftForm: React.FC = () => {
                                 error={errors.endTime}
                             />
                             <TextInput
-                                label="Break Duration (mins)"
+                                label="Break (mins)"
                                 name="breakDuration"
                                 value={formData.breakDuration}
                                 type="number"
                                 min={0}
                                 placeholder="e.g. 30"
+                                horizontal
                                 onChange={handleChange}
                                 error={errors.breakDuration}
                             />
                             <TextInput
-                                label="Grace Period (mins)"
+                                label="Grace (mins)"
                                 name="gracePeriod"
                                 value={formData.gracePeriod}
                                 type="number"
                                 min={0}
                                 placeholder="e.g. 15"
+                                horizontal
                                 onChange={handleChange}
                                 error={errors.gracePeriod}
                             />
                         </div>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-3 mt-auto pt-4 border-t border-line-soft">
+
+                    <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
                         {!isEdit && (
                             <CustomButton
                                 text="Clear"
@@ -218,8 +222,8 @@ const ShiftForm: React.FC = () => {
                             disabled={isSubmitting || loading}
                         />
                     </div>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     );
 };

@@ -19,7 +19,7 @@ import { formatDate } from "../../../utils/dateUtils";
 
 import { usePermission } from "../../../hooks/usePermission";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const GoodsDispatchList: React.FC = () => {
   const navigate = useNavigate();

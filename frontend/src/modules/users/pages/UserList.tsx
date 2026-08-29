@@ -12,7 +12,7 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import { usePermission } from "../../../hooks/usePermission";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const UserList: React.FC = () => {
     const { users, loading, error, loadUsers, changeUserStatus } = useUsers();

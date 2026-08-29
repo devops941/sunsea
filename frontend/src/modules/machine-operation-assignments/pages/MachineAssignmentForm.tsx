@@ -291,17 +291,17 @@ export const MachineAssignmentForm: React.FC = () => {
   const selectedEmpIds = new Set(formData.operators.map(op => op.employeeId).filter(Boolean));
 
   return (
-    <div className="w-full">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-ink">
-          {isEdit ? "Edit Machine Assignment" : "Assign Machine Operation"}
-        </h2>
-        <BackButton text="Back to List" to="/machines/assignments" />
-      </div>
-
+    <div className="w-full max-w-[1024px] xl:mr-auto">
       <form onSubmit={handleSubmit} noValidate>
-        <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-180px)] flex flex-col">
-          <div className="flex-1 p-5 lg:p-6 space-y-6">
+        <div className="w-full bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+            <h2 className="text-xl font-bold text-ink">
+              {isEdit ? "Edit Machine Assignment" : "Assign Machine Operation"}
+            </h2>
+            <BackButton text="Back to List" to="/machines/assignments" />
+          </div>
+
+          <div className="p-5 lg:p-6 space-y-6">
 
             {/* Section 1: Week, Machine & Shift */}
             <div className="space-y-4">
@@ -371,7 +371,7 @@ export const MachineAssignmentForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-line-soft/50" />
+            <div className="border-t border-line" />
 
             {/* Section 2: Operators */}
             <div className="space-y-4">
@@ -445,7 +445,7 @@ export const MachineAssignmentForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-line-soft/50" />
+            <div className="border-t border-line" />
 
             {/* Section 3: Remarks */}
             <div className="space-y-4">
@@ -460,7 +460,7 @@ export const MachineAssignmentForm: React.FC = () => {
             </div>
           </div>
 
-          <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end gap-3 mt-auto">
+          <div className="px-5 py-4 border-t border-line flex justify-end gap-3">
             <CustomButton
               text="Clear"
               icon={FaEraser}

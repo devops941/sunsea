@@ -181,7 +181,7 @@ const WhatsappCreatePage: React.FC = () => {
     if (loading) return <CommonLoader text="Loading ..." fullScreen={false} />;
 
     return (
-        <div className="max-w-[1600px] xl:mr-auto">
+        <div className="max-w-[1024px] xl:mr-auto">
             <form onSubmit={handleSubmit} noValidate>
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 

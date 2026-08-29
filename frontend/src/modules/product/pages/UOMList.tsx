@@ -3,7 +3,7 @@ import { FaSearch } from "react-icons/fa";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { useUOM } from "../../../hooks/useUOM";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const UOMList: React.FC = () => {
     const { units, loading, error } = useUOM();
@@ -37,7 +37,7 @@ const UOMList: React.FC = () => {
     return (
         <div>
             <div>
-                <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>

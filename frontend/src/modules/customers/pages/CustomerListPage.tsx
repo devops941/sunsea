@@ -20,7 +20,7 @@ import CustomerViewModal from "../components/CustomerViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
 import { FaPlus } from "react-icons/fa";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 interface FilterState {
   status: string;         // "" = all  |  "Active"  |  "Inactive"
@@ -162,7 +162,7 @@ const CustomerListPage: React.FC = () => {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
-      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1300px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">

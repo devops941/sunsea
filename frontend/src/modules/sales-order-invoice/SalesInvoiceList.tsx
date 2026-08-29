@@ -20,7 +20,7 @@ import { useAppSelector } from "../../hooks/reduxHooks";
 import { useSocketSync } from "../../hooks/useSocketSync";
 import { usePermission } from "../../hooks/usePermission";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const getMobileFromCustomer = (cust: any) => {
     if (!cust) return "";
@@ -304,7 +304,7 @@ const SalesInvoiceList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1700px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>

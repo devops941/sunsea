@@ -277,7 +277,7 @@ const CompanySettings: React.FC = () => {
 
   // Normal Settings/Edit Screen Design
   return (
-    <div className="max-w-[1600px] xl:mr-auto">
+    <div className="max-w-[1024px] xl:mr-auto">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         <form onSubmit={handleSubmit} noValidate>
           <div className="flex flex-col lg:flex-row">

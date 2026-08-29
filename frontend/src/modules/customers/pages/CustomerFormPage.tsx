@@ -271,26 +271,24 @@ const CustomerFormPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
-      <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible flex-1 flex flex-col">
-        <div className="px-4 py-3 border-b border-line-soft">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h3 className="text-lg font-bold text-ink flex items-start">
-              {isEditMode ? 'Edit Customer' : 'Create Customer'}
-              <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("customerId")}</span>
-            </h3>
-            <CustomButton
-              text="Back to List"
-              icon={FaArrowLeft}
-              variant="secondary"
-              onClick={() => navigate("/customers")}
-            />
-          </div>
+    <div className="max-w-[1400px] xl:mr-auto">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+          <h3 className="text-lg font-bold text-ink flex items-start">
+            {isEditMode ? 'Edit Customer' : 'Create Customer'}
+            <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("customerId")}</span>
+          </h3>
+          <CustomButton
+            text="Back to List"
+            icon={FaArrowLeft}
+            variant="secondary"
+            onClick={() => navigate("/customers")}
+          />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-4 py-3 space-y-4 flex-1 flex flex-col" noValidate>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-5" noValidate>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
             <Controller name="firmName" control={control} render={({ field }) => (
               <CtrlText field={field} label="Firm / Legal Name" placeholder="e.g. Murugan Plastics" required error={errors.firmName?.message} />
             )} />
@@ -503,21 +501,23 @@ const CustomerFormPage: React.FC = () => {
             })}
           </div>
 
-          <div className="mt-auto flex justify-end gap-3 pt-4">
-            {!isEditMode && (
-              <CustomButton
-                text="Clear Form"
-                onClick={handleClear}
-                type="button"
-              />
-            )}
-            <CustomButton
-              text={isSubmitting ? "Saving..." : "Save Customer"}
-              type="submit"
-              disabled={isSubmitting}
-            />
-          </div>
         </form>
+
+        <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+          {!isEditMode && (
+            <CustomButton
+              text="Clear Form"
+              onClick={handleClear}
+              type="button"
+            />
+          )}
+          <CustomButton
+            text={isSubmitting ? "Saving..." : "Save Customer"}
+            type="submit"
+            disabled={isSubmitting}
+            onClick={handleSubmit(onSubmit)}
+          />
+        </div>
       </div>
 
       <CommonConfirmModal

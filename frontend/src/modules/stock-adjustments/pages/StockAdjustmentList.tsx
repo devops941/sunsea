@@ -27,7 +27,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { formatDate } from "../../../utils/dateUtils";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
   PRODUCTION_MATERIAL_ISSUE: "Prod. Material Issue",
@@ -319,7 +319,7 @@ const StockAdjustmentList: React.FC = () => {
 
   return (
     <div className="p-4 md:p-1 ">
-      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>

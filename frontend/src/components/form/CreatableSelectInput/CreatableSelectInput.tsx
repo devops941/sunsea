@@ -97,6 +97,7 @@ export default function CreatableSelectInput({
   const [inputText, setInputText] = useState('');
   const [createInputValue, setCreateInputValue] = useState('');
   const [showCreateInput, setShowCreateInput] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [editItem, setEditItem] = useState<{ value: number | string; label: string } | null>(null);
 
@@ -178,6 +179,8 @@ export default function CreatableSelectInput({
     setInputText('');
     setShowCreateInput(false);
     setCreateInputValue('');
+    const currentIdx = options.findIndex((o) => o.value == value);
+    setHighlightedIndex(currentIdx >= 0 ? currentIdx : 0);
     updateDropdownPosition();
     setIsOpen(true);
   };
@@ -242,21 +245,40 @@ export default function CreatableSelectInput({
           onChange={(e) => {
             if (!isOpen) openDropdown();
             setInputText(e.target.value);
+            setHighlightedIndex(0);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') closeDropdown();
-            if (e.key === 'Tab') closeDropdown();
-            if (e.key === 'Enter' && onCreateOption) {
+            if (e.key === 'Escape') { closeDropdown(); return; }
+            if (e.key === 'Tab') { closeDropdown(); return; }
+            if (e.key === 'ArrowDown') {
               e.preventDefault();
-              const trimmed = inputText.trim();
-              const exactMatch = options.find(
-                (opt) => opt.label.toString().toLowerCase() === trimmed.toLowerCase()
-              );
-              if (trimmed && !exactMatch) {
-                onCreateOption(trimmed);
-                closeDropdown();
-              } else if (exactMatch) {
-                handleSelect(exactMatch.value);
+              if (!isOpen) { openDropdown(); return; }
+              setHighlightedIndex((prev) => (prev + 1 < filteredOptions.length ? prev + 1 : prev));
+              return;
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (!isOpen) { openDropdown(); return; }
+              setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+              return;
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (isOpen && highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+                handleSelect(filteredOptions[highlightedIndex].value);
+                return;
+              }
+              if (onCreateOption) {
+                const trimmed = inputText.trim();
+                const exactMatch = options.find(
+                  (opt) => opt.label.toString().toLowerCase() === trimmed.toLowerCase()
+                );
+                if (trimmed && !exactMatch) {
+                  onCreateOption(trimmed);
+                  closeDropdown();
+                } else if (exactMatch) {
+                  handleSelect(exactMatch.value);
+                }
               }
             }
           }}
@@ -313,13 +335,17 @@ export default function CreatableSelectInput({
                 {filteredOptions.length === 0 && !onCreateOption && (
                   <div className="px-4 py-3 text-sm text-ink-subtle font-semibold text-center">No results found</div>
                 )}
-                {filteredOptions.map((option) => (
+                {filteredOptions.map((option, index) => (
                   <div
                     key={option.value}
                     className={`
                       group/item px-4 py-2.5 text-sm cursor-pointer flex items-center justify-between
                       transition-colors duration-150
-                      ${value == option.value ? 'bg-primary/15 text-primary font-bold' : 'text-ink font-semibold hover:bg-card-2'}
+                      ${index === highlightedIndex
+                        ? 'bg-primary/20 text-primary font-bold'
+                        : value == option.value
+                          ? 'bg-primary/15 text-primary font-bold'
+                          : 'text-ink font-semibold hover:bg-card-2'}
                     `}
                     onMouseDown={(e) => { e.preventDefault(); handleSelect(option.value); }}
                   >

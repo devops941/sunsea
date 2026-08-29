@@ -17,7 +17,7 @@ import FilterPopover from '../../../components/ui/FilterPopover/FilterPopover';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: any) => Number(n || 0).toLocaleString('en-IN');
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const MONTH_OPTIONS = [
   { value: 'ALL', label: 'All Months' },

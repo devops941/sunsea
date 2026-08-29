@@ -380,7 +380,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>

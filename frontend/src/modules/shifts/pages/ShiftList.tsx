@@ -19,7 +19,7 @@ import type { Shift } from "../../../features/shifts/types";
 import { usePermission } from "../../../hooks/usePermission";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const formatTime12h = (time24: string): string => {
     if (!time24) return "N/A";
@@ -143,7 +143,7 @@ const ShiftList: React.FC = () => {
         <div>
             <div>
 
-                <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>

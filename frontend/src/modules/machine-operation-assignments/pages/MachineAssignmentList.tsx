@@ -28,7 +28,7 @@ import {
 import { machineService } from "../../../services/machineService";
 import MachineAssignmentViewModal from "../components/MachineAssignmentViewModal";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const MachineAssignmentList: React.FC = () => {
   const [assignments, setAssignments] = useState<MachineOperationAssignment[]>([]);
@@ -197,17 +197,45 @@ const MachineAssignmentList: React.FC = () => {
 
   return (
     <div>
-      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
         {/* Top Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 border-b border-line">
-          <div>
-            <h2 className="text-xl font-bold text-ink">Machine Operation Assignments</h2>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto ml-auto">
+        <div className="flex items-center gap-3 p-4 border-b border-line overflow-x-auto">
+          <h2 className="text-base font-bold text-ink whitespace-nowrap shrink-0">Machine Operation Assignments</h2>
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            <div className="w-[160px]">
+              <SelectInput
+                name="filterMachineId"
+                hideLabel={true}
+                value={filterMachineId}
+                onChange={(e) => {
+                  setFilterMachineId(e.target.value);
+                  setCurrentPage(1);
+                }}
+                noMargin={true}
+                options={[
+                  { label: "-- All Machines --", value: "" },
+                  ...machines.map((m) => ({
+                    label: `${m.machineName} (${m.machineId})`,
+                    value: m.machineId,
+                  })),
+                ]}
+              />
+            </div>
+            <div className="w-[150px]">
+              <DatePickerCalendar
+                name="filterWeekDate"
+                value={filterWeekDate}
+                onChange={(e: any) => {
+                  setFilterWeekDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Filter by Week"
+              />
+            </div>
             <SearchInput
               value={searchTerm}
               onChange={handleSearch}
-              placeholder="Search assignments..."
+              placeholder="Search..."
             />
             <CustomButton
               text="Export CSV"
@@ -223,41 +251,6 @@ const MachineAssignmentList: React.FC = () => {
                 onClick={handleOpenCreate}
               />
             )}
-          </div>
-        </div>
-
-        {/* Filters & Search Bar */}
-        <div className="p-6 bg-card border-b border-line space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <SelectInput
-              name="filterMachineId"
-              hideLabel={true}
-              value={filterMachineId}
-              onChange={(e) => {
-                setFilterMachineId(e.target.value);
-                setCurrentPage(1);
-              }}
-              noMargin={true}
-              options={[
-                { label: "-- All Machines --", value: "" },
-                ...machines.map((m) => ({
-                  label: `${m.machineName} (${m.machineId})`,
-                  value: m.machineId,
-                })),
-              ]}
-            />
-
-
-
-            <DatePickerCalendar
-              name="filterWeekDate"
-              value={filterWeekDate}
-              onChange={(e: any) => {
-                setFilterWeekDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Filter by Week Start Date"
-            />
           </div>
         </div>
 

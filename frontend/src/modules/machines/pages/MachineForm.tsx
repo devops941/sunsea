@@ -191,7 +191,7 @@ const MachineForm: React.FC = () => {
     }
 
     return (
-        <div className="max-w-[1600px] xl:mr-auto">
+        <div className="max-w-[1024px] xl:mr-auto">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
                     <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
@@ -199,7 +199,7 @@ const MachineForm: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-5 lg:p-6 space-y-4" noValidate>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4 lg:gap-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
                         <TextInput
                             label="Machine ID"
                             name="machineId"

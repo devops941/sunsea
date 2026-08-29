@@ -15,7 +15,7 @@ import EditButton from "../../../../components/ui/EditButton/EditButton";
 
 import { useUsers } from "../../../../hooks/useUsers";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const InvoiceList: React.FC = () => {
     const navigate = useNavigate();

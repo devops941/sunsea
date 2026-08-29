@@ -28,7 +28,7 @@ import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
 import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 // ─── Group raw order items by Sales Product (same logic as SalesOrderDetail) ──
 function groupItemsBySalesProduct(orderItems: any[], salesProducts: any[]) {
@@ -365,7 +365,7 @@ const AllSalesOrderList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
