@@ -11,6 +11,8 @@ import CustomButton from "../../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import EmailButton from "../../../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../../../components/ui/WhatsappButton/WhatsappButton";
+
+import IconButton from "../../../../components/ui/IconButton/IconButton";
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { usePermission } from "../../../../hooks/usePermission";
@@ -23,6 +25,7 @@ import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import { FiClipboard } from "react-icons/fi";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -366,7 +369,12 @@ const PurchaseOrderListPage: React.FC = () => {
                     )}
                     {item.status !== "REJECTED" && item.status !== "CANCELLED" && item.status !== "PENDING" && item.status !== "DRAFT" && (
                       <>
-                        <ViewButton onClick={() => navigate(`/po-invoice/${item.id}`)} />
+                        <IconButton
+                          icon={FiClipboard}
+                          variant="info"
+                          title="PO Invoice"
+                          onClick={() => navigate(`/po-invoice/${item.id}`)}
+                        />
                         <EmailButton 
                           onClick={() => handleOpenEmailModal(item)} 
                           disabled={sendingEmail && emailPo?.id === item.id} 
