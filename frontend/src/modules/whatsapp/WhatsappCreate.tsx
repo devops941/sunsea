@@ -181,28 +181,27 @@ const WhatsappCreatePage: React.FC = () => {
     if (loading) return <CommonLoader text="Loading ..." fullScreen={false} />;
 
     return (
-        <div className="w-full">
-            {/* Page Header */}
-            <div className="mb-4">
-                <h2 className="text-lg font-bold text-ink">
-                    WhatsApp Business Configuration
-                </h2>
-            </div>
-
+        <div className="max-w-[1600px] xl:mr-auto">
             <form onSubmit={handleSubmit} noValidate>
-                <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-240px)] flex flex-col">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
-                    <div className="flex-1 p-5 lg:p-6 space-y-6">
+                    {/* Page Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                        <h2 className="text-xl font-bold text-ink">WhatsApp Business Configuration</h2>
+                    </div>
+
+                    <div className="p-5 lg:p-6 space-y-6">
                         {/* Section: API Setup Credentials */}
                         <div>
                             <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-4">API Setup Credentials</h6>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
                                 <TextInput
                                     label="Phone Number ID"
                                     name="phoneNumberId"
                                     value={formData.phoneNumberId}
                                     placeholder="e.g. 109876543212345"
                                     required
+                                    horizontal
                                     onChange={handleChange as any}
                                     error={errors.phoneNumberId}
                                 />
@@ -212,15 +211,17 @@ const WhatsappCreatePage: React.FC = () => {
                                     value={formData.wabaId}
                                     placeholder="e.g. 987654321098765"
                                     required
+                                    horizontal
                                     onChange={handleChange as any}
                                     error={errors.wabaId}
                                 />
                                 <IndiaPhoneInput
-                                    label="Business Phone Number"
+                                    label="Business Phone"
                                     name="businessPhone"
                                     value={formData.businessPhone}
                                     placeholder="e.g. 919876543210"
                                     required
+                                    horizontal
                                     onChange={handleChange as any}
                                     error={errors.businessPhone}
                                 />
@@ -230,22 +231,24 @@ const WhatsappCreatePage: React.FC = () => {
                         {/* Section: Security & Credentials */}
                         <div>
                             <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-4">Security & Credentials</h6>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5  ">
                                 <TextInput
                                     label="Access Token"
                                     name="accessToken"
                                     value={formData.accessToken}
-                                    placeholder="Paste your Meta Permanent or Temporary Access Token here..."
+                                    placeholder="Paste your Access Token..."
                                     required
+                                    horizontal
                                     onChange={handleChange as any}
                                     onFocus={handleTokenFocus}
                                     error={errors.accessToken}
                                 />
                                 <TextInput
-                                    label="Webhook Verify Token"
+                                    label="Webhook Token"
                                     name="webhookVerifyToken"
                                     value={formData.webhookVerifyToken}
                                     placeholder="e.g. my_secret_token_123"
+                                    horizontal
                                     onChange={handleChange as any}
                                     error={errors.webhookVerifyToken}
                                 />
@@ -256,19 +259,21 @@ const WhatsappCreatePage: React.FC = () => {
                         {isEditing && (
                             <div>
                                 <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-4">Send a Test Message</h6>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
                                     <IndiaPhoneInput
-                                        label="Recipient Phone Number"
+                                        label="Recipient Phone"
                                         name="testPhone"
                                         value={testPhone}
                                         placeholder="e.g. 919876543210"
+                                        horizontal
                                         onChange={(e) => setTestPhone(e.target.value)}
                                     />
                                     <TextInput
                                         label="Test Message"
                                         name="testMessage"
                                         value={testMessage}
-                                        placeholder="Enter your test message here..."
+                                        placeholder="Enter your test message..."
+                                        horizontal
                                         onChange={(e) => setTestMessage(e.target.value)}
                                     />
                                 </div>
@@ -286,7 +291,7 @@ const WhatsappCreatePage: React.FC = () => {
 
                     {/* Footer */}
                     {canEditWhatsapp && (
-                        <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end gap-3 mt-auto">
+                        <div className="px-5 py-4 border-t border-line flex justify-end gap-3">
                             <CustomButton text="Clear" icon={FaEraser} variant="secondary" onClick={handleClear} type="button" />
                             <CustomButton
                                 text={saving ? "Saving..." : "Save Configuration"}

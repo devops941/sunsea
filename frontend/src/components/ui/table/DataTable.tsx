@@ -194,7 +194,7 @@ function DataTable<T>({
                           {col.render
                             ? col.render(row, index)
                             : col.accessor
-                              ? String(row[col.accessor] ?? "")
+                              ? <span className="block truncate" title={String(row[col.accessor] ?? "")}>{String(row[col.accessor] ?? "")}</span>
                               : null}
                         </div>
                       ))}

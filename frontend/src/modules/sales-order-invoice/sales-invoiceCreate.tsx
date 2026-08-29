@@ -209,15 +209,16 @@ const SalesInvoiceCreate: React.FC = () => {
     }
 
     return (
-        <div className="w-full">
-            {/* Page Header */}
-            <div className="mb-4">
-                <h2 className="text-lg font-bold text-ink">Invoice Configuration</h2>
-            </div>
-
+        <div className="max-w-[1600px] xl:mr-auto">
             <form onSubmit={handleSubmit} noValidate>
-                <div className="bg-card rounded-xl border border-line-soft overflow-hidden min-h-[calc(100vh-240px)] flex flex-col">
-                    <div className="flex-1 p-5 lg:p-6 space-y-6">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+
+                    {/* Page Header */}
+                    <div className="px-5 py-4 border-b border-line">
+                        <h2 className="text-xl font-bold text-ink">Invoice Configuration</h2>
+                    </div>
+
+                    <div className="p-5 lg:p-6 space-y-6">
 
                         {/* Section 1: Invoice Numbering */}
                         <div className="space-y-4">
@@ -226,7 +227,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                 <p className="text-[11px] text-ink-subtle mt-1">Configure how invoice numbers are generated</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
                                 <div>
                                     <TextInput
                                         label="Invoice Prefix"
@@ -234,10 +235,11 @@ const SalesInvoiceCreate: React.FC = () => {
                                         value={formData.invoicePrefix}
                                         onChange={handleChange as any}
                                         required
+                                        horizontal
                                         error={errors.invoicePrefix}
                                         maxLength={3}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1">2-3 letter prefix (e.g., IN, INV)</p>
+                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">2-3 letter prefix (e.g., IN, INV)</p>
                                 </div>
                                 <div>
                                     <TextInput
@@ -248,9 +250,10 @@ const SalesInvoiceCreate: React.FC = () => {
                                         value={String(formData.sequenceLength)}
                                         onChange={handleChange as any}
                                         required
+                                        horizontal
                                         error={errors.sequenceLength}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1">Number of digits (e.g., 4 = 0001)</p>
+                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">Number of digits (e.g., 4 = 0001)</p>
                                 </div>
                                 <div>
                                     <TextInput
@@ -260,14 +263,15 @@ const SalesInvoiceCreate: React.FC = () => {
                                         value={String(formData.currentSequenceNumber)}
                                         onChange={handleChange as any}
                                         disabled
+                                        horizontal
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1">Auto-incremented with each invoice</p>
+                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">Auto-incremented with each invoice</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Divider */}
-                        <div className="border-t border-line-soft/50" />
+                        <div className="border-t border-line" />
 
                         {/* Section 2: Financial Year */}
                         <div className="space-y-4">
@@ -292,19 +296,20 @@ const SalesInvoiceCreate: React.FC = () => {
                                 </label>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
                                 <div>
                                     <TextInput
-                                        label="Financial Year Start"
+                                        label="FY Start"
                                         name="financialYearStart"
                                         type="date"
                                         value={formData.financialYearStart}
                                         onChange={handleChange as any}
                                         required
+                                        horizontal
                                         error={errors.financialYearStart}
                                         disabled={formData.autoFinancialYear}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1">
+                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">
                                         {formData.autoFinancialYear
                                             ? "Auto-calculated — disabled while Auto Financial Year is on"
                                             : "Start date of your financial year"}
@@ -312,20 +317,21 @@ const SalesInvoiceCreate: React.FC = () => {
                                 </div>
                                 <div>
                                     <TextInput
-                                        label="Financial Year End"
+                                        label="FY End"
                                         name="financialYearEnd"
                                         type="date"
                                         value={formData.financialYearEnd}
                                         onChange={handleChange as any}
                                         disabled
+                                        horizontal
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1">Auto-calculated as one day before start date (next year)</p>
+                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">Auto-calculated as one day before start date (next year)</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Divider */}
-                        <div className="border-t border-line-soft/50" />
+                        <div className="border-t border-line" />
 
                         {/* Section 3: Invoice Format */}
                         <div className="space-y-4">
@@ -334,7 +340,7 @@ const SalesInvoiceCreate: React.FC = () => {
                                 <p className="text-[11px] text-ink-subtle mt-1">Auto-generated invoice number format based on your settings</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5 items-start">
                                 <div>
                                     <TextInput
                                         label="Format Template"
@@ -342,25 +348,25 @@ const SalesInvoiceCreate: React.FC = () => {
                                         value={formData.formatTemplate}
                                         onChange={handleChange as any}
                                         required
+                                        horizontal
                                         error={errors.formatTemplate}
                                     />
-                                    <p className="text-[11px] text-ink-subtle mt-1">
+                                    <p className="text-[11px] text-ink-subtle mt-1 ml-[152px]">
                                         Variables: {"{PREFIX}"} - Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence
                                     </p>
                                 </div>
-                                <div>
-                                    <label className="flex items-center gap-1.5 mb-2 text-xs font-extrabold uppercase tracking-[0.5px] text-ink">Preview</label>
-                                    <div className="h-10 px-4 rounded-md border border-primary/30 bg-primary/5 flex items-center justify-center text-lg font-mono font-bold tracking-widest text-ink">
+                                <div className="flex items-center gap-3">
+                                    <label className="shrink-0 w-[140px] text-xs font-extrabold uppercase tracking-[0.5px] text-ink">Preview</label>
+                                    <div className="flex-1 h-10 px-4 rounded-md border border-primary/30 bg-primary/5 flex items-center justify-center text-lg font-mono font-bold tracking-widest text-ink">
                                         {livePreview}
                                     </div>
-                                    <p className="text-[11px] text-ink-subtle mt-1">This is how your next invoice number will look</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {canEditInvoice && (
-                        <div className="px-5 py-4 border-t border-line-soft bg-card-2/30 flex justify-end mt-auto">
+                        <div className="px-5 py-4 border-t border-line flex justify-end">
                             <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
                         </div>
                     )}

@@ -183,6 +183,8 @@ interface IndiaPhoneInputSingleProps {
     placeholder?: string;
     required?: boolean;
     error?: string;
+    /** Place label and input side by side in one row */
+    horizontal?: boolean;
     onChange: (e: { target: { name: string; value: string } }) => void;
 }
 
@@ -545,7 +547,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
     }
 
     /* ============ SINGLE MODE (original behavior) ============ */
-    const { value, error, onChange } = props as IndiaPhoneInputSingleProps;
+    const { value, error, onChange, horizontal: singleHorizontal = false } = props as IndiaPhoneInputSingleProps;
 
     const handleBlur = () => {
         setSingleLocalError(validatePhoneNumber(value, required));
@@ -561,17 +563,18 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
     const displayError = error || singleLocalError;
 
     return (
-        <div className="mb-[18px] group w-full">
+        <div className={`group w-full ${singleHorizontal ? "flex items-center gap-3" : ""}`}>
             {label && (
                 <label
                     htmlFor={name}
                     className={`
-                        flex items-center gap-[6px] mb-2
+                        flex items-center gap-[6px]
                         text-xs font-extrabold uppercase
                         tracking-[0.5px]
                         transition-colors duration-250
                         ${displayError ? "text-red-500" : "text-ink"}
                         group-focus-within:text-primary
+                        ${singleHorizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}
                     `}
                 >
                     <span>{label}</span>
@@ -579,15 +582,17 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                 </label>
             )}
 
-            <SinglePhoneField
-                name={name}
-                value={value}
-                placeholder={placeholder}
-                required={required}
-                error={displayError}
-                onChange={handleOnChange}
-                onBlur={handleBlur}
-            />
+            <div className={singleHorizontal ? "flex-1" : ""}>
+                <SinglePhoneField
+                    name={name}
+                    value={value}
+                    placeholder={placeholder}
+                    required={required}
+                    error={displayError}
+                    onChange={handleOnChange}
+                    onBlur={handleBlur}
+                />
+            </div>
 
             <PhoneInputStyles />
         </div>

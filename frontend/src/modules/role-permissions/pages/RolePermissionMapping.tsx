@@ -638,31 +638,20 @@ const RolePermissionMapping: React.FC = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="w-full mx-auto space-y-6">
-      {/* PAGE HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-ink tracking-tight mb-1">
-            Role Permissions Matrix
-          </h2>
-          <p className="text-sm text-ink-muted">
-            Select a role and configure <span className="font-semibold text-blue-500">View</span>,{" "}
-            <span className="font-semibold text-emerald-500">Add</span>,{" "}
-            <span className="font-semibold text-amber-500">Edit</span>,{" "}
-            <span className="font-semibold text-rose-500">Delete</span> permissions per module.
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5 bg-card px-4 py-2.5 rounded-xl shadow-xs border border-line-soft shrink-0">
-          <FaShieldAlt className="text-violet-500 text-lg" />
-          <div>
-            <div className="text-xs text-ink-subtle font-medium leading-none mb-0.5">Total Active</div>
-            <div className="text-xl font-extrabold text-ink leading-none">{assignedIds.size}</div>
+    <div className="max-w-[1600px] xl:mr-auto space-y-5">
+      {/* ROLE SELECTOR */}
+      <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+          <h2 className="text-xl font-bold text-ink">Role Permissions Matrix</h2>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 px-4 py-2 rounded-xl border border-violet-500/20 shrink-0">
+            <FaShieldAlt className="text-violet-400 text-lg" />
+            <div>
+              <div className="text-[10px] text-violet-300/80 font-semibold uppercase tracking-wider leading-none mb-1">Total Active</div>
+              <div className="text-xl font-extrabold text-violet-300 leading-none">{assignedIds.size}</div>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* ROLE SELECTOR */}
-      <div className="bg-card rounded-2xl border border-line-soft shadow-xs p-4 mb-5">
+        <div className="p-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
           <div className="lg:col-span-4">
             <SelectInput
@@ -688,16 +677,17 @@ const RolePermissionMapping: React.FC = () => {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* MAIN */}
       {loading && permissions.length === 0 ? (
         <CommonLoader text="Loading permissions..." fullScreen={false} />
       ) : (
-        <div className="flex gap-4">
+        <div className="flex gap-5">
 
           {/* ── LEFT SIDEBAR ── */}
-          <div className="w-52 shrink-0 space-y-1">
+          <div className="w-52 shrink-0 space-y-1.5">
             {enrichedGroups.map(group => {
               const gs = SECTION_STYLE[group.colorId];
               const isActive = activeGroupId === group.id;
@@ -708,9 +698,9 @@ const RolePermissionMapping: React.FC = () => {
                 <button
                   key={group.id}
                   onClick={() => setActiveGroupId(group.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-all duration-150 border ${isActive
-                      ? `${gs.activeBg} text-white border-transparent shadow-lg ${gs.activeShadow}`
-                      : "bg-card border-line-soft hover:bg-card-2 text-ink shadow-xs"
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left text-sm font-medium transition-all duration-200 border ${isActive
+                      ? `${gs.activeBg} text-white border-transparent shadow-lg ${gs.activeShadow} scale-[1.02]`
+                      : "bg-card border-line hover:bg-card-2 hover:border-line-soft text-ink shadow-sm"
                     }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -731,16 +721,16 @@ const RolePermissionMapping: React.FC = () => {
           {/* ── RIGHT PANEL ── */}
           <div className="flex-1 min-w-0">
             {activeGroup && (
-              <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
+              <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
 
                 {/* Panel header */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-line-soft bg-card-2">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-line bg-card-2/80">
                   <div className="flex items-center gap-3">
-                    <div className={`text-lg ${s.iconClass}`}>{activeGroup.icon}</div>
+                    <div className={`text-xl p-2 rounded-lg ${s.iconClass} bg-card border border-line-soft`}>{activeGroup.icon}</div>
                     <div>
                       <h3 className="font-bold text-ink text-sm">{activeGroup.groupName}</h3>
                       <p className="text-xs text-ink-muted">
-                        {activeGroup.assignedTotal} of {activeGroup.totalPerms} permissions active
+                        <span className="font-semibold text-ink">{activeGroup.assignedTotal}</span> of <span className="font-semibold">{activeGroup.totalPerms}</span> permissions active
                         {activeGroup.totalPerms === 0 && " — no DB permission records yet"}
                       </p>
                     </div>
@@ -764,7 +754,7 @@ const RolePermissionMapping: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[580px]">
                     <thead>
-                      <tr className="border-b border-line-soft bg-card-2/50">
+                      <tr className="border-b border-line bg-card-2/60">
                         <th className="text-left py-3 px-5 text-[10px] font-extrabold text-ink-muted uppercase tracking-[1.5px] w-[240px]">
                           Page / Module
                         </th>
@@ -933,7 +923,7 @@ const RolePermissionMapping: React.FC = () => {
                 </div>
 
                 {/* Footer legend */}
-                <div className="px-5 py-2.5 bg-card-2 border-t border-line-soft flex items-center gap-4 flex-wrap">
+                <div className="px-5 py-3 bg-card-2/80 border-t border-line flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <span className="inline-block rounded" style={{ width: 20, height: 2, background: "#64748b" }} />
                     <span className="text-[11px] text-ink-subtle">No DB record — permission not yet seeded</span>
