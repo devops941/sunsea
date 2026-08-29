@@ -381,7 +381,7 @@ const DashboardPage: React.FC = () => {
         {accountsSummary && (
           <>
             {/* 6 Top Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-3 sm:mb-4">
               <button
                 onClick={() => navigate("/accounts/vouchers")}
                 className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
@@ -454,7 +454,7 @@ const DashboardPage: React.FC = () => {
                 <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.cashBankAccountCount} accounts</div>
               </button>
 
-              <div className="bg-card border border-line-soft rounded-lg p-3">
+              {/* <div className="bg-card border border-line-soft rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Stock Value</span>
                   <FaWarehouse className="text-cyan-500 text-xs" />
@@ -463,7 +463,7 @@ const DashboardPage: React.FC = () => {
                   ₹{Number(accountsSummary.stockValue).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                 </div>
                 <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.stockItemCount} items</div>
-              </div>
+              </div> */}
             </div>
 
             {/* Alerts + Recent Transactions — single 2-col row.
