@@ -340,14 +340,14 @@ const dashboardController = {
         alerts.push({
           level: "danger",
           message: `Total outstanding receivable: ₹${totalReceivable.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${customerLedgers.length} customers)`,
-          link: "/accounts/outstanding/receivable",
+          link: "/accounts/receivable",
         });
       }
       if (totalPayable > 0) {
         alerts.push({
           level: "danger",
           message: `Total outstanding payable: ₹${totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${supplierLedgers.length} suppliers)`,
-          link: "/accounts/outstanding/payable",
+          link: "/accounts/payable",
         });
       }
       if (draftVouchers > 0) {
@@ -362,7 +362,7 @@ const dashboardController = {
         alerts.push({
           level: "warn",
           message: `${zeroStockCount} raw material${zeroStockCount > 1 ? "s have" : " has"} zero stock — reorder needed`,
-          link: "/rawmaterials",
+          link: "/raw-materials",
         });
       }
       const negativeBankAccounts = bankLedgers.filter((l) => {
