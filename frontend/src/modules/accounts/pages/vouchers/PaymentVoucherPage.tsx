@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMoneyBillWave, FaPlus, FaSync, FaFilter } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -41,6 +41,7 @@ const PaymentVoucherPage: React.FC = () => {
   const [applied, setApplied] = useState<FilterOptions>(() => defaultFilters());
   const [pending, setPending] = useState<FilterOptions>(() => defaultFilters());
   const [panelOpen, setPanelOpen] = useState(true);
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
 
   // F2 = OK inside the filter panel (matches Busy shortcut).
   useEffect(() => {
@@ -84,6 +85,18 @@ const PaymentVoucherPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+
+  // Sum of all voucher totals — memoised to avoid re-summing on unrelated
+  // renders. MUST live above the early return below so hook order is stable
+  // between the "filter panel" and "list" branches.
+  const grandTotal = useMemo(
+    () =>
+      vouchers.reduce(
+        (s, v) => s + v.items.reduce((si, i) => si + Number(i.debitAmount || 0), 0),
+        0
+      ),
+    [vouchers]
+  );
 
   // ────── Busy-style pre-list filter dialog ──────
   if (panelOpen) {
@@ -170,11 +183,14 @@ const PaymentVoucherPage: React.FC = () => {
     );
   }
 
-  // ────── Payment Register (list) ──────
+  // ────── Payment Register (list) — Busy spreadsheet style ──────
+  // Column count for footer colSpan (Date + Vch + Mode? + Account = 3 or 4)
+  const preAmountCols = 2 + (applied.showPaidFrom ? 1 : 0) + 1;
+
   return (
-    <div className="p-3 space-y-3 min-h-screen">
+    <div className="p-3 space-y-2 w-full max-w-7xl">
       {/* Header bar */}
-      <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2">
+      <div className="bg-card rounded-md border border-line px-3 py-1.5 flex flex-wrap items-center gap-2 shadow-sm">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
           <FaMoneyBillWave className="text-red-500 text-sm" /> Payment Register
           {refreshing && <FaSync className="animate-spin text-red-500 text-[10px]" />}
@@ -197,7 +213,7 @@ const PaymentVoucherPage: React.FC = () => {
           </button>
           <button
             onClick={refresh}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line cursor-pointer"
           >
             <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
           </button>
@@ -210,33 +226,44 @@ const PaymentVoucherPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
-          <h2 className="text-xs font-semibold text-ink">Payment Vouchers</h2>
-          <span className="text-[11px] text-ink-subtle font-mono">Total: {total}</span>
-        </div>
-        {vouchers.length === 0 ? (
-          loading ? null : <div className="p-8 text-center text-xs text-ink-subtle">No payment vouchers found.</div>
+      {/* Spreadsheet-style table — Busy layout: fixed header/footer, only body
+         scrolls, empty filler rows fill the visible area when data is sparse. */}
+      <div
+        className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
+        style={{ height: "calc(100vh - 240px)" }}
+      >
+        {vouchers.length === 0 && !loading ? (
+          <div className="p-8 text-center text-xs text-ink-subtle">
+            No payment vouchers found in this date range.
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-ink-muted">
-              <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
-                <tr>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Vch/Bill No</th>
-                  {applied.showPaidFrom && <th className="px-3 py-2">Mode</th>}
-                  <th className="px-3 py-2">Account</th>
-                  {applied.showAmount && <th className="px-3 py-2 text-right">Amount (₹)</th>}
-                  {applied.showNarration && <th className="px-3 py-2">Narration</th>}
+          <div className="overflow-auto flex-1">
+            <table className="w-full text-left text-[11px] text-ink-muted border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-card-2 text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                  <th className="px-2 py-1.5 border-r border-line w-28">Date</th>
+                  <th className="px-2 py-1.5 border-r border-line w-24 text-center">Vch/Bill No</th>
+                  {applied.showPaidFrom && (
+                    <th className="px-2 py-1.5 border-r border-line w-48">Mode</th>
+                  )}
+                  <th className="px-2 py-1.5 border-r border-line">Account</th>
+                  {applied.showAmount && (
+                    <th className="px-2 py-1.5 border-r border-line w-32 text-right">Amount (₹)</th>
+                  )}
+                  {applied.showNarration && <th className="px-2 py-1.5">Narration</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line-soft">
-                {vouchers.map((v) => {
-                  const voucherTotal = v.items.reduce((s, i) => s + Number(i.debitAmount || 0), 0);
+              <tbody>
+                {vouchers.map((v, rowIdx) => {
+                  const voucherTotal = v.items.reduce(
+                    (s, i) => s + Number(i.debitAmount || 0),
+                    0
+                  );
                   const debitLabel = v.items
                     .map((i) =>
-                      applied.accountShownBy === "Code" ? i.debitLedger?.code : i.debitLedger?.name
+                      applied.accountShownBy === "Code"
+                        ? i.debitLedger?.code
+                        : i.debitLedger?.name
                     )
                     .filter(Boolean)
                     .join(", ");
@@ -244,42 +271,81 @@ const PaymentVoucherPage: React.FC = () => {
                     applied.accountShownBy === "Code"
                       ? v.items[0]?.creditLedger?.code
                       : v.items[0]?.creditLedger?.name;
+                  const isSelected = selectedRow === v.id;
                   return (
-                    <tr key={v.id} className="hover:bg-card-2 transition-colors">
-                      <td className="px-3 py-1.5 font-mono text-[11px]">
-                        {new Date(v.date).toLocaleDateString("en-IN")}
+                    <tr
+                      key={v.id}
+                      onClick={() => setSelectedRow(v.id)}
+                      className={`border-b border-line-soft cursor-pointer ${
+                        isSelected
+                          ? "bg-red-600/20 text-ink"
+                          : rowIdx % 2 === 0
+                            ? "hover:bg-card-2/70"
+                            : "bg-card-2/20 hover:bg-card-2/70"
+                      }`}
+                    >
+                      <td className="px-2 py-1 border-r border-line-soft font-mono text-[11px]">
+                        {new Date(v.date).toLocaleDateString("en-GB")}
                       </td>
-                      <td className="px-3 py-1.5 font-mono font-semibold text-red-500">{displayVoucherNo(v.voucherNo)}</td>
+                      <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-red-500 text-center">
+                        {displayVoucherNo(v.voucherNo)}
+                      </td>
                       {applied.showPaidFrom && (
-                        <td className="px-3 py-1.5 text-ink-muted">{creditLabel || "-"}</td>
+                        <td className="px-2 py-1 border-r border-line-soft text-ink-muted uppercase">
+                          {creditLabel || "-"}
+                        </td>
                       )}
-                      <td className="px-3 py-1.5 font-semibold text-ink">{debitLabel || "-"}</td>
+                      <td className="px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase">
+                        {debitLabel || "-"}
+                      </td>
                       {applied.showAmount && (
-                        <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
-                          ₹{voucherTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
+                          {voucherTotal.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
                       )}
                       {applied.showNarration && (
-                        <td className="px-3 py-1.5 text-ink-subtle max-w-xs truncate">{v.narration || "-"}</td>
+                        <td className="px-2 py-1 text-ink-subtle max-w-xs truncate">
+                          {v.narration || "-"}
+                        </td>
                       )}
                     </tr>
                   );
                 })}
+                {/* Busy-style empty filler rows so the grid always looks full.
+                   Number chosen to comfortably fill a typical viewport; if real
+                   data exceeds this, the tbody just scrolls further. */}
+                {Array.from({ length: Math.max(0, 25 - vouchers.length) }).map((_, i) => (
+                  <tr key={`empty-${i}`} className="border-b border-line-soft">
+                    <td className="px-2 py-1 border-r border-line-soft">&nbsp;</td>
+                    <td className="px-2 py-1 border-r border-line-soft"></td>
+                    {applied.showPaidFrom && (
+                      <td className="px-2 py-1 border-r border-line-soft"></td>
+                    )}
+                    <td className="px-2 py-1 border-r border-line-soft"></td>
+                    {applied.showAmount && (
+                      <td className="px-2 py-1 border-r border-line-soft"></td>
+                    )}
+                    {applied.showNarration && <td className="px-2 py-1"></td>}
+                  </tr>
+                ))}
               </tbody>
-              {vouchers.length > 0 && applied.showAmount && (
-                <tfoot className="border-t-2 border-line bg-card-2">
+              {applied.showAmount && (
+                <tfoot className="sticky bottom-0 z-10 bg-card-2 border-t-2 border-line">
                   <tr>
                     <td
-                      colSpan={applied.showPaidFrom ? 4 : 3}
-                      className="px-3 py-2 text-right text-[10px] font-bold text-ink uppercase tracking-wide"
+                      colSpan={preAmountCols}
+                      className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide border-r border-line"
                     >
                       Page Total ({vouchers.length})
                     </td>
-                    <td className="px-3 py-2 text-right font-bold text-sm text-ink font-mono">
-                      ₹
-                      {vouchers
-                        .reduce((s, v) => s + v.items.reduce((si, i) => si + Number(i.debitAmount || 0), 0), 0)
-                        .toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">
+                      {grandTotal.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     {applied.showNarration && <td></td>}
                   </tr>
@@ -288,6 +354,24 @@ const PaymentVoucherPage: React.FC = () => {
             </table>
           </div>
         )}
+
+        {/* Busy-style status bar */}
+        <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[10px] font-mono text-ink-subtle">
+          <div className="flex gap-4">
+            <span>
+              Entry No: <b className="text-ink">{vouchers.length > 0 ? 1 : 0} / {vouchers.length}</b>
+            </span>
+            <span>
+              Row No: <b className="text-ink">
+                {selectedRow ? vouchers.findIndex((v) => v.id === selectedRow) + 1 : (vouchers.length > 0 ? 1 : 0)}
+                {" / "}{vouchers.length}
+              </b>
+            </span>
+          </div>
+          <div className="flex gap-3 uppercase tracking-wide">
+            <span>Total: <b className="text-ink">{total}</b></span>
+          </div>
+        </div>
       </div>
     </div>
   );
