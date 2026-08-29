@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSocketSync } from "../../../hooks/useSocketSync";
-import dashboardService from "../../../services/dashboardService";
+import dashboardService, { type AccountsSummary } from "../../../services/dashboardService";
+import { useListCache } from "../../../hooks/useListCache";
 
 // Recharts
 import {
@@ -15,13 +17,14 @@ import {
   FaLayerGroup, FaBoxOpen, FaUsers, FaUserTie,
   FaShoppingCart, FaTruck, FaChartLine, FaClock,
   FaMoneyBillWave, FaCalendarAlt, FaHourglassHalf, FaUserFriends,
+  FaArrowUp, FaHandHoldingUsd, FaFileInvoiceDollar,
+  FaUniversity, FaWarehouse, FaCheckCircle, FaSync,
 } from "react-icons/fa";
 import { FiTrendingUp, FiTrendingDown, FiMoreVertical } from "react-icons/fi";
 
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import DashboardFooter from "../components/DashboardFooter";
 import { SparklineCard } from "../components/SparklineCard";
-import { Card } from "../components/Card";
 import SalesPurchaseTrendChart from "../components/SalesPurchaseTrendChart";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../../components/ui/chart";
 import { usePermission } from "../../../hooks/usePermission";
@@ -63,6 +66,7 @@ const inventoryChartConfig = {
    MAIN DASHBOARD
    ════════════════════════════════════════════════════════════════ */
 const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const { can, isSuperAdmin } = usePermission();
 
   // Dashboard widget visibility — super admin always sees everything
@@ -74,57 +78,75 @@ const DashboardPage: React.FC = () => {
   const showTopProducts  = isSuperAdmin || can("dash-top-products.view");
   const showRecentSales  = isSuperAdmin || can("dash-recent-sales.view");
 
-  const [loadingInitial, setLoadingInitial] = useState(true);
-
-  // All data from single API
-  const [salesOrders, setSalesOrders] = useState<any[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
-  const [productionOrders, setProductionOrders] = useState<any[]>([]);
-  const [dailyPlans, setDailyPlans] = useState<any[]>([]);
-  const [finishedGoodsStocks, setFinishedGoodsStocks] = useState<any[]>([]);
-  const [rawMaterialStocks, setRawMaterialStocks] = useState<any[]>([]);
-  const [machines, setMachines] = useState<any[]>([]);
-  const [weeklyPrograms, setWeeklyPrograms] = useState<any[]>([]);
-  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
-  const [productsCount, setProductsCount] = useState(0);
-  const [employeesCount, setEmployeesCount] = useState(0);
-  const [salesInvoices, setSalesInvoices] = useState<any[]>([]);
-
-  // ── Single Dashboard API ────────────────────────────────────
-  const loadDashboard = useCallback(async () => {
-    setLoadingInitial(true);
-    try {
-      const data = await dashboardService.getSummary();
-      setSalesOrders(data.salesOrders || []);
-      setPurchaseOrders(data.purchaseOrders || []);
-      setProductionOrders(data.productionOrders || []);
-      setDailyPlans(data.dailyPlans || []);
-      setFinishedGoodsStocks(data.finishedGoodsStocks || []);
-      setRawMaterialStocks(data.rawMaterialStocks || []);
-      setMachines(data.machines || []);
-      setWeeklyPrograms(data.weeklyPrograms || []);
-      setRawMaterials(data.rawMaterials || []);
-      setProductsCount(data.productsCount || 0);
-      setEmployeesCount(data.employeesCount || 0);
-      setSalesInvoices(data.salesInvoices || []);
-    } catch (e) {
-      console.error("Dashboard load error", e);
-    } finally {
-      setLoadingInitial(false);
-    }
+  // ─────────────────────────────────────────────────────────────
+  //  DASHBOARD SUMMARY — cache-first (no full-page Loading spinner)
+  //  Same pattern used across all accounts pages: cached data shows
+  //  instantly on repeat visits, silent background refetch keeps it fresh,
+  //  socket events invalidate and refetch in the background.
+  // ─────────────────────────────────────────────────────────────
+  const dashboardFetcher = useCallback(async (_signal: AbortSignal) => {
+    const data = await dashboardService.getSummary();
+    return { data: [data], total: 1 };
   }, []);
 
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+  const dashboardCache = useListCache<any>({
+    cacheKey: "dashboard:summary",
+    socketModule: "salesOrder",
+    fetcher: dashboardFetcher,
+  });
+  const dashData = dashboardCache.data[0] || {};
+  const refreshDashboard = dashboardCache.refresh;
+
+  // Derive the individual arrays from the cached payload. Empty arrays fall
+  // through cleanly during cold-load; downstream useMemos handle that.
+  const salesOrders = dashData.salesOrders || [];
+  const purchaseOrders = dashData.purchaseOrders || [];
+  const productionOrders = dashData.productionOrders || [];
+  const dailyPlans = dashData.dailyPlans || [];
+  const finishedGoodsStocks = dashData.finishedGoodsStocks || [];
+  const rawMaterialStocks = dashData.rawMaterialStocks || [];
+  const machines = dashData.machines || [];
+  const weeklyPrograms = dashData.weeklyPrograms || [];
+  const rawMaterials = dashData.rawMaterials || [];
+  const productsCount = dashData.productsCount || 0;
+  const employeesCount = dashData.employeesCount || 0;
+  const salesInvoices = dashData.salesInvoices || [];
+  void rawMaterialStocks; // reserved for future use
 
   // ── Real-time socket refresh on any relevant change ─────────
-  useSocketSync("salesOrder", undefined, loadDashboard);
-  useSocketSync("purchaseOrder", undefined, loadDashboard);
-  useSocketSync("productionOrder", undefined, loadDashboard);
-  useSocketSync("dailyPlan", undefined, loadDashboard);
-  useSocketSync("finishedGoodsStock", undefined, loadDashboard);
-  useSocketSync("rawMaterialStock", undefined, loadDashboard);
+  useSocketSync("purchaseOrder", undefined, refreshDashboard);
+  useSocketSync("productionOrder", undefined, refreshDashboard);
+  useSocketSync("dailyPlan", undefined, refreshDashboard);
+  useSocketSync("finishedGoodsStock", undefined, refreshDashboard);
+  useSocketSync("rawMaterialStock", undefined, refreshDashboard);
+
+  // ─────────────────────────────────────────────────────────────
+  //  ACCOUNTS SUMMARY — 6 top cards + Alerts + Recent Transactions
+  //  Uses useListCache so it is auto-tracked by the global prefetch
+  //  progress bar and gets prefetched on app boot. Multiple socket
+  //  listeners keep it fresh in realtime as vouchers are posted.
+  // ─────────────────────────────────────────────────────────────
+  const accountsSummaryFetcher = useCallback(async (_signal: AbortSignal) => {
+    const summary = await dashboardService.getAccountsSummary();
+    return { data: [summary], total: 1 };
+  }, []);
+
+  const accountsSummaryCache = useListCache<AccountsSummary>({
+    cacheKey: "accounts:dashboard-summary",
+    socketModule: "voucher",
+    fetcher: accountsSummaryFetcher,
+  });
+  const accSummaryList = accountsSummaryCache.data;
+  const isSyncingAccounts = accountsSummaryCache.refreshing;
+  const refreshAccountsSummary = accountsSummaryCache.refresh;
+  const accountsSummary = accSummaryList[0] || null;
+
+  useSocketSync("payment", undefined, refreshAccountsSummary);
+  useSocketSync("journalItem", undefined, refreshAccountsSummary);
+  useSocketSync("accountLedger", undefined, refreshAccountsSummary);
+  useSocketSync("salesInvoice", undefined, refreshAccountsSummary);
+  useSocketSync("grnInvoice", undefined, refreshAccountsSummary);
+  useSocketSync("pettyCashEntry", undefined, refreshAccountsSummary);
 
   /* ─── DERIVED DATA ────────────────────────────────────────── */
   const safe = (d: any) => (Array.isArray(d) ? d : []);
@@ -327,44 +349,240 @@ const DashboardPage: React.FC = () => {
       .slice(0, 5);
   }, [salesOrders]);
 
-  const loading = loadingInitial;
-
   /* ═══════════════ RENDER ═══════════════ */
+  // Cache-first render: no full-page CommonLoader anymore. On first cold visit
+  // cards may briefly show ₹0 / empty until the background fetch resolves.
+  // On repeat visits data appears instantly from cache. The "Syncing…" pill in
+  // the header signals when a silent background refresh is in flight.
   return (
-    <div className="bg-page min-h-screen">
-      {loading && <CommonLoader text="Loading ..." />}
+    <div className="bg-page flex flex-col min-h-0" style={{ height: "calc(100vh - 100px)" }}>
 
-      <div className="w-full px-2 py-3 sm:px-6 sm:py-6 lg:px-8">
-
-        {/* ── HEADER ──────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-2 sm:gap-3">
-          <div>
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black tracking-tight text-ink">Dashboard</h1>
-            <p className="text-ink-muted text-xs sm:text-sm mt-0.5 sm:mt-1 font-medium">Complete overview of all ERP modules</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="bg-card border border-line-soft text-ink text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl shadow-xs hover:bg-card-2 transition-colors flex items-center gap-1.5 sm:gap-2">
-              Overview
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-            </button>
-          </div>
+      {/* ── FIXED HEADER ────────────────────────────────────── */}
+      <div className="shrink-0   px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-2">
+        <div>
+          <h1 className="text-base sm:text-lg lg:text-xl font-black tracking-tight text-ink">Dashboard</h1>
         </div>
+        <div className="flex items-center gap-2">
+          {isSyncingAccounts && (
+            <span className="flex items-center gap-1 text-[10px] text-blue-500">
+              <FaSync className="animate-spin" /> Syncing…
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── SCROLLABLE MAIN CONTENT ─────────────────────────── */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-2 py-3 sm:px-6 sm:py-4 lg:px-8">
 
         {/* ══════════════════════════════════════════════════════
-           ROW 1  –  Top Sparkline Stats (5 cards across)
+           ROW 0  –  ACCOUNTS SUMMARY (Busy-style)
+           6 stat cards + Quick Actions + Alerts + Recent Txns
            ══════════════════════════════════════════════════════ */}
+        {accountsSummary && (
+          <>
+            {/* 6 Top Stat Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <button
+                onClick={() => navigate("/accounts/vouchers")}
+                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Sales</span>
+                  <FaArrowUp className="text-emerald-500 text-xs" />
+                </div>
+                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
+                  ₹{Number(accountsSummary.totalSales).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.salesVoucherCount} vouchers</div>
+              </button>
 
+              <button
+                onClick={() => navigate("/invoice")}
+                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Purchase</span>
+                  <FaCheckCircle className="text-blue-500 text-xs" />
+                </div>
+                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
+                  ₹{Number(accountsSummary.totalPurchase).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.purchaseVoucherCount} vouchers</div>
+              </button>
 
-        {/* ══ ROW 1 – Top Stat Cards ══ */}
-        {showOverview && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
-            <SparklineCard title="Last Month Income" value={`₹${topStats.lastMonthRevenue.toLocaleString()}`} icon={FaCalendarAlt} iconBg="" gradient="bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700" />
-            <SparklineCard title="Total Income" value={`₹${topStats.totalRevenue.toLocaleString()}`} icon={FaMoneyBillWave} iconBg="" gradient="bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600" />
-            <SparklineCard title="Customers" value={topStats.uniqueCustomers} icon={FaUserFriends} iconBg="" gradient="bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
-            <SparklineCard title="Pending Amount" value={`₹${topStats.pendingAmount.toLocaleString()}`} icon={FaHourglassHalf} iconBg="" gradient="bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-500" />
-            <SparklineCard title="Products" value={topStats.products} icon={FaBoxOpen} iconBg="" gradient="bg-gradient-to-br from-rose-400 via-pink-500 to-fuchsia-600" />
-          </div>
+              <button
+                onClick={() => navigate("/accounts/receivable")}
+                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Receivable</span>
+                  <FaHandHoldingUsd className="text-amber-500 text-xs" />
+                </div>
+                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalReceivable < 0 ? "text-emerald-500" : "text-ink"}`}>
+                  ₹{Math.abs(accountsSummary.totalReceivable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  {accountsSummary.totalReceivable < 0 && <span className="text-[10px] ml-1">Cr</span>}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.receivableCustomerCount} customers</div>
+              </button>
+
+              <button
+                onClick={() => navigate("/accounts/payable")}
+                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Payable</span>
+                  <FaFileInvoiceDollar className="text-rose-500 text-xs" />
+                </div>
+                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalPayable < 0 ? "text-emerald-500" : "text-ink"}`}>
+                  ₹{Math.abs(accountsSummary.totalPayable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  {accountsSummary.totalPayable < 0 && <span className="text-[10px] ml-1">Dr</span>}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.payableSupplierCount} suppliers</div>
+              </button>
+
+              <button
+                onClick={() => navigate("/accounts/bank-accounts")}
+                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Cash / Bank</span>
+                  <FaUniversity className="text-indigo-500 text-xs" />
+                </div>
+                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
+                  ₹{(accountsSummary.totalCashInHand + accountsSummary.totalBankBalance).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.cashBankAccountCount} accounts</div>
+              </button>
+
+              <div className="bg-card border border-line-soft rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Stock Value</span>
+                  <FaWarehouse className="text-cyan-500 text-xs" />
+                </div>
+                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
+                  ₹{Number(accountsSummary.stockValue).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.stockItemCount} items</div>
+              </div>
+            </div>
+
+            {/* Alerts + Recent Transactions — single 2-col row.
+                Each card has fixed header (+ footer for txns) with scrollable body. */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4" style={{ height: "340px" }}>
+              {/* Alerts (1 col) — each alert is a separate scrollable row.
+                  Clickable → redirects to the relevant page (Outstanding, Day
+                  Book, Bank Accounts, etc.) based on the alert's link. */}
+              <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+                <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                  <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Alerts</div>
+                  {accountsSummary.alerts.length > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/30">
+                      {accountsSummary.alerts.length}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1.5">
+                  {accountsSummary.alerts.length === 0 ? (
+                    <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
+                      <FaCheckCircle className="text-emerald-500 text-[10px]" /> All good, no alerts
+                    </div>
+                  ) : (
+                    accountsSummary.alerts.map((a, i) => {
+                      const styles = a.level === "danger"
+                        ? "bg-rose-500/10 border-rose-500/20 text-rose-500 hover:bg-rose-500/15"
+                        : a.level === "warn"
+                        ? "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/15"
+                        : "bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/15";
+                      const dot = a.level === "danger" ? "bg-rose-500"
+                        : a.level === "warn" ? "bg-amber-500"
+                        : "bg-blue-500";
+                      const content = (
+                        <>
+                          <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${dot}`}></span>
+                          <span className="flex-1 text-left">{a.message}</span>
+                          {a.link && <span className="shrink-0 text-[10px] opacity-70">→</span>}
+                        </>
+                      );
+                      return a.link ? (
+                        <button
+                          key={i}
+                          onClick={() => navigate(a.link!)}
+                          className={`w-full flex items-start gap-2 px-2 py-1.5 rounded text-[11px] border transition-colors cursor-pointer ${styles}`}
+                        >
+                          {content}
+                        </button>
+                      ) : (
+                        <div key={i}
+                          className={`flex items-start gap-2 px-2 py-1.5 rounded text-[11px] border ${styles}`}>
+                          {content}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Transactions (2 cols) */}
+              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+                <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                  <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Transactions</div>
+                  <button onClick={() => navigate("/accounts/ledger-statement")} className="text-[11px] font-semibold text-blue-500 hover:underline">
+                    View Ledger Statement →
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto">
+                  {accountsSummary.recentTransactions.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
+                  ) : (
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3 py-1.5 bg-card-2">Voucher No</th>
+                          <th className="px-3 py-1.5 bg-card-2">Type</th>
+                          <th className="px-3 py-1.5 bg-card-2">Party / Account</th>
+                          <th className="px-3 py-1.5 bg-card-2">Date</th>
+                          <th className="px-3 py-1.5 bg-card-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line-soft">
+                        {accountsSummary.recentTransactions.map((t) => {
+                          const typeColor: Record<string, string> = {
+                            SALES: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                            PURCHASE: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                            RECEIPT: "bg-green-500/10 text-green-500 border-green-500/20",
+                            PAYMENT: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+                            JOURNAL: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                            CONTRA: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+                          };
+                          const party = t.debitLedger || t.creditLedger || t.narration || "-";
+                          return (
+                            <tr key={t.id} className="hover:bg-card-2 transition-colors">
+                              <td className="px-3 py-1.5 font-mono font-semibold text-blue-500 whitespace-nowrap">{t.voucherNo}</td>
+                              <td className="px-3 py-1.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
+                                  {t.type}
+                                </span>
+                              </td>
+                              <td className="px-3 py-1.5 text-ink truncate max-w-[200px]">{party}</td>
+                              <td className="px-3 py-1.5 font-mono text-[11px] text-ink-muted whitespace-nowrap">
+                                {new Date(t.date).toLocaleDateString("en-IN")}
+                              </td>
+                              <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
+                                ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
         )}
+
+        {/* Old sparkline stats row removed — replaced by the 6 accounts cards above. */}
 
         {/* ══════════════════════════════════════════════════════
            ROW 2.5  –  Trend Chart (Full Width)
@@ -380,206 +598,132 @@ const DashboardPage: React.FC = () => {
         )}
 
         {/* ══════════════════════════════════════════════════════
-           ROW 2b  –  Today's Tasks | Inventory Doughnut
+           BOTTOM ROW  –  Today's Tasks | Top Products | Recent Sales
+           Single 3-col row. Each widget has fixed header + scrollable body.
            ══════════════════════════════════════════════════════ */}
-        {(showTasks || showInventory) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-5 mb-4 sm:mb-6">
-          {/* Today's Tasks List */}
-          {showTasks && <Card title="Today's Tasks" badge="Live" className="min-h-[240px] sm:min-h-[340px]">
-            <div className="flex flex-col gap-4 h-full">
-              {todayStats.tasksList.length > 0 ? (
-                todayStats.tasksList.map((task: any, i: number) => {
-                  const linkedPo = safe(productionOrders).find((po: any) => po.productionOrderId === task.productionOrderId || po.id === task.productionOrderId);
-                  const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
-                  const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
-                  const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "No Shift";
+        {(showTasks || showTopProducts || showRecentSales) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ height: "340px" }}>
 
-                  return (
-                    <div key={i} className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-card-2 border border-line-soft hover:bg-card hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer">
-                      <div className="flex items-center gap-2.5 sm:gap-4">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shadow-sm bg-gradient-to-br from-indigo-500 to-purple-600 text-white group-hover:scale-110 transition-transform duration-300">
-                          <FaCalendarCheck className="text-xs sm:text-base" />
+          {/* Today's Tasks */}
+          {showTasks && (
+            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Today's Tasks</div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 uppercase">Live</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                {todayStats.tasksList.length > 0 ? (
+                  todayStats.tasksList.map((task: any, i: number) => {
+                    const linkedPo = safe(productionOrders).find((po: any) => po.productionOrderId === task.productionOrderId || po.id === task.productionOrderId);
+                    const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
+                    const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
+                    const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "No Shift";
+                    return (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors group cursor-pointer">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                            <FaCalendarCheck className="text-xs" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="block text-[11px] font-bold text-ink truncate">{machineName}</span>
+                            <span className="text-[10px] font-medium text-ink-muted truncate block">{productName} · {shiftName}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="block text-[11px] sm:text-[13px] font-bold text-ink group-hover:text-accent transition-colors">
-                            {machineName}
-                          </span>
-                          <span className="text-[9px] sm:text-[11px] font-medium text-ink-muted">
-                            {productName} • {shiftName}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[9px] sm:text-[11px] font-black px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        <span className="shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                           {task.status || "SCHEDULED"}
                         </span>
                       </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-slate-300 flex-1">
-                  <FaCalendarCheck size={48} className="mb-4 opacity-20" />
-                  <p className="text-[13px] font-semibold text-slate-400">No tasks scheduled for today</p>
-                  <p className="text-[11px] text-slate-400 mt-1">Schedules added for today will appear here</p>
-                </div>
-              )}
-            </div>
-          </Card>}
-
-          {/* Inventory Doughnut */}
-          {showInventory && <Card title="Stock by Store" badge="Raw Materials">
-            <div className="flex flex-col items-center justify-center h-[160px] sm:h-[200px] relative">
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span className="text-[9px] sm:text-[11px] font-bold text-ink-subtle uppercase tracking-widest">Items</span>
-                <span className="text-xl sm:text-[28px] font-black text-ink leading-none">
-                  {inventoryData.length === 1 && inventoryData[0].name === "No Stock" ? 0 : inventoryData.length}
-                </span>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-ink-subtle">
+                    <FaCalendarCheck size={36} className="mb-2 opacity-20" />
+                    <p className="text-[12px] font-semibold">No tasks scheduled for today</p>
+                    <p className="text-[10px] mt-0.5">Schedules for today will appear here</p>
+                  </div>
+                )}
               </div>
-              <ChartContainer config={inventoryChartConfig} className="w-full h-full pb-0 [&_.recharts-pie-label-text]:fill-foreground">
-                <PieChart>
-                  <Pie data={inventoryData} cx="50%" cy="50%" innerRadius="65%" outerRadius="85%" paddingAngle={4} dataKey="value" nameKey="name" stroke="none" isAnimationActive={false}>
-                    {inventoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie>
-                  <ChartTooltip 
-                    cursor={false} 
-                    content={
-                      <ChartTooltipContent 
-                        hideLabel 
-                        formatter={(value: any, name: any, item: any, index: any, payload: any) => (
-                          <>
-                            <div
-                              className="shrink-0 rounded-[2px] h-2.5 w-2.5"
-                              style={{ backgroundColor: payload?.color || item?.color }}
-                            />
-                            <div className="flex flex-1 justify-between leading-none gap-4 items-center">
-                              <div className="flex flex-col gap-1">
-                                <span className="text-ink font-bold">{name}</span>
-                                <span className="text-ink-subtle text-[11px] font-semibold">{payload?.products}</span>
-                              </div>
-                              <span className="text-ink font-mono font-bold tabular-nums ml-2">
-                                {payload?.displayValue || value}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      />
-                    } 
-                  />
-                </PieChart>
-              </ChartContainer>
             </div>
-            <div className="flex flex-row flex-wrap justify-center gap-x-3 sm:gap-x-4 gap-y-1.5 sm:gap-y-2 px-2 mt-2">
-              {inventoryData.map((item, i) => (
-                <div key={i} className="flex items-center p-1.5 sm:p-2 rounded-lg hover:bg-card-2 transition-colors">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></div>
-                    <span className="text-[10px] sm:text-[13px] font-bold text-ink">{item.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>}
-        </div>
-        )}
+          )}
 
-        {/* ══════════════════════════════════════════════════════
-           ROW 3  –  Machine Utilization | Top Products | Recent Sales
-           ══════════════════════════════════════════════════════ */}
-        {(showMachines || showTopProducts || showRecentSales) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-5 mb-4 sm:mb-6">
-
-          {/* Machine Utilization */}
-          {showMachines && <Card title="Machine Overview" badge="Live">
-            <div className="flex flex-col gap-2 sm:gap-3">
-              {machineList.length === 0 ? (
-                <div className="flex items-center justify-center py-6 sm:py-8 text-slate-400 text-xs sm:text-sm font-medium">No Machines</div>
-              ) : (
-                machineList.map((mac, i) => (
-                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 border border-line-soft transition-all duration-200">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shadow-sm ${mac.status === "Active" ? "bg-emerald-400 shadow-emerald-200" : "bg-slate-300"}`}></div>
-                      <span className="text-[10px] sm:text-[12px] font-bold text-ink">{mac.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border ${
-                        mac.status === "Active"
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                          : "bg-slate-800 text-slate-400 border-slate-700"
-                      }`}>{mac.status}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>}
-
-          {/* Top Products List */}
-          {showTopProducts && <Card title="Top Products" badge="By stock level" className="min-h-[260px] sm:min-h-[370px]">
-            <div className="flex flex-col gap-2 sm:gap-3">
-              {topProducts.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-ink-muted text-sm font-medium">No Products</div>
-              ) : (
-                topProducts.map((prod: any, i: number) => {
-                  const maxVal = topProducts[0]?.value || 1;
-                  const pct = Math.min((prod.value / maxVal) * 100, 100);
-                  const barColors = [
-                    "from-violet-500 to-indigo-500",
-                    "from-sky-400 to-blue-500",
-                    "from-emerald-400 to-teal-500",
-                    "from-amber-400 to-orange-500",
-                    "from-rose-400 to-pink-500",
-                    "from-fuchsia-400 to-purple-500",
-                    "from-cyan-400 to-sky-500",
-                  ];
-                  return (
-                    <div key={i} className="flex flex-col gap-1.5">
-                      <div className="flex justify-between items-end">
-                        <span className="text-[10px] sm:text-[12px] font-semibold text-ink-muted truncate max-w-[100px] sm:max-w-[140px]">{prod.name}</span>
-                        <span className="text-[10px] sm:text-[12px] font-bold text-ink">{prod.value.toLocaleString()}</span>
+          {/* Top Products */}
+          {showTopProducts && (
+            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Top Products</div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-500 border border-teal-500/30 uppercase">By stock</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                {topProducts.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
+                ) : (
+                  topProducts.map((prod: any, i: number) => {
+                    const maxVal = topProducts[0]?.value || 1;
+                    const pct = Math.min((prod.value / maxVal) * 100, 100);
+                    const barColors = [
+                      "from-violet-500 to-indigo-500",
+                      "from-sky-400 to-blue-500",
+                      "from-emerald-400 to-teal-500",
+                      "from-amber-400 to-orange-500",
+                      "from-rose-400 to-pink-500",
+                      "from-fuchsia-400 to-purple-500",
+                      "from-cyan-400 to-sky-500",
+                    ];
+                    return (
+                      <div key={i} className="flex flex-col gap-1">
+                        <div className="flex justify-between items-end">
+                          <span className="text-[11px] font-semibold text-ink-muted truncate max-w-[140px]">{prod.name}</span>
+                          <span className="text-[11px] font-bold text-ink whitespace-nowrap">{prod.value.toLocaleString()}</span>
+                        </div>
+                        <div className="w-full bg-line-soft rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full bg-gradient-to-r ${barColors[i % barColors.length]} transition-all duration-700`}
+                            style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
-                      <div className="w-full bg-line-soft rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full bg-gradient-to-r ${barColors[i % barColors.length]} transition-all duration-700`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </Card>}
+          )}
 
           {/* Recent Sales Orders */}
-          {showRecentSales && <Card title="Recent Sales Orders" badge="Latest 5">
-            <div className="flex flex-col gap-2 sm:gap-3">
-              {recentSales.length === 0 ? (
-                <div className="flex items-center justify-center py-6 sm:py-8 text-ink-muted text-xs sm:text-sm font-medium">No Sales Orders</div>
-              ) : (
-                recentSales.map((so: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 border border-line-soft transition-all duration-200">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] sm:text-[12px] font-bold text-ink">{so.orderNo || `SO-${so.id}`}</span>
-                      <span className="text-[8px] sm:text-[10px] font-medium text-ink-muted">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
+          {showRecentSales && (
+            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Sales Orders</div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/30 uppercase">Latest 5</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                {recentSales.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Sales Orders</div>
+                ) : (
+                  recentSales.map((so: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-lg px-3 py-2 border border-line-soft transition-colors">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[11px] font-bold text-ink truncate">{so.orderNo || `SO-${so.id}`}</span>
+                        <span className="text-[10px] font-medium text-ink-muted truncate">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5 shrink-0">
+                        <span className="text-[11px] font-black text-ink whitespace-nowrap">₹{Number(so.netAmount || 0).toLocaleString("en-IN")}</span>
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${
+                          so.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                          so.status === "CANCELLED" ? "bg-rose-500/20 text-rose-300 border-rose-500/30" :
+                          "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                        }`}>{(so.status || "DRAFT").replace(/_/g, " ")}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-0.5 sm:gap-1">
-                      <span className="text-[11px] sm:text-[13px] font-black text-ink">₹{Number(so.netAmount || 0).toLocaleString()}</span>
-                      <span className={`text-[7px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border ${
-                        so.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
-                        so.status === "CANCELLED" ? "bg-rose-500/20 text-rose-300 border-rose-500/30" :
-                        "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                      }`}>{(so.status || "DRAFT").replace(/_/g, " ")}</span>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </Card>}
+          )}
         </div>
         )}
+      </div>
 
-        {/* Footer */}
+      {/* ── FIXED FOOTER ────────────────────────────────────── */}
+      <div className="shrink-0">
         <DashboardFooter />
       </div>
     </div>

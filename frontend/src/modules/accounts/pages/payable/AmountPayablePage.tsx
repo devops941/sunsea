@@ -51,7 +51,7 @@ export const AmountPayablePage: React.FC = () => {
     "debit",
     "credit",
     "netBalance",
-    "dueDays",
+    // "dueDays",
     "action"
   ];
 

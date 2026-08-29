@@ -184,20 +184,37 @@ const BalanceSheetPage: React.FC = () => {
               <tbody className="divide-y divide-line-soft">
                 {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([gname, gitems]) => {
                   const gtotal = gitems.reduce((s, i) => s + i.balance, 0);
+                  // Profit & Loss row: green if profit (positive), red if loss (negative)
+                  const isPnlGroup = /profit.*loss|net profit/i.test(gname);
+                  const gtotalClass = isPnlGroup
+                    ? (gtotal >= 0 ? "text-emerald-500" : "text-red-500")
+                    : "text-ink";
                   return (
                     <React.Fragment key={gname}>
                       {activeConfig.layout === "hierarchical" && (
                         <tr className="bg-card-2/60">
-                          <td className="px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-ink">{gname}</td>
-                          <td className="px-3 py-1 text-right text-[11px] font-mono font-bold text-ink">₹{fmt(gtotal)}</td>
+                          <td className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${isPnlGroup ? gtotalClass : "text-ink"}`}>{gname}</td>
+                          <td className={`px-3 py-1 text-right text-[11px] font-mono font-bold ${gtotalClass}`}>
+                            {isPnlGroup && gtotal < 0 ? "-" : ""}₹{fmt(Math.abs(gtotal))}
+                          </td>
                         </tr>
                       )}
-                      {gitems.map((it) => (
-                        <tr key={it.code} className="hover:bg-card-2 transition-colors">
-                          <td className={`py-1 text-xs text-ink ${activeConfig.layout === "hierarchical" ? "pl-6 pr-3" : "px-3"}`}>{it.name}</td>
-                          <td className="px-3 py-1 text-right text-xs font-mono text-ink">₹{fmt(it.balance)}</td>
-                        </tr>
-                      ))}
+                      {gitems.map((it) => {
+                        const isPnlItem = /net profit|profit.*loss/i.test(it.name || "") || it.code === "NET-PNL";
+                        const itClass = isPnlItem
+                          ? (it.balance >= 0 ? "text-emerald-500" : "text-red-500")
+                          : "text-ink";
+                        return (
+                          <tr key={it.code} className="hover:bg-card-2 transition-colors">
+                            <td className={`py-1 text-xs ${itClass} ${activeConfig.layout === "hierarchical" ? "pl-6 pr-3" : "px-3"}`}>
+                              {isPnlItem ? (it.balance >= 0 ? "Net Profit" : "Net Loss") : it.name}
+                            </td>
+                            <td className={`px-3 py-1 text-right text-xs font-mono ${itClass}`}>
+                              {isPnlItem && it.balance < 0 ? "-" : ""}₹{fmt(Math.abs(it.balance))}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </React.Fragment>
                   );
                 })}
@@ -229,10 +246,18 @@ const BalanceSheetPage: React.FC = () => {
             <tbody className="divide-y divide-line-soft">
               {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([gname, gitems]) => {
                 const gtotal = gitems.reduce((s, i) => s + i.balance, 0);
+                // Profit & Loss row: green if profit, red if loss
+                const isPnl = /profit.*loss|net profit/i.test(gname);
+                const cls = isPnl
+                  ? (gtotal >= 0 ? "text-emerald-500 font-bold" : "text-red-500 font-bold")
+                  : "text-ink";
+                const label = isPnl ? (gtotal >= 0 ? "Profit & Loss (Net Profit)" : "Profit & Loss (Net Loss)") : gname;
                 return (
                   <tr key={gname} className="hover:bg-card-2 transition-colors">
-                    <td className="px-3 py-1.5 text-xs font-semibold text-ink">{gname}</td>
-                    <td className="px-3 py-1.5 text-right text-xs font-mono text-ink">₹{fmt(gtotal)}</td>
+                    <td className={`px-3 py-1.5 text-xs font-semibold ${cls}`}>{label}</td>
+                    <td className={`px-3 py-1.5 text-right text-xs font-mono ${cls}`}>
+                      {isPnl && gtotal < 0 ? "-" : ""}₹{fmt(Math.abs(gtotal))}
+                    </td>
                   </tr>
                 );
               })}
@@ -272,20 +297,30 @@ const BalanceSheetPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {all.map((it) => (
-                <tr key={`${it.section}-${it.code}`} className="hover:bg-card-2/50 border-b border-line-soft">
-                  <td className="px-3 py-1 text-xs text-ink">{it.name}</td>
-                  <td className="px-3 py-1 text-[11px]">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                      it.section === "Asset" ? "bg-blue-500/10 text-blue-500" :
-                      it.section === "Liability" ? "bg-red-500/10 text-red-500" :
-                      "bg-purple-500/10 text-purple-500"
-                    }`}>{it.section}</span>
-                  </td>
-                  <td className="px-3 py-1 text-[11px] text-ink-muted">{it.group}</td>
-                  <td className="px-3 py-1 text-right text-xs font-mono text-ink">₹{fmt(it.balance)}</td>
-                </tr>
-              ))}
+              {all.map((it) => {
+                const isPnl = /net profit|profit.*loss/i.test(it.name || "") || it.code === "NET-PNL";
+                const cls = isPnl
+                  ? (it.balance >= 0 ? "text-emerald-500 font-bold" : "text-red-500 font-bold")
+                  : "text-ink";
+                return (
+                  <tr key={`${it.section}-${it.code}`} className="hover:bg-card-2/50 border-b border-line-soft">
+                    <td className={`px-3 py-1 text-xs ${cls}`}>
+                      {isPnl ? (it.balance >= 0 ? "Net Profit" : "Net Loss") : it.name}
+                    </td>
+                    <td className="px-3 py-1 text-[11px]">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                        it.section === "Asset" ? "bg-blue-500/10 text-blue-500" :
+                        it.section === "Liability" ? "bg-red-500/10 text-red-500" :
+                        "bg-purple-500/10 text-purple-500"
+                      }`}>{it.section}</span>
+                    </td>
+                    <td className="px-3 py-1 text-[11px] text-ink-muted">{it.group}</td>
+                    <td className={`px-3 py-1 text-right text-xs font-mono ${cls}`}>
+                      {isPnl && it.balance < 0 ? "-" : ""}₹{fmt(Math.abs(it.balance))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

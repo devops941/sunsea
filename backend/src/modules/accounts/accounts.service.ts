@@ -514,13 +514,41 @@ class AccountsService {
       console.error("[AccountsService] Sync unposted vouchers failed:", err);
     }
 
-    const ledgers = await prisma.accountLedger.findMany({
+    // First fetch the caller-supplied ledgers so we can detect aggregate parents.
+    const requestedLedgers = await prisma.accountLedger.findMany({
       where: { id: { in: ids } },
       include: { customer: true, supplier: true },
     });
-    if (ledgers.length === 0) {
+    if (requestedLedgers.length === 0) {
       throw new ApiError(404, "No matching ledgers found");
     }
+
+    // Aggregate expansion — if any requested ledger is an aggregate parent
+    // (Sundry Debtors / Sundry Creditors), swap it in for ALL its child party
+    // ledgers so their vouchers actually show up. Without this, selecting
+    // "Sundry Debtors" in "Selected Accounts" mode returns zero rows because
+    // the parent ledger itself has no direct journal items — all activity is
+    // on the individual customer/supplier ledgers under it.
+    const { AGGREGATE_LEDGER_CODES, expandAggregateLedger } = require("./standardLedgers");
+    const expandedIdSet = new Set<number>();
+    for (const l of requestedLedgers) {
+      if (AGGREGATE_LEDGER_CODES.has(l.code)) {
+        const expansion = await expandAggregateLedger(l, prisma);
+        expansion.ledgerIds.forEach((id: number) => expandedIdSet.add(id));
+      } else {
+        expandedIdSet.add(l.id);
+      }
+    }
+    const effectiveIds = Array.from(expandedIdSet);
+
+    // Refetch the full ledger set including expanded children (needed for
+    // opening-balance aggregation and running-balance calculation below).
+    const ledgers = effectiveIds.length === requestedLedgers.length
+      ? requestedLedgers
+      : await prisma.accountLedger.findMany({
+          where: { id: { in: effectiveIds } },
+          include: { customer: true, supplier: true },
+        });
 
     const dateFilter: Prisma.VoucherWhereInput = {};
     if (options.startDate || options.endDate) {
@@ -533,8 +561,8 @@ class AccountsService {
     const journalItems = await prisma.journalItem.findMany({
       where: {
         OR: [
-          { debitLedgerId: { in: ids } },
-          { creditLedgerId: { in: ids } },
+          { debitLedgerId: { in: effectiveIds } },
+          { creditLedgerId: { in: effectiveIds } },
         ],
         voucher: {
           ...dateFilter,
@@ -695,7 +723,7 @@ class AccountsService {
     return {
       mode: "multi" as const,
       label: options.label || `${ledgers.length} accounts`,
-      ledgerIds: ids,
+      ledgerIds: effectiveIds,
       ledgerCount: ledgers.length,
       startDate: options.startDate || null,
       endDate: options.endDate || null,
