@@ -14,7 +14,7 @@ import DataTable, { type DataTableColumn } from '../../../components/ui/table/Da
 import PayslipModal from '../components/PayslipModal';
 import FilterPopover from '../../../components/ui/FilterPopover/FilterPopover';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const MONTH_OPTIONS = [
   { value: 'ALL', label: 'All Months' },

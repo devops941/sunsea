@@ -16,7 +16,7 @@ import { usePermission } from "../../../hooks/usePermission";
 import DataTable from "../../../components/ui/table/DataTable";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 const SupplierList: React.FC = () => {
     const navigate = useNavigate();
     const { suppliers, loading, error, totalPages, loadSuppliers, removeSupplier } = useSuppliers();
@@ -109,7 +109,7 @@ const SupplierList: React.FC = () => {
     return (
         <div >
             <div className="">
-                <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>

@@ -15,7 +15,7 @@ import EditButton from "../../../../components/ui/EditButton/EditButton";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -106,7 +106,7 @@ const InvoiceList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>

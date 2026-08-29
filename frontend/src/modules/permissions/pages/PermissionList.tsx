@@ -13,7 +13,7 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { usePermissions } from "../../../hooks/usePermissions";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const PermissionList: React.FC = () => {
     const { permissions, loading, error, loadPermissions, addPermission, editPermission, removePermission } = usePermissions();

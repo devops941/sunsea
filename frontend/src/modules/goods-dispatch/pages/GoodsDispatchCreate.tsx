@@ -282,7 +282,7 @@ const GoodsDispatchCreate: React.FC = () => {
 
   return (
     <div className="w-full mx-auto p-4 md:p-6 min-h-screen space-y-6">
-      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
         <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

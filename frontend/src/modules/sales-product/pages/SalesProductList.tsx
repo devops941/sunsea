@@ -14,7 +14,7 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const SalesProductList: React.FC = () => {
     const navigate = useNavigate();
@@ -131,7 +131,7 @@ const SalesProductList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
                         <h2 className="text-2xl font-bold text-ink">Sales Product</h2>

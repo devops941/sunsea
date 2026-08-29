@@ -11,7 +11,7 @@ import { Outlet } from "react-router-dom";
  * The Bootstrap `Container fluid` that used to sit in here has been dropped:
  * its gutters stacked on top of `.inner-container`'s own padding and the
  * layout wrapper's, giving the table three nested gutters. Horizontal spacing
- * now comes solely from the max-w-[1600px] wrapper in BaseLayout.
+ * now comes solely from the max-w-[1024px] wrapper in BaseLayout.
  *
  * Only list/content pages sit under this route. Create/edit forms were never
  * inside a tab wrapper and stay full-width, exactly as before.

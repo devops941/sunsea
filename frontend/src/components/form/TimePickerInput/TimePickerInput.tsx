@@ -10,6 +10,8 @@ interface TimePickerInputProps {
   required?: boolean;
   error?: string;
   disabled?: boolean;
+  /** Place label and input side by side in one row */
+  horizontal?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -20,6 +22,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
   required = false,
   error,
   disabled = false,
+  horizontal = false,
   onChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -106,16 +109,17 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
   const displayValue = value ? `${hour}:${minute} ${period}` : "";
 
   return (
-    <div className="mb-[18px] group" ref={containerRef}>
+    <div className={`group ${horizontal ? "flex items-center gap-3" : ""}`} ref={containerRef}>
       {label && (
         <label
           className={`
-            flex items-center gap-[6px] mb-2
+            flex items-center gap-[6px]
             text-xs font-bold uppercase
             tracking-[0.5px]
             transition-colors duration-250
             ${error ? "text-red-500" : "text-ink-muted"}
             group-focus-within:text-primary
+            ${horizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}
           `}
         >
           <span>{label}</span>
@@ -123,7 +127,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
         </label>
       )}
 
-      <div className="relative">
+      <div className={`relative ${horizontal ? "flex-1" : ""}`}>
         <div
           className={`
             w-full h-10 px-4 flex items-center justify-between

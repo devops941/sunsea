@@ -29,7 +29,7 @@ const ProfilePage: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col sm:flex-row items-center gap-5 p-5 border-b border-line">
                     <div className="w-14 h-14 rounded-full border-[3px] border-indigo-400/40 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-violet-700 shadow-[0_0_30px_rgba(99,102,241,0.35)] shrink-0">

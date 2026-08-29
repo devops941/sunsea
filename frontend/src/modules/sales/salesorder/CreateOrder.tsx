@@ -667,22 +667,20 @@ const SalesOrderForm: React.FC = () => {
 
     // ─── Render ──────────────────────────────────────────────────────
     return (
-        <div className="w-full mx-auto h-full flex flex-col min-h-[calc(100vh-120px)]">
-            <div className="bg-card rounded-xl border border-line-soft shadow-xs flex-1 flex flex-col">
+        <div className="max-w-[1400px] xl:mr-auto">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <h2 className="text-xl font-bold text-ink flex items-start">
-                            {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
-                            <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("orderNo")}</span>
-                        </h2>
-                        <BackButton text="Back to List" />
-                    </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                    <h2 className="text-lg font-bold text-ink flex items-start">
+                        {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
+                        <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("orderNo")}</span>
+                    </h2>
+                    <BackButton text="Back to List" />
                 </div>
 
-                <form className="px-4 py-3 space-y-4 flex-1 flex flex-col" noValidate>
+                <form className="p-5 space-y-5" noValidate>
                     {/* ── Main Fields ── */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
                         <div>
                             <Controller name="customerId" control={control} render={({ field }) => (
                                 <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required searchable onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} error={errors.customerId?.message} />
@@ -764,7 +762,7 @@ const SalesOrderForm: React.FC = () => {
                     </div>
 
                     {/* ── Order Items ── */}
-                    <div className="lg:max-w-[1000px]">
+                    <div className="lg:max-w-[1024px]">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-semibold text-ink">Order Items</span>
                             <CustomButton
@@ -815,13 +813,14 @@ const SalesOrderForm: React.FC = () => {
                         )} />
                     </div>
 
-                    {/* ── Actions ── */}
-                    <div className="mt-auto flex justify-end gap-3 pt-4">
-                        <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
-                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
-                        <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
-                    </div>
                 </form>
+
+                {/* ── Actions ── */}
+                <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+                    <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
+                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
+                    <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
+                </div>
             </div>
         </div>
     );

@@ -473,7 +473,7 @@ const SalesOrderDetail: React.FC = () => {
 
     return (
         <div className="w-full mx-auto space-y-3">
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* ── Page Header ── */}
                 <div className="px-4 py-3 border-b border-line bg-card-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

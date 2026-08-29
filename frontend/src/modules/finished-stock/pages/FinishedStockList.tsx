@@ -23,7 +23,7 @@ const formatUom = (uomCode: string | undefined) => {
     return code;
 };
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 interface FinishedStockListProps {
     storeId?: string;
@@ -138,7 +138,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
 
     return (
         <div className="p-4 md:p-6 bg-card">
-            <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>

@@ -45,6 +45,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<any>(null);
@@ -154,6 +155,55 @@ const SelectInput: React.FC<SelectInputProps> = ({
     ? options.filter((opt) => toPlainText(opt.selectedLabel || opt.label).toLowerCase().includes(searchTerm.toLowerCase()))
     : options;
 
+  // Reset highlighted index when filtered options change
+  useEffect(() => {
+    if (isOpen) {
+      const currentIndex = filteredOptions.findIndex((o) => String(o.value) === String(value ?? ""));
+      setHighlightedIndex(currentIndex >= 0 ? currentIndex : 0);
+    }
+  }, [isOpen, searchTerm]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        updateDropdownPosition();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          let next = prev + 1;
+          while (next < filteredOptions.length && filteredOptions[next]?.disabled) next++;
+          return next < filteredOptions.length ? next : prev;
+        });
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          let next = prev - 1;
+          while (next >= 0 && filteredOptions[next]?.disabled) next--;
+          return next >= 0 ? next : prev;
+        });
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+          const opt = filteredOptions[highlightedIndex];
+          if (!opt.disabled) handleSelect(opt.value, opt.disabled);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        setIsOpen(false);
+        break;
+    }
+  };
+
   return (
     <div className={`${noMargin ? "" : "mb-0.5 "}group ${horizontal ? "flex items-center gap-3" : "flex flex-col"} w-full`} ref={wrapperRef}>
       {!hideLabel && (
@@ -211,6 +261,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
                 setIsOpen(true);
               }
             }}
+            onKeyDown={handleKeyDown}
             className={`
               w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
               border rounded-md outline-none
@@ -237,6 +288,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
                 setIsOpen(!isOpen);
               }
             }}
+            onKeyDown={handleKeyDown}
             className={`
               w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
               border rounded-md outline-none
@@ -288,9 +340,11 @@ const SelectInput: React.FC<SelectInputProps> = ({
                       px-4 py-2.5 text-sm cursor-pointer
                       transition-colors duration-150
                       ${option.disabled ? "opacity-50 cursor-not-allowed text-ink-subtle" : ""}
-                      ${value === option.value
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-ink hover:bg-card-2"
+                      ${index === highlightedIndex
+                        ? "bg-primary/20 text-primary font-semibold"
+                        : String(value) === String(option.value)
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-ink hover:bg-card-2"
                       }
                     `}
                   >

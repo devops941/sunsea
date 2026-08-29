@@ -14,7 +14,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import WastageViewModal from "../components/WastageViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const WastageList: React.FC = () => {
 
@@ -117,7 +117,7 @@ const WastageList: React.FC = () => {
 
   return (
     <div className="p-4 md:p-1">
-      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>

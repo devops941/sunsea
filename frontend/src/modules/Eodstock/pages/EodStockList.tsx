@@ -279,7 +279,7 @@ const EodStockList: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* ── Header ───────────────────────────────────────────────────────────── */}
         <div className="border-b border-line px-5 py-4">

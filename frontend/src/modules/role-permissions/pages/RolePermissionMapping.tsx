@@ -638,16 +638,16 @@ const RolePermissionMapping: React.FC = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[1600px] xl:mr-auto space-y-5">
+    <div className="max-w-[1024px] xl:mr-auto space-y-5">
       {/* ROLE SELECTOR */}
       <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-          <h2 className="text-xl font-bold text-ink">Role Permissions Matrix</h2>
-          <div className="flex items-center gap-3 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 px-4 py-2 rounded-xl border border-violet-500/20 shrink-0">
-            <FaShieldAlt className="text-violet-400 text-lg" />
+          <h2 className="text-lg font-bold text-ink">Role Permissions Matrix</h2>
+          <div className="flex items-center gap-2 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 px-3 py-1.5 rounded-lg border border-violet-500/20 shrink-0">
+            <FaShieldAlt className="text-violet-400 text-sm" />
             <div>
-              <div className="text-[10px] text-violet-300/80 font-semibold uppercase tracking-wider leading-none mb-1">Total Active</div>
-              <div className="text-xl font-extrabold text-violet-300 leading-none">{assignedIds.size}</div>
+              <div className="text-[9px] text-violet-300/80 font-semibold uppercase tracking-wider leading-none mb-0.5">Total Active</div>
+              <div className="text-lg font-extrabold text-violet-300 leading-none">{assignedIds.size}</div>
             </div>
           </div>
         </div>
@@ -667,11 +667,11 @@ const RolePermissionMapping: React.FC = () => {
               <FaSlidersH className="text-xl" />
             </div>
             <div>
-              <p className="text-sm font-bold text-ink mb-0.5">
+              <p className="text-xs font-bold text-ink mb-0.5">
                 Modifying Policy:{" "}
                 <span className="text-violet-400">{selectedRoleName || "—"}</span>
               </p>
-              <p className="text-xs text-ink-subtle leading-relaxed">
+              <p className="text-[10px] text-ink-subtle leading-relaxed">
                 Changes take effect immediately. Verify you are editing the correct role before modifying access levels.
               </p>
             </div>
@@ -687,7 +687,7 @@ const RolePermissionMapping: React.FC = () => {
         <div className="flex gap-5">
 
           {/* ── LEFT SIDEBAR ── */}
-          <div className="w-52 shrink-0 space-y-1.5">
+          <div className="w-44 shrink-0 space-y-1">
             {enrichedGroups.map(group => {
               const gs = SECTION_STYLE[group.colorId];
               const isActive = activeGroupId === group.id;
@@ -698,18 +698,18 @@ const RolePermissionMapping: React.FC = () => {
                 <button
                   key={group.id}
                   onClick={() => setActiveGroupId(group.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left text-sm font-medium transition-all duration-200 border ${isActive
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left text-xs font-medium transition-all duration-200 border ${isActive
                       ? `${gs.activeBg} text-white border-transparent shadow-lg ${gs.activeShadow} scale-[1.02]`
                       : "bg-card border-line hover:bg-card-2 hover:border-line-soft text-ink shadow-sm"
                     }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`text-sm shrink-0 ${isActive ? "text-white" : gs.iconClass}`}>
+                    <span className={`text-xs shrink-0 ${isActive ? "text-white" : gs.iconClass}`}>
                       {group.icon}
                     </span>
                     <span className="truncate text-xs font-semibold">{group.groupName}</span>
                   </div>
-                  <span className={`ml-1.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? gs.badgeActive : gs.badgeInactive
+                  <span className={`ml-1 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? gs.badgeActive : gs.badgeInactive
                     }`}>
                     {pct}%
                   </span>
@@ -724,9 +724,9 @@ const RolePermissionMapping: React.FC = () => {
               <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
 
                 {/* Panel header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-line bg-card-2/80">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-xl p-2 rounded-lg ${s.iconClass} bg-card border border-line-soft`}>{activeGroup.icon}</div>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-card-2/80">
+                  <div className="flex items-center gap-2">
+                    <div className={`text-base p-1.5 rounded-lg ${s.iconClass} bg-card border border-line-soft`}>{activeGroup.icon}</div>
                     <div>
                       <h3 className="font-bold text-ink text-sm">{activeGroup.groupName}</h3>
                       <p className="text-xs text-ink-muted">
@@ -752,18 +752,18 @@ const RolePermissionMapping: React.FC = () => {
 
                 {/* Matrix table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[580px]">
+                  <table className="w-full text-xs min-w-[500px]">
                     <thead>
                       <tr className="border-b border-line bg-card-2/60">
-                        <th className="text-left py-3 px-5 text-[10px] font-extrabold text-ink-muted uppercase tracking-[1.5px] w-[240px]">
+                        <th className="text-left py-2.5 px-4 text-[10px] font-extrabold text-ink-muted uppercase tracking-[1.5px] w-[220px]">
                           Page / Module
                         </th>
                         {ACTIONS.map(action => {
                           const cs = colState(action.key);
                           return (
-                            <th key={action.key} className="py-3 px-3 text-center min-w-[80px]">
-                              <div className="flex flex-col items-center gap-1.5">
-                                <span className={`text-[11px] font-extrabold uppercase tracking-wider ${action.headerColor}`}>
+                            <th key={action.key} className="py-2.5 px-2.5 text-center min-w-[65px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span className={`text-[10px] font-extrabold uppercase tracking-wider ${action.headerColor}`}>
                                   {action.label}
                                 </span>
                                 <Cb
@@ -779,8 +779,8 @@ const RolePermissionMapping: React.FC = () => {
                           );
                         })}
                         {/* Row all-column */}
-                        <th className="py-3 px-3 text-center min-w-[60px]">
-                          <span className="text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider">All</span>
+                        <th className="py-2.5 px-2.5 text-center min-w-[55px]">
+                          <span className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">All</span>
                         </th>
                       </tr>
                     </thead>
@@ -798,8 +798,8 @@ const RolePermissionMapping: React.FC = () => {
                           <React.Fragment key={mod.key}>
                             <tr className={`transition-colors hover:bg-card-2 ${rowBg} ${extraPerms.length > 0 ? "border-b-0" : ""}`}>
                               {/* Entity name */}
-                              <td className="py-3 px-5">
-                                <div className="font-semibold text-ink text-[13px]">{mod.label}</div>
+                              <td className="py-2.5 px-4">
+                                <div className="font-semibold text-ink text-[12px]">{mod.label}</div>
                                 <div className="text-[9px] text-ink-subtle/60 font-mono mt-0.5">{mod.key}</div>
                               </td>
 
@@ -807,7 +807,7 @@ const RolePermissionMapping: React.FC = () => {
                               {ACTIONS.map(action => {
                                 const perm = mod.byAction[action.key];
                                 return (
-                                  <td key={action.key} className={`py-3 px-3 text-center ${action.colBg}`}>
+                                  <td key={action.key} className={`py-2 px-2 text-center ${action.colBg}`}>
                                     {perm ? (
                                       <Cb
                                         checked={assignedIds.has(perm.id)}
@@ -826,7 +826,7 @@ const RolePermissionMapping: React.FC = () => {
                               })}
 
                               {/* Row all checkbox */}
-                              <td className="py-3 px-3 text-center">
+                              <td className="py-2 px-2 text-center">
                                 {hasPerms ? (
                                   <Cb
                                     checked={rowAll}
@@ -923,20 +923,20 @@ const RolePermissionMapping: React.FC = () => {
                 </div>
 
                 {/* Footer legend */}
-                <div className="px-5 py-3 bg-card-2/80 border-t border-line flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block rounded" style={{ width: 20, height: 2, background: "#64748b" }} />
-                    <span className="text-[11px] text-ink-subtle">No DB record — permission not yet seeded</span>
+                <div className="px-4 py-2 bg-card-2/80 border-t border-line flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="inline-block rounded" style={{ width: 16, height: 2, background: "#64748b" }} />
+                    <span className="text-[10px] text-ink-subtle">No DB record</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Cb checked={false} indeterminate onChange={() => { }} hex="#6b7280" size={13} disabled />
-                    <span className="text-[11px] text-ink-subtle">Partially assigned</span>
+                    <Cb checked={false} indeterminate onChange={() => { }} hex="#6b7280" size={12} disabled />
+                    <span className="text-[10px] text-ink-subtle">Partially assigned</span>
                   </div>
                   {isSuperAdmin && (
-                    <div className="flex items-center gap-1.5">
-                      <FaKey className="text-violet-400" size={10} />
-                      <span className="text-[11px] text-violet-400 font-medium">Special Access</span>
-                      <span className="text-[11px] text-ink-subtle">— Super Admin only · mutually exclusive pairs are auto-locked</span>
+                    <div className="flex items-center gap-1">
+                      <FaKey className="text-violet-400" size={8} />
+                      <span className="text-[10px] text-violet-400 font-medium">Special Access</span>
+                      <span className="text-[10px] text-ink-subtle">— Super Admin only</span>
                     </div>
                   )}
                   {busy && (
