@@ -244,7 +244,6 @@ const SalesProductForm: React.FC = () => {
                                 fields={fields}
                                 errors={itemErrors}
                                 productOptions={componentProductOptions}
-                                products={products}
                                 remove={remove}
                                 editable={canSave}
                             />

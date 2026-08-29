@@ -120,7 +120,7 @@ const HorizontalNav = () => {
     return "User";
   };
 
-  const avatarImage = user?.employeeProfile?.profilePicture || user?.avatar;
+  const avatarImage = (user as any)?.employeeProfile?.profilePicture || user?.avatarUrl || user?.profilePicture || user?.photoUrl;
 
   const handleLogout = () => {
     setShowLogoutModal(true);

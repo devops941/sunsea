@@ -742,8 +742,8 @@ const ProductionOrderCreate: React.FC = () => {
                     if (so?.orderDate) {
                         setValue("orderDate", so.orderDate.split("T")[0]);
                     }
-                    if (so?.expectedCompletionDate) {
-                        setValue("dueDate", so.expectedCompletionDate.split("T")[0]);
+                    if ((so as any)?.expectedCompletionDate) {
+                        setValue("dueDate", (so as any).expectedCompletionDate.split("T")[0]);
                     }
                     if (so?.dispatchType) {
                         setValue("priority", so.dispatchType);

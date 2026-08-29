@@ -244,7 +244,7 @@ const SalaryAdvancePage = lazy(() => import("../modules/payroll/pages/SalaryAdva
 const MonthlyPayrollReport = lazy(() => import("../modules/payroll/pages/MonthlyPayrollReport"));
 const WeeklyPayrollReport = lazy(() => import("../modules/payroll/pages/WeeklyPayrollReport"));
 
-const LoadingFallback = () => <CommonLoader text="Loading..." image={logo} />;
+const LoadingFallback = () => <CommonLoader text="Loading..." />;
 
 const AppRoutes = () => {
   return (

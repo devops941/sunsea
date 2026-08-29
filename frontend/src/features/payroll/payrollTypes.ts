@@ -122,7 +122,7 @@ export interface PayrollEmployee {
   da: number;
   hra: number;
   otherAllowance: number;
-  cashInHand: number;
+  cashInHand?: number;
   dailySalary?: number;
   bankAccount?: string;
   pfNumber?: string;

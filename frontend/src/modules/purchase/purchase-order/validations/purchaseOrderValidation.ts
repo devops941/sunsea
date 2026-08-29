@@ -12,7 +12,7 @@ const purchaseOrderItemSchema = z.object({
 export const purchaseOrderSchema = z.object({
   poDate: z.string().min(1, "PO Date is required"),
   supplierId: z.union([z.string().min(1), z.number().min(1)], {
-    errorMap: () => ({ message: "Supplier is required" }),
+    message: "Supplier is required",
   }),
   storeId: z.string().min(1, "Store is required"),
   billingAddressLine1: z.string().min(1, "Billing address line is required"),

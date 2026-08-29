@@ -323,7 +323,7 @@ const ACTIONS = [
   { key: "delete", label: "Delete", headerColor: "text-rose-500", hex: "#e11d48", colBg: "bg-rose-500/5" },
 ] as const;
 
-const STANDARD_ACTION_KEYS = new Set(ACTIONS.map(a => a.key));
+const STANDARD_ACTION_KEYS = new Set<string>(ACTIONS.map(a => a.key));
 
 /**
  * Mutually exclusive extra permissions — if one is assigned the other is blocked.

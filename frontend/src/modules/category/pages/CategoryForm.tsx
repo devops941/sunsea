@@ -17,8 +17,7 @@ import type { CategoryType } from "../../../features/categories/types";
 
 const categorySchema = z.object({
   type: z.enum(["PRODUCT", "RAW_MATERIAL", "WASTAGE"], {
-    required_error: "Category type is required",
-    invalid_type_error: "Category type is required",
+    message: "Category type is required",
   }),
   name: z
     .string()
@@ -161,7 +160,7 @@ const CategoryForm: React.FC = () => {
 
     if (!result.success) {
       const newErrors: FormErrors = {};
-      result.error.errors.forEach((err) => {
+      result.error.issues.forEach((err) => {
         const field = err.path[0] as keyof CategorySchema;
         if (!newErrors[field]) newErrors[field] = err.message;
       });

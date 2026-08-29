@@ -78,8 +78,8 @@ export const SalesReturnCreatePage: React.FC = () => {
                 if (uomCode === "ton" || uomCode === "tonne" || uomCode === "tons") uomCode = "t";
 
                 const prodObj = pList?.find((p: any) => Number(p.id) === Number(item.productId));
-                const groupName = prodObj?.category?.name || prodObj?.category?.categoryName || "Sales Group";
-                const rawBaseUom = prodObj?.baseUom || prodObj?.uom?.baseUom || prodObj?.weightUom || "kg, g, t";
+                const groupName = (prodObj as any)?.category?.name || (prodObj as any)?.category?.categoryName || "Sales Group";
+                const rawBaseUom = (prodObj as any)?.baseUom || (prodObj as any)?.uom?.baseUom || (prodObj as any)?.weightUom || "kg, g, t";
 
                 return {
                   productId: Number(item.productId),

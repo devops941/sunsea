@@ -161,7 +161,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                                                 <td className="master-data-cell">{index + 1}</td>
                                                 <td className="master-data-cell">{order.orderNo}</td>
                                                 <td className="master-data-cell">{formatDate(order.orderDate)}</td>
-                                                <td className="master-data-cell">{order.expectedCompletionDate ? formatDate(order.expectedCompletionDate) : "-"}</td>
+                                                <td className="master-data-cell">{(order as any).expectedCompletionDate ? formatDate((order as any).expectedCompletionDate) : "-"}</td>
                                                 <td className="master-data-cell">{order.dispatchType || "-"}</td>
                                                 <td className="master-data-cell">{order.customer?.firmName || "-"}</td>
                                                 <td className="master-data-cell">{order.remarks || "-"}</td>
