@@ -197,16 +197,11 @@ const MachineAssignmentList: React.FC = () => {
 
   return (
     <div>
-      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Top Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-ink flex items-center gap-3">
-              Machine Operation Assignments
-            </h2>
-            <p className="text-ink-subtle text-sm mt-0.5">
-              Manage weekly operator assignments and review complete historical logs
-            </p>
+            <h2 className="text-xl font-bold text-ink">Machine Operation Assignments</h2>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto ml-auto">
             <SearchInput

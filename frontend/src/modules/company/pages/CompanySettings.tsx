@@ -275,22 +275,22 @@ const CompanySettings: React.FC = () => {
     );
   }
 
-  // Normal Settings/Edit Screen Design — same as create page
+  // Normal Settings/Edit Screen Design
   return (
-    <div className="w-full">
-      <div className="bg-card rounded-xl shadow-lg border border-line-soft">
+    <div className="max-w-[1600px] xl:mr-auto">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         <form onSubmit={handleSubmit} noValidate>
-          <div className="flex flex-col lg:flex-row min-h-[calc(100vh-240px)]">
+          <div className="flex flex-col lg:flex-row">
 
             {/* Left: All Input Fields — 70% */}
-            <div className="lg:w-[70%] px-6 py-6 space-y-8">
+            <div className="lg:w-[70%] px-6 py-6 space-y-6">
               {/* General Info */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <FaInfoCircle className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-ink m-0">General Info</h6>
+                  <FaInfoCircle className="text-primary text-lg" />
+                  <h6 className="text-sm font-bold text-ink m-0">General Info</h6>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
                   <TextInput label="Email" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
                   <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
@@ -300,8 +300,8 @@ const CompanySettings: React.FC = () => {
               {/* Contact Details */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <FaPhoneAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-ink m-0">Contact Details</h6>
+                  <FaPhoneAlt className="text-primary text-lg" />
+                  <h6 className="text-sm font-bold text-ink m-0">Contact Details</h6>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <TextInput label="Website" name="website" value={formData.website || ""} onChange={handleChange} placeholder="http://www.example.com" />
@@ -325,54 +325,50 @@ const CompanySettings: React.FC = () => {
               {/* Address Details */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <FaMapMarkerAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-ink m-0">Address Details</h6>
+                  <FaMapMarkerAlt className="text-primary text-lg" />
+                  <h6 className="text-sm font-bold text-ink m-0">Address Details</h6>
                 </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <TextInput label="Street Address" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Building, street, area" required error={errors.addressLine1} />
-                    <CityStateSelect
-                      countryLabel=""
-                      countryValue={formData.country || "India"}
-                      onCountryChange={handleCountryChange}
-                      countryError={errors.country}
-                      stateLabel=""
-                      stateValue={formData.state || ""}
-                      onStateChange={handleStateChange}
-                      stateError={errors.state}
-                      cityLabel="City"
-                      cityValue={formData.city || ""}
-                      onCityChange={handleCityChange}
-                      cityError={errors.city}
-                      required
-                      renderOnly="city"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <CityStateSelect
-                      countryLabel="Country"
-                      countryValue={formData.country || "India"}
-                      onCountryChange={handleCountryChange}
-                      countryError={errors.country}
-                      stateLabel="State"
-                      stateValue={formData.state || ""}
-                      onStateChange={handleStateChange}
-                      stateError={errors.state}
-                      cityLabel=""
-                      cityValue={formData.city || ""}
-                      onCityChange={handleCityChange}
-                      cityError={errors.city}
-                      required
-                      renderOnly="state-country"
-                    />
-                    <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Zipcode" required error={errors.zipcode} />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TextInput label="Street Address" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Building, street, area" required error={errors.addressLine1} />
+                  <CityStateSelect
+                    countryLabel=""
+                    countryValue={formData.country || "India"}
+                    onCountryChange={handleCountryChange}
+                    countryError={errors.country}
+                    stateLabel=""
+                    stateValue={formData.state || ""}
+                    onStateChange={handleStateChange}
+                    stateError={errors.state}
+                    cityLabel="City"
+                    cityValue={formData.city || ""}
+                    onCityChange={handleCityChange}
+                    cityError={errors.city}
+                    required
+                    renderOnly="city"
+                  />
+                  <CityStateSelect
+                    countryLabel="Country"
+                    countryValue={formData.country || "India"}
+                    onCountryChange={handleCountryChange}
+                    countryError={errors.country}
+                    stateLabel="State"
+                    stateValue={formData.state || ""}
+                    onStateChange={handleStateChange}
+                    stateError={errors.state}
+                    cityLabel=""
+                    cityValue={formData.city || ""}
+                    onCityChange={handleCityChange}
+                    cityError={errors.city}
+                    required
+                    renderOnly="state-country"
+                  />
+                  <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Zipcode" required error={errors.zipcode} />
                 </div>
               </div>
             </div>
 
             {/* Right: Image Uploads — 30% */}
-            <div className="lg:w-[30%] lg:border-l border-t lg:border-t-0 border-line-soft/50 px-6 py-6 flex lg:flex-col items-center justify-evenly">
+            <div className="lg:w-[30%] lg:border-l border-t lg:border-t-0 border-line/50 px-6 py-6 flex lg:flex-col items-center justify-evenly gap-6">
               <ImageUpload label="Company Logo" name="logoFile" hint="PNG or SVG · min 256×256px" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
               <ImageUpload label="Favicon" name="faviconFile" hint="PNG · min 64×64px" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
             </div>
@@ -385,7 +381,7 @@ const CompanySettings: React.FC = () => {
 
           {/* Footer */}
           {canEdit && (
-            <div className="flex justify-end px-6 py-5 border-t border-line-soft">
+            <div className="flex justify-end px-6 py-4 border-t border-line">
               <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
             </div>
           )}

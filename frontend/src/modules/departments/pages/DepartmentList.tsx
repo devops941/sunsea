@@ -194,8 +194,18 @@ const DepartmentList: React.FC = () => {
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        { header: "Department Name", accessor: "name" },
-        { header: "Description", render: (dept) => dept.description || "N/A" },
+        {
+            header: "Department Name",
+            render: (dept) => (
+                <span className="block max-w-[200px] truncate" title={dept.name}>{dept.name}</span>
+            ),
+        },
+        {
+            header: "Description",
+            render: (dept) => (
+                <span className="block max-w-[200px] truncate" title={dept.description || "N/A"}>{dept.description || "N/A"}</span>
+            ),
+        },
         {
             header: "Actions",
             render: (dept) => (
@@ -210,9 +220,9 @@ const DepartmentList: React.FC = () => {
     ];
 
     return (
-        <div className="bg-card">
+        <div>
             <div className="">
-                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="max-w-[1600px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>
