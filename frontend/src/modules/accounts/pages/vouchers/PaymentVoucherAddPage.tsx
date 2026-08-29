@@ -159,6 +159,20 @@ const PaymentVoucherAddPage: React.FC = () => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
+  // Busy behaviour: after save, wipe the entry rows so the operator can key
+  // the next voucher without leaving the page. Date + Payment Mode are kept
+  // (batch data-entry keeps the same bank / same day). Vch No is re-fetched
+  // so the top shows the next sequential number ready to go.
+  const resetFormForNext = () => {
+    setMainNarration("");
+    setRows(Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow));
+    voucherService
+      .fetchNextVoucherNo("PAYMENT")
+      .then(setNextVoucherNo)
+      .catch(() => setNextVoucherNo(""));
+    setTimeout(() => focusCell(0, "account"), 0);
+  };
+
   const totalAmount = rows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
   const validCount = rows.filter((r) => r.debitLedgerId && parseFloat(r.amount) > 0).length;
 
@@ -224,7 +238,7 @@ const PaymentVoucherAddPage: React.FC = () => {
         })),
       });
       toast.success("Payment voucher saved successfully");
-      navigate("/accounts/payment-voucher");
+      resetFormForNext();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to save");
     } finally {

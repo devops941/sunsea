@@ -1,21 +1,44 @@
-import React, { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaExchangeAlt, FaArrowLeft } from "react-icons/fa";
+import React, { useState, useCallback, useRef } from "react";
+import { FaExchangeAlt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
+import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache } from "../../../../hooks/useListCache";
 
+// Contra is Journal's twin: free-form D/C rows with balanced totals. The
+// only real business rule is that every ledger picked must be a cash or
+// bank account (Contra = money transfer between cash and bank, or between
+// two bank accounts — never touches customers, suppliers, income, expense).
+interface ContraRow {
+  id: number;
+  dc: "D" | "C";
+  ledgerId: string;
+  amount: string;
+  narration: string;
+}
+
+let rowCounter = 1;
+const INITIAL_ROW_COUNT = 17;
+
+const makeEmptyRow = (idx: number): ContraRow => ({
+  id: rowCounter++,
+  dc: idx === 0 ? "D" : "C",
+  ledgerId: "",
+  amount: "",
+  narration: "",
+});
+
+const buildEmptyRows = () =>
+  Array.from({ length: INITIAL_ROW_COUNT }, (_, i) => makeEmptyRow(i));
+
 const ContraVoucherAddPage: React.FC = () => {
-  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [debitLedgerId, setDebitLedgerId] = useState("");
-  const [creditLedgerId, setCreditLedgerId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [narration, setNarration] = useState("");
+  const [mainNarration, setMainNarration] = useState("");
+  const [rows, setRows] = useState<ContraRow[]>(() => buildEmptyRows());
 
   const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await accountService.fetchLedgers({ limit: 1000 });
@@ -29,144 +52,330 @@ const ContraVoucherAddPage: React.FC = () => {
     fetcher: ledgersFetcher,
   });
 
+  // Keyboard nav — DC → account → amount → narration → next row DC
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const focusCell = (rowIdx: number, field: "dc" | "account" | "amount" | "narration") => {
+    if (!tableRef.current) return;
+    const wrap = tableRef.current.querySelector<HTMLElement>(`[data-cell="${rowIdx}-${field}"]`);
+    if (!wrap) return;
+    const el =
+      wrap.tagName === "INPUT" || wrap.tagName === "SELECT"
+        ? (wrap as HTMLInputElement)
+        : wrap.querySelector("input");
+    if (el) {
+      el.focus();
+      if ((el as HTMLInputElement).select) (el as HTMLInputElement).select();
+    }
+  };
+
+  const addRow = () => {
+    setRows((prev) => [...prev, makeEmptyRow(prev.length)]);
+  };
+
+  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      focusCell(rowIdx, "narration");
+    }
+  };
+
+  const handleNarrationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (rowIdx === rows.length - 1) {
+        addRow();
+        setTimeout(() => focusCell(rowIdx + 1, "dc"), 0);
+      } else {
+        focusCell(rowIdx + 1, "dc");
+      }
+    }
+  };
+
+  const updateRow = (id: number, field: keyof ContraRow, value: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  };
+
+  const totalDebit = rows.reduce(
+    (sum, r) => sum + (r.dc === "D" ? parseFloat(r.amount) || 0 : 0),
+    0
+  );
+  const totalCredit = rows.reduce(
+    (sum, r) => sum + (r.dc === "C" ? parseFloat(r.amount) || 0 : 0),
+    0
+  );
+  const diff = totalDebit - totalCredit;
+  const isBalanced = Math.abs(diff) < 0.01;
+  const hasAnyAmount = totalDebit > 0 || totalCredit > 0;
+  const validCount = rows.filter((r) => r.ledgerId && parseFloat(r.amount) > 0).length;
+
+  const isRowComplete = (r: ContraRow) => !!r.ledgerId && parseFloat(r.amount) > 0;
+  const isRowUnlocked = (idx: number): boolean => {
+    for (let i = 0; i < idx; i++) {
+      if (!isRowComplete(rows[i])) return false;
+    }
+    return true;
+  };
+
+  // Busy-style: after save, clear the form so the operator can enter the
+  // next Contra voucher without navigating away. Date is preserved because
+  // most operators do a batch of same-day entries.
+  const resetForm = () => {
+    setMainNarration("");
+    setRows(buildEmptyRows());
+    setTimeout(() => focusCell(0, "dc"), 0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!debitLedgerId || !creditLedgerId || !amount || parseFloat(amount) <= 0) {
-      toast.error("Fill all required fields"); return;
+
+    const validRows = rows.filter((r) => r.ledgerId && parseFloat(r.amount) > 0);
+    if (validRows.length < 2) {
+      toast.error("Need at least 2 entries (one debit, one credit)");
+      return;
     }
-    if (debitLedgerId === creditLedgerId) { toast.error("Transfer To and From must be different"); return; }
+    if (!isBalanced) {
+      toast.error("Debit & Credit amounts should be equal.");
+      return;
+    }
+
+    const items = validRows.map((r) => {
+      const amt = parseFloat(r.amount);
+      const isDebit = r.dc === "D";
+      return {
+        debitLedgerId: isDebit ? parseInt(r.ledgerId, 10) : null,
+        creditLedgerId: !isDebit ? parseInt(r.ledgerId, 10) : null,
+        debitAmount: isDebit ? amt : 0,
+        creditAmount: !isDebit ? amt : 0,
+        narration: r.narration || mainNarration || "Contra Entry",
+      };
+    });
 
     setSubmitting(true);
     try {
       await voucherService.createVoucher({
-        type: "CONTRA", date, narration: narration || "Bank / Cash Transfer",
-        items: [{
-          debitLedgerId: parseInt(debitLedgerId, 10), creditLedgerId: parseInt(creditLedgerId, 10),
-          debitAmount: parseFloat(amount), creditAmount: parseFloat(amount),
-          narration: narration || "Bank / Cash Transfer",
-        }],
+        type: "CONTRA",
+        date,
+        narration: mainNarration || "Contra Entry",
+        items,
       });
-      toast.success("Contra entry saved successfully");
-      navigate("/accounts/contra-entry");
-    } catch (err: any) { toast.error(err?.response?.data?.message || err?.message || "Failed to save"); }
-    finally { setSubmitting(false); }
+      toast.success("Contra voucher saved successfully");
+      resetForm();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to save");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="p-3 space-y-3 min-h-screen">
-      {/* Compact Header */}
-      <div className="bg-card rounded-lg border border-line flex items-center justify-between gap-2 px-3 py-2">
-        <h1 className="text-sm font-bold text-ink flex items-center gap-2">
-          <FaExchangeAlt className="text-amber-500 text-sm" /> New Contra Entry
-        </h1>
-        <button
-          onClick={() => navigate("/accounts/contra-entry")}
-          className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-card border border-line text-ink rounded text-xs font-semibold transition cursor-pointer"
-        >
-          <FaArrowLeft className="text-[10px]" /> Back
-        </button>
-      </div>
+    <div className="p-3">
+      <div className="w-full lg:w-7xl max-w-full">
+        <form onSubmit={handleSubmit} className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
+          {/* Title bar — Contra uses rose/pink accent */}
+          <div className="bg-rose-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+            Add Contra Voucher
+          </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-1.5 border-b border-line bg-amber-600/10 flex items-center gap-2">
-          <FaExchangeAlt className="text-amber-500 text-xs" />
-          <h2 className="text-xs font-bold text-ink">Contra Details</h2>
-        </div>
+          {/* Top meta grid — Contra has NO Mode field (same as Journal) */}
+          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[11px] items-center">
+            <label className="col-span-1 text-ink-subtle font-semibold text-right">Date</label>
+            <div className="col-span-4">
+              <DatePickerCalendar name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            </div>
 
-        <div className="p-3 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div>
-              <label className="block mb-0.5 text-[10px] font-semibold text-ink-subtle uppercase tracking-wide">
-                Date <span className="text-amber-500">*</span>
-              </label>
+            <label className="col-span-1 text-ink-subtle font-semibold text-right">Vch No.</label>
+            <div className="col-span-6 text-ink-subtle font-mono text-[11px] italic">
+              (auto)
+            </div>
+
+            <label className="col-span-1 text-ink-subtle font-semibold text-right">Narration</label>
+            <div className="col-span-11">
               <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block mb-0.5 text-[10px] font-semibold text-ink-subtle uppercase tracking-wide">
-                Amount (₹) <span className="text-amber-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink text-right font-mono font-semibold focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
+                type="text"
+                placeholder=""
+                value={mainNarration}
+                onChange={(e) => setMainNarration(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    focusCell(0, "dc");
+                  }
+                }}
+                className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div>
-              <LedgerSearchInput
-                label="Transfer From (Source)"
-                value={creditLedgerId}
-                ledgers={ledgers}
-                onChange={setCreditLedgerId}
-                placeholder="Search source bank / cash..."
-                required
-                filterFn={isBankOrCashLedger}
-                accentColor="amber-500"
-              />
-            </div>
-            <div>
-              <LedgerSearchInput
-                label="Transfer To (Destination)"
-                value={debitLedgerId}
-                ledgers={ledgers}
-                onChange={setDebitLedgerId}
-                placeholder="Search destination bank / cash..."
-                required
-                filterFn={isBankOrCashLedger}
-                accentColor="amber-500"
-              />
-            </div>
+          {/* Spreadsheet items grid — Journal-style D/C + Dr/Cr split.
+             Ledger dropdown restricted to cash/bank accounts only. */}
+          <div className="border-b border-line" ref={tableRef}>
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="bg-card-2 text-ink font-bold border-b border-line">
+                  <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
+                  <th className="w-12 px-2 py-1 text-center border-r border-line">D/C</th>
+                  <th className="px-2 py-1 text-left border-r border-line">Account (Cash / Bank)</th>
+                  <th className="w-28 px-2 py-1 text-right border-r border-line">Debit (Rs.)</th>
+                  <th className="w-28 px-2 py-1 text-right border-r border-line">Credit (Rs.)</th>
+                  <th className="px-2 py-1 text-left">Short Narration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, idx) => {
+                  const unlocked = isRowUnlocked(idx);
+                  const isDebit = row.dc === "D";
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-line-soft last:border-b-0 ${unlocked ? "" : "bg-card-2/10"}`}
+                    >
+                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[11px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
+                        {idx + 1}
+                      </td>
+                      <td className="w-12 px-0 py-0 border-r border-line text-center">
+                        <select
+                          data-cell={`${idx}-dc`}
+                          value={row.dc}
+                          onChange={(e) => updateRow(row.id, "dc", e.target.value)}
+                          disabled={!unlocked}
+                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                        >
+                          <option value="D">D</option>
+                          <option value="C">C</option>
+                        </select>
+                      </td>
+                      <td className="px-0 py-0 border-r border-line">
+                        <div data-cell={`${idx}-account`}>
+                          <LedgerSearchInput
+                            value={row.ledgerId}
+                            ledgers={ledgers}
+                            onChange={(val) => updateRow(row.id, "ledgerId", val)}
+                            placeholder=""
+                            filterFn={isBankOrCashLedger}
+                            accentColor="rose-500"
+                            variant="cell"
+                            onSelected={() => focusCell(idx, "amount")}
+                            disabled={!unlocked}
+                          />
+                        </div>
+                      </td>
+                      <td className="w-28 px-0 py-0 border-r border-line">
+                        {isDebit ? (
+                          <input
+                            data-cell={`${idx}-amount`}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder=""
+                            value={row.amount}
+                            onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            disabled={!unlocked}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          />
+                        ) : (
+                          <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
+                        )}
+                      </td>
+                      <td className="w-28 px-0 py-0 border-r border-line">
+                        {!isDebit ? (
+                          <input
+                            data-cell={`${idx}-amount`}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder=""
+                            value={row.amount}
+                            onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            disabled={!unlocked}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          />
+                        ) : (
+                          <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
+                        )}
+                      </td>
+                      <td className="px-0 py-0">
+                        <input
+                          data-cell={`${idx}-narration`}
+                          type="text"
+                          placeholder=""
+                          value={row.narration}
+                          onChange={(e) => updateRow(row.id, "narration", e.target.value)}
+                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          disabled={!unlocked}
+                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-card-2 border-t border-line">
+                  <td className="px-2 py-1 text-left" colSpan={3}>
+                    <button
+                      type="button"
+                      onClick={addRow}
+                      className="flex items-center gap-1 text-[10px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer"
+                    >
+                      <FaPlus className="w-2 h-2" /> Add Row
+                    </button>
+                  </td>
+                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
+                    {totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
+                    {totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-2 py-1 text-[10px] italic">
+                    {hasAnyAmount ? (
+                      isBalanced ? (
+                        <span className="text-emerald-600 font-semibold">Balanced · {validCount} entries</span>
+                      ) : (
+                        <span className="text-red-500 font-semibold">
+                          Diff: {Math.abs(diff).toFixed(2)} {diff > 0 ? "(Cr short)" : "(Dr short)"}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-ink-subtle">{validCount} valid entries</span>
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
-          <div>
-            <label className="block mb-0.5 text-[10px] font-semibold text-ink-subtle uppercase tracking-wide">Narration / Remarks</label>
-            <input
-              type="text"
-              placeholder="e.g. Cash deposit to HDFC Bank"
-              value={narration}
-              onChange={(e) => setNarration(e.target.value)}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-between pt-2 border-t border-line">
-            <div className="text-xs text-ink-muted">
-              {amount && parseFloat(amount) > 0 && (
-                <>
-                  <span className="text-[10px] text-ink-subtle uppercase tracking-wide">Transfer:</span>
-                  <span className="ml-2 text-sm font-mono font-bold text-ink">
-                    ₹{parseFloat(amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </>
-              )}
+          {/* Bottom action bar */}
+          <div className="px-3 py-2 flex items-center justify-between bg-card-2/40">
+            <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
+              <FaExchangeAlt className="text-rose-500" />
+              <span>
+                <kbd className="px-1 border border-line rounded bg-card text-[10px]">D</kbd> /
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">C</kbd> in D/C column •
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> to move forward
+              </span>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => navigate("/accounts/contra-entry")}
-                className="px-3 py-1.5 text-ink-muted bg-card-2 hover:bg-card border border-line rounded font-semibold text-xs transition cursor-pointer">
-                Cancel
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
+              >
+                Quit
               </button>
-              <button type="submit" disabled={submitting}
-                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-semibold text-xs transition disabled:opacity-50 cursor-pointer">
-                {submitting ? "Saving..." : "Save Contra Entry"}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold text-[11px] transition disabled:opacity-50 cursor-pointer"
+              >
+                {submitting ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

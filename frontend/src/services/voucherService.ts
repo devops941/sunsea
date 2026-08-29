@@ -108,12 +108,34 @@ export const voucherService = {
 };
 
 /**
- * Strip the type prefix so the UI can show plain integers like Busy
- * ("Vch No. 1", "2", ...). Falls back to the raw string for older
- * random-format numbers ("PAY-123456-7890") that don't fit the sequence.
+ * Busy-style voucher-number display. Different voucher types use different
+ * short prefixes in the UI while sharing the same DB uniqueness guarantee:
+ *
+ *   PAY-1 → "1"     (Payment shows as plain integer)
+ *   RCT-1 → "R-1"   (Receipt keeps a short "R-" tag)
+ *   JRN-1 → "J-1"
+ *   CTR-1 → "C-1"
+ *
+ * Older random-format numbers ("PAY-123456-7890") that don't match the
+ * sequential pattern fall through to raw display so nothing looks broken.
  */
+const SHORT_PREFIX_BY_TYPE_LETTER: Record<string, string> = {
+  PAY: "",
+  RCT: "R-",
+  JRN: "J-",
+  CTR: "C-",
+  SLS: "S-",
+  PUR: "P-",
+  SRT: "SR-",
+  PRT: "PR-",
+  EXP: "E-",
+};
+
 export function displayVoucherNo(voucherNo: string | undefined | null): string {
   if (!voucherNo) return "";
-  const m = voucherNo.match(/^[A-Z]+-(\d+)$/);
-  return m ? m[1] : voucherNo;
+  const m = voucherNo.match(/^([A-Z]+)-(\d+)$/);
+  if (!m) return voucherNo;
+  const [, prefix, num] = m;
+  const shortPrefix = SHORT_PREFIX_BY_TYPE_LETTER[prefix] ?? `${prefix}-`;
+  return `${shortPrefix}${num}`;
 }
