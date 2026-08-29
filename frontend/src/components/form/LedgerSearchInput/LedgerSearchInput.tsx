@@ -13,6 +13,11 @@ interface LedgerSearchInputProps {
   /** Custom predicate to restrict selectable ledgers (e.g. bank/cash only). */
   filterFn?: (ledger: AccountLedger) => boolean;
   accentColor?: string; // tailwind ring color class e.g. "red-500"
+  /** "default" = bordered rounded input; "cell" = borderless flush input for spreadsheet-like tables */
+  variant?: "default" | "cell";
+  /** Called after a ledger is selected (via keyboard or click). Use to auto-advance focus. */
+  onSelected?: (ledger: AccountLedger) => void;
+  disabled?: boolean;
 }
 
 /** True if a ledger's group looks like a bank or cash account. */
@@ -31,6 +36,9 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
   filterType,
   filterFn,
   accentColor = "primary",
+  variant = "default",
+  onSelected,
+  disabled,
 }) => {
   const [searchText, setSearchText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -116,6 +124,11 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
     setSearchText("");
     setIsOpen(false);
     setHighlightIndex(-1);
+    if (onSelected) {
+      // Fire on next tick so parent can shift focus AFTER dropdown closes /
+      // the current input finishes its blur/state transitions.
+      setTimeout(() => onSelected(ledger), 0);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -133,9 +146,16 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === "Enter" && highlightIndex >= 0 && highlightIndex < flatFiltered.length) {
-      e.preventDefault();
-      handleSelect(flatFiltered[highlightIndex]);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      // Busy-style: Enter/Tab picks the highlighted item (or first filtered
+      // match if nothing was highlighted) and fires onSelected so the parent
+      // can advance focus. Tab keeps its default forward-focus behavior only
+      // when the dropdown is empty.
+      const idx = highlightIndex >= 0 ? highlightIndex : 0;
+      if (flatFiltered.length > 0 && idx < flatFiltered.length) {
+        e.preventDefault();
+        handleSelect(flatFiltered[idx]);
+      }
     } else if (e.key === "Escape") {
       setIsOpen(false);
       setSearchText("");
@@ -159,6 +179,10 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
       : "";
 
   const ringClass = `focus:ring-${accentColor}`;
+  const inputClass =
+    variant === "cell"
+      ? `w-full px-2 py-1 bg-transparent border-0 text-xs text-ink focus:outline-none focus:bg-card-2/60`
+      : `w-full px-3 py-2 border border-line bg-card rounded-lg text-sm text-ink focus:ring-2 ${ringClass} focus:outline-none`;
 
   return (
     <div ref={containerRef} className="relative">
@@ -173,6 +197,7 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
         value={displayValue}
         placeholder={placeholder}
         required={required && !value}
+        disabled={disabled}
         onChange={(e) => {
           setSearchText(e.target.value);
           setIsOpen(true);
@@ -182,12 +207,13 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
           }
         }}
         onFocus={() => {
+          if (disabled) return;
           setIsOpen(true);
           setSearchText("");
           updatePosition();
         }}
         onKeyDown={handleKeyDown}
-        className={`w-full px-3 py-2 border border-line bg-card rounded-lg text-sm text-ink focus:ring-2 ${ringClass} focus:outline-none`}
+        className={`${inputClass} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
         autoComplete="off"
       />
 

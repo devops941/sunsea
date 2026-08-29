@@ -99,4 +99,21 @@ export const voucherService = {
     const response = await apiClient.post("/vouchers", data);
     return response.data?.data;
   },
+
+  /** Peek the next sequential voucher number that would be assigned for a given type. */
+  fetchNextVoucherNo: async (type: VoucherType): Promise<string> => {
+    const response = await apiClient.get("/vouchers/next-no", { params: { type } });
+    return response.data?.data?.voucherNo || "";
+  },
 };
+
+/**
+ * Strip the type prefix so the UI can show plain integers like Busy
+ * ("Vch No. 1", "2", ...). Falls back to the raw string for older
+ * random-format numbers ("PAY-123456-7890") that don't fit the sequence.
+ */
+export function displayVoucherNo(voucherNo: string | undefined | null): string {
+  if (!voucherNo) return "";
+  const m = voucherNo.match(/^[A-Z]+-(\d+)$/);
+  return m ? m[1] : voucherNo;
+}
