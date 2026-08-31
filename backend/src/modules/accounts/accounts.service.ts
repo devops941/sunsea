@@ -9,14 +9,14 @@ import { CreateLedgerInput, UpdateLedgerInput } from "./accounts.types";
  * The auto-posting system looks up ledgers from DB by code at runtime.
  */
 const DEFAULT_SEED_LEDGERS = [
-  { code: "CASH-001", name: "Cash in Hand", type: LedgerType.ASSET, group: "Cash & Bank" },
-  { code: "BANK-001", name: "Main Bank Account", type: LedgerType.ASSET, group: "Cash & Bank" },
+  { code: "CASH-001", name: "Cash in Hand", type: LedgerType.ASSET, group: "Cash in Hand" },
+  { code: "BANK-001", name: "Main Bank Account", type: LedgerType.ASSET, group: "Bank Accounts" },
   { code: "CRED-001", name: "Sundry Creditors", type: LedgerType.LIABILITY, group: "Current Liabilities" },
   { code: "DEBT-001", name: "Sundry Debtors", type: LedgerType.ASSET, group: "Current Assets" },
   { code: "PURCH-001", name: "Purchase Account", type: LedgerType.EXPENSE, group: "Direct Expenses" },
   { code: "SALES-001", name: "Sales Account", type: LedgerType.INCOME, group: "Direct Income" },
   { code: "EXP-001", name: "General Expenses", type: LedgerType.EXPENSE, group: "Indirect Expenses" },
-  { code: "PCASH-001", name: "Petty Cash Account", type: LedgerType.ASSET, group: "Cash & Bank" },
+  { code: "PCASH-001", name: "Petty Cash Account", type: LedgerType.ASSET, group: "Cash in Hand" },
   { code: "SRT-001", name: "Sales Return Account", type: LedgerType.INCOME, group: "Direct Income" },
   { code: "PRT-001", name: "Purchase Return Account", type: LedgerType.EXPENSE, group: "Direct Expenses" },
   { code: "CGST-LIA-001", name: "CGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
@@ -74,12 +74,12 @@ class AccountsService {
     const codes = DEFAULT_SEED_LEDGERS.map((l) => l.code);
     const existing = await db.accountLedger.findMany({
       where: { code: { in: codes } },
-      select: { code: true },
+      select: { code: true, group: true },
     });
-    const existingCodes = new Set(existing.map((e) => e.code));
-    if (existingCodes.size === codes.length) return; // All exist, fast exit
+    const existingMap = new Map(existing.map((e) => [e.code, e.group]));
 
-    const missing = DEFAULT_SEED_LEDGERS.filter((l) => !existingCodes.has(l.code));
+    // Create missing ledgers
+    const missing = DEFAULT_SEED_LEDGERS.filter((l) => !existingMap.has(l.code));
     for (const ledger of missing) {
       await db.accountLedger.upsert({
         where: { code: ledger.code },
@@ -92,6 +92,17 @@ class AccountsService {
           isActive: true,
         },
       });
+    }
+
+    // Fix existing ledgers with stale "Cash & Bank" group — migrate to proper groups
+    for (const ledger of DEFAULT_SEED_LEDGERS) {
+      const currentGroup = existingMap.get(ledger.code);
+      if (currentGroup && currentGroup.toLowerCase().trim() === "cash & bank" && ledger.group !== "Cash & Bank") {
+        await db.accountLedger.update({
+          where: { code: ledger.code },
+          data: { group: ledger.group },
+        });
+      }
     }
   }
 

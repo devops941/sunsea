@@ -193,7 +193,7 @@ const SalesProductForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto">
+        <div className="w-full max-w-[1024px] xl:mr-auto">
             <div className="bg-card rounded-xl border border-line-soft shadow-xs">
                 <div className="px-6 py-4 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

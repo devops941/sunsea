@@ -334,7 +334,7 @@ const RawMaterialForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto h-full flex flex-col">
+        <div className="w-full max-w-[1024px] xl:mr-auto h-full flex flex-col">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft flex flex-col flex-1 h-full">
                 <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-xl font-bold text-ink">
@@ -345,7 +345,8 @@ const RawMaterialForm: React.FC = () => {
 
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1" noValidate>
                     <div className="px-6 py-4 flex-1 overflow-y-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Row 1: ID (narrow) | Material Name (wide) */}
                             <TextInput
                                 label="Raw Material ID"
                                 name="rawMaterialId"
@@ -355,14 +356,18 @@ const RawMaterialForm: React.FC = () => {
                                 error={errors.rawMaterialId}
                                 onChange={handleChange}
                             />
-                            <TextInput
-                                label="Material Name"
-                                name="materialName"
-                                value={formData.materialName}
-                                required
-                                error={errors.materialName}
-                                onChange={handleChange}
-                            />
+                            <div className="md:col-span-2">
+                                <TextInput
+                                    label="Material Name"
+                                    name="materialName"
+                                    value={formData.materialName}
+                                    required
+                                    error={errors.materialName}
+                                    onChange={handleChange}
+                                />
+                            </div>
+
+                            {/* Row 2: Category | Store | HSN Code */}
                             <SelectInput
                                 label="Category"
                                 name="categoryId"
@@ -394,28 +399,33 @@ const RawMaterialForm: React.FC = () => {
                                 error={errors.hsnCode}
                                 onChange={handleChange}
                             />
-                            <UOMSelect
-                                name="baseUom"
-                                label="Base UOM"
-                                value={formData.baseUom}
-                                required
-                                isMulti
-                                category={["length", "mass", "each", "volume"]}
-                                allowedCodes={[
-                                    "kg", "g", "mt",
-                                    "l", "ml",
-                                    "m", "cm", "mm",
-                                    "dz", "ea"
-                                ]}
-                                onChange={(value) => {
-                                    setFormData(prev => ({ ...prev, baseUom: value }));
-                                    if (errors.baseUom) {
-                                        setErrors(prev => ({ ...prev, baseUom: "" }));
-                                    }
-                                }}
-                                error={errors.baseUom}
-                            />
-                            
+
+                            {/* Row 3: Base UOM (full width) */}
+                            <div className="md:col-span-3">
+                                <UOMSelect
+                                    name="baseUom"
+                                    label="Base UOM"
+                                    value={formData.baseUom}
+                                    required
+                                    isMulti
+                                    category={["length", "mass", "each", "volume"]}
+                                    allowedCodes={[
+                                        "kg", "g", "mt",
+                                        "l", "ml",
+                                        "m", "cm", "mm",
+                                        "dz", "ea"
+                                    ]}
+                                    onChange={(value) => {
+                                        setFormData(prev => ({ ...prev, baseUom: value }));
+                                        if (errors.baseUom) {
+                                            setErrors(prev => ({ ...prev, baseUom: "" }));
+                                        }
+                                    }}
+                                    error={errors.baseUom}
+                                />
+                            </div>
+
+                            {/* Row 4: Opening Stock | Minimum Stock | Reorder Level */}
                             <QuantityInput
                                 label="Opening Stock"
                                 name="onHandQty"
@@ -450,6 +460,8 @@ const RawMaterialForm: React.FC = () => {
                                 error={errors.reorderLevel}
                                 onChange={handleChange}
                             />
+
+                            {/* Row 5: Rate (narrow) | Status (narrow) | Narration (wide) */}
                             <TextInput
                                 type="number"
                                 label="Rate"

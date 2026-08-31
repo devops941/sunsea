@@ -125,7 +125,7 @@ const CategoryForm: React.FC = () => {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -214,119 +214,113 @@ const CategoryForm: React.FC = () => {
 
   if (isFetchingData) {
     return (
-      <div className="flex items-center justify-center h-48 text-ink-subtle">
-        Loading category data...
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="w-full mx-auto flex-1 flex flex-col">
-      <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible flex-1 flex flex-col">
+    <div>
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-line-soft">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-ink">
-                {isEditMode ? "Edit Category" : "Create Category"}
-              </h2>
-              <p className="text-sm text-ink-subtle mt-1">
-                {isEditMode
-                  ? "Update category details"
-                  : "Add a new category for Products, Raw Materials, or Wastage"}
-              </p>
-            </div>
-            <BackButton text="Back to List" to="/categories" />
-          </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+          <h2 className="text-xl font-bold text-ink">
+            {isEditMode ? "Edit Category" : "Create Category"}
+          </h2>
+          <BackButton text="Back to List" to="/categories" />
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
-          <div>
-            <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
-              <h3 className="text-lg font-bold text-ink">Category Details</h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Type — pick first so code auto-generates */}
-              <SelectInput
-                label="Category Type"
-                name="type"
-                value={formData.type}
-                options={TYPE_OPTIONS}
-                required
-                onChange={handleSelectChange}
-                error={errors.type}
-                disabled={isEditMode}
-              />
-
-              {/* Code — auto-generated, read-only */}
-              <TextInput
-                label="Category Code"
-                name="code"
-                value={isFetchingCode ? "Generating..." : formData.code}
-                placeholder="Auto-generated"
-                required
-                onChange={() => {}}
-                disabled
-              />
-
-              {/* Name */}
-              <TextInput
-                label="Category Name"
-                name="name"
-                value={formData.name}
-                placeholder="e.g. Plastics, Containers..."
-                required
-                onChange={handleChange}
-                error={errors.name}
-              />
-
-              {/* Description */}
-              <div className="md:col-span-2">
-                <TextInput
-                  label="Description"
-                  name="description"
-                  value={formData.description}
-                  placeholder="Short description of this category (optional)"
-                  onChange={handleChange}
-                  error={errors.description}
-                  as="textarea"
-                  rows={3}
-                />
-              </div>
-
-              {/* Status */}
-              <SelectInput
-                label="Status"
-                name="isActive"
-                value={formData.isActive ? "true" : "false"}
-                options={STATUS_OPTIONS}
-                onChange={handleSelectChange}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-3 mt-auto pt-4 border-t border-line-soft">
-            {!isEditMode && (
-              <CustomButton
-                text="Clear"
-                icon={FaEraser}
-                variant="secondary"
-                onClick={handleClear}
-                disabled={isSubmitting}
-              />
-            )}
-            <CustomButton
-              text={isSubmitting ? "Saving..." : isEditMode ? "Update Category" : "Save Category"}
-              icon={FaSave}
-              type="submit"
-              disabled={isSubmitting}
+        <form onSubmit={handleSubmit} className="p-5 lg:p-6 space-y-4" noValidate>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 md:gap-x-8 xl:gap-x-10 gap-y-3 md:gap-y-4 lg:gap-y-5">
+            {/* Type — pick first so code auto-generates */}
+            <SelectInput
+              label="Category Type"
+              name="type"
+              value={formData.type}
+              defaultOptionLabel="Select Category Type"
+              options={TYPE_OPTIONS}
+              required
+              horizontal
+              onChange={handleSelectChange}
+              error={errors.type}
+              disabled={isEditMode}
             />
+
+            {/* Code — auto-generated, read-only */}
+            <TextInput
+              label="Category Code"
+              name="code"
+              value={isFetchingCode ? "Generating..." : formData.code}
+              placeholder="Auto-generated"
+              required
+              horizontal
+              onChange={() => {}}
+              disabled
+            />
+
+            {/* Name */}
+            <TextInput
+              label="Category Name"
+              name="name"
+              value={formData.name}
+              placeholder="e.g. Plastics, Containers..."
+              required
+              horizontal
+              onChange={handleChange}
+              error={errors.name}
+            />
+
+            {/* Status */}
+            <SelectInput
+              label="Active Status"
+              name="isActive"
+              value={formData.isActive ? "true" : "false"}
+              defaultOptionLabel="Select Status"
+              options={STATUS_OPTIONS}
+              horizontal
+              onChange={handleSelectChange}
+            />
+
+            {/* Description - Spans 2 columns to align cleanly with grid */}
+            <div className="md:col-span-2 lg:col-span-2">
+              <TextInput
+                label="Description"
+                name="description"
+                value={formData.description}
+                placeholder="Short description of this category (optional)"
+                horizontal
+                onChange={handleChange}
+                error={errors.description}
+                as="textarea"
+                rows={2}
+              />
+            </div>
           </div>
         </form>
+
+        <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+          {!isEditMode && (
+            <CustomButton
+              text="Clear"
+              icon={FaEraser}
+              variant="secondary"
+              onClick={handleClear}
+              disabled={isSubmitting}
+            />
+          )}
+          <CustomButton
+            text={isSubmitting ? (isEditMode ? "Updating..." : "Saving...") : (isEditMode ? "Update Category" : "Save Category")}
+            icon={FaSave}
+            type="submit"
+            disabled={isSubmitting}
+            onClick={handleSubmit}
+          />
+        </div>
       </div>
     </div>
   );
 };
 
 export default CategoryForm;
+

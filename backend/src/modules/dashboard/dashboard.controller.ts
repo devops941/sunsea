@@ -256,12 +256,29 @@ const dashboardController = {
       );
 
       // ─── Bank & Cash aggregation ─────────────────────────────
+      const isCashAccount = (group: string, name: string) => {
+        const g = (group || "").toLowerCase().trim();
+        if (g === "cash in hand" || g === "cash") return true;
+        // For legacy "Cash & Bank" group, check the account name
+        if (g === "cash & bank") {
+          const n = (name || "").toLowerCase();
+          return n.includes("cash") && !n.includes("bank");
+        }
+        return false;
+      };
       let totalBankBalance = 0;
       let totalCashInHand = 0;
+      let cashAccountCount = 0;
+      let bankAccountCount = 0;
       for (const l of bankLedgers) {
         const balance = (debitMap.get(l.id) || 0) - (creditMap.get(l.id) || 0);
-        if ((l.group || "").toLowerCase().includes("cash")) totalCashInHand += balance;
-        else totalBankBalance += balance;
+        if (isCashAccount(l.group || "", l.name || "")) {
+          totalCashInHand += balance;
+          cashAccountCount++;
+        } else {
+          totalBankBalance += balance;
+          bankAccountCount++;
+        }
       }
 
       // ─── Receivable (customers owe us) — signed opening ──────
@@ -387,6 +404,7 @@ const dashboardController = {
           totalPayable, payableSupplierCount: supplierLedgers.length,
           totalCashInHand, totalBankBalance,
           cashBankAccountCount: bankLedgers.length,
+          cashAccountCount, bankAccountCount,
           stockValue, stockItemCount,
           // Extras
           todayReceipts, todayPayments, todayReceiptCount, todayPaymentCount,

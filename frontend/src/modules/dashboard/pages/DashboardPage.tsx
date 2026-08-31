@@ -381,7 +381,7 @@ const DashboardPage: React.FC = () => {
         {accountsSummary && (
           <>
             {/* 6 Top Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
               <button
                 onClick={() => navigate("/accounts/vouchers")}
                 className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
@@ -441,17 +441,31 @@ const DashboardPage: React.FC = () => {
               </button>
 
               <button
-                onClick={() => navigate("/accounts/bank-accounts")}
+                onClick={() => navigate("/accounts/bank-accounts?filter=cash")}
                 className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Cash / Bank</span>
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Cash</span>
+                  <FaMoneyBillWave className="text-emerald-500 text-xs" />
+                </div>
+                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalCashInHand < 0 ? "text-rose-500" : "text-ink"}`}>
+                  ₹{Math.abs(accountsSummary.totalCashInHand).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.cashAccountCount || 0} accounts</div>
+              </button>
+
+              <button
+                onClick={() => navigate("/accounts/bank-accounts?filter=bank")}
+                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Bank</span>
                   <FaUniversity className="text-indigo-500 text-xs" />
                 </div>
-                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
-                  ₹{(accountsSummary.totalCashInHand + accountsSummary.totalBankBalance).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalBankBalance < 0 ? "text-rose-500" : "text-ink"}`}>
+                  ₹{Math.abs(accountsSummary.totalBankBalance).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                 </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.cashBankAccountCount} accounts</div>
+                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.bankAccountCount || 0} accounts</div>
               </button>
 
               {/* <div className="bg-card border border-line-soft rounded-lg p-3">
