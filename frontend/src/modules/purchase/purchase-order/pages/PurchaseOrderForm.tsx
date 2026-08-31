@@ -935,75 +935,66 @@ const PurchaseOrderForm: React.FC = () => {
 
 
   return (
-    <div className="w-full mx-auto">
-      <div className="bg-card rounded-2xl border border-line-soft shadow-xs">
-        <div className="px-6 py-5 border-b border-line-soft">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-ink tracking-tight">
-                {isEdit ? (isLocked ? "View Purchase Order" : "Edit Purchase Order") : "Create Purchase Order"}
-              </h2>
-            </div>
-            <div><BackButton text="Back to List" /></div>
-          </div>
+    <div className="w-full flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 0 }}>
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs flex flex-col flex-1 min-h-0">
+
+        {/* Fixed Header */}
+        <div className="px-5 py-2.5 border-b border-line-soft flex-shrink-0 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-ink">
+            {isEdit ? (isLocked ? "View Purchase Order" : "Edit Purchase Order") : "Create Purchase Order"}
+          </h2>
+          <BackButton text="Back to List" />
         </div>
-        <form className="px-6 py-6 space-y-6" noValidate>
-          {isLocked && (
-            <div className="mb-4 p-4 bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl flex items-center gap-2 text-sm font-semibold">
-              <span className="font-bold">View Only Mode:</span>
-              This Purchase Order is in '{formData.status}' status and cannot be edited. Only Draft orders can be modified.
-            </div>
-          )}
 
-          {/* Main Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div>
-              <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} disabled />
-            </div>
-            <div>
-              <DatePickerCalendar
-                label="PO Date"
-                name="poDate"
-                value={formData.poDate}
-                onChange={(e) => handleChange(e as any)}
-                required
-                error={errors.poDate}
-                disabled={isLocked || isEdit}
-              />
-            </div>
+        {isLocked && (
+          <div className="px-5 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 flex items-center gap-2 text-xs font-semibold flex-shrink-0">
+            <span className="font-bold">View Only:</span>
+            This Purchase Order is in '{formData.status}' status and cannot be edited. Only Draft orders can be modified.
+          </div>
+        )}
 
-            <div>
-              <SelectInput
-                label="Supplier"
-                name="supplierId"
-                value={formData.supplierId}
-                options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]}
-                onChange={handleChange}
-                required
-                searchable
-                disabled={isLocked || isEdit}
-              />
-              {errors.supplierId && <div className="text-red-400 mt-1 text-sm font-medium">{errors.supplierId}</div>}
-            </div>
-            <div>
-              <SelectInput
-                label="Store"
-                name="storeId"
-                value={formData.storeId || ""}
-                options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]}
-                required
-                onChange={handleChange}
-                searchable
-                disabled={isLocked}
-              />
-              {errors.storeId && <div className="text-red-400 mt-1 text-sm font-medium">{errors.storeId}</div>}
-            </div>
+        <form className="flex flex-col flex-1 min-h-0 px-5 py-3 gap-3" noValidate>
 
+          {/* Row 1: PO fields */}
+          <div className="grid grid-cols-4 gap-3 flex-shrink-0">
+            <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} disabled />
+            <DatePickerCalendar
+              label="PO Date"
+              name="poDate"
+              value={formData.poDate}
+              onChange={(e) => handleChange(e as any)}
+              required
+              error={errors.poDate}
+              disabled={isLocked || isEdit}
+            />
+            <SelectInput
+              label="Supplier"
+              name="supplierId"
+              value={formData.supplierId}
+              options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]}
+              onChange={handleChange}
+              required
+              searchable
+              error={errors.supplierId}
+              disabled={isLocked || isEdit}
+            />
+            <SelectInput
+              label="Store"
+              name="storeId"
+              value={formData.storeId || ""}
+              options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]}
+              required
+              onChange={handleChange}
+              searchable
+              error={errors.storeId}
+              disabled={isLocked}
+            />
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
+          {/* Row 2: Billing + Shipping side by side */}
+          <div className="grid grid-cols-2 gap-x-6 flex-shrink-0 border-t border-line-soft pt-3">
             <div>
-              <h6 className="text-lg font-bold text-ink mb-3">Billing</h6>
+              <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Billing Address</p>
               <AddressForm
                 addressValue={formData.billingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, billingAddressLine1: val }))}
@@ -1025,10 +1016,7 @@ const PurchaseOrderForm: React.FC = () => {
               />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h6 className="text-lg font-bold text-ink mb-0">Shipping</h6>
-              </div>
-
+              <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Shipping Address</p>
               <AddressForm
                 addressValue={formData.shippingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}
@@ -1051,162 +1039,163 @@ const PurchaseOrderForm: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-between items-center mb-4 mt-6">
-            <span className="text-lg font-bold text-ink">Order Items</span>
-            <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" disabled={isLocked} />
-          </div>
-
-          <div className="rounded-xl border border-line-soft bg-card-2 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
-            <table className="min-w-full divide-y divide-line-soft">
-              <thead className="bg-card-2 border-b border-line-soft">
-                <tr>
-                  <th className="px-3 py-3 text-center text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider w-12 border-b border-line-soft">#</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">RAW MATERIAL</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft min-w-[200px]">QTY & UOM</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">UNIT PRICE (₹)</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">TAX %</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider border-b border-line-soft">TOTAL (₹)</th>
-                  <th className="px-3 py-3 text-center text-[11px] font-extrabold text-ink-subtle uppercase tracking-wider w-16 border-b border-line-soft"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-soft">
-                {formData.items.map((item, index) => {
-                  const qty = Number(item.quantity) || 0;
-                  const price = Number(item.unitPrice) || 0;
-                  const taxPercent = Number(item.tax) || 0;
-                  const rawMaterial = rawMaterials.find(
-                    (rm) => String(rm.rawMaterialId) === String(item.productId)
-                  );
-                  const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
-                  const taxableAmount = qty * mult * price;
-                  const gstAmount = taxableAmount * (taxPercent / 100);
-                  const lineTotal = taxableAmount + gstAmount;
-                  return (
-                    <tr key={index} className="hover:bg-card/60 transition-colors duration-200">
-                      <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-ink-subtle text-center">{index + 1}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <SelectInput
-                          noMargin={true}
-                          name={`items[${index}].productId`}
-                          value={item.productId ? String(item.productId) : ""}
-                          options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
-                          onChange={(e) => handleItemProductChange(index, e.target.value)}
-                          error={errors[`items.${index}.productId`]}
-                          hideLabel
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <QuantityInput
-                          name={`items[${index}].quantity`}
-                          value={item.quantity}
-                          baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
-                          uom={item.uom}
-                          onUomChange={(newUom) => handleItemChange(index, "uom", newUom)}
-                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value), e.target.uom)}
-                          error={errors[`items.${index}.quantity`]}
-                          step="0.01"
-                          hideLabel
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <TextInput
-                          label=""
-                          name={`items[${index}].unitPrice`}
-                          type="number"
-                          value={String(item.unitPrice)}
-                          onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
-                          error={errors[`items.${index}.unitPrice`]}
-                          min={0}
-                          step={0.01}
-                          placeholder="0.00"
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <TextInput
-                          name={`items[${index}].tax`}
-                          type="number"
-                          value={String(item.tax || 0)}
-                          onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
-                          min={0}
-                          max={100}
-                          step={0.01}
-                          placeholder="0"
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right font-extrabold text-ink">₹{lineTotal.toFixed(2)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-center">
-                        <DeleteButton
-                          onClick={() => removeItem(index)}
-                          disabled={isLocked}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-                {formData.items.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-ink-subtle font-bold">
-                      No items added — click "Add Item" to begin
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            <div className="col-span-2">
-              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
+          {/* Row 3: Order Items (flex-1 — takes all remaining vertical space) */}
+          <div className="flex flex-col flex-1 min-h-0 border-t border-line-soft pt-3">
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
+              <span className="text-sm font-bold text-ink">Order Items</span>
+              <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" size="sm" disabled={isLocked} />
             </div>
-            <div>
-              <div className="bg-card-2 rounded-xl border border-line-soft p-5 shadow-xs">
-                <h6 className="mb-3 font-extrabold text-primary text-base">Order Summary</h6>
-                <div className="flex justify-between mb-2 text-ink-subtle text-sm font-semibold"><span>Subtotal:</span><span className="text-ink font-extrabold">₹{formData.subtotal.toFixed(2)}</span></div>
-
-                {isInterState ? (
-                  gstRateBreakdown.length === 0 ? (
-                    <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
-                  ) : (
-                    gstRateBreakdown.map((group) => (
-                      <div key={`igst-${group.gstRate}`} className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
-                        <span>IGST {group.gstRate}%:</span>
-                        <span>+₹{group.igstAmount.toFixed(2)}</span>
-                      </div>
-                    ))
-                  )
-                ) : (
-                  gstRateBreakdown.length === 0 ? (
-                    <>
-                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
-                      <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
-                    </>
-                  ) : (
-                    gstRateBreakdown.map((group) => (
-                      <React.Fragment key={`gst-${group.gstRate}`}>
-                        <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
-                          <span>CGST {group.cgstRate}%:</span>
-                          <span>+₹{group.cgstAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between mb-2 text-emerald-400 font-semibold text-sm">
-                          <span>SGST {group.sgstRate}%:</span>
-                          <span>+₹{group.sgstAmount.toFixed(2)}</span>
-                        </div>
-                      </React.Fragment>
-                    ))
-                  )
-                )}
-                <hr className="my-3 border-line-soft" />
-                <div className="flex justify-between text-base font-extrabold text-ink"><span>Net Amount:</span><span className="text-primary text-lg font-black">₹{formData.netAmount.toFixed(2)}</span></div>
+            <div className="flex-1 min-h-0 rounded-xl border border-line-soft bg-card-2 overflow-hidden flex flex-col [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
+              <div className="overflow-y-auto flex-1">
+                <table className="min-w-full divide-y divide-line-soft">
+                  <thead className="bg-card-2 sticky top-0 z-10 border-b border-line-soft">
+                    <tr>
+                      <th className="px-3 py-2 text-center text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider w-10">#</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Raw Material</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider min-w-[180px]">Qty & UOM</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Unit Price (₹)</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Tax %</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Total (₹)</th>
+                      <th className="px-3 py-2 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-soft">
+                    {formData.items.map((item, index) => {
+                      const qty = Number(item.quantity) || 0;
+                      const price = Number(item.unitPrice) || 0;
+                      const taxPercent = Number(item.tax) || 0;
+                      const rawMaterial = rawMaterials.find(
+                        (rm) => String(rm.rawMaterialId) === String(item.productId)
+                      );
+                      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+                      const taxableAmount = qty * mult * price;
+                      const gstAmount = taxableAmount * (taxPercent / 100);
+                      const lineTotal = taxableAmount + gstAmount;
+                      return (
+                        <tr key={index} className="hover:bg-card/60 transition-colors duration-200">
+                          <td className="px-3 py-1.5 text-xs font-bold text-ink-subtle text-center">{index + 1}</td>
+                          <td className="px-3 py-1.5">
+                            <SelectInput
+                              noMargin={true}
+                              name={`items[${index}].productId`}
+                              value={item.productId ? String(item.productId) : ""}
+                              options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
+                              onChange={(e) => handleItemProductChange(index, e.target.value)}
+                              error={errors[`items.${index}.productId`]}
+                              hideLabel
+                              disabled={isLocked}
+                            />
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <QuantityInput
+                              name={`items[${index}].quantity`}
+                              value={item.quantity}
+                              baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
+                              uom={item.uom}
+                              onUomChange={(newUom) => handleItemChange(index, "uom", newUom)}
+                              onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value), e.target.uom)}
+                              error={errors[`items.${index}.quantity`]}
+                              step="0.01"
+                              hideLabel
+                              disabled={isLocked}
+                            />
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <TextInput
+                              label=""
+                              name={`items[${index}].unitPrice`}
+                              type="number"
+                              value={String(item.unitPrice)}
+                              onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
+                              error={errors[`items.${index}.unitPrice`]}
+                              min={0}
+                              step={0.01}
+                              placeholder="0.00"
+                              disabled={isLocked}
+                            />
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <TextInput
+                              name={`items[${index}].tax`}
+                              type="number"
+                              value={String(item.tax || 0)}
+                              onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              placeholder="0"
+                              disabled={isLocked}
+                            />
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-xs font-extrabold text-ink">₹{lineTotal.toFixed(2)}</td>
+                          <td className="px-3 py-1.5 text-center">
+                            <DeleteButton onClick={() => removeItem(index)} disabled={isLocked} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {formData.items.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-6 text-center text-ink-subtle text-sm font-bold">
+                          No items added — click "Add Item" to begin
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
 
+          {/* Row 4: Remarks + Order Summary */}
+          <div className="grid grid-cols-3 gap-4 flex-shrink-0 border-t border-line-soft pt-3">
+            <div className="col-span-2">
+              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
+            </div>
+            <div className="bg-card-2 rounded-xl border border-line-soft px-4 py-3 shadow-xs">
+              <h6 className="mb-2 font-extrabold text-primary text-sm">Order Summary</h6>
+              <div className="flex justify-between mb-1.5 text-ink-subtle text-xs font-semibold">
+                <span>Subtotal:</span><span className="text-ink font-extrabold">₹{formData.subtotal.toFixed(2)}</span>
+              </div>
+              {isInterState ? (
+                gstRateBreakdown.length === 0 ? (
+                  <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
+                ) : (
+                  gstRateBreakdown.map((group) => (
+                    <div key={`igst-${group.gstRate}`} className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs">
+                      <span>IGST {group.gstRate}%:</span><span>+₹{group.igstAmount.toFixed(2)}</span>
+                    </div>
+                  ))
+                )
+              ) : (
+                gstRateBreakdown.length === 0 ? (
+                  <>
+                    <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
+                  </>
+                ) : (
+                  gstRateBreakdown.map((group) => (
+                    <React.Fragment key={`gst-${group.gstRate}`}>
+                      <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs">
+                        <span>CGST {group.cgstRate}%:</span><span>+₹{group.cgstAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs">
+                        <span>SGST {group.sgstRate}%:</span><span>+₹{group.sgstAmount.toFixed(2)}</span>
+                      </div>
+                    </React.Fragment>
+                  ))
+                )
+              )}
+              <hr className="my-2 border-line-soft" />
+              <div className="flex justify-between text-sm font-extrabold text-ink">
+                <span>Net Amount:</span><span className="text-primary font-black">₹{formData.netAmount.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Buttons */}
           {!isLocked && (
-            <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
+            <div className="flex justify-end gap-3 flex-shrink-0">
               <CustomButton
                 text={isSubmitting ? "Saving..." : "Save as Draft"}
                 icon={isSubmitting ? undefined : FaSave}

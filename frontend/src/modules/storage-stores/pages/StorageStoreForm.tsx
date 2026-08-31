@@ -268,7 +268,7 @@ const StorageStoreForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto flex-1 flex flex-col">
+        <div className="w-full max-w-[1024px] xl:mr-auto flex-1 flex flex-col">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible flex-1 flex flex-col">
                 {/* Page Header */}
                 <div className="px-6 py-5 border-b border-line-soft">
