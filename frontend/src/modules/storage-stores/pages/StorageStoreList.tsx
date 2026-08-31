@@ -139,12 +139,12 @@ const StorageStoreList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Storage Store Management</h2>
-                        <p className="text-sm text-ink-subtle mt-1">Manage warehouse and storage locations</p>
+                        <h2 className="text-2xl font-bold text-ink"> Store Management</h2>
+                       
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <div className="w-48">

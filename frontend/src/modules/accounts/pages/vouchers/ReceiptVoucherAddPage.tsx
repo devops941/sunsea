@@ -222,7 +222,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
 
   return (
     <div className="p-3">
-      <div className="w-full lg:w-[780px] max-w-full">
+      <div className="w-full lg:w-5xl max-w-full">
         <form onSubmit={handleSubmit} className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
           {/* Title bar — Busy-style green header (Receipt uses green) */}
           <div className="bg-emerald-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">

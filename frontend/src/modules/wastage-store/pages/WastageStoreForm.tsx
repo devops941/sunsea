@@ -217,7 +217,7 @@ const WastageStoreForm: React.FC = () => {
     };
 
     return (
-        <div className="w-full mx-auto h-full flex flex-col">
+        <div className="w-full max-w-[1024px] xl:mr-auto h-full flex flex-col">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft flex flex-col flex-1 h-full">
                 <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-xl font-bold text-ink">
@@ -227,43 +227,46 @@ const WastageStoreForm: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1" noValidate>
-                    <div className="px-6 py-4 flex-1 overflow-y-auto space-y-8">
-                        <div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                <TextInput
-                                    label="Wastage ID"
-                                    name="rawMaterialId"
-                                    value={formData.rawMaterialId}
-                                    readOnly
-                                    disabled
-                                />
-                                <TextInput
-                                    label="Material Name"
-                                    name="materialName"
-                                    value={formData.materialName}
-                                    onChange={handleChange}
-                                    error={errors.materialName}
-                                    required
-                                />
-                                <SelectInput
-                                    label="Category"
-                                    name="categoryId"
-                                    value={formData.categoryId}
-                                    onChange={handleChange}
-                                    options={categoryOptions}
-                                    defaultOptionLabel="Select Category"
-                                />
-                                <SelectInput
-                                    label="Store"
-                                    name="storeId"
-                                    value={formData.storeId}
-                                    onChange={handleChange}
-                                    options={(stores || []).map((s: any) => ({ value: String(s.storeId), label: s.storeName }))}
-                                    defaultOptionLabel="Select Store"
-                                    error={errors.storeId}
-                                    required
-                                    disabled={isEditMode}
-                                />
+                    <div className="px-6 py-4 flex-1 overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Row 1: Wastage ID | Material Name | Category */}
+                            <TextInput
+                                label="Wastage ID"
+                                name="rawMaterialId"
+                                value={formData.rawMaterialId}
+                                readOnly
+                                disabled
+                            />
+                            <TextInput
+                                label="Material Name"
+                                name="materialName"
+                                value={formData.materialName}
+                                onChange={handleChange}
+                                error={errors.materialName}
+                                required
+                            />
+                            <SelectInput
+                                label="Category"
+                                name="categoryId"
+                                value={formData.categoryId}
+                                onChange={handleChange}
+                                options={categoryOptions}
+                                defaultOptionLabel="Select Category"
+                            />
+
+                            {/* Row 2: Store (narrow) | Base UOM (wide) */}
+                            <SelectInput
+                                label="Store"
+                                name="storeId"
+                                value={formData.storeId}
+                                onChange={handleChange}
+                                options={(stores || []).map((s: any) => ({ value: String(s.storeId), label: s.storeName }))}
+                                defaultOptionLabel="Select Store"
+                                error={errors.storeId}
+                                required
+                                disabled={isEditMode}
+                            />
+                            <div className="md:col-span-2">
                                 <UOMSelect
                                     name="baseUom"
                                     label="Base UOM"
@@ -286,37 +289,38 @@ const WastageStoreForm: React.FC = () => {
                                     error={errors.baseUom}
                                     disabled={isEditMode}
                                 />
-
-                                <QuantityInput
-                                    label="Opening Stock"
-                                    name="onHandQty"
-                                    value={formData.onHandQty}
-                                    baseUoms={formData.baseUom}
-                                    uom={openingStockUom || undefined}
-                                    onUomChange={setOpeningStockUom}
-                                    onChange={handleChange}
-                                    error={errors.onHandQty}
-                                    required
-                                    disabled={isEditMode}
-                                />
-                                <SelectInput
-                                    label="Status"
-                                    name="status"
-                                    value={formData.status}
-                                    onChange={handleChange}
-                                    options={[
-                                        { value: "Active", label: "Active" },
-                                        { value: "Inactive", label: "Inactive" },
-                                    ]}
-                                />
-                                <TextInput
-                                    label="Narration"
-                                    name="narration"
-                                    value={formData.narration}
-                                    onChange={handleChange}
-                                    error={errors.narration}
-                                />
                             </div>
+
+                            {/* Row 3: Opening Stock | Status | Narration */}
+                            <QuantityInput
+                                label="Opening Stock"
+                                name="onHandQty"
+                                value={formData.onHandQty}
+                                baseUoms={formData.baseUom}
+                                uom={openingStockUom || undefined}
+                                onUomChange={setOpeningStockUom}
+                                onChange={handleChange}
+                                error={errors.onHandQty}
+                                required
+                                disabled={isEditMode}
+                            />
+                            <SelectInput
+                                label="Status"
+                                name="status"
+                                value={formData.status}
+                                onChange={handleChange}
+                                options={[
+                                    { value: "Active", label: "Active" },
+                                    { value: "Inactive", label: "Inactive" },
+                                ]}
+                            />
+                            <TextInput
+                                label="Narration"
+                                name="narration"
+                                value={formData.narration}
+                                onChange={handleChange}
+                                error={errors.narration}
+                            />
                         </div>
                     </div>
 

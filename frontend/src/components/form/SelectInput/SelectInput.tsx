@@ -233,136 +233,140 @@ const SelectInput: React.FC<SelectInputProps> = ({
         </label>
       )}
 
-      <div className={`relative ${horizontal ? "flex-1" : ""}`}>
-        {/* Hidden native select for form serialization if needed */}
-        <select name={name} value={value} className="hidden" onChange={() => { }}>
-          {defaultOptionLabel && <option value="">{defaultOptionLabel}</option>}
-          {options.map((opt, i) => <option key={i} value={opt.value}>{toPlainText(opt.label)}</option>)}
-        </select>
+      {/* Wrap trigger + error together so error always sits below the input,
+          even when the outer container is a horizontal flex row. */}
+      <div className={`flex flex-col ${horizontal ? "flex-1" : ""}`}>
+        <div className="relative">
+          {/* Hidden native select for form serialization if needed */}
+          <select name={name} value={value} className="hidden" onChange={() => { }}>
+            {defaultOptionLabel && <option value="">{defaultOptionLabel}</option>}
+            {options.map((opt, i) => <option key={i} value={opt.value}>{toPlainText(opt.label)}</option>)}
+          </select>
 
-        {searchable ? (
-          <input
-            type="text"
-            autoComplete="off"
-            ref={triggerRef}
-            disabled={disabled}
-            value={isOpen ? searchTerm : toPlainText(displayLabel)}
-            placeholder={toPlainText(displayLabel)}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              if (!isOpen) {
-                updateDropdownPosition();
-                setIsOpen(true);
-              }
-            }}
-            onFocus={() => {
-              if (!disabled) {
-                updateDropdownPosition();
-                setIsOpen(true);
-              }
-            }}
-            onKeyDown={handleKeyDown}
-            className={`
-              w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
-              border rounded-md outline-none
-              text-xs sm:text-[15px] font-semibold flex items-center justify-between
-              transition-all duration-250 text-left
-              [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-ink)]
-              ${value ? "text-ink" : "text-ink-subtle font-normal"}
-              ${error
-                ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
-              }
-              ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
-              ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-semibold opacity-85" : ""}
-            `}
-          />
-        ) : (
-          <button
-            type="button"
-            ref={triggerRef}
-            disabled={disabled}
-            onClick={() => {
-              if (!disabled) {
-                if (!isOpen) updateDropdownPosition();
-                setIsOpen(!isOpen);
-              }
-            }}
-            onKeyDown={handleKeyDown}
-            className={`
-              w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
-              border rounded-md outline-none
-              text-xs sm:text-[15px] font-semibold flex items-center justify-between
-              transition-all duration-250 text-left
-              ${value ? "text-ink" : "text-ink-subtle font-normal"}
-              ${error
-                ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
-              }
-              ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
-              ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-semibold opacity-85" : ""}
-            `}
-          >
-            <span className="truncate">{displayLabel}</span>
-          </button>
-        )}
+          {searchable ? (
+            <input
+              type="text"
+              autoComplete="off"
+              ref={triggerRef}
+              disabled={disabled}
+              value={isOpen ? searchTerm : toPlainText(displayLabel)}
+              placeholder={toPlainText(displayLabel)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                if (!isOpen) {
+                  updateDropdownPosition();
+                  setIsOpen(true);
+                }
+              }}
+              onFocus={() => {
+                if (!disabled) {
+                  updateDropdownPosition();
+                  setIsOpen(true);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              className={`
+                w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
+                border rounded-md outline-none
+                text-xs sm:text-[15px] font-semibold flex items-center justify-between
+                transition-all duration-250 text-left
+                [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-ink)]
+                ${value ? "text-ink" : "text-ink-subtle font-normal"}
+                ${error
+                  ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                  : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                }
+                ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
+                ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-semibold opacity-85" : ""}
+              `}
+            />
+          ) : (
+            <button
+              type="button"
+              ref={triggerRef}
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) {
+                  if (!isOpen) updateDropdownPosition();
+                  setIsOpen(!isOpen);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              className={`
+                w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
+                border rounded-md outline-none
+                text-xs sm:text-[15px] font-semibold flex items-center justify-between
+                transition-all duration-250 text-left
+                ${value ? "text-ink" : "text-ink-subtle font-normal"}
+                ${error
+                  ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                  : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                }
+                ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
+                ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-semibold opacity-85" : ""}
+              `}
+            >
+              <span className="truncate">{displayLabel}</span>
+            </button>
+          )}
 
-        <span className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none">
-          <FaChevronDown className={`text-[10px] sm:text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-        </span>
+          <span className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none">
+            <FaChevronDown className={`text-[10px] sm:text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+          </span>
 
-        {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
-        {isOpen && createPortal(
-          <div data-select-portal="true" ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink" style={dropdownStyle}>
-            <div className="overflow-y-auto min-h-0 flex-1">
-              {defaultOptionLabel && !searchTerm && (
-                <div
-                  onClick={() => handleSelect("")}
-                  className={`
-                    px-4 py-2.5 text-sm cursor-pointer
-                    transition-colors duration-150
-                    ${!value ? "bg-primary/10 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
-                  `}
-                >
-                  {defaultOptionLabel}
-                </div>
-              )}
-              {filteredOptions.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-ink-subtle text-center">
-                  No results found
-                </div>
-              ) : (
-                filteredOptions.map((option, index) => (
+          {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
+          {isOpen && createPortal(
+            <div data-select-portal="true" ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink" style={dropdownStyle}>
+              <div className="overflow-y-auto min-h-0 flex-1">
+                {defaultOptionLabel && !searchTerm && (
                   <div
-                    key={index}
-                    onClick={() => handleSelect(option.value, option.disabled)}
+                    onClick={() => handleSelect("")}
                     className={`
                       px-4 py-2.5 text-sm cursor-pointer
                       transition-colors duration-150
-                      ${option.disabled ? "opacity-50 cursor-not-allowed text-ink-subtle" : ""}
-                      ${index === highlightedIndex
-                        ? "bg-primary/20 text-primary font-semibold"
-                        : String(value) === String(option.value)
-                          ? "bg-primary/10 text-primary font-semibold"
-                          : "text-ink hover:bg-card-2"
-                      }
+                      ${!value ? "bg-primary/10 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
                     `}
                   >
-                    {option.label}
+                    {defaultOptionLabel}
                   </div>
-                ))
-              )}
-            </div>
-          </div>,
-          document.body
+                )}
+                {filteredOptions.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-ink-subtle text-center">
+                    No results found
+                  </div>
+                ) : (
+                  filteredOptions.map((option, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSelect(option.value, option.disabled)}
+                      className={`
+                        px-4 py-2.5 text-sm cursor-pointer
+                        transition-colors duration-150
+                        ${option.disabled ? "opacity-50 cursor-not-allowed text-ink-subtle" : ""}
+                        ${index === highlightedIndex
+                          ? "bg-primary/20 text-primary font-semibold"
+                          : String(value) === String(option.value)
+                            ? "bg-primary/10 text-primary font-semibold"
+                            : "text-ink hover:bg-card-2"
+                        }
+                      `}
+                    >
+                      {option.label}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>,
+            document.body
+          )}
+        </div>
+
+        {error && (
+          <div className="text-[#dc3545] text-sm font-medium mt-1">
+            {error}
+          </div>
         )}
       </div>
-
-      {error && (
-        <div className="text-[#dc3545] text-sm font-medium mt-1">
-          {error}
-        </div>
-      )}
     </div>
   );
 };

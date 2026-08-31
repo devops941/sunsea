@@ -558,463 +558,216 @@ const ProductForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-xl border border-line-soft shadow-xs">
-                {/* Page Header */}
-                <div className="px-6 py-4 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Product" : "Create Product"}</h2>
-                        <BackButton text="Back to List" to="/products" />
+        <div className="w-full max-w-[1200px] mr-auto product-form-compact">
+            {/* Compact overrides for child form components */}
+            <style>{`
+                .product-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
+                .product-form-compact input, .product-form-compact select,
+                .product-form-compact button[role="combobox"] { height: 30px !important; min-height: 30px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+                .product-form-compact .group { margin-bottom: 0 !important; }
+            `}</style>
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
+
+                {/* ── Page Header ── */}
+                <div className="px-4 py-2 border-b border-line-soft flex items-center justify-between">
+                    <div>
+                        <h2 className="text-sm font-bold text-ink leading-tight">{isEditMode ? "Edit Product" : "Create Product"}</h2>
+                        <p className="text-[11px] text-ink-subtle">
+                            {isEditMode ? `Editing: ${formData.productCode}` : "Enter details to create a new product."}
+                        </p>
                     </div>
+                    <BackButton text="Back to List" to="/products" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
-                    {/* Basic Information */}
+                <form onSubmit={handleSubmit} className="px-4 py-2 space-y-2.5" noValidate>
+
+                    {/* ── Section 1: Basic Product Details ── */}
                     <div>
-                        <h6 className="text-base font-semibold text-ink mb-3">Basic Information</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                            <TextInput
-                                label="Product Code"
-                                name="productCode"
-                                value={formData.productCode}
-                                placeholder="e.g. PRD-001"
-                                required
-                                onChange={handleChange}
-                                disabled
-                            />
-                            <TextInput
-                                label="Product Name"
-                                name="productName"
-                                value={formData.productName}
-                                placeholder="e.g. Plastic Bucket 20L"
-                                required
-                                onChange={handleChange}
-                                error={errors.productName}
-                            />
-                            <SelectInput
-                                label="Category"
-                                name="categoryId"
-                                value={formData.categoryId}
-                                options={categoryOptions}
-                                defaultOptionLabel="-- Select Category --"
-                                required
-                                onChange={handleChange}
-                                error={errors.categoryId}
-                                disabled={isEditMode}
-                            />
-                            <TextInput
-                                label="Opening Stock Qty"
-                                name="openingStockQty"
-                                type="number"
-                                placeholder="0"
-                                required
-                                value={formData.openingStockQty}
-                                onChange={handleChange}
-                                error={errors.openingStockQty}
-                                disabled={isEditMode}
-                            />
-                            <TextInput
-                                label="Minimum Stock Qty"
-                                name="minimumQty"
-                                type="number"
-                                placeholder="0"
-                                value={String(formData.minimumQty)}
-                                onChange={handleChange}
-                                required
-                                error={errors.minimumQty}
-                            />
-                            <SelectInput
-                                label="Opening Stock Store"
-                                name="openingStockStoreId"
-                                required
-                                value={formData.openingStockStoreId}
-                                options={storeOptions}
-                                onChange={handleChange}
-                                error={errors.openingStockStoreId}
-                                disabled={isEditMode}
-                            />
-                            <QuantityInput
-                                label="Weight per Piece"
-                                name="weightPerPiece"
-                                required
-                                value={formData.weightPerPiece}
-                                baseUoms="kg,g"
-                                uom={formData.weightUom}
-                                onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))}
-                                onChange={handleChange}
-                                error={errors.weightPerPiece}
-                                disabled={isEditMode}
-                            />
-                            <TextInput
-                                label="HSN CODE"
-                                name="hsnCode"
-                                value={formData.hsnCode}
-                                placeholder="e.g. 3924"
-                                required
-                                onChange={handleChange}
-                                error={errors.hsnCode}
-                            />
-                            <TextInput
-                                label="Rate (₹)"
-                                name="rate"
-                                type="number"
-                                step="0.01"
-                                value={formData.rate}
-                                placeholder="0.00"
-                                onChange={handleChange}
-                                error={errors.rate}
-                            />
-                            {/* ── Dynamic grade-based rates ── */}
-                            {customerGrades.length > 0 && (
-                                <div className="col-span-full">
-                                    <p className="text-sm font-medium text-ink mb-2">
-                                        Grade Rates (₹) <span className="text-rose-500">*</span>
-                                    </p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                        {customerGrades.map((grade) => (
-                                            <TextInput
-                                                key={grade.id}
-                                                label={`Grade ${grade.name} Rate (₹)`}
-                                                name={`gradeRate_${grade.name}`}
-                                                type="number"
-                                                step="0.01"
-                                                value={gradeRates[grade.name] ?? ""}
-                                                placeholder="0.00"
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setGradeRates(prev => ({ ...prev, [grade.name]: val }));
-                                                    if (errors[`gradeRate_${grade.name}`] || errors.gradeRates) {
-                                                        setErrors(prev => ({ ...prev, [`gradeRate_${grade.name}`]: "", gradeRates: "" }));
-                                                    }
-                                                }}
-                                                error={errors[`gradeRate_${grade.name}`]}
-                                            />
-                                        ))}
-                                    </div>
-                                    {errors.gradeRates && (
-                                        <p className="mt-1 text-sm text-rose-500">{errors.gradeRates}</p>
-                                    )}
-                                </div>
-                            )}
-                            <SelectInput
-                                label="Product Type"
-                                name="productType"
-                                value={formData.productType}
-                                options={[
-                                    { value: "PRODUCTION", label: "Production" },
-                                    { value: "SALES_PRODUCTION", label: "Sales Production" },
-                                ]}
-                                required
-                                onChange={handleChange}
-                                error={errors.productType}
-                            />
+                        <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
+                            <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Basic Product Details</h3>
+                        </div>
+                        <div className="grid grid-cols-4 gap-x-3 gap-y-1">
+                            <TextInput label="Product Code" name="productCode" value={formData.productCode} placeholder="e.g. PRD-001" required onChange={handleChange} disabled />
+                            <TextInput label="Product Name" name="productName" value={formData.productName} placeholder="e.g. Plastic Bucket 20L" required onChange={handleChange} error={errors.productName} />
+                            <SelectInput label="Category" name="categoryId" value={formData.categoryId} options={categoryOptions} defaultOptionLabel="-- Select Category --" required onChange={handleChange} error={errors.categoryId} disabled={isEditMode} />
+                            <SelectInput label="Product Type" name="productType" value={formData.productType} options={[{ value: "PRODUCTION", label: "Production" }, { value: "SALES_PRODUCTION", label: "Sales Production" }]} required onChange={handleChange} error={errors.productType} />
+                            <TextInput label="HSN Code" name="hsnCode" value={formData.hsnCode} placeholder="e.g. 3924" required onChange={handleChange} error={errors.hsnCode} />
+                            <QuantityInput label="Weight per Piece" name="weightPerPiece" required value={formData.weightPerPiece} baseUoms="kg,g" uom={formData.weightUom} onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))} onChange={handleChange} error={errors.weightPerPiece} disabled={isEditMode} />
+                            <TextInput label="Rate (₹)" name="rate" type="number" step="0.01" value={formData.rate} placeholder="0.00" onChange={handleChange} error={errors.rate} />
+                            <SelectInput label="Opening Stock Store" name="openingStockStoreId" required value={formData.openingStockStoreId} options={storeOptions} onChange={handleChange} error={errors.openingStockStoreId} disabled={isEditMode} />
+                            <TextInput label="Opening Stock Qty" name="openingStockQty" type="number" placeholder="0" required value={formData.openingStockQty} onChange={handleChange} error={errors.openingStockQty} disabled={isEditMode} />
+                            <TextInput label="Minimum Stock Qty" name="minimumQty" type="number" placeholder="0" value={String(formData.minimumQty)} onChange={handleChange} required error={errors.minimumQty} />
+                            <SelectInput label="Status" name="isActive" value={formData.isActive} options={[{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }]} onChange={handleChange} />
+                            <TextInput label="Description" name="description" value={formData.description} placeholder="Enter catalogue description..." onChange={handleChange} />
                         </div>
                     </div>
 
-                    {/* Raw Materials Composition */}
-                    <div className="pt-2">
-                        <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-ink m-0">
-                                Raw Materials Composition (BOM) <span className="text-rose-500 ml-1">*</span>
-                            </h6>
-                            <CustomButton
-                                text="Add Raw Material"
-                                icon={FaPlus}
-                                onClick={handleAddRawMaterial}
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                            />
-                        </div>
-                        {rawMaterials.length > 0 ? (
-                            <div className="border border-line-soft rounded-xl overflow-visible bg-card">
-                                <table className="w-full text-left text-sm whitespace-nowrap">
-                                    <thead className="bg-card-2 text-ink-muted border-b border-line-soft">
-                                        <tr>
-                                            <th className="px-4 py-3 font-semibold border-b border-line-soft w-[60%]">Raw Material</th>
-                                            <th className="px-4 py-3 font-semibold border-b border-line-soft w-[30%]">Percentage (%)</th>
-                                            <th className="px-4 py-3 font-semibold border-b border-line-soft w-[10%] text-center">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-line-soft">
-                                        {rawMaterials.map((rm, idx) => (
-                                            <tr key={`rm-${idx}`} className="hover:bg-card-2/60 transition-colors">
-                                                <td className="px-4 py-3 align-top">
-                                                    <SelectInput
-                                                        hideLabel={true}
-                                                        name={`rm-${idx}`}
-                                                        value={rm.rawMaterialId}
-                                                        options={[{ value: "", label: "-- Select --" }, ...bomOptions]}
-                                                        onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)}
-                                                        error={errors[`rawMaterials.${idx}.rawMaterialId`]}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 align-top">
-                                                    <TextInput
-                                                        label=""
-                                                        bottom={true}
-                                                        name={`percent-${idx}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={rm.percentage}
-                                                        placeholder="0.00"
-                                                        onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)}
-                                                        error={errors[`rawMaterials.${idx}.percentage`]}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 align-top text-center">
-                                                    <DeleteButton onClick={() => handleRemoveRawMaterial(idx)} />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {errors.rawMaterials && (
-                                    <div className="px-4 py-2 bg-red-500/10 text-red-400 text-sm font-medium border-t border-line-soft">
-                                        {errors.rawMaterials}
-                                    </div>
-                                )}
+                    {/* ── Section 2: Grade Rates ── */}
+                    {customerGrades.length > 0 && (
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Grade Rates (₹) <span className="text-rose-500">*</span></h3>
                             </div>
-                        ) : (
-                            <div>
-                                <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.rawMaterials ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-medium' : 'bg-card-2 border-line-soft text-ink-subtle'}`}>
-                                    No raw materials added. Click "Add Raw Material" to specify the composition.
-                                </div>
-                                {errors.rawMaterials && (
-                                    <p className="mt-1.5 text-sm text-rose-400 font-medium">{errors.rawMaterials}</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Capacity Setup — create mode only */}
-                    {!isEditMode && <div className="pt-2 mt-4">
-                        <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-ink m-0">Initial Capacity Setup</h6>
-                            <CustomButton
-                                text="Add Capacity Setup"
-                                icon={FaPlus}
-                                onClick={handleAddInitialCapacity}
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                            />
-                        </div>
-                        {initialCapacities.length > 0 ? (
-                            <div className="space-y-4">
-                                {initialCapacities.map((cap, idx) => (
-                                    <div key={`cap-${idx}`} className="p-4 border border-line-soft rounded-xl bg-card-2">
-                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-line-soft">
-                                            <span className="text-xs font-bold text-ink-muted uppercase tracking-wider">Capacity Setup #{idx + 1}</span>
-                                            <DeleteButton onClick={() => handleRemoveInitialCapacity(idx)} />
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                            <div>
-                                                <DatePickerCalendar
-                                                    label="Date"
-                                                    name={`capDate-${idx}`}
-                                                    value={cap.capDate}
-                                                    onChange={(e) => handleInitialCapacityChange(idx, "capDate", e.target.value)}
-                                                    required
-                                                    error={errors[`cap_${idx}_date`]}
-                                                />
-                                            </div>
-                                            <div>
-                                                <SelectInput
-                                                    label="Shift"
-                                                    name={`capShiftId-${idx}`}
-                                                    value={cap.capShiftId}
-                                                    options={[
-                                                        { value: "", label: "-- Shift --" },
-                                                        ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))
-                                                    ]}
-                                                    onChange={(e) => handleInitialCapacityChange(idx, "capShiftId", e.target.value)}
-                                                    required
-                                                    error={errors[`cap_${idx}_shift`]}
-                                                />
-                                            </div>
-                                            <div>
-                                                <SelectInput
-                                                    label="Machine"
-                                                    name={`capMachine-${idx}`}
-                                                    value={cap.capMachine}
-                                                    options={[
-                                                        { value: "", label: "-- Machine --" },
-                                                        ...machines
-                                                            .filter(m =>
-                                                                String(m.machineId) === String(cap.capMachine) ||
-                                                                !initialCapacities.some((c, i) => i !== idx && String(c.capMachine) === String(m.machineId))
-                                                            )
-                                                            .map(m => ({ value: String(m.machineId), label: `${m.machineId} - ${m.machineName}` }))
-                                                    ]}
-                                                    onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)}
-                                                    required
-                                                    error={errors[`cap_${idx}_machine`]}
-                                                />
-                                            </div>
-                                            <div>
-                                                <SelectInput
-                                                    label="Role"
-                                                    name={`capRoleId-${idx}`}
-                                                    value={cap.capRoleId}
-                                                    options={[
-                                                        { value: "", label: "-- Role --" },
-                                                        ...roles.map(role => ({ value: String(role.id), label: role.name }))
-                                                    ]}
-                                                    onChange={(e) => handleInitialCapacityChange(idx, "capRoleId", e.target.value)}
-                                                    required
-                                                    error={errors[`cap_${idx}_role`]}
-                                                />
-                                            </div>
-                                            <div className="col-span-full xl:col-span-3">
-                                                <MultiSelect
-                                                    label="Operators"
-                                                    name={`capOperatorIds-${idx}`}
-                                                    options={employees
-                                                        .filter(emp => {
-                                                            if (!cap.capRoleId) return false;
-                                                            const empRoleId = emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id;
-                                                            return String(empRoleId) === String(cap.capRoleId);
-                                                        })
-                                                        .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
-                                                    value={cap.capOperatorIds}
-                                                    onChange={(_, vals) => handleInitialCapacityChange(idx, "capOperatorIds", vals)}
-                                                    placeholder={cap.capRoleId ? "Select operators" : "Select role first"}
-                                                    required
-                                                    error={errors[`cap_${idx}_operators`]}
-                                                />
-                                            </div>
-                                            <div>
-                                                <TextInput
-                                                    label="Qty / Shift"
-                                                    name={`capQty-${idx}`}
-                                                    type="number"
-                                                    step="any"
-                                                    value={cap.capQty}
-                                                    onChange={(e) => handleInitialCapacityChange(idx, "capQty", e.target.value)}
-                                                    placeholder="0"
-                                                    required
-                                                    error={errors[`cap_${idx}_qty`]}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div className="grid grid-cols-4 gap-x-3 gap-y-1">
+                                {customerGrades.map((grade) => (
+                                    <TextInput
+                                        key={grade.id}
+                                        label={`${grade.name} Rate (₹)`}
+                                        name={`gradeRate_${grade.name}`}
+                                        type="number"
+                                        step="0.01"
+                                        value={gradeRates[grade.name] ?? ""}
+                                        placeholder="0.00"
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setGradeRates(prev => ({ ...prev, [grade.name]: val }));
+                                            if (errors[`gradeRate_${grade.name}`] || errors.gradeRates) {
+                                                setErrors(prev => ({ ...prev, [`gradeRate_${grade.name}`]: "", gradeRates: "" }));
+                                            }
+                                        }}
+                                        error={errors[`gradeRate_${grade.name}`]}
+                                    />
                                 ))}
                             </div>
-                        ) : (
-                            <div className="text-sm italic p-4 rounded-xl bg-card-2 border border-dashed border-line-soft text-ink-subtle text-center">
-                                No initial capacity added. Click "Add Capacity Setup" to configure machines and operators.
-                            </div>
-                        )}
-                    </div>}
-
-                    {/* Status & Description */}
-                    <div className="pt-6">
-                        <h6 className="text-base font-semibold text-ink mb-3">Status & Description</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                            <SelectInput
-                                label="Status"
-                                name="isActive"
-                                value={formData.isActive}
-                                options={[
-                                    { value: "true", label: "Active" },
-                                    { value: "false", label: "Inactive" },
-                                ]}
-                                onChange={handleChange}
-                            />
-                            <div className="lg:col-span-2">
-                                <TextInput
-                                    label="Description"
-                                    name="description"
-                                    value={formData.description}
-                                    placeholder="Enter catalogue description..."
-                                    onChange={handleChange}
-                                />
-                            </div>
+                            {errors.gradeRates && <p className="mt-0.5 text-[11px] text-rose-500">{errors.gradeRates}</p>}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Product Images */}
-                    <div className="pt-2">
-                        <h6 className="text-base font-extrabold text-ink mb-3">Product Images</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                            <div className="col-span-1 md:col-span-2 border border-line-soft rounded-xl p-4 bg-card-2 flex flex-col justify-center h-32">
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    multiple
-                                    accept="image/png,image/jpeg,image/webp"
-                                    className="w-full text-sm text-ink-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/15 file:text-primary hover:file:bg-primary/25 cursor-pointer"
-                                    onChange={handleImageChange}
-                                    disabled={remainingSlots <= 0}
-                                />
-                                <p className="text-xs text-ink-subtle mt-2">
-                                    Maximum {MAX_IMAGES} images. First is primary.<br />
-                                    {remainingSlots > 0 ? `${remainingSlots} slot(s) remaining.` : "Image limit reached."}
-                                </p>
-                                {errors.images && (
-                                    <p className="text-xs text-red-500 mt-1">{errors.images}</p>
+                    {/* ── Images & BOM side-by-side ── */}
+                    <div className="grid grid-cols-2 gap-x-4">
+
+                        {/* Product Images */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Product Images</h3>
+                            </div>
+                            <div className="flex gap-2 items-stretch">
+                                <div className="flex-1 border border-line-soft rounded p-2 bg-card-2 flex flex-col justify-center min-w-0">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        accept="image/png,image/jpeg,image/webp"
+                                        className="w-full text-[11px] text-ink-muted file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-primary/15 file:text-primary hover:file:bg-primary/25 cursor-pointer"
+                                        onChange={handleImageChange}
+                                        disabled={remainingSlots <= 0}
+                                        style={{ height: 'auto', minHeight: 'auto' }}
+                                    />
+                                    <p className="text-[10px] text-ink-subtle mt-0.5 leading-tight">
+                                        Max {MAX_IMAGES} · First = primary · {remainingSlots > 0 ? `${remainingSlots} left` : "Limit reached"}
+                                    </p>
+                                    {errors.images && <p className="text-[10px] text-red-500">{errors.images}</p>}
+                                </div>
+
+                                {existingImages.map((img, index) => (
+                                    <div key={`existing-${img.id}`} className="w-14 h-14 border border-line-soft rounded relative flex items-center justify-center bg-card-2 flex-shrink-0">
+                                        <img src={getImageUrl(img.imageUrl)} alt={`img-${index + 1}`} className="max-h-full max-w-full object-contain rounded" />
+                                        {index === 0 && <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[7px] font-bold px-0.5 rounded leading-none">Pri</span>}
+                                        <button type="button" className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full hover:bg-red-600" onClick={() => handleRemoveExistingImage(img.id)}><FaTimes size={6} /></button>
+                                    </div>
+                                ))}
+
+                                {newImagePreviews.map((preview, index) => (
+                                    <div key={`new-${index}`} className="w-14 h-14 border border-line-soft rounded relative flex items-center justify-center bg-card-2 flex-shrink-0">
+                                        <img src={preview} alt={`new-${index + 1}`} className="max-h-full max-w-full object-contain rounded" />
+                                        {existingImages.length === 0 && index === 0 && <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[7px] font-bold px-0.5 rounded leading-none">Pri</span>}
+                                        <span className="absolute bottom-0.5 left-0.5 bg-primary text-white text-[7px] font-bold px-0.5 rounded leading-none">New</span>
+                                        <button type="button" className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full hover:bg-red-600" onClick={() => handleRemoveNewImage(index)}><FaTimes size={6} /></button>
+                                    </div>
+                                ))}
+
+                                {!hasAnyImage && (
+                                    <div className="w-14 h-14 border border-dashed border-line-soft rounded flex flex-col items-center justify-center bg-card-2 text-ink-subtle flex-shrink-0">
+                                        <FaImage size={12} className="opacity-40" />
+                                        <span className="text-[8px] mt-0.5">No img</span>
+                                    </div>
                                 )}
                             </div>
+                        </div>
 
-                            {existingImages.map((img, index) => (
-                                <div key={`existing-${img.id}`} className="col-span-1 border border-line-soft rounded-xl p-2 relative h-32 flex items-center justify-center bg-card-2 shadow-xs">
-                                    <img
-                                        src={getImageUrl(img.imageUrl)}
-                                        alt={`Product image ${index + 1}`}
-                                        className="max-h-full max-w-full object-contain rounded-lg"
-                                    />
-                                    {index === 0 && (
-                                        <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                            Primary
-                                        </span>
-                                    )}
-                                    <button
-                                        type="button"
-                                        className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors shadow-sm"
-                                        onClick={() => handleRemoveExistingImage(img.id)}
-                                    >
-                                        <FaTimes size={10} />
-                                    </button>
+                        {/* Raw Materials BOM */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2 pb-1 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Raw Materials (BOM) <span className="text-rose-500">*</span></h3>
+                                <CustomButton text="Add Raw Material" icon={FaPlus} onClick={handleAddRawMaterial} type="button" size="sm" variant="secondary" />
+                            </div>
+                            {rawMaterials.length > 0 ? (
+                                <div className="border border-line-soft rounded-lg overflow-visible bg-card">
+                                    <table className="w-full text-left text-[11px]">
+                                        <thead className="bg-card-2 text-ink-muted border-b border-line-soft">
+                                            <tr>
+                                                <th className="px-2 py-1 font-semibold text-[10px] w-[60%]">Raw Material</th>
+                                                <th className="px-2 py-1 font-semibold text-[10px] w-[28%]">Percentage (%)</th>
+                                                <th className="px-2 py-1 font-semibold text-[10px] w-[12%] text-center">Del</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-line-soft">
+                                            {rawMaterials.map((rm, idx) => (
+                                                <tr key={`rm-${idx}`} className="hover:bg-card-2/60 transition-colors">
+                                                    <td className="px-2 py-0.5 align-top">
+                                                        <SelectInput hideLabel={true} name={`rm-${idx}`} value={rm.rawMaterialId} options={[{ value: "", label: "-- Select --" }, ...bomOptions]} onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)} error={errors[`rawMaterials.${idx}.rawMaterialId`]} />
+                                                    </td>
+                                                    <td className="px-2 py-0.5 align-top">
+                                                        <TextInput label="" bottom={true} name={`percent-${idx}`} type="number" step="0.01" value={rm.percentage} placeholder="0.00" onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)} error={errors[`rawMaterials.${idx}.percentage`]} />
+                                                    </td>
+                                                    <td className="px-2 py-0.5 align-top text-center">
+                                                        <DeleteButton onClick={() => handleRemoveRawMaterial(idx)} />
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {errors.rawMaterials && <div className="px-2 py-1 bg-red-500/10 text-red-400 text-[10px] font-medium border-t border-line-soft">{errors.rawMaterials}</div>}
                                 </div>
-                            ))}
-
-                            {newImagePreviews.map((preview, index) => (
-                                <div key={`new-${index}`} className="col-span-1 border border-line-soft rounded-xl p-2 relative h-32 flex items-center justify-center bg-card-2 shadow-xs">
-                                    <img
-                                        src={preview}
-                                        alt={`New image ${index + 1}`}
-                                        className="max-h-full max-w-full object-contain rounded-lg"
-                                    />
-                                    {existingImages.length === 0 && index === 0 && (
-                                        <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                            Primary
-                                        </span>
-                                    )}
-                                    <span className="absolute bottom-2 left-2 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded">
-                                        New
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors shadow-sm"
-                                        onClick={() => handleRemoveNewImage(index)}
-                                    >
-                                        <FaTimes size={10} />
-                                    </button>
-                                </div>
-                            ))}
-
-                            {!hasAnyImage && (
-                                <div className="col-span-1 border border-line-soft rounded-xl p-2 h-32 flex flex-col items-center justify-center bg-card-2 text-ink-subtle">
-                                    <FaImage size={24} className="mb-2 opacity-50" />
-                                    <span className="text-xs font-medium">No images</span>
+                            ) : (
+                                <div>
+                                    <div className={`text-[11px] italic p-2 rounded-lg border border-dashed text-center ${errors.rawMaterials ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-medium' : 'bg-card-2 border-line-soft text-ink-subtle'}`}>
+                                        No raw materials added. Click "Add Raw Material" to specify the composition.
+                                    </div>
+                                    {errors.rawMaterials && <p className="mt-0.5 text-[10px] text-rose-400 font-medium">{errors.rawMaterials}</p>}
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Form Actions */}
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+                    {/* ── Initial Capacity Setup — create mode only ── */}
+                    {!isEditMode && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2 pb-1 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Initial Capacity Setup</h3>
+                                <CustomButton text="Add Capacity Setup" icon={FaPlus} onClick={handleAddInitialCapacity} type="button" size="sm" variant="secondary" />
+                            </div>
+                            {initialCapacities.length > 0 ? (
+                                <div className="space-y-1.5">
+                                    {initialCapacities.map((cap, idx) => (
+                                        <div key={`cap-${idx}`} className="p-2 border border-line-soft rounded-lg bg-card-2/40">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">Setup #{idx + 1}</span>
+                                                <DeleteButton onClick={() => handleRemoveInitialCapacity(idx)} />
+                                            </div>
+                                            <div className="grid grid-cols-6 gap-x-2 gap-y-1">
+                                                <DatePickerCalendar label="Date" name={`capDate-${idx}`} value={cap.capDate} onChange={(e) => handleInitialCapacityChange(idx, "capDate", e.target.value)} required error={errors[`cap_${idx}_date`]} />
+                                                <SelectInput label="Shift" name={`capShiftId-${idx}`} value={cap.capShiftId} options={[{ value: "", label: "-- Shift --" }, ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))]} onChange={(e) => handleInitialCapacityChange(idx, "capShiftId", e.target.value)} required error={errors[`cap_${idx}_shift`]} />
+                                                <SelectInput label="Machine" name={`capMachine-${idx}`} value={cap.capMachine} options={[{ value: "", label: "-- Machine --" }, ...machines.filter(m => String(m.machineId) === String(cap.capMachine) || !initialCapacities.some((c, i) => i !== idx && String(c.capMachine) === String(m.machineId))).map(m => ({ value: String(m.machineId), label: `${m.machineId} - ${m.machineName}` }))]} onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)} required error={errors[`cap_${idx}_machine`]} />
+                                                <SelectInput label="Role" name={`capRoleId-${idx}`} value={cap.capRoleId} options={[{ value: "", label: "-- Role --" }, ...roles.map(role => ({ value: String(role.id), label: role.name }))]} onChange={(e) => handleInitialCapacityChange(idx, "capRoleId", e.target.value)} required error={errors[`cap_${idx}_role`]} />
+                                                <TextInput label="Qty / Shift" name={`capQty-${idx}`} type="number" step="any" value={cap.capQty} onChange={(e) => handleInitialCapacityChange(idx, "capQty", e.target.value)} placeholder="0" required error={errors[`cap_${idx}_qty`]} />
+                                                <div className="col-span-full">
+                                                    <MultiSelect label="Operators" name={`capOperatorIds-${idx}`} options={employees.filter(emp => { if (!cap.capRoleId) return false; const empRoleId = emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id; return String(empRoleId) === String(cap.capRoleId); }).map(emp => ({ value: String(emp.id), label: emp.fullName }))} value={cap.capOperatorIds} onChange={(_, vals) => handleInitialCapacityChange(idx, "capOperatorIds", vals)} placeholder={cap.capRoleId ? "Select operators" : "Select role first"} required error={errors[`cap_${idx}_operators`]} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-[11px] italic p-1.5 rounded-lg bg-card-2 border border-dashed border-line-soft text-ink-subtle text-center">
+                                    No capacity added. Click "Add Capacity Setup" to configure machines and operators.
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Footer Action Buttons ── */}
+                    <div className="flex justify-end gap-3 pt-2 border-t border-line-soft">
                         {!isEditMode && (
                             <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} variant="secondary" disabled={isSubmitting} />
                         )}

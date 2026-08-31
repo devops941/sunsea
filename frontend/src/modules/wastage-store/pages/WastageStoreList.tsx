@@ -205,17 +205,15 @@ const WastageStoreList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1250px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
                         <h2 className="text-2xl font-bold text-ink">Wastage Products Management</h2>
-                        <p className="text-sm text-ink-subtle mt-1">
-                            Manage wastage product master records and stock levels
-                        </p>
+                      
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        <div className="w-44">
+                        <div className="w-40">
                             <SelectInput
                                 label="Store Filter"
                                 hideLabel

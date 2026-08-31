@@ -13,9 +13,9 @@ const WhatsappButton: React.FC<WhatsappButtonProps> = ({ onClick, disabled }) =>
       onClick={onClick}
       disabled={disabled}
       className="
-        w-10 h-10
+        w-7 h-7
         flex items-center justify-center
-        border border-green-500/20 rounded-xl
+        border border-green-500/20 rounded-sm
         cursor-pointer
         bg-green-500/20 text-green-400 border-green-500/30
         transition-all duration-[250ms] ease-in-out
@@ -28,7 +28,7 @@ const WhatsappButton: React.FC<WhatsappButtonProps> = ({ onClick, disabled }) =>
       "
       title="WhatsApp"
     >
-      <MessageCircle className="text-[18px]" size={18} />
+      <MessageCircle size={13} />
     </button>
   );
 };

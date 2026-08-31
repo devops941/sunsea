@@ -45,6 +45,8 @@ export interface AccountsSummary {
   totalCashInHand: number;
   totalBankBalance: number;
   cashBankAccountCount: number;
+  cashAccountCount: number;
+  bankAccountCount: number;
   stockValue: number;
   stockItemCount: number;
   todayReceipts: number;

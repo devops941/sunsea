@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaUniversity, FaPlus, FaArrowRight, FaWallet, FaTimes, FaSync } from "react-icons/fa";
+import React, { useState, useCallback, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { FaUniversity, FaPlus, FaArrowRight, FaTimes, FaSync, FaMoneyBillWave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
 import { accountService } from "../../../../services/accountService";
@@ -22,8 +22,20 @@ interface BankAccountsData {
   totalBalance: number;
 }
 
+const isCashAccount = (group: string, name: string) => {
+  const g = (group || "").toLowerCase().trim();
+  if (g === "cash in hand" || g === "cash") return true;
+  if (g === "cash & bank") {
+    const n = (name || "").toLowerCase();
+    return n.includes("cash") && !n.includes("bank");
+  }
+  return false;
+};
+
 const BankAccountsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterType = searchParams.get("filter"); // "cash" | "bank" | null (all)
   const [showAddForm, setShowAddForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,7 +44,6 @@ const BankAccountsPage: React.FC = () => {
   const [newCode, setNewCode] = useState("");
   const [newGroup, setNewGroup] = useState("Bank Accounts");
   const [newOpeningBalance, setNewOpeningBalance] = useState<string>("");
-  const [newOpeningType, setNewOpeningType] = useState<"DEBIT" | "CREDIT">("DEBIT");
 
   const cacheKey = `accounts:bank-accounts`;
 
@@ -83,12 +94,22 @@ const BankAccountsPage: React.FC = () => {
 
   const data: BankAccountsData = cachedList[0] || { accounts: [], totalBalance: 0 };
 
+  const filteredAccounts = useMemo(() => {
+    if (!filterType) return data.accounts;
+    if (filterType === "cash") return data.accounts.filter(a => isCashAccount(a.group, a.name));
+    if (filterType === "bank") return data.accounts.filter(a => !isCashAccount(a.group, a.name));
+    return data.accounts;
+  }, [data.accounts, filterType]);
+
+  const filteredBalance = useMemo(() => {
+    return filteredAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
+  }, [filteredAccounts]);
+
   const resetForm = () => {
     setNewName("");
     setNewCode("");
     setNewGroup("Bank Accounts");
     setNewOpeningBalance("");
-    setNewOpeningType("DEBIT");
   };
 
   const handleAddBank = async (e: React.FormEvent) => {
@@ -110,7 +131,7 @@ const BankAccountsPage: React.FC = () => {
         type: "ASSET",
         group: newGroup,
         openingBalance,
-        openingBalanceType: newOpeningType,
+        openingBalanceType: "DEBIT" as const,
       });
       toast.success(
         openingBalance > 0
@@ -133,7 +154,10 @@ const BankAccountsPage: React.FC = () => {
       <div className="bg-card rounded-lg border border-line">
         <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaUniversity className="text-blue-600 text-sm" /> Bank & Cash Accounts
+            {filterType === "cash" ? <FaMoneyBillWave className="text-emerald-500 text-sm" />
+              : filterType === "bank" ? <FaUniversity className="text-blue-600 text-sm" />
+              : <FaUniversity className="text-blue-600 text-sm" />}
+            {filterType === "cash" ? "Cash Accounts" : filterType === "bank" ? "Bank Accounts" : "Bank & Cash Accounts"}
             {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
           </h2>
           <div className="flex items-center gap-1.5">
@@ -147,37 +171,60 @@ const BankAccountsPage: React.FC = () => {
               onClick={() => setShowAddForm(true)}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition cursor-pointer"
             >
-              <FaPlus className="text-[10px]" /> Add Bank Account
+              <FaPlus className="text-[10px]" /> Add Account
             </button>
           </div>
         </div>
 
-        {/* Total Balance summary bar */}
+        {/* Filter tabs + Total Balance */}
         <div className="px-3 py-2 bg-card-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSearchParams({})}
+              className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors ${
+                !filterType ? "bg-blue-600 text-white border-blue-600" : "bg-card text-ink-muted border-line hover:border-blue-500/50"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSearchParams({ filter: "cash" })}
+              className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors flex items-center gap-1 ${
+                filterType === "cash" ? "bg-emerald-600 text-white border-emerald-600" : "bg-card text-ink-muted border-line hover:border-emerald-500/50"
+              }`}
+            >
+              <FaMoneyBillWave className="text-[9px]" /> Cash
+            </button>
+            <button
+              onClick={() => setSearchParams({ filter: "bank" })}
+              className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors flex items-center gap-1 ${
+                filterType === "bank" ? "bg-blue-600 text-white border-blue-600" : "bg-card text-ink-muted border-line hover:border-blue-500/50"
+              }`}
+            >
+              <FaUniversity className="text-[9px]" /> Bank
+            </button>
+          </div>
           <div className="flex items-center gap-2">
-            <FaWallet className="text-blue-600 text-sm" />
             <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-              Total Balance (All Accounts)
+              {filterType === "cash" ? "Cash Balance" : filterType === "bank" ? "Bank Balance" : "Total Balance"}
+            </span>
+            <span className={`text-lg font-mono font-bold ${filteredBalance < 0 ? "text-red-500" : "text-ink"}`}>
+              ₹{Math.abs(filteredBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <span className="text-lg font-mono font-bold text-ink">
-            ₹{data.totalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
         </div>
       </div>
 
-      {/* Account Cards - compact grid. No full-page "Loading..." blocker —
-          useListCache returns cached data instantly on repeat visits, and the
-          empty state only shows once the fetch actually completes with 0 rows. */}
-      {data.accounts.length === 0 && !loading ? (
+      {/* Account Cards */}
+      {filteredAccounts.length === 0 && !loading ? (
         <div className="bg-card rounded-lg border border-line p-8 text-center text-xs text-ink-subtle">
-          No bank or cash accounts found. Click "Add Bank Account" to create one.
+          {filterType === "cash" ? "No cash accounts found." : filterType === "bank" ? "No bank accounts found." : "No bank or cash accounts found."} Click "Add Account" to create one.
         </div>
-      ) : data.accounts.length === 0 ? (
+      ) : filteredAccounts.length === 0 ? (
         null
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-          {data.accounts.map((acc) => (
+          {filteredAccounts.map((acc) => (
             <div
               key={acc.id}
               onClick={() => navigate(`/accounts/bank-accounts/${acc.id}`)}
@@ -189,11 +236,11 @@ const BankAccountsPage: React.FC = () => {
                   <p className="text-[10px] uppercase tracking-wide font-mono text-ink-subtle mt-0.5">{acc.code}</p>
                 </div>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                  acc.group.toLowerCase().includes("cash")
+                  isCashAccount(acc.group, acc.name)
                     ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                     : "bg-blue-500/10 text-blue-500 border border-blue-500/20"
                 }`}>
-                  {acc.group.toLowerCase().includes("cash") ? "Cash" : "Bank"}
+                  {isCashAccount(acc.group, acc.name) ? "Cash" : "Bank"}
                 </span>
               </div>
               <div className="border-t border-line pt-2">
@@ -291,19 +338,6 @@ const BankAccountsPage: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                    Opening Type
-                  </label>
-                  <select
-                    value={newOpeningType}
-                    onChange={(e) => setNewOpeningType(e.target.value as "DEBIT" | "CREDIT")}
-                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
-                  >
-                    <option value="DEBIT">Debit (Money in account)</option>
-                    <option value="CREDIT">Credit (Overdraft / Owed)</option>
-                  </select>
-                </div>
               </div>
 
               <div className="text-[10px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
