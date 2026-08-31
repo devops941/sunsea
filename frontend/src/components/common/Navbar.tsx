@@ -131,6 +131,9 @@ const TopNavbar: React.FC<NavbarProps> = ({
           <span className="hidden sm:inline">MD Approvals</span>
         </button>
 
+        {/* Theme Toggle */}
+        <ThemeToggle />
+
         {/* Direct Logout Button */}
         <button
           type="button"
