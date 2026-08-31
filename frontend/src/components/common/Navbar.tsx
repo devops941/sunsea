@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBars, FaUser, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa';
+import ThemeToggle from './ThemeToggle';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logoutUser } from '../../features/auth/authSlice';

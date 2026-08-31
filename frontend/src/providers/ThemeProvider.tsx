@@ -1,37 +1,69 @@
-import React, { createContext, useContext, useEffect, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 
-export type ThemeMode = "dark";
-type ResolvedTheme = "dark";
+export type ThemeMode = "dark" | "light";
 
 interface ThemeContextValue {
-  /** Always "dark" — only dark mode is supported. */
   mode: ThemeMode;
-  /** Always "dark". */
-  theme: ResolvedTheme;
   setMode: (mode: ThemeMode) => void;
   toggle: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Always apply dark theme on mount
+const STORAGE_KEY = "sunsea-theme";
+
+function applyTheme(mode: ThemeMode) {
+  const root = document.documentElement;
+  root.setAttribute("data-theme", mode);
+  if (mode === "dark") {
+    root.classList.add("dark");
+  } else {
+    root.classList.remove("dark");
+  }
+}
+
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [mode, setModeState] = useState<ThemeMode>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+      return stored === "light" ? "light" : "dark";
+    } catch {
+      return "dark";
+    }
+  });
+
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", "dark");
-    document.documentElement.classList.add("dark");
+    applyTheme(mode);
+    try {
+      localStorage.setItem(STORAGE_KEY, mode);
+    } catch {}
+  }, [mode]);
+
+  const setMode = useCallback((newMode: ThemeMode) => {
+    setModeState(newMode);
   }, []);
 
-  const value = useMemo<ThemeContextValue>(
-    () => ({
-      mode: "dark",
-      theme: "dark",
-      setMode: () => {},
-      toggle: () => {},
-    }),
-    []
+  const toggle = useCallback(() => {
+    setModeState((prev) => (prev === "dark" ? "light" : "dark"));
+  }, []);
+
+  const value = useMemo(
+    () => ({ mode, setMode, toggle }),
+    [mode, setMode, toggle]
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 };
 
 export const useTheme = (): ThemeContextValue => {
