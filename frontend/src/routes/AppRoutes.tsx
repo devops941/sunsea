@@ -442,6 +442,7 @@ const AppRoutes = () => {
                 <Route path="/accounts/payable" element={<AmountPayablePage />} />
                 <Route path="/accounts/receivable" element={<AmountReceivablePage />} />
                 <Route path="/accounts/ledger-statement" element={<LedgerStatementPage />} />
+                <Route path="/accounts/ledger-statement/merged" element={<LedgerStatementPage />} />
                 <Route path="/accounts/chart-of-accounts" element={<ChartOfAccountsPage />} />
                 <Route path="/accounts/bank-accounts" element={<BankAccountsPage />} />
                 <Route path="/accounts/payment-voucher" element={<PaymentVoucherPage />} />
