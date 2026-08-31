@@ -123,9 +123,25 @@ class AccountsService {
       await this.ensureSystemLedgersExist();
     }
 
+    // `group` may match either the ledger's own `group` field OR a customer
+    // grade/type name (Grade A, Retailer, etc.). We build the WHERE at query
+    // time to keep it a single fast query.
+    const groupIsPartyMeta =
+      !!params.group &&
+      (
+        // If Prisma returns rows for either grade/type match, use OR. We can't
+        // know ahead of time, so we always OR against both.
+        true
+      );
     const where: Prisma.AccountLedgerWhereInput = {
       ...(params.type && { type: params.type }),
-      ...(params.group && { group: { equals: params.group, mode: "insensitive" } }),
+      ...(params.group && {
+        OR: [
+          { group: { equals: params.group, mode: "insensitive" } },
+          { customer: { customerGrade: { name: { equals: params.group, mode: "insensitive" } } } },
+          { customer: { customerType: { name: { equals: params.group, mode: "insensitive" } } } },
+        ],
+      }),
       ...(params.search && {
         OR: [
           { code: { contains: params.search, mode: "insensitive" } },
@@ -134,6 +150,8 @@ class AccountsService {
         ],
       }),
     };
+    // Silence unused-var lint hint (kept as a doc marker for the reader).
+    void groupIsPartyMeta;
 
     const [ledgers, total] = await Promise.all([
       prisma.accountLedger.findMany({
@@ -142,21 +160,39 @@ class AccountsService {
         take: limit,
         orderBy: { code: "asc" },
         include: {
-          customer: { select: { id: true, firmName: true, customerCode: true } },
+          customer: {
+            select: {
+              id: true,
+              firmName: true,
+              customerCode: true,
+              customerGrade: { select: { name: true } },
+              customerType: { select: { name: true } },
+            },
+          },
           supplier: { select: { id: true, legalName: true, supplierCode: true } },
         },
       }),
       prisma.accountLedger.count({ where }),
     ]);
 
-    // Optional pre-grouped output for sidebar tree views
+    // Optional pre-grouped output for sidebar tree views.
+    // In addition to the ledger's own `group`, party ledgers also appear
+    // under their customer grade/type as pseudo-groups so the user can
+    // pick "Grade A" or "Retailer" straight from the group picker.
     let grouped: Array<{ group: string; ledgers: typeof ledgers }> | null = null;
     if (params.grouped) {
       const buckets: Record<string, typeof ledgers> = {};
+      const push = (key: string, l: typeof ledgers[number]) => {
+        if (!buckets[key]) buckets[key] = [];
+        // Avoid double-listing the same ledger under the same key
+        if (!buckets[key].some((x) => x.id === l.id)) buckets[key].push(l);
+      };
       for (const l of ledgers) {
-        const g = l.group || "Others";
-        if (!buckets[g]) buckets[g] = [];
-        buckets[g].push(l);
+        push(l.group || "Others", l);
+        const gradeName = (l as any).customer?.customerGrade?.name as string | undefined;
+        const typeName = (l as any).customer?.customerType?.name as string | undefined;
+        if (gradeName) push(gradeName, l);
+        if (typeName) push(typeName, l);
       }
       grouped = Object.entries(buckets)
         .sort(([a], [b]) => a.localeCompare(b))
