@@ -1,9 +1,8 @@
 import { ToastContainer } from "react-toastify";
+import { useTheme } from "../../providers/ThemeProvider";
 
-/**
- * Toastify container — always dark theme.
- */
 const ThemedToastContainer = () => {
+  const { mode } = useTheme();
   return (
     <ToastContainer
       position="top-right"
@@ -13,7 +12,7 @@ const ThemedToastContainer = () => {
       closeOnClick
       pauseOnHover
       draggable
-      theme="dark"
+      theme={mode}
     />
   );
 };

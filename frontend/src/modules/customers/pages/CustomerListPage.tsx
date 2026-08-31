@@ -303,7 +303,6 @@ const CustomerListPage: React.FC = () => {
             }
             columns={[
               { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
-              // { header: "CUSTOMER CODE", accessor: "customerCode" },
               { header: " NAME",     accessor: "firmName" },
               { header: "TYPE",  render: (c) => c.customerType?.name  || "—" },
               { header: "GRADE", render: (c) => c.customerGrade?.name || "—" },

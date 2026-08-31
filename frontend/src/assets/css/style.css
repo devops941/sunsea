@@ -101,6 +101,50 @@
 }
 
 /* ===============================
+   Dark theme tokens
+================================ */
+:root[data-theme="dark"] {
+    --color-page: #0B1120;
+    --color-card: #131B2E;
+    --color-card-2: #1C273C;
+    --color-ink: #F8FAFC;
+    --color-ink-muted: #CBD5E1;
+    --color-ink-subtle: #94A3B8;
+    --color-line: #28354A;
+    --color-line-soft: #1E2A3E;
+    --color-head: #1A2438;
+    --color-nav: #0F172A;
+    --color-nav-fg: #94A3B8;
+    --color-nav-hover: #1E293B;
+    --color-nav-active: #0D9488;
+    --color-nav-active-fg: #FFFFFF;
+    --color-accent: #2DD4BF;
+    color-scheme: dark;
+}
+
+/* ===============================
+   Light theme tokens
+================================ */
+:root[data-theme="light"] {
+    --color-page: #F1F5F9;
+    --color-card: #FFFFFF;
+    --color-card-2: #F8FAFC;
+    --color-ink: #0F172A;
+    --color-ink-muted: #334155;
+    --color-ink-subtle: #64748B;
+    --color-line: #E2E8F0;
+    --color-line-soft: #F1F5F9;
+    --color-head: #F1F5F9;
+    --color-nav: #1E293B;
+    --color-nav-fg: #94A3B8;
+    --color-nav-hover: #334155;
+    --color-nav-active: #0D9488;
+    --color-nav-active-fg: #FFFFFF;
+    --color-accent: #0D9488;
+    color-scheme: light;
+}
+
+/* ===============================
    Global style
 ================================ */
 *,
@@ -699,9 +743,31 @@ ul {
 /* ===========================
    Browser Autofill Styling Overrides
 =========================== */
+/* Light mode autofill */
+:root[data-theme="light"] input:-webkit-autofill,
+:root[data-theme="light"] input:-webkit-autofill:hover,
+:root[data-theme="light"] input:-webkit-autofill:focus,
+:root[data-theme="light"] input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+    -webkit-text-fill-color: #0f172a !important;
+    caret-color: #0f172a !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Dark mode autofill */
+:root[data-theme="dark"] input:-webkit-autofill,
+:root[data-theme="dark"] input:-webkit-autofill:hover,
+:root[data-theme="dark"] input:-webkit-autofill:focus,
+:root[data-theme="dark"] input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #131B2E inset !important;
+    -webkit-text-fill-color: #F8FAFC !important;
+    caret-color: #F8FAFC !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
 input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
     -webkit-text-fill-color: #0f172a !important;
