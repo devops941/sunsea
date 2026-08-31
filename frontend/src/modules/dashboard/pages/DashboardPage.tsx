@@ -18,7 +18,7 @@ import {
   FaShoppingCart, FaTruck, FaChartLine, FaClock,
   FaMoneyBillWave, FaCalendarAlt, FaHourglassHalf, FaUserFriends,
   FaArrowUp, FaHandHoldingUsd, FaFileInvoiceDollar,
-  FaUniversity, FaWarehouse, FaCheckCircle, FaSync,
+  FaUniversity, FaWarehouse, FaCheckCircle, FaSync, FaMapMarkerAlt, FaTimes,
 } from "react-icons/fa";
 import { FiTrendingUp, FiTrendingDown, FiMoreVertical } from "react-icons/fi";
 
@@ -68,6 +68,7 @@ const inventoryChartConfig = {
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { can, isSuperAdmin } = usePermission();
+  const [productModal, setProductModal] = useState<{ customer: string; type: "purchased" | "notPurchased"; products: string[] } | null>(null);
 
   // Dashboard widget visibility — super admin always sees everything
   const showOverview     = isSuperAdmin || can("dash-overview.view");
@@ -108,7 +109,9 @@ const DashboardPage: React.FC = () => {
   const machines = dashData.machines || [];
   const weeklyPrograms = dashData.weeklyPrograms || [];
   const rawMaterials = dashData.rawMaterials || [];
-  const productsCount = dashData.productsCount || 0;
+  const allProducts = dashData.products || [];
+  const allCustomers = dashData.customers || [];
+  const productsCount = dashData.productsCount || (Array.isArray(allProducts) ? allProducts.length : 0);
   const employeesCount = dashData.employeesCount || 0;
   const salesInvoices = dashData.salesInvoices || [];
   void rawMaterialStocks; // reserved for future use
@@ -349,6 +352,51 @@ const DashboardPage: React.FC = () => {
       .slice(0, 5);
   }, [salesOrders]);
 
+  // Customer Purchase Report — per-customer: which products purchased vs not purchased
+  const customerPurchaseReport = useMemo(() => {
+    const so = safe(salesOrders);
+    const products = safe(allProducts);
+    const customers = safe(allCustomers);
+    const productNames = products.map((p: any) => p.productName || p.name || "").filter(Boolean);
+    const totalProducts = productNames.length;
+
+    // Build: { customerName → Set of purchased product names }
+    const customerProducts: Record<string, Set<string>> = {};
+    for (const order of so) {
+      const cName = order.customer?.firmName || "Unknown";
+      if (!customerProducts[cName]) customerProducts[cName] = new Set();
+      const items = Array.isArray(order.items) ? order.items : [];
+      for (const item of items) {
+        const pName = item.product?.productName || item.productName || "";
+        if (pName) customerProducts[cName].add(pName);
+      }
+    }
+
+    // Build result for ALL customers (including those with 0 orders)
+    const seen = new Set<string>();
+    const result: Array<{ name: string; purchasedProducts: string[]; notPurchasedProducts: string[] }> = [];
+
+    // Customers from master
+    for (const c of customers) {
+      const cName = c.firmName || "";
+      if (!cName) continue;
+      seen.add(cName);
+      const purchased = customerProducts[cName] || new Set<string>();
+      const purchasedList = productNames.filter((p: string) => purchased.has(p));
+      const notPurchasedList = productNames.filter((p: string) => !purchased.has(p));
+      result.push({ name: cName, purchasedProducts: purchasedList, notPurchasedProducts: notPurchasedList });
+    }
+    // Customers from orders not in master (edge case)
+    for (const [cName, purchased] of Object.entries(customerProducts)) {
+      if (seen.has(cName)) continue;
+      const purchasedList = productNames.filter((p: string) => purchased.has(p));
+      const notPurchasedList = productNames.filter((p: string) => !purchased.has(p));
+      result.push({ name: cName, purchasedProducts: purchasedList, notPurchasedProducts: notPurchasedList });
+    }
+
+    return { totalProducts, customers: result.sort((a, b) => b.purchasedProducts.length - a.purchasedProducts.length || a.name.localeCompare(b.name)) };
+  }, [salesOrders, allProducts, allCustomers]);
+
   /* ═══════════════ RENDER ═══════════════ */
   // Cache-first render: no full-page CommonLoader anymore. On first cold visit
   // cards may briefly show ₹0 / empty until the background fetch resolves.
@@ -482,10 +530,8 @@ const DashboardPage: React.FC = () => {
 
             {/* Alerts + Recent Transactions — single 2-col row.
                 Each card has fixed header (+ footer for txns) with scrollable body. */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4" style={{ height: "340px" }}>
-              {/* Alerts (1 col) — each alert is a separate scrollable row.
-                  Clickable → redirects to the relevant page (Outstanding, Day
-                  Book, Bank Accounts, etc.) based on the alert's link. */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4 mb-3 sm:mb-4" style={{ height: "340px" }}>
+              {/* Alerts (1 col of 5) */}
               <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
                 <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                   <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Alerts</div>
@@ -536,7 +582,7 @@ const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Recent Transactions (2 cols) */}
+              {/* Recent Transactions (2 cols of 5) */}
               <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
                 <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                   <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Transactions</div>
@@ -551,11 +597,11 @@ const DashboardPage: React.FC = () => {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
                         <tr>
-                          <th className="px-3 py-1.5 bg-card-2">Voucher No</th>
-                          <th className="px-3 py-1.5 bg-card-2">Type</th>
-                          <th className="px-3 py-1.5 bg-card-2">Party / Account</th>
-                          <th className="px-3 py-1.5 bg-card-2">Date</th>
-                          <th className="px-3 py-1.5 bg-card-2 text-right">Amount</th>
+                          <th className="px-2 py-1.5 bg-card-2">Voucher No</th>
+                          <th className="px-2 py-1.5 bg-card-2">Type</th>
+                          <th className="px-2 py-1.5 bg-card-2">Party / Account</th>
+                          <th className="px-2 py-1.5 bg-card-2">Date</th>
+                          <th className="px-2 py-1.5 bg-card-2 text-right">Amount</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line-soft">
@@ -571,17 +617,17 @@ const DashboardPage: React.FC = () => {
                           const party = t.debitLedger || t.creditLedger || t.narration || "-";
                           return (
                             <tr key={t.id} className="hover:bg-card-2 transition-colors">
-                              <td className="px-3 py-1.5 font-mono font-semibold text-blue-500 whitespace-nowrap">{t.voucherNo}</td>
-                              <td className="px-3 py-1.5">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
+                              <td className="px-2 py-1.5 font-mono font-semibold text-blue-500 whitespace-nowrap text-[11px]">{t.voucherNo}</td>
+                              <td className="px-2 py-1.5">
+                                <span className={`px-1 py-0.5 rounded text-[9px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
                                   {t.type}
                                 </span>
                               </td>
-                              <td className="px-3 py-1.5 text-ink truncate max-w-[200px]">{party}</td>
-                              <td className="px-3 py-1.5 font-mono text-[11px] text-ink-muted whitespace-nowrap">
+                              <td className="px-2 py-1.5 text-ink truncate max-w-[140px] text-[11px]">{party}</td>
+                              <td className="px-2 py-1.5 font-mono text-[10px] text-ink-muted whitespace-nowrap">
                                 {new Date(t.date).toLocaleDateString("en-IN")}
                               </td>
-                              <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
+                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap text-[11px]">
                                 ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -592,6 +638,74 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Sales Person Location Map (2 cols of 5) */}
+              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+                <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                  <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle flex items-center gap-1.5">
+                    <FaMapMarkerAlt className="text-emerald-500 text-[10px]" /> Sales Person Location
+                  </div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 uppercase">Live</span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden relative">
+                  {/* Satellite map — Google Maps embed (satellite view, Coimbatore–Tirupur region) */}
+                  <iframe
+                    title="Sales Person Locations"
+                    src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d250000!2d77.3!3d11.1!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4t3!5e1!3m2!1sen!2sin"
+                    className="w-full h-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                  />
+                  {/* Location pin overlays */}
+                  {[
+                    { name: "Ravi K", area: "RS Puram", initials: "RK", top: "30%", left: "30%", status: "active", color: "from-emerald-400 to-emerald-600" },
+                    { name: "Suresh M", area: "SIDCO", initials: "SM", top: "62%", left: "62%", status: "active", color: "from-blue-400 to-blue-600" },
+                    { name: "Karthik S", area: "Perundurai", initials: "KS", top: "45%", left: "78%", status: "idle", color: "from-amber-400 to-amber-600" },
+                  ].map((pin, i) => (
+                    <div key={i} className="absolute group" style={{ top: pin.top, left: pin.left, transform: "translate(-50%, -100%)" }}>
+                      <div className="relative flex flex-col items-center cursor-pointer">
+                        {/* Pin body */}
+                        <div className="relative">
+                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${pin.color} border-[2.5px] border-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] flex items-center justify-center`}>
+                            <span className="text-white text-[9px] font-black leading-none">{pin.initials}</span>
+                          </div>
+                          {pin.status === "active" && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-[1.5px] border-white animate-pulse" />}
+                        </div>
+                        {/* Pin tail */}
+                        <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-[6px] border-l-transparent border-r-transparent border-t-white -mt-[1px]" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))" }} />
+                        {/* Name label (always visible) */}
+                        <div className="mt-0.5 bg-black/70 backdrop-blur-sm rounded px-1.5 py-0.5 shadow-lg">
+                          <p className="text-[8px] font-bold text-white whitespace-nowrap leading-tight">{pin.name}</p>
+                        </div>
+                        {/* Expanded tooltip on hover */}
+                        <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col items-center z-20">
+                          <div className="bg-card border border-line-soft rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                            <p className="text-[11px] font-bold text-ink">{pin.name}</p>
+                            <p className="text-[10px] text-ink-subtle">{pin.area}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className={`w-1.5 h-1.5 rounded-full ${pin.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                              <span className="text-[9px] font-semibold text-ink-muted">{pin.status === "active" ? "Active now" : "Idle"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Bottom legend */}
+                  <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5 flex items-center gap-3 z-10">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="text-[9px] font-semibold text-white/80">Active</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <span className="text-[9px] font-semibold text-white/80">Idle</span>
+                    </div>
+                    <span className="text-[9px] text-white/50">3 persons</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -599,15 +713,76 @@ const DashboardPage: React.FC = () => {
         {/* Old sparkline stats row removed — replaced by the 6 accounts cards above. */}
 
         {/* ══════════════════════════════════════════════════════
-           ROW 2.5  –  Trend Chart (Full Width)
+           ROW 2.5  –  Sales/Purchase Trend + Customer Product Report
            ══════════════════════════════════════════════════════ */}
         {showTrend && (
-          <div className="mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+            {/* Sales & Purchase Trend Chart */}
             <SalesPurchaseTrendChart
               salesOrders={salesOrders}
               purchaseOrders={purchaseOrders}
               productionOrders={productionOrders}
             />
+
+            {/* Customer Product Purchase Report */}
+            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle flex items-center gap-1.5">
+                  <FaShoppingCart className="text-indigo-500 text-[10px]" /> Product Purchase Report
+                </div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 border border-indigo-500/30">
+                  {customerPurchaseReport.totalProducts} Products · {customerPurchaseReport.customers.length} Customers
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto">
+                {customerPurchaseReport.customers.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-ink-subtle">No customers available</div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
+                      <tr>
+                        <th className="px-3 py-1.5 bg-card-2">Customer</th>
+                        <th className="px-3 py-1.5 bg-card-2 text-center">Purchased</th>
+                        <th className="px-3 py-1.5 bg-card-2 text-center">Not Purchased</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-soft">
+                      {customerPurchaseReport.customers.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-card-2 transition-colors">
+                          <td className="px-3 py-1.5">
+                            <span className="text-[11px] font-semibold text-ink truncate block max-w-[180px]">{row.name}</span>
+                          </td>
+                          <td className="px-3 py-1.5 text-center">
+                            {row.purchasedProducts.length > 0 ? (
+                              <button
+                                onClick={() => setProductModal({ customer: row.name, type: "purchased", products: row.purchasedProducts })}
+                                className="text-[11px] font-mono font-bold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                              >
+                                {row.purchasedProducts.length}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] font-mono text-ink-muted">0</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5 text-center">
+                            {row.notPurchasedProducts.length > 0 ? (
+                              <button
+                                onClick={() => setProductModal({ customer: row.name, type: "notPurchased", products: row.notPurchasedProducts })}
+                                className="text-[11px] font-mono font-bold text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
+                              >
+                                {row.notPurchasedProducts.length}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] font-mono text-emerald-400">0</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -740,6 +915,54 @@ const DashboardPage: React.FC = () => {
       <div className="shrink-0">
         <DashboardFooter />
       </div>
+
+      {/* ── Product List Modal ────────────────────────────────── */}
+      {productModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setProductModal(null)}>
+          <div className="bg-card border border-line rounded-lg shadow-2xl w-[480px] max-w-[95vw] max-h-[70vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className={`px-4 py-2.5 flex items-center justify-between ${productModal.type === "purchased" ? "bg-emerald-600" : "bg-rose-600"} text-white`}>
+              <div>
+                <h3 className="text-sm font-bold">
+                  {productModal.type === "purchased" ? "Purchased Products" : "Not Purchased Products"}
+                </h3>
+                <p className="text-[11px] text-white/80 mt-0.5">{productModal.customer}</p>
+              </div>
+              <button onClick={() => setProductModal(null)} className="text-white/80 hover:text-white p-1">
+                <FaTimes className="text-sm" />
+              </button>
+            </div>
+            <div className="px-3 py-2 bg-card-2 border-b border-line-soft flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                {productModal.products.length} of {customerPurchaseReport.totalProducts} products
+              </span>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${productModal.type === "purchased" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-rose-500/10 text-rose-500 border-rose-500/30"}`}>
+                {productModal.type === "purchased" ? "ORDERED" : "NOT ORDERED"}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {productModal.products.length === 0 ? (
+                <div className="p-6 text-center text-xs text-ink-subtle">No products</div>
+              ) : (
+                <div className="divide-y divide-line-soft">
+                  {productModal.products.map((product, idx) => (
+                    <div key={idx} className="flex items-center gap-2.5 px-4 py-2 hover:bg-card-2 transition-colors">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${productModal.type === "purchased" ? "bg-emerald-500" : "bg-rose-500"}`}>
+                        {idx + 1}
+                      </span>
+                      <span className="text-xs font-semibold text-ink truncate">{product}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-2 border-t border-line-soft flex justify-end">
+              <button onClick={() => setProductModal(null)} className="px-3 py-1 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

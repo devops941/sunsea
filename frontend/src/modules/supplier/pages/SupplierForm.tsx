@@ -479,180 +479,60 @@ const SupplierForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 0 }}>
-            <div className="bg-card rounded-xl border border-line-soft shadow-xs flex flex-col flex-1 min-h-0">
+        <div className="w-full max-w-[1200px] mr-auto supplier-form-compact">
+            <style>{`
+                .supplier-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
+                .supplier-form-compact input, .supplier-form-compact select,
+                .supplier-form-compact button[role="combobox"] { height: 32px !important; min-height: 32px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+                .supplier-form-compact .group { margin-bottom: 0 !important; }
+            `}</style>
+            <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible">
 
                 {/* Header */}
-                <div className="px-5 py-2.5 border-b border-line-soft flex-shrink-0 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-ink">{isEdit ? "Edit Supplier" : "Add New Supplier"}</h2>
+                <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
+                    <h2 className="text-base font-bold text-ink">{isEdit ? "Edit Supplier" : "Add New Supplier"}</h2>
                     <BackButton text="Back" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0" noValidate>
+                <form onSubmit={handleSubmit} noValidate>
+                    <div className="px-5 py-3 space-y-3">
 
-                    {/* Split body */}
-                    <div className="flex flex-1 min-h-0">
-
-                        {/* LEFT PANEL — identification, contact, tax, opening balance */}
-                        <div className="w-[45%] border-r border-line-soft overflow-y-auto px-5 py-3">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-
-                                {/* Supplier Code | Status */}
-                                <TextInput
-                                    label="Supplier Code"
-                                    name="supplierCode"
-                                    value={formData.supplierCode}
-                                    placeholder="SUP-001"
-                                    required
-                                    error={errors.supplierCode}
-                                    onChange={handleChange}
-                                    disabled
+                        {/* ── Section 1: Supplier Details ── */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Supplier Details</h3>
+                            </div>
+                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                                <TextInput label="Supplier Code" name="supplierCode" value={formData.supplierCode} placeholder="SUP-001" required error={errors.supplierCode} onChange={handleChange} disabled />
+                                <TextInput label="Legal Name" name="legalName" value={formData.legalName} placeholder="Sri Vinayaga Chemicals Pvt Ltd" required error={errors.legalName} onChange={handleChange} />
+                                <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="SVC" error={errors.displayName} onChange={handleChange} />
+                                <SelectInput label="Status" name="status" value={formData.status} options={[{ value: "Active", label: "Active" }, { value: "Backup", label: "Backup" }, { value: "Inactive", label: "Inactive" }, { value: "Blacklisted", label: "Blacklisted" }]} error={errors.status} onChange={handleChange} />
+                                <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Contact person name" error={errors.contactPerson} onChange={handleChange} />
+                                <TextInput label="Email" name="email" value={formData.email} placeholder="sales@svchemicals.com" error={errors.email} onChange={handleChange} />
+                                <TextInput label="GSTIN" name="gstin" value={formData.gstin} placeholder="33ABCDE1234F1Z5" error={errors.gstin} onChange={handleChange} />
+                                <TextInput label="PAN" name="pan" value={formData.pan} placeholder="ABCDE1234F" error={errors.pan} onChange={handleChange} />
+                            </div>
+                            <div className="mt-1.5 max-w-[50%]">
+                                <IndiaPhoneInput
+                                    multi
+                                    label="Mobile Numbers"
+                                    name="phones"
+                                    value={phones}
+                                    onChange={(e) => {
+                                        setPhones(e.target.value);
+                                        if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: "" }));
+                                    }}
+                                    maxNumbers={5}
+                                    error={errors.mobile}
                                 />
-                                <SelectInput
-                                    label="Status"
-                                    name="status"
-                                    value={formData.status}
-                                    options={[
-                                        { value: "Active", label: "Active" },
-                                        { value: "Backup", label: "Backup" },
-                                        { value: "Inactive", label: "Inactive" },
-                                        { value: "Blacklisted", label: "Blacklisted" },
-                                    ]}
-                                    error={errors.status}
-                                    onChange={handleChange}
-                                />
-
-                                {/* Legal Name — full width */}
-                                <div className="col-span-full">
-                                    <TextInput
-                                        label="Legal Name"
-                                        name="legalName"
-                                        value={formData.legalName}
-                                        placeholder="Sri Vinayaga Chemicals Pvt Ltd"
-                                        required
-                                        error={errors.legalName}
-                                        onChange={handleChange}
-                                    />
-                                </div>
-
-                                {/* Display Name | Contact Person */}
-                                <TextInput
-                                    label="Display Name"
-                                    name="displayName"
-                                    value={formData.displayName}
-                                    placeholder="SVC"
-                                    error={errors.displayName}
-                                    onChange={handleChange}
-                                />
-                                <TextInput
-                                    label="Contact Person"
-                                    name="contactPerson"
-                                    value={formData.contactPerson}
-                                    placeholder="Contact person name"
-                                    error={errors.contactPerson}
-                                    onChange={handleChange}
-                                />
-
-                                {/* Mobile — full width */}
-                                <div className="col-span-full">
-                                    <IndiaPhoneInput
-                                        multi
-                                        label="Mobile Numbers"
-                                        name="phones"
-                                        value={phones}
-                                        onChange={(e) => {
-                                            setPhones(e.target.value);
-                                            if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: "" }));
-                                        }}
-                                        maxNumbers={5}
-                                        error={errors.mobile}
-                                    />
-                                </div>
-
-                                {/* Email | GSTIN */}
-                                <TextInput
-                                    label="Email"
-                                    name="email"
-                                    value={formData.email}
-                                    placeholder="sales@svchemicals.com"
-                                    error={errors.email}
-                                    onChange={handleChange}
-                                />
-                                <TextInput
-                                    label="GSTIN"
-                                    name="gstin"
-                                    value={formData.gstin}
-                                    placeholder="33ABCDE1234F1Z5"
-                                    error={errors.gstin}
-                                    onChange={handleChange}
-                                />
-
-                                {/* PAN */}
-                                <TextInput
-                                    label="PAN"
-                                    name="pan"
-                                    value={formData.pan}
-                                    placeholder="ABCDE1234F"
-                                    error={errors.pan}
-                                    onChange={handleChange}
-                                />
-
-                                {/* Opening Balance — create mode only */}
-                                {!isEdit && (
-                                    <>
-                                        <div className="col-span-full pt-1 border-t border-line-soft">
-                                            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mt-2">Opening Balance</p>
-                                        </div>
-                                        <div>
-                                            <TextInput
-                                                label="Opening Balance (₹)"
-                                                name="openingBalance"
-                                                type="number"
-                                                value={String(formData.openingBalance)}
-                                                placeholder="0.00"
-                                                error={errors.openingBalance}
-                                                onChange={handleChange}
-                                            />
-                                            <p className="mt-0.5 text-[11px] text-amber-600">⚠ Set once. Cannot be edited later.</p>
-                                        </div>
-                                        <SelectInput
-                                            label="Balance Type"
-                                            name="openingBalanceType"
-                                            value={formData.openingBalanceType}
-                                            options={[
-                                                { value: "CREDIT", label: "Credit (We owe supplier)" },
-                                                { value: "DEBIT", label: "Debit (Advance paid)" },
-                                            ]}
-                                            onChange={handleChange}
-                                        />
-                                        {Number(formData.openingBalance || 0) > 0 && (
-                                            <div className="col-span-full">
-                                                <SelectInput
-                                                    searchable
-                                                    label={formData.openingBalanceType === "DEBIT" ? "Advance Paid From (Bank / Cash)" : "Related Bank / Cash Account (optional)"}
-                                                    name="openingBalancePaidThroughLedgerId"
-                                                    value={String(formData.openingBalancePaidThroughLedgerId || "")}
-                                                    options={[
-                                                        { value: "", label: "— Opening Balance Equity —" },
-                                                        ...bankAccounts.map((b) => ({ value: String(b.id), label: `[${b.code}] ${b.name}` })),
-                                                    ]}
-                                                    onChange={handleChange as any}
-                                                />
-                                            </div>
-                                        )}
-                                    </>
-                                )}
                             </div>
                         </div>
 
-                        {/* RIGHT PANEL — billing address + delivery addresses */}
-                        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
-
-                            {/* Billing Address */}
-                            <div>
-                                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
-                                    Billing Address <span className="text-rose-500">*</span>
-                                </p>
+                        {/* ── Section 2: Billing Address ── */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Billing Address <span className="text-rose-500">*</span></h3>
+                            </div>
                                 <AddressForm
                                     addressValue={formData.billingAddressLine1}
                                     onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
@@ -680,103 +560,103 @@ const SupplierForm: React.FC = () => {
                                     pincodeError={errors.billingAddressPincode}
                                     required
                                 />
-                            </div>
+                        </div>
 
-                            {/* Delivery / Plant Addresses */}
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                                        Delivery / Plant Addresses <span className="text-rose-500">*</span>
-                                    </p>
-                                    <CustomButton
-                                        text="Add Address"
-                                        icon={FaPlus}
-                                        onClick={addShippingAddress}
-                                        type="button"
-                                        size="sm"
-                                        variant="secondary"
-                                    />
-                                </div>
-                                <div className="space-y-3">
-                                    {addresses.length === 0 && (
-                                        <div className="text-center text-sm text-ink-subtle py-3 border border-dashed border-line-soft rounded-xl bg-card-2">
-                                            No addresses added.
-                                        </div>
-                                    )}
-                                    {(() => {
-                                        const isAnyAddressSameAsBilling = addresses.some((addr) =>
+                        {/* ── Section 3: Delivery / Plant Addresses ── */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Delivery / Plant Addresses <span className="text-rose-500">*</span></h3>
+                                <CustomButton text="Add Address" icon={FaPlus} onClick={addShippingAddress} type="button" size="sm" variant="secondary" />
+                            </div>
+                            <div className="space-y-2">
+                                {addresses.length === 0 && (
+                                    <div className="text-center text-[11px] text-ink-subtle py-2 border border-dashed border-line-soft rounded-lg bg-card-2">No addresses added.</div>
+                                )}
+                                {(() => {
+                                    const isAnyAddressSameAsBilling = addresses.some((addr) =>
+                                        addr.address.addressLine1 === formData.billingAddressLine1 &&
+                                        addr.address.city === formData.billingAddressCity &&
+                                        addr.address.state === formData.billingAddressState &&
+                                        addr.address.pincode === formData.billingAddressPincode &&
+                                        !!formData.billingAddressLine1
+                                    );
+                                    return addresses.map((addr, index) => {
+                                        const isThisSameAsBilling =
                                             addr.address.addressLine1 === formData.billingAddressLine1 &&
                                             addr.address.city === formData.billingAddressCity &&
                                             addr.address.state === formData.billingAddressState &&
                                             addr.address.pincode === formData.billingAddressPincode &&
-                                            !!formData.billingAddressLine1
-                                        );
-                                        return addresses.map((addr, index) => {
-                                            const isThisSameAsBilling =
-                                                addr.address.addressLine1 === formData.billingAddressLine1 &&
-                                                addr.address.city === formData.billingAddressCity &&
-                                                addr.address.state === formData.billingAddressState &&
-                                                addr.address.pincode === formData.billingAddressPincode &&
-                                                !!formData.billingAddressLine1;
-                                            const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
-                                            return (
-                                                <div key={index} className="p-3 border border-line-soft rounded-xl bg-card-2">
-                                                    <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
-                                                        <span className="text-xs font-bold text-ink-muted uppercase tracking-wider">Address {index + 1}</span>
-                                                        <div className="flex items-center gap-3">
-                                                            {showSameAsBillingCheckbox && (
-                                                                <label className="flex items-center gap-1.5 text-xs text-ink-subtle cursor-pointer hover:text-ink">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="w-3.5 h-3.5 rounded accent-primary cursor-pointer"
-                                                                        checked={isThisSameAsBilling}
-                                                                        onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
-                                                                    />
-                                                                    Same as billing
-                                                                </label>
-                                                            )}
-                                                            {addresses.length > 1 && (
-                                                                <DeleteButton onClick={() => removeShippingAddress(index)} />
-                                                            )}
-                                                        </div>
+                                            !!formData.billingAddressLine1;
+                                        const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
+                                        return (
+                                            <div key={index} className="p-2.5 border border-line-soft rounded-lg bg-card-2">
+                                                <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-line-soft">
+                                                    <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">Address {index + 1}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        {showSameAsBillingCheckbox && (
+                                                            <label className="flex items-center gap-1 text-[10px] text-ink-subtle cursor-pointer hover:text-ink">
+                                                                <input type="checkbox" className="w-3 h-3 rounded accent-primary cursor-pointer" checked={isThisSameAsBilling} onChange={(e) => toggleSameAsBilling(index, e.target.checked)} />
+                                                                Same as billing
+                                                            </label>
+                                                        )}
+                                                        {addresses.length > 1 && <DeleteButton onClick={() => removeShippingAddress(index)} />}
                                                     </div>
-                                                    <AddressForm
-                                                        addressValue={addr.address.addressLine1}
-                                                        onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
-                                                        addressError={errors[`addresses.${index}.address.addressLine1`]}
-                                                        stateValue={addr.address.state}
-                                                        onStateChange={(v) => {
-                                                            handleShippingAddressChange(index, "state", v);
-                                                            handleShippingAddressChange(index, "city", "");
-                                                        }}
-                                                        stateError={errors[`addresses.${index}.address.state`]}
-                                                        cityValue={addr.address.city}
-                                                        onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
-                                                        cityError={errors[`addresses.${index}.address.city`]}
-                                                        pincodeValue={addr.address.pincode}
-                                                        onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
-                                                        pincodeError={errors[`addresses.${index}.address.pincode`]}
-                                                        required
-                                                    />
                                                 </div>
-                                            );
-                                        });
-                                    })()}
-                                </div>
+                                                <AddressForm
+                                                    addressValue={addr.address.addressLine1}
+                                                    onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
+                                                    addressError={errors[`addresses.${index}.address.addressLine1`]}
+                                                    stateValue={addr.address.state}
+                                                    onStateChange={(v) => { handleShippingAddressChange(index, "state", v); handleShippingAddressChange(index, "city", ""); }}
+                                                    stateError={errors[`addresses.${index}.address.state`]}
+                                                    cityValue={addr.address.city}
+                                                    onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
+                                                    cityError={errors[`addresses.${index}.address.city`]}
+                                                    pincodeValue={addr.address.pincode}
+                                                    onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
+                                                    pincodeError={errors[`addresses.${index}.address.pincode`]}
+                                                    required
+                                                />
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </div>
+
+                        {/* ── Section 4: Opening Balance — create mode only ── */}
+                        {!isEdit && (
+                            <div>
+                                <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                    <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Opening Balance</h3>
+                                </div>
+                                <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                                    <div>
+                                        <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} />
+                                        <p className="mt-0.5 text-[10px] text-amber-600">Set once. Cannot be edited later.</p>
+                                    </div>
+                                    <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} />
+                                    {Number(formData.openingBalance || 0) > 0 && (
+                                        <div className="col-span-2">
+                                            <SelectInput
+                                                searchable
+                                                label={formData.openingBalanceType === "DEBIT" ? "Advance Paid From (Bank / Cash)" : "Related Bank / Cash Account (optional)"}
+                                                name="openingBalancePaidThroughLedgerId"
+                                                value={String(formData.openingBalancePaidThroughLedgerId || "")}
+                                                options={[{ value: "", label: "— Opening Balance Equity —" }, ...bankAccounts.map((b) => ({ value: String(b.id), label: `[${b.code}] ${b.name}` }))]}
+                                                onChange={handleChange as any}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2 flex-shrink-0">
+                    <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2">
                         {!isEdit && (
-                            <CustomButton
-                                text="Clear Form"
-                                icon={FaEraser}
-                                onClick={handleClear}
-                                type="button"
-                                variant="secondary"
-                            />
+                            <CustomButton text="Clear Form" icon={FaEraser} onClick={handleClear} type="button" variant="secondary" />
                         )}
                         <CustomButton
                             text={isSubmitting ? "Saving..." : (isEdit ? "Update Supplier" : "Save Supplier")}
