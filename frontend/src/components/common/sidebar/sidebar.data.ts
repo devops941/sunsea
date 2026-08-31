@@ -228,9 +228,7 @@ export const sidebarItems: SidebarItem[] = [
     pathsByPermission: [
       { permission: "suppliers.view", path: "/suppliers" },
       { permission: "purchaseOrders.view", path: "/purchase-orders" },
-
       { permission: "invoice.view", path: "/invoice" },
-      { permission: "expenses.view", path: "/expenses" },
       { permission: "purchase-returns.view", path: "/purchase-returns" },
     ],
     children: [
@@ -244,23 +242,18 @@ export const sidebarItems: SidebarItem[] = [
       },
       { title: "Purchase Orders", path: "/purchase-orders", permission: "purchaseOrders.view" },
       { title: "Bill & Invoice", path: "/invoice", permission: "invoice.view" },
-      { title: "Expenses", path: "/expenses", permission: "expenses.view" },
       { title: "Purchase Return", path: "/purchase-returns", permission: "purchase-returns.view" },
     ],
     activePaths: [
       "/suppliers",
       "/purchase-orders",
-
-      "/expenses",
       "/invoice",
       "/purchase-returns",
     ],
     permissionAny: [
       "suppliers.view",
       "purchaseOrders.view",
-
       "invoice.view",
-      "expenses.view",
       "purchase-returns.view",
     ],
   },

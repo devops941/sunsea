@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBars, FaUser, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa';
+import ThemeToggle from './ThemeToggle';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logoutUser } from '../../features/auth/authSlice';
@@ -129,6 +130,9 @@ const TopNavbar: React.FC<NavbarProps> = ({
           <FaCheckCircle size={13} />
           <span className="hidden sm:inline">MD Approvals</span>
         </button>
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
 
         {/* Direct Logout Button */}
         <button

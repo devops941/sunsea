@@ -1,15 +1,8 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  FaUndo,
-  FaPlus,
-  FaSync,
-  FaTimes,
-  FaSearch,
-  FaEye,
-  FaEdit,
-} from "react-icons/fa";
+import { FaUndo, FaPlus, FaTimes, FaEdit, FaEye } from "react-icons/fa";
 import { toast } from "react-toastify";
+
 import { returnService, type SalesReturn } from "../../../../services/returnService";
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
@@ -17,6 +10,11 @@ import { useCustomerGrades } from "../../../../hooks/useCustomerGrades";
 import { formatStockQty } from "../../../../utils/uomConversion";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { useListCache } from "../../../../hooks/useListCache";
+import CustomButton from "../../../../components/ui/Button/Button";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import DataTable, { type DataTableColumn } from "../../../../components/ui/table/DataTable";
 
 interface FilterState {
   customerGradeId: string;
@@ -34,7 +32,7 @@ export const SalesReturnPage: React.FC = () => {
 
   const { customerGrades } = useCustomerGrades();
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
-
+  const [draftFilters, setDraftFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   const cacheKey = `accounts:sales-returns`;
@@ -50,7 +48,7 @@ export const SalesReturnPage: React.FC = () => {
     }
   }, []);
 
-  const { data: returns, loading, refreshing, refresh } = useListCache<SalesReturn>({
+  const { data: returns, loading, refresh } = useListCache<SalesReturn>({
     cacheKey,
     socketModule: "salesReturn",
     fetcher,
@@ -59,9 +57,17 @@ export const SalesReturnPage: React.FC = () => {
   useSocketSync("salesInvoice", undefined, refresh);
   useSocketSync("customer", undefined, refresh);
 
-  const hasActiveFilters = Boolean(appliedFilters.customerGradeId || appliedFilters.status);
+  const activeFilterCount = [appliedFilters.customerGradeId, appliedFilters.status].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const handleFilterOpen = () => setDraftFilters(appliedFilters);
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(draftFilters);
+  };
 
   const handleClearFilters = () => {
+    setDraftFilters(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
   };
 
@@ -95,233 +101,218 @@ export const SalesReturnPage: React.FC = () => {
     return true;
   });
 
-  const paginatedReturns = filteredReturns;
+  const activeGradeName = customerGrades.find(
+    (g) => String(g.id) === appliedFilters.customerGradeId
+  )?.name;
 
-  return (
-    <div className="p-3 space-y-3 min-h-screen">
-      {/* Compact Header + Filters */}
-      <div className="bg-card rounded-lg border border-line">
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
-          <h1 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaUndo className="text-pink-500 text-sm" /> Sales Returns (Credit Note)
-            {refreshing && <FaSync className="animate-spin text-pink-500 text-[10px]" />}
-          </h1>
-          <div className="flex items-center gap-1.5">
+  const gradeOptions = customerGrades.map((g) => ({ label: g.name, value: String(g.id) }));
+
+  const columns: DataTableColumn<SalesReturn>[] = [
+    {
+      header: "#",
+      width: "60px",
+      render: (_item, index) => index + 1,
+      align: "center",
+    },
+    {
+      header: "RETURN NO",
+      render: (item) => (
+        <button
+          onClick={() => setSelectedViewReturn(item)}
+          className="font-mono font-semibold text-indigo-500 hover:underline cursor-pointer"
+          title="Click to view Sales Return Details"
+        >
+          {item.returnNo}
+        </button>
+      ),
+    },
+    {
+      header: "DATE",
+      render: (item) => (
+        <span className="text-ink-muted">
+          {new Date(item.returnDate).toLocaleDateString("en-IN")}
+        </span>
+      ),
+    },
+    {
+      header: "CUSTOMER",
+      render: (item) => {
+        const gradeName = item.customer?.customerGrade?.name || item.customer?.grade;
+        return (
+          <div className="flex flex-col">
+            <span className="font-semibold text-ink">{item.customer?.firmName || "—"}</span>
+            {gradeName && (
+              <span className="text-[11px] text-ink-subtle">Grade: {gradeName}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: "REFUND MODE",
+      render: (item) => (
+        <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-card-2 text-ink-muted border border-line">
+          {item.refundMode || "CREDIT_NOTE"}
+        </span>
+      ),
+    },
+    {
+      header: "STATUS",
+      render: (item) => <StatusBadge status={item.status} />,
+      align: "center",
+    },
+    {
+      header: "GRAND TOTAL (₹)",
+      render: (item) => (
+        <span className="font-mono font-semibold text-indigo-500 whitespace-nowrap">
+          ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+        </span>
+      ),
+      align: "right",
+    },
+    {
+      header: "REASON",
+      render: (item) => (
+        <span className="text-ink-subtle truncate max-w-xs block">{item.reason || "—"}</span>
+      ),
+    },
+    {
+      header: "ACTIONS",
+      align: "center",
+      render: (item) => (
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => setSelectedViewReturn(item)}
+            className="w-7 h-7 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all duration-200 cursor-pointer"
+            title="View"
+          >
+            <FaEye size={12} />
+          </button>
+          {item.status === "DRAFT" && (
             <button
-              onClick={refresh}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
+              onClick={() => navigate(`/sales-returns/edit/${item.id}`)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all duration-200 cursor-pointer"
+              title="Edit"
             >
-              <FaSync className={refreshing ? "animate-spin text-pink-500" : ""} /> Refresh
-            </button>
-            <button
-              onClick={() => navigate("/sales-returns/create")}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500 hover:bg-pink-600 text-white rounded text-xs font-semibold transition cursor-pointer"
-            >
-              <FaPlus className="text-[10px]" /> New Sales Return
-            </button>
-          </div>
-        </div>
-
-        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="w-[160px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Customer Grade</label>
-            <select
-              value={appliedFilters.customerGradeId}
-              onChange={(e) => {
-                setAppliedFilters((prev) => ({ ...prev, customerGradeId: e.target.value }));
-              }}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
-            >
-              <option value="">All Grades</option>
-              {customerGrades.map((g) => (
-                <option key={g.id} value={String(g.id)}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="w-[140px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Status</label>
-            <select
-              value={appliedFilters.status}
-              onChange={(e) => {
-                setAppliedFilters((prev) => ({ ...prev, status: e.target.value }));
-              }}
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
-            >
-              <option value="">All Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="APPROVED">Approved / Completed</option>
-            </select>
-          </div>
-
-          <div className="w-full max-w-[320px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Return no, customer, reason..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                }}
-                className="w-full pl-7 pr-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-pink-500/40 focus:border-pink-500 focus:outline-none"
-              />
-              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
-            </div>
-          </div>
-
-          {(hasActiveFilters || searchTerm) && (
-            <button
-              onClick={() => {
-                handleClearFilters();
-                setSearchTerm("");
-              }}
-              className="px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink border border-line rounded cursor-pointer"
-            >
-              Clear
+              <FaEdit size={12} />
             </button>
           )}
         </div>
+      ),
+    },
+  ];
 
-        {/* Active Filter Chips */}
+  return (
+    <div>
+      <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
+          <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+            <FaUndo className="text-indigo-500" />
+            Sales Returns (Credit Note)
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-3 relative w-full md:w-auto">
+            <SearchInput
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Return no, customer, reason..."
+            />
+
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onOpen={handleFilterOpen}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+            >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Customer Grade
+                  </label>
+                  <SelectInput
+                    name="filterGrade"
+                    value={draftFilters.customerGradeId}
+                    options={gradeOptions}
+                    defaultOptionLabel="All Grades"
+                    searchable={false}
+                    noMargin
+                    onChange={(e) =>
+                      setDraftFilters((p) => ({ ...p, customerGradeId: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Status
+                  </label>
+                  <SelectInput
+                    name="filterStatus"
+                    value={draftFilters.status}
+                    options={[
+                      { value: "DRAFT", label: "Draft" },
+                      { value: "APPROVED", label: "Approved / Completed" },
+                    ]}
+                    defaultOptionLabel="All Statuses"
+                    searchable={false}
+                    noMargin
+                    onChange={(e) =>
+                      setDraftFilters((p) => ({ ...p, status: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            </FilterPopover>
+
+            <CustomButton
+              text="New Sales Return"
+              icon={FaPlus}
+              onClick={() => navigate("/sales-returns/create")}
+            />
+          </div>
+        </div>
+
+        {/* Active filter chips */}
         {hasActiveFilters && (
-          <div className="px-3 py-1.5 border-t border-line-soft bg-card flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-ink-subtle uppercase tracking-wide font-semibold">Active:</span>
+          <div className="flex items-center gap-2 px-6 py-2 border-b border-line flex-wrap">
+            <span className="text-xs text-ink-subtle">Active filters:</span>
 
             {appliedFilters.customerGradeId && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-500/10 text-pink-500 border border-pink-500/20">
-                Grade: {customerGrades.find((g) => String(g.id) === appliedFilters.customerGradeId)?.name || appliedFilters.customerGradeId}
-                <button
-                  type="button"
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Grade: {activeGradeName || appliedFilters.customerGradeId}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
                   onClick={() => handleRemoveFilter("customerGradeId")}
-                  className="hover:text-rose-500 cursor-pointer"
-                >
-                  <FaTimes size={8} />
-                </button>
+                />
               </span>
             )}
 
             {appliedFilters.status && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-500/10 text-pink-500 border border-pink-500/20">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
                 Status: {appliedFilters.status}
-                <button
-                  type="button"
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
                   onClick={() => handleRemoveFilter("status")}
-                  className="hover:text-rose-500 cursor-pointer"
-                >
-                  <FaTimes size={8} />
-                </button>
+                />
               </span>
             )}
           </div>
         )}
+
+        {/* Table */}
+        <DataTable
+          columns={columns}
+          data={filteredReturns}
+          rowKey={(item) => item.id}
+          loading={loading}
+          emptyMessage="No sales return records found."
+        />
       </div>
 
-      {/* Table */}
-      <div className="bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
-          <h2 className="text-xs font-semibold text-ink">Sales Returns</h2>
-          <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredReturns.length}</span>
-        </div>
-        {paginatedReturns.length === 0 ? (
-          loading ? null : <div className="p-8 text-center text-xs text-ink-subtle">No sales return records found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-ink-muted">
-              <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
-                <tr>
-                  <th className="px-3 py-2 w-10">#</th>
-                  <th className="px-3 py-2">Return No</th>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Customer</th>
-                  <th className="px-3 py-2">Refund Mode</th>
-                  <th className="px-3 py-2 text-center">Status</th>
-                  <th className="px-3 py-2 text-right">Grand Total (₹)</th>
-                  <th className="px-3 py-2">Reason</th>
-                  <th className="px-3 py-2 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-soft">
-                {paginatedReturns.map((item, index) => {
-                  const gradeName = item.customer?.customerGrade?.name || item.customer?.grade;
-                  return (
-                    <tr key={item.id} className="hover:bg-card-2 transition-colors">
-                      <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">
-                        {index + 1}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <button
-                          onClick={() => setSelectedViewReturn(item)}
-                          className="font-mono font-semibold text-pink-500 hover:underline cursor-pointer"
-                          title="Click to view Sales Return Details"
-                        >
-                          {item.returnNo}
-                        </button>
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-[11px]">
-                        {new Date(item.returnDate).toLocaleDateString("en-IN")}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-ink">{item.customer?.firmName || "-"}</span>
-                          {gradeName && (
-                            <span className="text-[10px] text-ink-subtle">Grade: {gradeName}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
-                          {item.refundMode || "CREDIT_NOTE"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-mono font-semibold text-pink-500 whitespace-nowrap">
-                        ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-3 py-1.5 text-ink-subtle max-w-xs truncate">{item.reason || "-"}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => setSelectedViewReturn(item)}
-                            className="p-1 text-pink-500 hover:text-white hover:bg-pink-500 border border-pink-200 rounded transition cursor-pointer"
-                            title="View"
-                          >
-                            <FaEye className="w-2.5 h-2.5" />
-                          </button>
-                          {item.status === "DRAFT" && (
-                            <button
-                              onClick={() => navigate(`/sales-returns/edit/${item.id}`)}
-                              className="p-1 text-blue-500 hover:text-white hover:bg-blue-500 border border-blue-200 rounded transition cursor-pointer"
-                              title="Edit"
-                            >
-                              <FaEdit className="w-2.5 h-2.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot className="border-t-2 border-line bg-card-2">
-                <tr>
-                  <td colSpan={6} className="px-3 py-2 text-right text-[10px] font-bold text-ink uppercase tracking-wide">
-                    Page Total ({paginatedReturns.length}):
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold text-sm text-pink-500 font-mono">
-                    ₹{paginatedReturns.reduce((s, r) => s + Number(r.grandTotal || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Sales Return Detail Modal using CommonViewModal */}
+      {/* Sales Return Detail Modal */}
       <CommonViewModal
         show={Boolean(selectedViewReturn)}
         onHide={() => setSelectedViewReturn(null)}
@@ -333,19 +324,35 @@ export const SalesReturnPage: React.FC = () => {
         sections={[
           {
             fields: [
-              { label: "Return Date", value: selectedViewReturn ? new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN") : "-" },
+              {
+                label: "Return Date",
+                value: selectedViewReturn
+                  ? new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")
+                  : "—",
+              },
               {
                 label: "Customer",
                 value: selectedViewReturn?.customer?.firmName
-                  ? `${selectedViewReturn.customer.firmName}${selectedViewReturn.customer.customerGrade?.name
-                    ? ` (${selectedViewReturn.customer.customerGrade.name})`
-                    : ""
-                  }`
-                  : "-",
+                  ? `${selectedViewReturn.customer.firmName}${
+                      selectedViewReturn.customer.customerGrade?.name
+                        ? ` (${selectedViewReturn.customer.customerGrade.name})`
+                        : ""
+                    }`
+                  : "—",
               },
-              { label: "Sales Invoice", value: selectedViewReturn?.salesInvoiceId ? `INV #${selectedViewReturn.salesInvoiceId}` : "Direct Return" },
+              {
+                label: "Sales Invoice",
+                value: selectedViewReturn?.salesInvoiceId
+                  ? `INV #${selectedViewReturn.salesInvoiceId}`
+                  : "Direct Return",
+              },
               { label: "Refund Mode", value: selectedViewReturn?.refundMode || "CREDIT_NOTE" },
-              { label: "Grand Total", value: selectedViewReturn ? `₹${Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "-" },
+              {
+                label: "Grand Total",
+                value: selectedViewReturn
+                  ? `₹${Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                  : "—",
+              },
             ],
           },
         ]}
@@ -360,7 +367,7 @@ export const SalesReturnPage: React.FC = () => {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
                       <tr>
-                        <th className="px-3 py-1.5">Product ID / Item</th>
+                        <th className="px-3 py-1.5">Product / Item</th>
                         <th className="px-3 py-1.5 text-center">Qty</th>
                         <th className="px-3 py-1.5 text-center">Weight / UOM</th>
                         <th className="px-3 py-1.5 text-right">Unit Price (₹)</th>
@@ -379,7 +386,9 @@ export const SalesReturnPage: React.FC = () => {
                               {item.quantity}
                             </td>
                             <td className="px-3 py-1.5 text-center font-medium text-ink-muted">
-                              {item.weight != null ? formatStockQty(item.weight, item.uom || undefined) : "—"}
+                              {item.weight != null
+                                ? formatStockQty(item.weight, item.uom || undefined)
+                                : "—"}
                             </td>
                             <td className="px-3 py-1.5 text-right font-mono text-ink">
                               ₹{Number(item.unitPrice).toFixed(2)}
@@ -406,7 +415,9 @@ export const SalesReturnPage: React.FC = () => {
 
               {selectedViewReturn.narration && (
                 <div className="bg-card-2 p-2 rounded border border-line text-xs">
-                  <span className="font-semibold text-ink block mb-0.5 text-[10px] uppercase tracking-wide">Narration / Notes</span>
+                  <span className="font-semibold text-ink block mb-0.5 text-[10px] uppercase tracking-wide">
+                    Narration / Notes
+                  </span>
                   <p className="text-ink-muted leading-relaxed">{selectedViewReturn.narration}</p>
                 </div>
               )}

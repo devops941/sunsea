@@ -7,6 +7,7 @@ import { logoutUser } from "../../../features/auth/authSlice";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa";
 import { FiLogOut } from "react-icons/fi";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import ThemeToggle from "../ThemeToggle";
 
 const HorizontalNav = () => {
   const { can } = usePermission();
@@ -204,6 +205,9 @@ const HorizontalNav = () => {
             </button>
           );
         })()}
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
 
         {/* Direct Logout Button */}
         <button

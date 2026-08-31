@@ -253,7 +253,7 @@ const Sidebar = () => {
         })}
       </div>
       <div className="p-4 mt-auto shrink-0">
-        <div className={`flex items-center p-3 rounded-2xl bg-card hover:bg-card-2 transition-colors border border-line-soft justify-between`}>
+<div className={`flex items-center p-3 rounded-2xl bg-card hover:bg-card-2 transition-colors border border-line-soft justify-between`}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-card-2 shadow-sm flex items-center justify-center text-primary font-bold text-lg border border-line">
               {avatarImage ? (

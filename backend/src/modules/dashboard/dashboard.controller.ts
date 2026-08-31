@@ -10,6 +10,7 @@ const dashboardController = {
         purchaseOrders,
         productionOrders,
         productsCount,
+        allCustomers,
         employeesCount,
         machines,
         weeklyPrograms,
@@ -27,7 +28,8 @@ const dashboardController = {
             status: true,
             createdAt: true,
             orderDate: true,
-            customer: { select: { id: true, firmName: true } }
+            customer: { select: { id: true, firmName: true } },
+            items: { select: { productId: true, quantity: true, product: { select: { productName: true } } } },
           },
           orderBy: { createdAt: "desc" },
         }).catch(() => []),
@@ -58,8 +60,19 @@ const dashboardController = {
           orderBy: { createdAt: "desc" },
         }).catch(() => []),
 
-        // Products count
-        prisma.product.count().catch(() => 0),
+        // Products — id, name, code for report
+        prisma.product.findMany({
+          where: { isActive: true },
+          select: { id: true, productName: true, productCode: true },
+          orderBy: { productName: "asc" },
+        }).catch(() => []),
+
+        // Customers — for product purchase report
+        prisma.customer.findMany({
+          where: { deletedAt: null },
+          select: { id: true, firmName: true, customerCode: true },
+          orderBy: { firmName: "asc" },
+        }).catch(() => []),
 
         // Active employees count
         prisma.employee.count({ where: { status: "active" } }).catch(() => 0),
@@ -137,7 +150,9 @@ const dashboardController = {
           salesOrders,
           purchaseOrders,
           productionOrders,
-          productsCount,
+          products: productsCount,
+          productsCount: Array.isArray(productsCount) ? productsCount.length : productsCount,
+          customers: allCustomers,
           employeesCount,
           machines,
           weeklyPrograms,

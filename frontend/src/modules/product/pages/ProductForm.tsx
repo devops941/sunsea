@@ -561,32 +561,27 @@ const ProductForm: React.FC = () => {
         <div className="w-full max-w-[1200px] mr-auto product-form-compact">
             {/* Compact overrides for child form components */}
             <style>{`
-                .product-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
+                .product-form-compact label { margin-bottom: 3px !important; font-size: 11px !important; }
                 .product-form-compact input, .product-form-compact select,
-                .product-form-compact button[role="combobox"] { height: 30px !important; min-height: 30px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+                .product-form-compact button[role="combobox"] { height: 34px !important; min-height: 34px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
                 .product-form-compact .group { margin-bottom: 0 !important; }
             `}</style>
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
 
                 {/* ── Page Header ── */}
-                <div className="px-4 py-2 border-b border-line-soft flex items-center justify-between">
-                    <div>
-                        <h2 className="text-sm font-bold text-ink leading-tight">{isEditMode ? "Edit Product" : "Create Product"}</h2>
-                        <p className="text-[11px] text-ink-subtle">
-                            {isEditMode ? `Editing: ${formData.productCode}` : "Enter details to create a new product."}
-                        </p>
-                    </div>
+                <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
+                    <h2 className="text-base font-bold text-ink">{isEditMode ? "Edit Product" : "Create Product"}</h2>
                     <BackButton text="Back to List" to="/products" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-4 py-2 space-y-2.5" noValidate>
+                <form onSubmit={handleSubmit} className="px-5 py-3 space-y-3" noValidate>
 
                     {/* ── Section 1: Basic Product Details ── */}
                     <div>
-                        <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
+                        <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-line-soft">
                             <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Basic Product Details</h3>
                         </div>
-                        <div className="grid grid-cols-4 gap-x-3 gap-y-1">
+                        <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
                             <TextInput label="Product Code" name="productCode" value={formData.productCode} placeholder="e.g. PRD-001" required onChange={handleChange} disabled />
                             <TextInput label="Product Name" name="productName" value={formData.productName} placeholder="e.g. Plastic Bucket 20L" required onChange={handleChange} error={errors.productName} />
                             <SelectInput label="Category" name="categoryId" value={formData.categoryId} options={categoryOptions} defaultOptionLabel="-- Select Category --" required onChange={handleChange} error={errors.categoryId} disabled={isEditMode} />
@@ -605,10 +600,10 @@ const ProductForm: React.FC = () => {
                     {/* ── Section 2: Grade Rates ── */}
                     {customerGrades.length > 0 && (
                         <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
+                            <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Grade Rates (₹) <span className="text-rose-500">*</span></h3>
                             </div>
-                            <div className="grid grid-cols-4 gap-x-3 gap-y-1">
+                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
                                 {customerGrades.map((grade) => (
                                     <TextInput
                                         key={grade.id}
@@ -638,7 +633,7 @@ const ProductForm: React.FC = () => {
 
                         {/* Product Images */}
                         <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
+                            <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Product Images</h3>
                             </div>
                             <div className="flex gap-2 items-stretch">
@@ -687,7 +682,7 @@ const ProductForm: React.FC = () => {
 
                         {/* Raw Materials BOM */}
                         <div>
-                            <div className="flex items-center justify-between mb-2 pb-1 border-b border-line-soft">
+                            <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Raw Materials (BOM) <span className="text-rose-500">*</span></h3>
                                 <CustomButton text="Add Raw Material" icon={FaPlus} onClick={handleAddRawMaterial} type="button" size="sm" variant="secondary" />
                             </div>
@@ -733,7 +728,7 @@ const ProductForm: React.FC = () => {
                     {/* ── Initial Capacity Setup — create mode only ── */}
                     {!isEditMode && (
                         <div>
-                            <div className="flex items-center justify-between mb-2 pb-1 border-b border-line-soft">
+                            <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Initial Capacity Setup</h3>
                                 <CustomButton text="Add Capacity Setup" icon={FaPlus} onClick={handleAddInitialCapacity} type="button" size="sm" variant="secondary" />
                             </div>
