@@ -13,9 +13,9 @@ const EmailButton: React.FC<EmailButtonProps> = ({ onClick, disabled }) => {
       onClick={onClick}
       disabled={disabled}
       className="
-        w-10 h-10
+        w-7 h-7
         flex items-center justify-center
-        border border-orange-500/20 rounded-xl
+        border border-orange-500/20 rounded-sm
         cursor-pointer
         bg-orange-500/20 text-orange-400 border-orange-500/30
         transition-all duration-[250ms] ease-in-out
@@ -28,7 +28,7 @@ const EmailButton: React.FC<EmailButtonProps> = ({ onClick, disabled }) => {
       "
       title="Email"
     >
-      <Mail className="text-[18px]" size={18} />
+      <Mail size={13} />
     </button>
   );
 };

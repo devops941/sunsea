@@ -72,7 +72,7 @@ const alignClass: Record<NonNullable<DataTableColumn<any>["align"]>, string> = {
 // internally (keeping the sticky header in view) rather than pushing the
 // footer off-screen. The offset covers the horizontal nav, page padding, card
 // header and footer that surround the table in BaseLayout.
-const TABLE_MIN_HEIGHT_CLASS = "";
+const TABLE_MIN_HEIGHT_CLASS = "min-h-[calc(100vh-16rem)]";
 const TABLE_MAX_HEIGHT_CLASS = "";
 
 function DataTable<T>({

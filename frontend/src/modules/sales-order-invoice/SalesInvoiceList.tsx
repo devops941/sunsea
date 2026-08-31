@@ -246,10 +246,10 @@ const SalesInvoiceList: React.FC = () => {
             header: "INVOICE DATE",
             render: (item) => <span className="text-ink-muted">{formatDate(item.invoiceDate)}</span>,
         },
-        {
-            header: "DUE DATE",
-            render: (item) => <span className="text-ink-muted">{formatDate(item.dueDate)}</span>,
-        },
+        // {
+        //     header: "DUE DATE",
+        //     render: (item) => <span className="text-ink-muted">{formatDate(item.dueDate)}</span>,
+        // },
         {
             header: "CUSTOMER",
             render: (item) => <span className="font-medium text-ink-muted">{item.customer?.displayName || item.customer?.firmName || "N/A"}</span>,
@@ -266,17 +266,17 @@ const SalesInvoiceList: React.FC = () => {
             header: "NET AMOUNT",
             render: (item) => <span className="font-bold text-emerald-600">{formatCurrency(item.grandTotal)}</span>,
         },
-        {
-            header: "PENDING PAYMENT",
-            render: (item) => {
-                const pending = calculateSalesPendingAmount(item);
-                return (
-                    <span className={`font-semibold ${pending > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
-                        {formatCurrency(pending)}
-                    </span>
-                );
-            },
-        },
+        // {
+        //     header: "PENDING PAYMENT",
+        //     render: (item) => {
+        //         const pending = calculateSalesPendingAmount(item);
+        //         return (
+        //             <span className={`font-semibold ${pending > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
+        //                 {formatCurrency(pending)}
+        //             </span>
+        //         );
+        //     },
+        // },
         {
             header: "STATUS",
             render: () => <StatusBadge status="INVOICED" />,

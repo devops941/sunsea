@@ -17,7 +17,7 @@ const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled, onMouseEnter
       className="
         w-7 h-7
         flex items-center justify-center
-        border border-blue-500/20 rounded-lg
+        border border-blue-500/20 rounded-sm
         cursor-pointer
         bg-blue-500/20 text-blue-400 border-blue-500/30
         transition-all duration-[250ms] ease-in-out

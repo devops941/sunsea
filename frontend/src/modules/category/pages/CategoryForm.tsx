@@ -119,7 +119,9 @@ const CategoryForm: React.FC = () => {
       .then((nextCode) => {
         if (nextCode) setFormData((prev) => ({ ...prev, code: nextCode }));
       })
-      .catch(() => {})
+
+
+      .catch(() => { })
       .finally(() => setIsFetchingCode(false));
   }, [formData.type, isEditMode]);
 
@@ -232,7 +234,7 @@ const CategoryForm: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 lg:p-6 space-y-4" noValidate>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 md:gap-x-8 xl:gap-x-10 gap-y-3 md:gap-y-4 lg:gap-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-8 xl:gap-x-10 gap-y-3 md:gap-y-4 lg:gap-y-5">
             {/* Type — pick first so code auto-generates */}
             <SelectInput
               label="Category Type"
@@ -255,7 +257,7 @@ const CategoryForm: React.FC = () => {
               placeholder="Auto-generated"
               required
               horizontal
-              onChange={() => {}}
+              onChange={() => { }}
               disabled
             />
 

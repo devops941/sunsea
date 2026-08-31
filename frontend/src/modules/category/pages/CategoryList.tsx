@@ -148,18 +148,16 @@ const CategoryList: React.FC = () => {
 
   return (
     <div>
-      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
           <div>
             <h2 className="text-2xl font-bold text-ink">Category Management</h2>
-            <p className="text-sm text-ink-subtle mt-1">
-              Manage categories for Products, Raw Materials &amp; Wastage
-            </p>
+
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {/* Type Filter */}
-            <div className="w-44">
+            <div className="w-40">
               <SelectInput
                 label="Type Filter"
                 hideLabel={true}
@@ -221,10 +219,10 @@ const CategoryList: React.FC = () => {
               pagination={
                 totalPages > 1
                   ? {
-                      currentPage,
-                      totalPages,
-                      onPageChange: (page) => setCurrentPage(page),
-                    }
+                    currentPage,
+                    totalPages,
+                    onPageChange: (page) => setCurrentPage(page),
+                  }
                   : undefined
               }
               columns={[
@@ -257,8 +255,8 @@ const CategoryList: React.FC = () => {
                         {item.type === "PRODUCT"
                           ? `${item._count.products} product(s)`
                           : item.type === "RAW_MATERIAL"
-                          ? `${item._count.rawMaterials} RM(s)`
-                          : `${item._count.rawMaterials + item._count.products} item(s)`}
+                            ? `${item._count.rawMaterials} RM(s)`
+                            : `${item._count.rawMaterials + item._count.products} item(s)`}
                       </span>
                     ) : (
                       "—"
@@ -288,7 +286,7 @@ const CategoryList: React.FC = () => {
                 },
               ]}
             />
-           
+
           </div>
         )}
       </div>
@@ -304,44 +302,44 @@ const CategoryList: React.FC = () => {
         sections={
           selectedItem
             ? [
-                {
-                  fields: [
-                    { label: "Category Code", value: selectedItem.code },
-                    { label: "Category Name", value: selectedItem.name },
-                    {
-                      label: "Type",
-                      value: TYPE_LABELS[selectedItem.type] || selectedItem.type,
-                    },
-                    {
-                      label: "Description",
-                      value: selectedItem.description || "—",
-                    },
-                  ],
-                },
-                {
-                  title: "Usage & Status",
-                  fields: [
-                    {
-                      label: "Status",
-                      value: selectedItem.isActive ? "Active" : "Inactive",
-                    },
-                    {
-                      label: "Products Linked",
-                      value: selectedItem._count?.products ?? "—",
-                    },
-                    {
-                      label: "Raw Materials Linked",
-                      value: selectedItem._count?.rawMaterials ?? "—",
-                    },
-                    {
-                      label: "Created At",
-                      value: selectedItem.createdAt
-                        ? new Date(selectedItem.createdAt).toLocaleDateString()
-                        : "—",
-                    },
-                  ],
-                },
-              ]
+              {
+                fields: [
+                  { label: "Category Code", value: selectedItem.code },
+                  { label: "Category Name", value: selectedItem.name },
+                  {
+                    label: "Type",
+                    value: TYPE_LABELS[selectedItem.type] || selectedItem.type,
+                  },
+                  {
+                    label: "Description",
+                    value: selectedItem.description || "—",
+                  },
+                ],
+              },
+              {
+                title: "Usage & Status",
+                fields: [
+                  {
+                    label: "Status",
+                    value: selectedItem.isActive ? "Active" : "Inactive",
+                  },
+                  {
+                    label: "Products Linked",
+                    value: selectedItem._count?.products ?? "—",
+                  },
+                  {
+                    label: "Raw Materials Linked",
+                    value: selectedItem._count?.rawMaterials ?? "—",
+                  },
+                  {
+                    label: "Created At",
+                    value: selectedItem.createdAt
+                      ? new Date(selectedItem.createdAt).toLocaleDateString()
+                      : "—",
+                  },
+                ],
+              },
+            ]
             : []
         }
       />
