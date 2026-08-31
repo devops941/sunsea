@@ -935,128 +935,73 @@ const PurchaseOrderForm: React.FC = () => {
 
 
   return (
-    <div className="w-full flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 0 }}>
-      <div className="bg-card rounded-xl border border-line-soft shadow-xs flex flex-col flex-1 min-h-0">
+    <div className="w-full max-w-[1200px] mr-auto po-form-compact">
+      <style>{`
+        .po-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
+        .po-form-compact input, .po-form-compact select,
+        .po-form-compact button[role="combobox"],
+        .po-form-compact .react-datepicker-wrapper input,
+        .po-form-compact input[type="date"] { height: 32px !important; min-height: 32px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+        .po-form-compact .group { margin-bottom: 0 !important; }
+      `}</style>
+      <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible">
 
-        {/* Fixed Header */}
-        <div className="px-5 py-2.5 border-b border-line-soft flex-shrink-0 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-ink">
+        {/* Header */}
+        <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
+          <h2 className="text-base font-bold text-ink">
             {isEdit ? (isLocked ? "View Purchase Order" : "Edit Purchase Order") : "Create Purchase Order"}
           </h2>
           <BackButton text="Back to List" />
         </div>
 
         {isLocked && (
-          <div className="px-5 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 flex items-center gap-2 text-xs font-semibold flex-shrink-0">
+          <div className="px-5 py-1.5 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 flex items-center gap-2 text-[11px] font-semibold">
             <span className="font-bold">View Only:</span>
-            This Purchase Order is in '{formData.status}' status and cannot be edited. Only Draft orders can be modified.
+            This PO is in '{formData.status}' status. Only Draft orders can be modified.
           </div>
         )}
 
-        <form className="flex flex-col flex-1 min-h-0 px-5 py-3 gap-3" noValidate>
+        <form noValidate>
+          <div className="px-5 py-3 space-y-3">
 
-          {/* Row 1: PO fields */}
-          <div className="grid grid-cols-4 gap-3 flex-shrink-0">
-            <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} disabled />
-            <DatePickerCalendar
-              label="PO Date"
-              name="poDate"
-              value={formData.poDate}
-              onChange={(e) => handleChange(e as any)}
-              required
-              error={errors.poDate}
-              disabled={isLocked || isEdit}
-            />
-            <SelectInput
-              label="Supplier"
-              name="supplierId"
-              value={formData.supplierId}
-              options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]}
-              onChange={handleChange}
-              required
-              searchable
-              error={errors.supplierId}
-              disabled={isLocked || isEdit}
-            />
-            <SelectInput
-              label="Store"
-              name="storeId"
-              value={formData.storeId || ""}
-              options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]}
-              required
-              onChange={handleChange}
-              searchable
-              error={errors.storeId}
-              disabled={isLocked}
-            />
-          </div>
-
-          {/* Row 2: Billing + Shipping side by side */}
-          <div className="grid grid-cols-2 gap-x-6 flex-shrink-0 border-t border-line-soft pt-3">
+            {/* ── Section 1: PO Details ── */}
             <div>
-              <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Billing Address</p>
-              <AddressForm
-                addressValue={formData.billingAddressLine1 || ""}
-                onAddressChange={(val) => setFormData(prev => ({ ...prev, billingAddressLine1: val }))}
-                addressError={errors.billingAddressLine1}
-                countryValue={formData.billingCountry || "India"}
-                onCountryChange={(val) => setFormData(prev => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))}
-                countryError={errors.billingCountry}
-                stateValue={formData.billingState || ""}
-                onStateChange={handleBillingStateChange}
-                stateError={errors.billingState}
-                cityValue={formData.billingCity || ""}
-                onCityChange={handleBillingCityChange}
-                cityError={errors.billingCity}
-                pincodeValue={formData.billingPincode || ""}
-                onPincodeChange={(val) => setFormData(prev => ({ ...prev, billingPincode: val }))}
-                pincodeError={errors.billingPincode}
-                required
-                disabled={isLocked}
-              />
+              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">PO Details</h3>
+              </div>
+              <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} disabled />
+                <DatePickerCalendar label="PO Date" name="poDate" value={formData.poDate} onChange={(e) => handleChange(e as any)} required error={errors.poDate} disabled={isLocked || isEdit} />
+                <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable error={errors.supplierId} disabled={isLocked || isEdit} />
+                <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable error={errors.storeId} disabled={isLocked} />
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Shipping Address</p>
-              <AddressForm
-                addressValue={formData.shippingAddressLine1 || ""}
-                onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}
-                addressError={errors.shippingAddressLine1}
-                countryValue={formData.shippingCountry || "India"}
-                onCountryChange={(val) => setFormData(prev => ({ ...prev, shippingCountry: val }))}
-                countryError={errors.shippingCountry}
-                stateValue={formData.shippingState || ""}
-                onStateChange={handleShippingStateChange}
-                stateError={errors.shippingState}
-                cityValue={formData.shippingCity || ""}
-                onCityChange={handleShippingCityChange}
-                cityError={errors.shippingCity}
-                pincodeValue={formData.shippingPincode || ""}
-                onPincodeChange={(val) => setFormData(prev => ({ ...prev, shippingPincode: val }))}
-                pincodeError={errors.shippingPincode}
-                disabled={isLocked}
-                resetKey={shippingResetKey}
-              />
-            </div>
-          </div>
 
-          {/* Row 3: Order Items (flex-1 — takes all remaining vertical space) */}
-          <div className="flex flex-col flex-1 min-h-0 border-t border-line-soft pt-3">
-            <div className="flex items-center justify-between mb-2 flex-shrink-0">
-              <span className="text-sm font-bold text-ink">Order Items</span>
-              <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" size="sm" disabled={isLocked} />
+            {/* ── Section 2: Shipping Address ── */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Shipping Address</h3>
+              </div>
+              <AddressForm addressValue={formData.shippingAddressLine1 || ""} onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))} addressError={errors.shippingAddressLine1} countryValue={formData.shippingCountry || "India"} onCountryChange={(val) => setFormData(prev => ({ ...prev, shippingCountry: val }))} countryError={errors.shippingCountry} stateValue={formData.shippingState || ""} onStateChange={handleShippingStateChange} stateError={errors.shippingState} cityValue={formData.shippingCity || ""} onCityChange={handleShippingCityChange} cityError={errors.shippingCity} pincodeValue={formData.shippingPincode || ""} onPincodeChange={(val) => setFormData(prev => ({ ...prev, shippingPincode: val }))} pincodeError={errors.shippingPincode} disabled={isLocked} resetKey={shippingResetKey} />
             </div>
-            <div className="flex-1 min-h-0 rounded-xl border border-line-soft bg-card-2 overflow-hidden flex flex-col [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
-              <div className="overflow-y-auto flex-1">
+
+            {/* ── Section 3: Order Items ── */}
+            <div>
+              <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Order Items</h3>
+                <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" size="sm" disabled={isLocked} />
+              </div>
+              <div className="rounded-lg border border-line-soft bg-card-2 overflow-visible [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
                 <table className="min-w-full divide-y divide-line-soft">
-                  <thead className="bg-card-2 sticky top-0 z-10 border-b border-line-soft">
+                  <thead className="bg-card-2 border-b border-line-soft">
                     <tr>
-                      <th className="px-3 py-2 text-center text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider w-10">#</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Raw Material</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider min-w-[180px]">Qty & UOM</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Unit Price (₹)</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Tax %</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-extrabold text-ink-subtle uppercase tracking-wider">Total (₹)</th>
-                      <th className="px-3 py-2 w-12"></th>
+                      <th className="px-2 py-1.5 text-center text-[10px] font-extrabold text-ink-subtle uppercase w-8">#</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Raw Material</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase min-w-[160px]">Qty & UOM</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Unit Price (₹)</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Tax %</th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-extrabold text-ink-subtle uppercase">Total (₹)</th>
+                      <th className="px-2 py-1.5 w-10"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line-soft">
@@ -1064,71 +1009,28 @@ const PurchaseOrderForm: React.FC = () => {
                       const qty = Number(item.quantity) || 0;
                       const price = Number(item.unitPrice) || 0;
                       const taxPercent = Number(item.tax) || 0;
-                      const rawMaterial = rawMaterials.find(
-                        (rm) => String(rm.rawMaterialId) === String(item.productId)
-                      );
+                      const rawMaterial = rawMaterials.find((rm) => String(rm.rawMaterialId) === String(item.productId));
                       const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
                       const taxableAmount = qty * mult * price;
                       const gstAmount = taxableAmount * (taxPercent / 100);
                       const lineTotal = taxableAmount + gstAmount;
                       return (
-                        <tr key={index} className="hover:bg-card/60 transition-colors duration-200">
-                          <td className="px-3 py-1.5 text-xs font-bold text-ink-subtle text-center">{index + 1}</td>
-                          <td className="px-3 py-1.5">
-                            <SelectInput
-                              noMargin={true}
-                              name={`items[${index}].productId`}
-                              value={item.productId ? String(item.productId) : ""}
-                              options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
-                              onChange={(e) => handleItemProductChange(index, e.target.value)}
-                              error={errors[`items.${index}.productId`]}
-                              hideLabel
-                              disabled={isLocked}
-                            />
+                        <tr key={index} className="hover:bg-card/60 transition-colors">
+                          <td className="px-2 py-1 text-[11px] font-bold text-ink-subtle text-center">{index + 1}</td>
+                          <td className="px-2 py-1">
+                            <SelectInput noMargin={true} name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel disabled={isLocked} />
                           </td>
-                          <td className="px-3 py-1.5">
-                            <QuantityInput
-                              name={`items[${index}].quantity`}
-                              value={item.quantity}
-                              baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
-                              uom={item.uom}
-                              onUomChange={(newUom) => handleItemChange(index, "uom", newUom)}
-                              onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value), e.target.uom)}
-                              error={errors[`items.${index}.quantity`]}
-                              step="0.01"
-                              hideLabel
-                              disabled={isLocked}
-                            />
+                          <td className="px-2 py-1">
+                            <QuantityInput name={`items[${index}].quantity`} value={item.quantity} baseUoms={rawMaterial?.baseUom || item.uom || "KG"} uom={item.uom} onUomChange={(newUom) => handleItemChange(index, "uom", newUom)} onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value), e.target.uom)} error={errors[`items.${index}.quantity`]} step="0.01" hideLabel disabled={isLocked} />
                           </td>
-                          <td className="px-3 py-1.5">
-                            <TextInput
-                              label=""
-                              name={`items[${index}].unitPrice`}
-                              type="number"
-                              value={String(item.unitPrice)}
-                              onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
-                              error={errors[`items.${index}.unitPrice`]}
-                              min={0}
-                              step={0.01}
-                              placeholder="0.00"
-                              disabled={isLocked}
-                            />
+                          <td className="px-2 py-1">
+                            <TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled={isLocked} />
                           </td>
-                          <td className="px-3 py-1.5">
-                            <TextInput
-                              name={`items[${index}].tax`}
-                              type="number"
-                              value={String(item.tax || 0)}
-                              onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
-                              min={0}
-                              max={100}
-                              step={0.01}
-                              placeholder="0"
-                              disabled={isLocked}
-                            />
+                          <td className="px-2 py-1">
+                            <TextInput name={`items[${index}].tax`} type="number" value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} min={0} max={100} step={0.01} placeholder="0" disabled={isLocked} />
                           </td>
-                          <td className="px-3 py-1.5 text-right text-xs font-extrabold text-ink">₹{lineTotal.toFixed(2)}</td>
-                          <td className="px-3 py-1.5 text-center">
+                          <td className="px-2 py-1 text-right text-[11px] font-extrabold text-ink">₹{lineTotal.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-center">
                             <DeleteButton onClick={() => removeItem(index)} disabled={isLocked} />
                           </td>
                         </tr>
@@ -1136,7 +1038,7 @@ const PurchaseOrderForm: React.FC = () => {
                     })}
                     {formData.items.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-3 py-6 text-center text-ink-subtle text-sm font-bold">
+                        <td colSpan={7} className="px-3 py-4 text-center text-ink-subtle text-[11px] font-semibold">
                           No items added — click "Add Item" to begin
                         </td>
                       </tr>
@@ -1145,73 +1047,63 @@ const PurchaseOrderForm: React.FC = () => {
                 </table>
               </div>
             </div>
-          </div>
 
-          {/* Row 4: Remarks + Order Summary */}
-          <div className="grid grid-cols-3 gap-4 flex-shrink-0 border-t border-line-soft pt-3">
-            <div className="col-span-2">
-              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
-            </div>
-            <div className="bg-card-2 rounded-xl border border-line-soft px-4 py-3 shadow-xs">
-              <h6 className="mb-2 font-extrabold text-primary text-sm">Order Summary</h6>
-              <div className="flex justify-between mb-1.5 text-ink-subtle text-xs font-semibold">
-                <span>Subtotal:</span><span className="text-ink font-extrabold">₹{formData.subtotal.toFixed(2)}</span>
+            {/* ── Section 4: Remarks + Order Summary ── */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
               </div>
-              {isInterState ? (
-                gstRateBreakdown.length === 0 ? (
-                  <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
-                ) : (
-                  gstRateBreakdown.map((group) => (
-                    <div key={`igst-${group.gstRate}`} className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs">
-                      <span>IGST {group.gstRate}%:</span><span>+₹{group.igstAmount.toFixed(2)}</span>
-                    </div>
-                  ))
-                )
-              ) : (
-                gstRateBreakdown.length === 0 ? (
-                  <>
-                    <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
-                    <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
-                  </>
-                ) : (
-                  gstRateBreakdown.map((group) => (
-                    <React.Fragment key={`gst-${group.gstRate}`}>
-                      <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs">
-                        <span>CGST {group.cgstRate}%:</span><span>+₹{group.cgstAmount.toFixed(2)}</span>
+              <div className="bg-card-2 rounded-lg border border-line-soft px-3 py-2.5 shadow-xs">
+                <h6 className="mb-1.5 font-extrabold text-primary text-xs">Order Summary</h6>
+                <div className="flex justify-between mb-1 text-ink-subtle text-[11px] font-semibold">
+                  <span>Subtotal:</span><span className="text-ink font-extrabold">₹{formData.subtotal.toFixed(2)}</span>
+                </div>
+                {isInterState ? (
+                  gstRateBreakdown.length === 0 ? (
+                    <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
+                  ) : (
+                    gstRateBreakdown.map((group) => (
+                      <div key={`igst-${group.gstRate}`} className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]">
+                        <span>IGST {group.gstRate}%:</span><span>+₹{group.igstAmount.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between mb-1.5 text-emerald-400 font-semibold text-xs">
-                        <span>SGST {group.sgstRate}%:</span><span>+₹{group.sgstAmount.toFixed(2)}</span>
-                      </div>
-                    </React.Fragment>
-                  ))
-                )
-              )}
-              <hr className="my-2 border-line-soft" />
-              <div className="flex justify-between text-sm font-extrabold text-ink">
-                <span>Net Amount:</span><span className="text-primary font-black">₹{formData.netAmount.toFixed(2)}</span>
+                    ))
+                  )
+                ) : (
+                  gstRateBreakdown.length === 0 ? (
+                    <>
+                      <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
+                      <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
+                    </>
+                  ) : (
+                    gstRateBreakdown.map((group) => (
+                      <React.Fragment key={`gst-${group.gstRate}`}>
+                        <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]">
+                          <span>CGST {group.cgstRate}%:</span><span>+₹{group.cgstAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]">
+                          <span>SGST {group.sgstRate}%:</span><span>+₹{group.sgstAmount.toFixed(2)}</span>
+                        </div>
+                      </React.Fragment>
+                    ))
+                  )
+                )}
+                <hr className="my-1.5 border-line-soft" />
+                <div className="flex justify-between text-xs font-extrabold text-ink">
+                  <span>Net Amount:</span><span className="text-primary font-black">₹{formData.netAmount.toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Footer Buttons */}
-          {!isLocked && (
-            <div className="flex justify-end gap-3 flex-shrink-0">
-              <CustomButton
-                text={isSubmitting ? "Saving..." : "Save as Draft"}
-                icon={isSubmitting ? undefined : FaSave}
-                onClick={(e: any) => handleSubmit(e, "DRAFT")}
-                type="button"
-                disabled={isSubmitting || isSubmittingForApproval}
-              />
-              <CustomButton
-                text={isSubmittingForApproval ? "Approving..." : "Approved"}
-                icon={isSubmittingForApproval ? undefined : FaPaperPlane}
-                onClick={(e: any) => handleSubmit(e, "APPROVED")}
-                type="button"
-                disabled={isSubmitting || isSubmittingForApproval}
-              />
-            </div>
-          )}
+          <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2">
+            {!isLocked && (
+              <>
+                <CustomButton text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+                <CustomButton text={isSubmittingForApproval ? "Approving..." : "Approved"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "APPROVED")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+              </>
+            )}
+          </div>
         </form>
       </div>
     </div>

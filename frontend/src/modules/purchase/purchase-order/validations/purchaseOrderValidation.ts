@@ -15,10 +15,6 @@ export const purchaseOrderSchema = z.object({
     message: "Supplier is required",
   }),
   storeId: z.string().min(1, "Store is required"),
-  billingAddressLine1: z.string().min(1, "Billing address line is required"),
-  billingCity: z.string().min(1, "Billing city is required"),
-  billingState: z.string().min(1, "Billing state is required"),
-  billingPincode: z.string().regex(/^\d{6}$/, "Invalid pincode format"),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required"),
 });
 
@@ -27,10 +23,6 @@ export const validatePurchaseOrder = (data: PurchaseOrderFormData): Record<strin
     poDate: data.poDate,
     supplierId: data.supplierId,
     storeId: data.storeId,
-    billingAddressLine1: data.billingAddressLine1,
-    billingCity: data.billingCity,
-    billingState: data.billingState,
-    billingPincode: data.billingPincode,
     items: data.items.map((item) => ({
       productId: item.productId,
       uom: item.uom,

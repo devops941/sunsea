@@ -430,10 +430,7 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permission="invoice.view" />}>
                 <Route path="/invoice" element={<InvoiceList />} />
               </Route>
-              <Route element={<ProtectedRoute permission="expenses.view" />}>
-                <Route path="/expenses" element={<ExpensesList />} />
-              </Route>
-              <Route element={<ProtectedRoute permissionAny={["purchase-returns.view", "expenses.view", "purchaseOrders.view"]} />}>
+              <Route element={<ProtectedRoute permissionAny={["purchase-returns.view", "purchaseOrders.view"]} />}>
                 <Route path="/purchase-returns" element={<PurchaseReturnPage />} />
               </Route>
 

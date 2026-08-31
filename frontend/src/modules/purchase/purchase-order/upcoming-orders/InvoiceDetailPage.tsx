@@ -898,436 +898,196 @@ const InvoiceDetailPage: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-lg shadow-sm border border-line-soft">
-                {/* Page Header */}
-                <div className="px-6 py-4 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-xl font-bold text-ink">
-                                {isEditMode ? "Edit GRN / Invoice" : "Create GRN / Invoice"}
-                            </h2>
-                        </div>
-                        <div>
-                            <BackButton text="Back to List" />
-                        </div>
-                    </div>
+        <div className="w-full max-w-[1200px] mr-auto grn-form-compact">
+            <style>{`
+                .grn-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
+                .grn-form-compact input, .grn-form-compact select,
+                .grn-form-compact button[role="combobox"],
+                .grn-form-compact .react-datepicker-wrapper input,
+                .grn-form-compact input[type="date"] { height: 32px !important; min-height: 32px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+                .grn-form-compact .group > div.flex.relative { height: 32px !important; }
+                .grn-form-compact .group > div.flex.relative input { font-size: 12px !important; }
+                .grn-form-compact .group > div.flex.relative select { height: 32px !important; font-size: 11px !important; }
+                .grn-form-compact .group > div.flex.relative span { font-size: 11px !important; }
+                .grn-form-compact .group { margin-bottom: 0 !important; }
+                .grn-form-compact textarea { font-size: 12px !important; }
+            `}</style>
+            <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible">
+
+                {/* Header */}
+                <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
+                    <h2 className="text-base font-bold text-ink">{isEditMode ? "Edit GRN / Invoice" : "Create GRN / Invoice"}</h2>
+                    <BackButton text="Back to List" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4" noValidate>
-                    {/* ── Row 1: Header Fields ── */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        <div>
-                            <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} disabled={isEditMode} />
-                            {loadingPO && <div className="text-muted small mt-1"><div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div> Loading…</div>}
-                        </div>
-                        <div>
-                            <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />
-                        </div>
-                        <div>
-                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} disabled={isEditMode} />
-                        </div>
-                        <div>
-                            <DatePickerCalendar
-                                label="GRN Date"
-                                name="grnDate"
-                                value={form.grnDate}
-                                onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))}
-                                required
-                                error={errors.grnDate}
-                                disabled={isEditMode}
-                            />
-                        </div>
-                        <div>
-                            <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable />
-                            {errors.supplierId && <div className="text-red-500 text-sm mt-1">{errors.supplierId}</div>}
-                        </div>
-                        <div>
-                            <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable />
-                            {errors.storeId && <div className="text-red-500 text-sm mt-1">{errors.storeId}</div>}
-                        </div>
-                    </div>
+                <form onSubmit={handleSubmit} noValidate>
+                    <div className="px-5 py-3 space-y-3">
 
-                    <div className="grid grid-cols-1 gap-4 mt-6">
-                        {/* Billing */}
+                        {/* ── Section 1: GRN Details ── */}
                         <div>
-                            <h6 className="text-lg font-semibold text-ink mb-4">Billing Address</h6>
-                            <AddressForm
-                                addressValue={form.billingAddressLine1}
-                                onAddressChange={(val) => setForm((prev) => ({ ...prev, billingAddressLine1: val }))}
-                                addressError={errors.billingAddressLine1}
-                                countryValue={form.billingCountry || "India"}
-                                onCountryChange={(val) => setForm((prev) => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))}
-                                countryError={errors.billingCountry}
-                                stateValue={form.billingState}
-                                onStateChange={(val) => handleBillingStateChange({ id: 0, name: val, isoCode: "" })}
-                                stateError={errors.billingState}
-                                cityValue={form.billingCity}
-                                onCityChange={(val) => handleBillingCityChange({ id: 0, name: val, isoCode: "" })}
-                                cityError={errors.billingCity}
-                                pincodeValue={form.billingPincode}
-                                onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))}
-                                pincodeError={errors.billingPincode}
-                                required
-                            />
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">GRN Details</h3>
+                            </div>
+                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                                <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} disabled={isEditMode} />
+                                <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />
+                                <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} disabled={isEditMode} />
+                                <DatePickerCalendar label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required error={errors.grnDate} disabled={isEditMode} />
+                                <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable error={errors.supplierId} />
+                                <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable error={errors.storeId} />
+                            </div>
                         </div>
 
-                        {/* Shipping */}
+                        {/* ── Section 2: Billing Address ── */}
                         <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h6 className="text-lg font-semibold text-ink mb-0">Shipping Address</h6>
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Billing Address</h3>
                             </div>
-                            <AddressForm
-                                addressValue={form.shippingAddressLine1}
-                                onAddressChange={(val) => setForm((prev) => ({ ...prev, shippingAddressLine1: val }))}
-                                addressError={errors.shippingAddressLine1}
-                                countryValue={form.shippingCountry || "India"}
-                                onCountryChange={(val) => setForm((prev) => ({ ...prev, shippingCountry: val }))}
-                                countryError={errors.shippingCountry}
-                                stateValue={form.shippingState}
-                                onStateChange={(val) => handleShippingStateChange({ id: 0, name: val, isoCode: "" })}
-                                stateError={errors.shippingState}
-                                cityValue={form.shippingCity}
-                                onCityChange={(val) => handleShippingCityChange({ id: 0, name: val, isoCode: "" })}
-                                cityError={errors.shippingCity}
-                                pincodeValue={form.shippingPincode}
-                                onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))}
-                                pincodeError={errors.shippingPincode}
-                                required={!form.sameAsBilling}
-                                disabled={form.sameAsBilling}
-                            />
+                            <AddressForm addressValue={form.billingAddressLine1} onAddressChange={(val) => setForm((prev) => ({ ...prev, billingAddressLine1: val }))} addressError={errors.billingAddressLine1} countryValue={form.billingCountry || "India"} onCountryChange={(val) => setForm((prev) => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))} countryError={errors.billingCountry} stateValue={form.billingState} onStateChange={(val) => handleBillingStateChange({ id: 0, name: val, isoCode: "" })} stateError={errors.billingState} cityValue={form.billingCity} onCityChange={(val) => handleBillingCityChange({ id: 0, name: val, isoCode: "" })} cityError={errors.billingCity} pincodeValue={form.billingPincode} onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))} pincodeError={errors.billingPincode} required />
                         </div>
-                    </div>
 
-                    {/* Receipt Details */}
-                    <div className="mt-6">
-                        <h6 className="text-lg font-semibold text-ink mb-4">Receipt Details</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div>
-                                <DatePickerCalendar
-                                    label="Receive Date"
-                                    name="receiveDate"
-                                    value={form.receiveDate}
-                                    onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))}
-                                    disabled={isEditMode}
-                                />
+                        {/* ── Section 3: Shipping Address ── */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Shipping Address</h3>
                             </div>
-                            <div>
-                                <DatePickerCalendar
-                                    label="Bill Due Date"
-                                    name="billDueDate"
-                                    value={form.billDueDate}
-                                    onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))}
-                                    disabled={isEditMode}
-                                />
+                            <AddressForm addressValue={form.shippingAddressLine1} onAddressChange={(val) => setForm((prev) => ({ ...prev, shippingAddressLine1: val }))} addressError={errors.shippingAddressLine1} countryValue={form.shippingCountry || "India"} onCountryChange={(val) => setForm((prev) => ({ ...prev, shippingCountry: val }))} countryError={errors.shippingCountry} stateValue={form.shippingState} onStateChange={(val) => handleShippingStateChange({ id: 0, name: val, isoCode: "" })} stateError={errors.shippingState} cityValue={form.shippingCity} onCityChange={(val) => handleShippingCityChange({ id: 0, name: val, isoCode: "" })} cityError={errors.shippingCity} pincodeValue={form.shippingPincode} onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))} pincodeError={errors.shippingPincode} required={!form.sameAsBilling} disabled={form.sameAsBilling} />
+                        </div>
+
+                        {/* ── Section 4: Receipt Details ── */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Receipt Details</h3>
                             </div>
-                            <div>
+                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                                <DatePickerCalendar label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} disabled={isEditMode} />
+                                <DatePickerCalendar label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} disabled={isEditMode} />
                                 <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
-                            </div>
-                            <div>
                                 <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
-                            </div>
-                            <div>
                                 <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
+                                {!isEditMode && <FileUpload label={form.invoiceImage ? `Invoice: ${form.invoiceImage}` : "Upload Invoice"} name="invoiceImage" onChange={handleFileChange} />}
                             </div>
-                            {!isEditMode && (
-                                <div>
-                                    <FileUpload
-                                        label={form.invoiceImage ? `Invoice: ${form.invoiceImage}` : "Upload Invoice"}
-                                        name="invoiceImage"
-                                        onChange={handleFileChange}
-                                    />
-                                </div>
-                            )}
                         </div>
-                    </div>
 
-                    {/* Items */}
-                    <div className="flex justify-between items-center mb-4 mt-6">
-                        <span className="text-lg font-semibold text-ink">Order Items</span>
-                        {!isEditMode && <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} />}
-                    </div>
-
-                    <div className="rounded-xl border border-line-soft bg-card [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
-                        <table className="min-w-full divide-y divide-line-soft">
-                            <thead className="bg-card-2">
-                                <tr>
-                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-ink-muted uppercase tracking-widest w-12 border-b border-line-soft">#</th>
-                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line-soft">
-                                        PRODUCT / DESCRIPTION <span className="text-rose-500">*</span>
-                                    </th>
-                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line-soft min-w-[200px]">
-                                        QUANTITY / UOM <span className="text-rose-500">*</span>
-                                    </th>
-                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line-soft">
-                                        UNIT PRICE (₹) <span className="text-rose-500">*</span>
-                                    </th>
-                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line-soft">TAX %</th>
-                                    <th className="px-3 py-3 text-right text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line-soft">NET (₹)</th>
-                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-ink-muted uppercase tracking-widest w-16 border-b border-line-soft"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-line-soft bg-card">
-                                {items.map((item, idx) => {
-                                    const itemRawMaterial = (rawMaterials || []).find(
-                                        (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId)
-                                    );
-                                    const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
-                                    const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
-                                    const materialName = itemRawMaterial?.materialName || itemRawMaterial?.productName || (item.description && item.description !== item.productId ? item.description : "") || item.productId || "—";
-
-                                    return (
-                                        <tr key={idx} className="hover:bg-card-2/50 transition-colors duration-200">
-                                            <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-ink-subtle text-center">{idx + 1}</td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                {isPOSelected || isEditMode ? (
-                                                    <span className="font-semibold text-ink text-sm px-1">{materialName}</span>
-                                                ) : (
-                                                    <SelectInput
-                                                        label=""
-    
-                                                        noMargin={true}
-                                                        value={item.productId ? String(item.productId) : ""}
-                                                        options={[
-                                                            { value: "", label: "-- Select Material --" },
-                                                            ...(rawMaterials || []).map((rm: any) => ({
-                                                                value: String(rm.rawMaterialId),
-                                                                label: rm.materialName || rm.productName || String(rm.rawMaterialId),
-                                                            }))
-                                                        ]}
-                                                        error={errors[`items.${idx}.productId`]}
-                                                        onChange={(e) => {
-                                                            const selId = e.target.value;
-                                                            const selectedRm = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === String(selId));
-                                                            if (selectedRm) {
-                                                                const matName = selectedRm.materialName || selectedRm.productName || "";
-                                                                const uPrice = Number(selectedRm.unitPrice) || 0;
-                                                                const gRate = Number(selectedRm.gstRate) || 0;
-                                                                const baseUomVal = selectedRm.baseUom ? selectedRm.baseUom.split(",")[0].trim() : "";
-
-                                                                setItems((prev) => {
-                                                                    const updated = [...prev];
-                                                                    updated[idx] = {
-                                                                        ...updated[idx],
-                                                                        productId: selId,
-                                                                        description: matName,
-                                                                        unitPrice: uPrice,
-                                                                        tax: gRate,
-                                                                        uom: baseUomVal || updated[idx].uom,
-                                                                    };
-                                                                    const lineSubtotal = updated[idx].qty * uPrice;
-                                                                    const totalGstAmount = (lineSubtotal * gRate) / 100;
-                                                                    updated[idx].taxableAmount = lineSubtotal;
-                                                                    updated[idx].netAmount = lineSubtotal + totalGstAmount;
-                                                                    return updated;
-                                                                });
-                                                            } else {
-                                                                setItems((prev) => {
-                                                                    const updated = [...prev];
-                                                                    updated[idx] = {
-                                                                        ...updated[idx],
-                                                                        productId: "",
-                                                                        description: "",
-                                                                    };
-                                                                    return updated;
-                                                                });
-                                                            }
-                                                            setErrors((prev) => {
-                                                                const next = { ...prev };
-                                                                delete next[`items.${idx}.productId`];
-                                                                delete next[`items.${idx}.description`];
-                                                                if (selectedRm && Number(selectedRm.unitPrice) > 0) {
-                                                                    delete next[`items.${idx}.unitPrice`];
-                                                                }
-                                                                return next;
-                                                            });
-                                                        }}
-                                                    />
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <QuantityInput
-                                                    label=""
-
-                                                    name={`items[${idx}].qty`}
-                                                    value={item.qty}
-                                                    baseUoms={baseUoms}
-                                                    uom={item.uom}
-                                                    onUomChange={(newUom) => updateItem(idx, "uom", newUom)}
-                                                    required
-                                                    disabled={isEditMode}
-                                                    error={errors[`items.${idx}.qty`]}
-                                                    onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <TextInput
-                                                    label=""
-
-                                                    name={`items[${idx}].unitPrice`}
-                                                    type="number"
-                                                    step="0.01"
-                                                    placeholder="0.00"
-                                                    preventNegative={true}
-                                                    value={String(item.unitPrice)}
-                                                    error={errors[`items.${idx}.unitPrice`]}
-                                                    onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))}
-                                                    disabled={isEditMode}
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <TextInput
-                                                    name={`items[${idx}].tax`}
-                                                    type="number"
-                                                    value={String(item.tax || 0)}
-                                                    onChange={(e) => updateItem(idx, "tax", Number(e.target.value))}
-                                                    min={0}
-                                                    max={100}
-                                                    step={0.01}
-                                                    placeholder="0"
-                                                    disabled={isEditMode}
-                                                />
-                                            </td>
-
-                                            <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-ink">₹{item.netAmount.toFixed(2)}</td>
-                                            <td className="px-3 py-2 whitespace-nowrap text-center">
-                                                {!isEditMode && (
-                                                    <button
-                                                        type="button"
-                                                        className="text-rose-400 hover:text-rose-600 hover:bg-rose-100 p-2 rounded-md disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all duration-200 inline-flex items-center justify-center"
-                                                        onClick={() => removeItem(idx)}
-                                                        title="Remove Item"
-                                                    >
-                                                        <FaTrash size={14} />
-                                                    </button>
-                                                )}
-                                            </td>
+                        {/* ── Section 5: Order Items ── */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Order Items</h3>
+                                {!isEditMode && <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} size="sm" />}
+                            </div>
+                            <div className="rounded-lg border border-line-soft bg-card-2 overflow-visible [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
+                                <table className="min-w-full divide-y divide-line-soft">
+                                    <thead className="bg-card-2 border-b border-line-soft">
+                                        <tr>
+                                            <th className="px-2 py-1.5 text-center text-[10px] font-extrabold text-ink-subtle uppercase w-8">#</th>
+                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Product</th>
+                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase min-w-[160px]">Qty & UOM</th>
+                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Unit Price (₹)</th>
+                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Tax %</th>
+                                            <th className="px-2 py-1.5 text-right text-[10px] font-extrabold text-ink-subtle uppercase">Net (₹)</th>
+                                            <th className="px-2 py-1.5 w-10"></th>
                                         </tr>
-                                    );
-                                })}
-                                {items.length === 0 && (
-                                    <tr><td colSpan={7} className="text-center text-ink-subtle py-8">No items added</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Remarks + Summary section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                        <div className="col-span-2">
-                            <TextArea
-                                label="Remarks (Optional)"
-                                name="remarks"
-                                value={form.remarks}
-                                placeholder="Additional notes..."
-                                rows={4}
-                                onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))}
-                                disabled={isEditMode}
-                            />
+                                    </thead>
+                                    <tbody className="divide-y divide-line-soft bg-card">
+                                        {items.map((item, idx) => {
+                                            const itemRawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId));
+                                            const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
+                                            const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+                                            const materialName = itemRawMaterial?.materialName || itemRawMaterial?.productName || (item.description && item.description !== item.productId ? item.description : "") || item.productId || "—";
+                                            return (
+                                                <tr key={idx} className="hover:bg-card-2/50 transition-colors">
+                                                    <td className="px-2 py-1 text-[11px] font-bold text-ink-subtle text-center">{idx + 1}</td>
+                                                    <td className="px-2 py-1">
+                                                        {isPOSelected || isEditMode ? (
+                                                            <span className="font-semibold text-ink text-[11px]">{materialName}</span>
+                                                        ) : (
+                                                            <SelectInput label="" noMargin={true} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...(rawMaterials || []).map((rm: any) => ({ value: String(rm.rawMaterialId), label: rm.materialName || rm.productName || String(rm.rawMaterialId) }))]} error={errors[`items.${idx}.productId`]} onChange={(e) => { const selId = e.target.value; const selectedRm = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === String(selId)); if (selectedRm) { const matName = selectedRm.materialName || selectedRm.productName || ""; const uPrice = Number(selectedRm.unitPrice) || 0; const gRate = Number(selectedRm.gstRate) || 0; const baseUomVal = selectedRm.baseUom ? selectedRm.baseUom.split(",")[0].trim() : ""; setItems((prev) => { const updated = [...prev]; updated[idx] = { ...updated[idx], productId: selId, description: matName, unitPrice: uPrice, tax: gRate, uom: baseUomVal || updated[idx].uom }; const lineSubtotal = updated[idx].qty * uPrice; const totalGstAmount = (lineSubtotal * gRate) / 100; updated[idx].taxableAmount = lineSubtotal; updated[idx].netAmount = lineSubtotal + totalGstAmount; return updated; }); } else { setItems((prev) => { const updated = [...prev]; updated[idx] = { ...updated[idx], productId: "", description: "" }; return updated; }); } setErrors((prev) => { const next = { ...prev }; delete next[`items.${idx}.productId`]; delete next[`items.${idx}.description`]; if (selectedRm && Number(selectedRm.unitPrice) > 0) { delete next[`items.${idx}.unitPrice`]; } return next; }); }} />
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 py-1">
+                                                        <QuantityInput label="" name={`items[${idx}].qty`} value={item.qty} baseUoms={baseUoms} uom={item.uom} onUomChange={(newUom) => updateItem(idx, "uom", newUom)} disabled={isEditMode} error={errors[`items.${idx}.qty`]} onChange={(e) => updateItem(idx, "qty", Number(e.target.value))} />
+                                                    </td>
+                                                    <td className="px-2 py-1">
+                                                        <TextInput label="" name={`items[${idx}].unitPrice`} type="number" step="0.01" placeholder="0.00" preventNegative={true} value={String(item.unitPrice)} error={errors[`items.${idx}.unitPrice`]} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} disabled={isEditMode} />
+                                                    </td>
+                                                    <td className="px-2 py-1">
+                                                        <TextInput name={`items[${idx}].tax`} type="number" value={String(item.tax || 0)} onChange={(e) => updateItem(idx, "tax", Number(e.target.value))} min={0} max={100} step={0.01} placeholder="0" disabled={isEditMode} />
+                                                    </td>
+                                                    <td className="px-2 py-1 text-right text-[11px] font-extrabold text-ink">₹{item.netAmount.toFixed(2)}</td>
+                                                    <td className="px-2 py-1 text-center">
+                                                        {!isEditMode && <button type="button" className="text-rose-400 hover:text-rose-600 p-1 rounded transition-colors" onClick={() => removeItem(idx)}><FaTrash size={11} /></button>}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {items.length === 0 && (
+                                            <tr><td colSpan={7} className="text-center text-ink-subtle py-4 text-[11px]">No items added</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
-                        <div className="border border-line-soft rounded-lg overflow-hidden shadow-sm h-fit">
-                            <div className="bg-card px-4 py-3 border-b border-line-soft font-semibold text-ink">Order Summary</div>
-                            <div className="p-4 space-y-3 bg-card">
-                                <div className="flex justify-between text-sm text-ink-muted">
-                                    <span>Subtotal</span>
-                                    <span className="font-semibold text-ink">₹{subtotal.toFixed(2)}</span>
+                        {/* ── Section 6: Remarks + Summary ── */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="col-span-2">
+                                <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={3} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} disabled={isEditMode} />
+                            </div>
+                            <div className="bg-card-2 rounded-lg border border-line-soft px-3 py-2.5 shadow-xs">
+                                <h6 className="mb-1.5 font-extrabold text-primary text-xs">Order Summary</h6>
+                                <div className="flex justify-between mb-1 text-ink-subtle text-[11px] font-semibold">
+                                    <span>Subtotal:</span><span className="text-ink font-extrabold">₹{subtotal.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-sm text-ink-muted">
+                                <div className="flex justify-between items-center mb-1 text-[11px] text-ink-muted">
                                     <span>Discount</span>
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            className="border border-line-soft rounded p-1 text-sm outline-none w-16 bg-card-2 text-ink"
-                                            value={form.discountType}
-                                            onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as any }))}
-                                            disabled={isEditMode}
-                                        >
-                                            <option value="flat">flat</option>
-                                            <option value="percent">%</option>
+                                    <div className="flex items-center gap-1">
+                                        <select className="border border-line-soft rounded px-1 py-0.5 text-[11px] outline-none w-12 bg-card text-ink" value={form.discountType} onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as any }))} disabled={isEditMode}>
+                                            <option value="flat">flat</option><option value="percent">%</option>
                                         </select>
-                                        <input type="number" min={0} step={0.01} value={form.discountValue}
-                                            onChange={(e) => setForm((p) => ({ ...p, discountValue: Number(e.target.value) }))}
-                                            className="border border-line-soft rounded p-1 text-sm outline-none w-20 text-right bg-card-2 text-ink"
-                                            disabled={isEditMode}
-                                        />
+                                        <input type="number" min={0} step={0.01} value={form.discountValue} onChange={(e) => setForm((p) => ({ ...p, discountValue: Number(e.target.value) }))} className="border border-line-soft rounded px-1 py-0.5 text-[11px] outline-none w-16 text-right bg-card text-ink" disabled={isEditMode} />
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center text-sm text-ink-muted">
+                                <div className="flex justify-between items-center mb-1 text-[11px] text-ink-muted">
                                     <span>Rounding</span>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex items-center">
-                                            <button type="button" onClick={() => setRoundingSign("+")}
-                                                disabled={isEditMode}
-                                                className={`px-2 py-1 border border-line-soft rounded-l text-xs font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-card-2 text-ink-muted"}`}>+</button>
-                                            <button type="button" onClick={() => setRoundingSign("-")}
-                                                disabled={isEditMode}
-                                                className={`px-2 py-1 border border-line-soft border-l-0 rounded-r text-xs font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-card-2 text-ink-muted"}`}>-</button>
+                                    <div className="flex items-center gap-1">
+                                        <div className="flex">
+                                            <button type="button" onClick={() => setRoundingSign("+")} disabled={isEditMode} className={`px-1.5 py-0.5 border border-line-soft rounded-l text-[10px] font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-card text-ink-muted"}`}>+</button>
+                                            <button type="button" onClick={() => setRoundingSign("-")} disabled={isEditMode} className={`px-1.5 py-0.5 border border-line-soft border-l-0 rounded-r text-[10px] font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-card text-ink-muted"}`}>-</button>
                                         </div>
-                                        <input type="number" min={0} step={0.01} value={form.roundingAdjust}
-                                            onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))}
-                                            className="border border-line-soft rounded p-1 text-sm outline-none w-20 text-right bg-card-2 text-ink"
-                                            placeholder="0.00"
-                                            disabled={isEditMode}
-                                        />
+                                        <input type="number" min={0} step={0.01} value={form.roundingAdjust} onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))} className="border border-line-soft rounded px-1 py-0.5 text-[11px] outline-none w-16 text-right bg-card text-ink" placeholder="0.00" disabled={isEditMode} />
                                     </div>
                                 </div>
                                 {isInterState ? (
                                     gstRateBreakdown.length === 0 ? (
-                                        <div className="flex justify-between text-sm text-ink-muted">
-                                            <span>Total IGST</span>
-                                            <span className="font-semibold text-green-600">+ ₹{totalIgst.toFixed(2)}</span>
-                                        </div>
-                                    ) : (
-                                        gstRateBreakdown.map((group) => (
-                                            <div key={`igst-${group.gstRate}`} className="flex justify-between text-sm text-ink-muted">
-                                                <span>IGST {group.gstRate}%</span>
-                                                <span className="font-semibold text-green-600">+ ₹{group.igstAmount.toFixed(2)}</span>
-                                            </div>
-                                        ))
-                                    )
+                                        <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total IGST:</span><span>+₹{totalIgst.toFixed(2)}</span></div>
+                                    ) : gstRateBreakdown.map((group) => (
+                                        <div key={`igst-${group.gstRate}`} className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>IGST {group.gstRate}%:</span><span>+₹{group.igstAmount.toFixed(2)}</span></div>
+                                    ))
                                 ) : (
                                     gstRateBreakdown.length === 0 ? (
                                         <>
-                                            <div className="flex justify-between text-sm text-ink-muted">
-                                                <span>Total CGST</span>
-                                                <span className="font-semibold text-green-600">+ ₹{totalCgst.toFixed(2)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm text-ink-muted">
-                                                <span>Total SGST</span>
-                                                <span className="font-semibold text-green-600">+ ₹{totalSgst.toFixed(2)}</span>
-                                            </div>
+                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total CGST:</span><span>+₹{totalCgst.toFixed(2)}</span></div>
+                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total SGST:</span><span>+₹{totalSgst.toFixed(2)}</span></div>
                                         </>
-                                    ) : (
-                                        gstRateBreakdown.map((group) => (
-                                            <React.Fragment key={`gst-${group.gstRate}`}>
-                                                <div className="flex justify-between text-sm text-ink-muted">
-                                                    <span>CGST {group.cgstRate}%</span>
-                                                    <span className="font-semibold text-green-600">+ ₹{group.cgstAmount.toFixed(2)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm text-ink-muted">
-                                                    <span>SGST {group.sgstRate}%</span>
-                                                    <span className="font-semibold text-green-600">+ ₹{group.sgstAmount.toFixed(2)}</span>
-                                                </div>
-                                            </React.Fragment>
-                                        ))
-                                    )
+                                    ) : gstRateBreakdown.map((group) => (
+                                        <React.Fragment key={`gst-${group.gstRate}`}>
+                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>CGST {group.cgstRate}%:</span><span>+₹{group.cgstAmount.toFixed(2)}</span></div>
+                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>SGST {group.sgstRate}%:</span><span>+₹{group.sgstAmount.toFixed(2)}</span></div>
+                                        </React.Fragment>
+                                    ))
                                 )}
-                            </div>
-                            <div className="bg-card px-4 py-3 border-t border-line-soft flex justify-between items-center">
-                                <span className="font-bold text-ink">Net Amount</span>
-                                <span className="font-extrabold text-blue-600 text-lg">₹{grandTotal.toFixed(2)}</span>
+                                <hr className="my-1.5 border-line-soft" />
+                                <div className="flex justify-between text-xs font-extrabold text-ink">
+                                    <span>Net Amount:</span><span className="text-primary font-black">₹{grandTotal.toFixed(2)}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
-                        <CustomButton text="Cancel" type="button" onClick={() => navigate("/invoice")} />
-                        <CustomButton
-                            text={saving ? "Saving…" : (isEditMode ? "Update Bill" : "Create Bill & Update Stock")}
-                            type="submit"
-                            disabled={saving}
-                        />
+                    {/* Footer */}
+                    <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2">
+                        <CustomButton text="Cancel" type="button" onClick={() => navigate("/invoice")} variant="secondary" />
+                        <CustomButton text={saving ? "Saving…" : (isEditMode ? "Update Bill" : "Create Bill & Update Stock")} type="submit" disabled={saving} />
                     </div>
                 </form>
             </div>
