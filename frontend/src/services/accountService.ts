@@ -10,7 +10,13 @@ export interface AccountLedger {
   isActive: boolean;
   customerId?: string | null;
   supplierId?: number | null;
-  customer?: { id: string; firmName: string; customerCode: string } | null;
+  customer?: {
+    id: string;
+    firmName: string;
+    customerCode: string;
+    customerGrade?: { name: string } | null;
+    customerType?: { name: string } | null;
+  } | null;
   supplier?: { id: number; legalName: string; supplierCode: string } | null;
   createdAt?: string;
   updatedAt?: string;
