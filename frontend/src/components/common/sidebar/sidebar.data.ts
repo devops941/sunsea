@@ -442,7 +442,14 @@ export const sidebarItems: SidebarItem[] = [
       // ── Accounts & Bank ──
       { title: "Bank Accounts", path: "/accounts/bank-accounts", permission: "accounts.view" },
       { title: "Chart of Accounts", path: "/accounts/chart-of-accounts", permission: "chart-of-accounts.view" },
-      { title: "Ledger Statement", path: "/accounts/ledger-statement", permission: "accounts.view" },
+      {
+        title: "Ledger",
+        permission: "accounts.view",
+        children: [
+          { title: "Account-Wise", path: "/accounts/ledger-statement", permission: "accounts.view" },
+          { title: "Merged Accounts", path: "/accounts/ledger-statement/merged", permission: "accounts.view" },
+        ],
+      },
       // ── Overview & Reports ──
       { title: "Amount Payable", path: "/accounts/payable", permission: "payable.view" },
       { title: "Amount Receivable", path: "/accounts/receivable", permission: "receivable.view" },
@@ -454,6 +461,7 @@ export const sidebarItems: SidebarItem[] = [
       "/accounts/payable",
       "/accounts/receivable",
       "/accounts/ledger-statement",
+      "/accounts/ledger-statement/merged",
       "/accounts/chart-of-accounts",
       "/accounts/petty-cash",
       "/accounts/trial-balance",
