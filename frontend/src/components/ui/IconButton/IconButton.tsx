@@ -8,6 +8,7 @@ interface IconButtonProps {
   title?: string;
   disabled?: boolean;
   className?: string;
+  size?: "sm" | "md";
 }
 
 const IconButton: React.FC<IconButtonProps> = ({
@@ -17,11 +18,12 @@ const IconButton: React.FC<IconButtonProps> = ({
   title,
   disabled = false,
   className = "",
+  size = "sm",
 }) => {
   return (
     <button
       type="button"
-      className={`icon-btn icon-btn-${variant} ${className}`}
+      className={`icon-btn icon-btn-${variant} icon-btn-${size} ${className}`}
       onClick={onClick}
       title={title}
       disabled={disabled}
