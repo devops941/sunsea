@@ -452,12 +452,12 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "TYPE",
-              width: "120px",
+              width: "150px",
               render: (item) => {
                 const info = getStockAdjustmentTypeInfo(item);
                 return (
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
                       info.variant === "success"
                         ? "bg-green-100 text-green-700 border border-green-200"
                         : "bg-red-100 text-red-700 border border-red-200"
@@ -489,7 +489,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "PRODUCT",
-              width: "minmax(140px, 1fr)",
+              width: "minmax(160px, 1.5fr)",
               render: (item) => {
                 const product = item.productionOrder?.productItem || item.items?.[0]?.product;
                 const rawMaterial = item.items?.[0]?.rawMaterial;
@@ -526,7 +526,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ORIGINAL QTY",
-              width: "110px",
+              width: "minmax(120px, 1fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.currentQty == null) return <span className="text-ink-subtle">—</span>;
@@ -545,7 +545,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ADJUSTED QTY",
-              width: "130px",
+              width: "minmax(150px, 1fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.adjustedQty == null) return <span className="text-ink-subtle">—</span>;

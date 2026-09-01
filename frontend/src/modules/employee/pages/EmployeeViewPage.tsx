@@ -4,11 +4,10 @@ import { toast } from "react-toastify";
 import {
   FaUser, FaPhone, FaUsers, FaIdCard, FaMapMarkerAlt,
   FaBriefcase, FaCalendarAlt, FaClock, FaMoneyBillWave,
-  FaLock, FaArrowLeft, FaEdit,
+  FaLock, FaArrowLeft,
 } from "react-icons/fa";
 import { employeeService } from "../../../services/employeeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-import { usePermission } from "../../../hooks/usePermission";
 import { usePayrollConfig } from "../../../hooks/usePayrollConfig";
 import {
   deriveFromMonthly, deriveFromWeekly, deriveFromDaily, deriveFromHourly,
@@ -236,8 +235,6 @@ function PayrollRows({ employee, payrollConfig }: { employee: any; payrollConfig
 export default function EmployeeViewPage() {
   const { id }      = useParams<{ id: string }>();
   const navigate    = useNavigate();
-  const { can }     = usePermission();
-  const canEdit     = can("employees.edit");
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading]   = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -281,14 +278,6 @@ export default function EmployeeViewPage() {
         >
           <FaArrowLeft size={11} /> Back to Employees
         </button>
-        {canEdit && (
-          <button
-            onClick={() => navigate(`/employees/edit/${employee.id}`)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
-          >
-            <FaEdit size={11} /> Edit Employee
-          </button>
-        )}
       </div>
 
       {/* ── Single Card ───────────────────────────────────────────────────── */}

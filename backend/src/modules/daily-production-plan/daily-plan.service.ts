@@ -340,10 +340,15 @@ class DailyPlanService {
                   where: { weeklyProgramId: checkWeeklyProgramId },
                   data: { status: "COMPLETED" },
                 });
-                // 2. Mark PO as COMPLETED_WITH_SHORTFALL (locked — no new DPs allowed)
+                // 2. Mark PO status — READY_FOR_DISPATCH if target met/exceeded, COMPLETED_WITH_SHORTFALL if under-produced
+                const targetQty = Number(productionOrderFull.targetQty || 0);
+                const producedQty = Number(productionOrderFull.producedQty || 0);
+                const permanentStopStatus = targetQty > 0 && producedQty >= targetQty
+                  ? "READY_FOR_DISPATCH"
+                  : "COMPLETED_WITH_SHORTFALL";
                 await tx.productionOrder.update({
                   where: { productionOrderId: checkProductionOrderId },
-                  data: { status: "COMPLETED_WITH_SHORTFALL" },
+                  data: { status: permanentStopStatus },
                 });
                 // 3. Cascade-stop ALL other active DPs for this PO
                 const otherActiveDPs = await tx.dailyProductionPlan.findMany({
@@ -377,13 +382,11 @@ class DailyPlanService {
                     stopReasonOnly = data.remarks;
                   }
                 }
-                const targetQty = Number(productionOrderFull.targetQty || 0);
-                const producedQty = Number(productionOrderFull.producedQty || 0);
                 const cancelledQty = targetQty > producedQty ? targetQty - producedQty : 0;
 
                 await StatusSyncService.logHistory(
-                  tx, checkProductionOrderId, productionOrderFull.status, "COMPLETED_WITH_SHORTFALL", userId,
-                  data.remarks || "Production force-stopped (Permanent Stop). All active plans closed. Proceeding to post-production.", "PERMANENT_STOP",
+                  tx, checkProductionOrderId, productionOrderFull.status, permanentStopStatus, userId,
+                  data.remarks || `Production force-stopped (Permanent Stop). All active plans closed. Proceeding to post-production.`, "PERMANENT_STOP",
                   {
                     stopReason: stopReasonOnly,
                     stopAction: "PERMANENT_STOP",
@@ -428,11 +431,16 @@ class DailyPlanService {
                   });
                 }
               }
-              // Also ensure PO is COMPLETED_WITH_SHORTFALL if not already
-              if (productionOrderFull.status !== "COMPLETED_WITH_SHORTFALL" && productionOrderFull.status !== "CLOSED") {
+              // Ensure PO gets correct stop status — READY_FOR_DISPATCH if target met, else COMPLETED_WITH_SHORTFALL
+              if (!["COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(productionOrderFull.status)) {
+                const stopTargetQty = Number(productionOrderFull.targetQty || 0);
+                const stopProducedQty = Number(productionOrderFull.producedQty || 0);
+                const fallbackStopStatus = stopTargetQty > 0 && stopProducedQty >= stopTargetQty
+                  ? "READY_FOR_DISPATCH"
+                  : "COMPLETED_WITH_SHORTFALL";
                 await tx.productionOrder.update({
                   where: { productionOrderId: checkProductionOrderId },
-                  data: { status: "COMPLETED_WITH_SHORTFALL" },
+                  data: { status: fallbackStopStatus },
                 });
               }
             }

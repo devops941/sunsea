@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { FaSave, FaEraser, FaArrowLeft, FaPlus } from "react-icons/fa";
+import { FaSave, FaEraser, FaPlus } from "react-icons/fa";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -12,7 +12,6 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import TextArea from "../../../components/form/TextArea/TextArea";
-import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
@@ -22,7 +21,6 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
-import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -129,96 +127,64 @@ const defaultValues: ProductionOrderFormValues = {
 };
 
 
-type CtrlTextProps = {
-    label?: string;
-    placeholder?: string;
-    required?: boolean;
-    type?: string;
-    disabled?: boolean;
-    error?: string;
-    field: {
-        name: string;
-        value: any;
-        onChange: React.ChangeEventHandler<HTMLInputElement>;
-        onBlur: React.FocusEventHandler<HTMLInputElement>;
-    };
-};
+// ————— Cell renderer components for the Raw Materials DataTable —————
 
-const CtrlText: React.FC<CtrlTextProps> = ({
-    field, label, placeholder, required, type, disabled, error,
-}) => (
-    <TextInput
-        label={label || ""}
-        name={field.name}
-        value={
-            field.value !== undefined && field.value !== null
-                ? String(field.value)
-                : ""
-        }
-        onChange={field.onChange}
-        onBlur={field.onBlur}
-        placeholder={placeholder}
-        required={required}
-        type={type}
-        disabled={disabled}
-        error={error}
-    />
-);
-
-//
-//  Each row owns its own options/loading/fetchedForStoreId state via the
-//  `rowState` prop (a slice of the parent's `rowRmStates` array).
-//  The parent passes `onStoreChange` and `onRmChange` so it can update that
-//  slice without touching other rows.
-//
-
-interface RawMaterialRowInnerProps {
+const StoreCellRenderer: React.FC<{
     productIndex: number;
     index: number;
     control: any;
-    remove: (index: number) => void;
     storeOptions: { label: string; value: string }[];
-    errors: any;
-    watch: (name: string) => any;
+    error?: string;
+    onStoreChange: (idx: number, storeId: string) => void;
+}> = React.memo(({ productIndex, index, control, storeOptions, error, onStoreChange }) => (
+    <div className="w-full">
+        <Controller
+            name={`products.${productIndex}.rawMaterials.${index}.storeId` as const}
+            control={control}
+            render={({ field }) => (
+                <SelectInput
+                    hideLabel
+                    noMargin
+                    name={field.name}
+                    value={field.value}
+                    options={storeOptions}
+                    defaultOptionLabel="Select Store"
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                        field.onChange(e);
+                        onStoreChange(index, e.target.value);
+                    }}
+                    error={error}
+                />
+            )}
+        />
+    </div>
+));
+
+const RawMaterialCellRenderer: React.FC<{
+    productIndex: number;
+    index: number;
+    control: any;
+    error?: string;
     rowState: RowRawMaterialState;
-    onStoreChange: (index: number, newStoreId: string) => void;
-    onRmChange: (index: number, newRmValue: string) => void;
+    onRmChange: (idx: number, rmValue: string) => void;
     fetchRawMaterialsForStore: (storeId: string, fieldId: string) => void;
     fieldId: string;
-    setValue: any;
-}
+}> = React.memo(({ productIndex, index, control, error, rowState, onRmChange, fetchRawMaterialsForStore, fieldId }) => {
+    const storeId = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.storeId` as const });
+    const currentRawMaterials = useWatch({ control, name: `products.${productIndex}.rawMaterials` as const });
+    const lastFetchedRef = useRef<string | null>(null);
 
-const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
-    productIndex,
-    index,
-    control,
-    remove,
-    storeOptions,
-    errors,
-    watch,
-    rowState,
-    onStoreChange,
-    onRmChange,
-    fetchRawMaterialsForStore,
-    fieldId,
-    setValue,
-}) => {
-    const { options, loading } = rowState;
-    const storeId = watch(`products.${productIndex}.rawMaterials.${index}.storeId`);
-    const lastFetchedStoreRef = useRef<string | null>(null);
-
-    // Fetch raw materials when storeId changes
     useEffect(() => {
-        if (storeId && storeId !== lastFetchedStoreRef.current) {
-            lastFetchedStoreRef.current = storeId;
+        if (storeId && storeId !== lastFetchedRef.current) {
+            lastFetchedRef.current = storeId;
             fetchRawMaterialsForStore(storeId, fieldId);
         }
     }, [storeId, fieldId, fetchRawMaterialsForStore]);
 
+    const { options, loading } = rowState;
     const noStore = !storeId;
     const rmDisabled = noStore || loading || options.length === 0;
     const showEmpty = storeId && !loading && options.length === 0;
-
     const rmPlaceholder = loading
         ? "Loading..."
         : noStore
@@ -227,147 +193,114 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                 ? "No materials available"
                 : "Select Raw Material";
 
-    const currentRawMaterials = watch(`products.${productIndex}.rawMaterials`);
-    const filteredOptions = options.map((opt) => {
-        const isSelected = currentRawMaterials?.some(
+    const filteredOptions = options.map((opt) => ({
+        ...opt,
+        disabled: currentRawMaterials?.some(
             (rm: any, rmIdx: number) => rmIdx !== index && rm.rawMaterialId === opt.value
-        );
-        return {
-            ...opt,
-            disabled: isSelected,
-        };
-    });
+        ),
+    }));
 
-    const currentRm = watch(`products.${productIndex}.rawMaterials.${index}.rawMaterialId`);
-    const currentUom = watch(`products.${productIndex}.rawMaterials.${index}.uom`);
+    return (
+        <div className="w-full">
+            <Controller
+                name={`products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const}
+                control={control}
+                render={({ field }) => (
+                    <SelectInput
+                        hideLabel
+                        noMargin
+                        name={field.name}
+                        value={field.value}
+                        options={filteredOptions}
+                        defaultOptionLabel={rmPlaceholder}
+                        disabled={rmDisabled}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                            field.onChange(e);
+                            onRmChange(index, e.target.value);
+                        }}
+                        error={error}
+                    />
+                )}
+            />
+            {loading && <div className="text-slate-500 text-xs mt-1">Fetching raw materials…</div>}
+            {showEmpty && <div className="text-red-500 text-xs mt-1">No Raw Materials available in this Store.</div>}
+        </div>
+    );
+});
+
+const QtyUomCellRenderer: React.FC<{
+    productIndex: number;
+    index: number;
+    control: any;
+    error?: string;
+    rowState: RowRawMaterialState;
+    setValue: any;
+}> = React.memo(({ productIndex, index, control, error, rowState, setValue }) => {
+    const currentRm  = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const });
+    const currentUom = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.uom` as const });
+    const { options } = rowState;
     const selectedRmOption = options.find((opt) => opt.value === currentRm);
-    const baseUoms = selectedRmOption ? (selectedRmOption as any).rawUom : (currentUom || "");
+    const baseUoms   = selectedRmOption ? (selectedRmOption as any).rawUom : (currentUom || "");
     const primaryUom = baseUoms ? baseUoms.split(",").map((u: string) => u.trim()).filter(Boolean)[0] : "";
 
     useEffect(() => {
-        if (primaryUom) {
-            setValue(`products.${productIndex}.rawMaterials.${index}.uom`, primaryUom);
-        }
+        if (primaryUom) setValue(`products.${productIndex}.rawMaterials.${index}.uom`, primaryUom);
     }, [primaryUom, productIndex, index, setValue]);
 
     return (
-        <tr className="master-data-row">
-            {/* STORE */}
-            <td className="px-4 py-3">
-                <Controller
-                    name={`products.${productIndex}.rawMaterials.${index}.storeId` as const}
-                    control={control}
-                    render={({ field }) => (
-                        <SelectInput
-                            hideLabel={true}
-                            noMargin={true}
-                            name={field.name}
-                            value={field.value}
-                            options={storeOptions}
-                            defaultOptionLabel="Select Store"
-                            disabled={false}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                                field.onChange(e);
-                                onStoreChange(index, e.target.value);
-                            }}
-                            error={errors?.storeId?.message}
-                        />
-                    )}
-                />
-            </td>
-
-            {/* RAW MATERIAL */}
-            <td className="px-4 py-3">
-                <Controller
-                    name={`products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const}
-                    control={control}
-                    render={({ field }) => (
-                        <>
-                            <SelectInput
-                                hideLabel={true}
-                                name={field.name}
-                                value={field.value}
-                                options={filteredOptions}
-                                defaultOptionLabel={rmPlaceholder}
-                                disabled={rmDisabled}
-                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                                    field.onChange(e);
-                                    onRmChange(index, e.target.value);
-                                }}
-                                error={errors?.rawMaterialId?.message}
-                            />
-                            {loading && (
-                                <div className="text-slate-500 text-sm mt-1">
-                                    Fetching raw materials
-                                </div>
-                            )}
-                            {showEmpty && (
-                                <div className="text-red-500 text-sm mt-1">
-                                    No Raw Materials available in this Store.
-                                </div>
-                            )}
-                        </>
-                    )}
-                />
-            </td>
-
-            {/* REQUIRED QTY & UOM */}
-            <td className="px-4 py-3">
-                <Controller
-                    name={`products.${productIndex}.rawMaterials.${index}.requiredQty` as const}
-                    control={control}
-                    render={({ field }) => (
-                        <QuantityInput
-                            hideLabel={true}
-                            name={field.name}
-                            value={field.value}
-                            baseUoms={baseUoms}
-                            error={errors?.requiredQty?.message || errors?.uom?.message}
-                            onChange={(e: any) => field.onChange(e.target.value)}
-                            disabled={false}
-                        />
-                    )}
-                />
-                <Controller
-                    name={`products.${productIndex}.rawMaterials.${index}.uom` as const}
-                    control={control}
-                    render={({ field }) => (
-                        <input type="hidden" name={field.name} value={field.value || ""} />
-                    )}
-                />
-            </td>
-
-            {/* REMARKS */}
-            <td className="px-4 py-3">
-                <Controller
-                    name={`products.${productIndex}.rawMaterials.${index}.remarks` as const}
-                    control={control}
-                    render={({ field }) => (
-                        <TextInput
-                            label=""
-                            bottom={true}
-                            name={field.name}
-                            placeholder="Remarks"
-                            value={field.value}
-                            onChange={field.onChange}
-                        />
-                    )}
-                />
-            </td>
-
-            {/* DELETE */}
-            <td className="px-4 py-3 text-center align-middle">
-                <DeleteButton onClick={() => remove(index)} />
-            </td>
-        </tr>
+        <div className="w-full">
+            <Controller
+                name={`products.${productIndex}.rawMaterials.${index}.requiredQty` as const}
+                control={control}
+                render={({ field }) => (
+                    <QuantityInput
+                        hideLabel
+                        name={field.name}
+                        value={field.value}
+                        baseUoms={baseUoms}
+                        error={error}
+                        onChange={(e: any) => field.onChange(e.target.value)}
+                    />
+                )}
+            />
+            <Controller
+                name={`products.${productIndex}.rawMaterials.${index}.uom` as const}
+                control={control}
+                render={({ field }) => (
+                    <input type="hidden" name={field.name} value={field.value || ""} />
+                )}
+            />
+        </div>
     );
 });
+
+const RemarksCellRenderer: React.FC<{
+    productIndex: number;
+    index: number;
+    control: any;
+}> = React.memo(({ productIndex, index, control }) => (
+    <div className="w-full">
+        <Controller
+            name={`products.${productIndex}.rawMaterials.${index}.remarks` as const}
+            control={control}
+            render={({ field }) => (
+                <TextInput
+                    label=""
+                    bottom
+                    name={field.name}
+                    placeholder="Narration"
+                    value={field.value}
+                    onChange={field.onChange}
+                />
+            )}
+        />
+    </div>
+));
 
 interface ProductRawMaterialsSectionProps {
     productIndex: number;
     productName?: string;
     control: any;
-    watch: any;
     errors: any;
     storeOptions: { label: string; value: string }[];
     rowRmStates: Record<string, RowRawMaterialState>;
@@ -382,7 +315,6 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     productIndex,
     productName,
     control,
-    watch,
     errors,
     storeOptions,
     rowRmStates,
@@ -397,6 +329,75 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
         name: `products.${productIndex}.rawMaterials` as const,
     });
 
+    const columns: DataTableColumn<typeof fields[number]>[] = useMemo(() => [
+        {
+            header: "STORE",
+            headerNode: <>STORE <span className="text-red-500">*</span></>,
+            width: "minmax(140px, 1fr)",
+            render: (row, index) => (
+                <StoreCellRenderer
+                    productIndex={productIndex}
+                    index={index}
+                    control={control}
+                    storeOptions={storeOptions}
+                    error={errors?.rawMaterials?.[index]?.storeId?.message}
+                    onStoreChange={(idx, storeId) => handleStoreChange(productIndex, idx, storeId, row.id)}
+                />
+            ),
+        },
+        {
+            header: "RAW MATERIAL",
+            headerNode: <>RAW MATERIAL <span className="text-red-500">*</span></>,
+            width: "minmax(180px, 1.3fr)",
+            render: (row, index) => (
+                <RawMaterialCellRenderer
+                    productIndex={productIndex}
+                    index={index}
+                    control={control}
+                    error={errors?.rawMaterials?.[index]?.rawMaterialId?.message}
+                    rowState={rowRmStates[row.id] ?? { options: [], loading: false, fetchedForStoreId: null }}
+                    onRmChange={(idx, rmValue) => handleRmChange(productIndex, idx, rmValue, row.id)}
+                    fetchRawMaterialsForStore={fetchRawMaterialsForStore}
+                    fieldId={row.id}
+                />
+            ),
+        },
+        {
+            header: "REQUIRED QTY & UOM",
+            headerNode: <>REQUIRED QTY & UOM <span className="text-red-500">*</span></>,
+            width: "minmax(160px, 1fr)",
+            render: (row, index) => (
+                <QtyUomCellRenderer
+                    productIndex={productIndex}
+                    index={index}
+                    control={control}
+                    error={errors?.rawMaterials?.[index]?.requiredQty?.message || errors?.rawMaterials?.[index]?.uom?.message}
+                    rowState={rowRmStates[row.id] ?? { options: [], loading: false, fetchedForStoreId: null }}
+                    setValue={setValue}
+                />
+            ),
+        },
+        {
+            header: "NARRATION",
+            width: "minmax(140px, 1fr)",
+            render: (_, index) => (
+                <RemarksCellRenderer
+                    productIndex={productIndex}
+                    index={index}
+                    control={control}
+                />
+            ),
+        },
+        {
+            header: "",
+            width: "52px",
+            align: "center",
+            render: (_, index) => (
+                <DeleteButton onClick={() => remove(index)} />
+            ),
+        },
+    ], [productIndex, control, storeOptions, errors, rowRmStates, handleStoreChange, handleRmChange, fetchRawMaterialsForStore, setValue, remove]);
+
     return (
         <div className="md:col-span-12 mt-3 relative min-h-[150px]">
             {isCalculatingRM && (
@@ -406,7 +407,7 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                     </div>
                 </div>
             )}
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-extrabold text-ink uppercase tracking-wider">
                     Manual Raw Materials ({productName || `Product ${productIndex + 1}`})
                 </h3>
@@ -416,78 +417,19 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                     type="button"
                     size="sm"
                     onClick={() =>
-                        append({
-                            rawMaterialId: "",
-                            requiredQty: "",
-                            uom: "",
-                            storeId: "",
-                            remarks: "",
-                        })
+                        append({ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" })
                     }
                 />
             </div>
 
-            <div className="mt-2 mb-2">
-                <table className="w-full text-left text-sm text-ink">
-                    <thead className="text-xs font-extrabold text-ink uppercase tracking-wider">
-                        <tr>
-                            <th className="pb-2">
-                                STORE{" "}
-                                <span className="text-red-500">
-                                    *
-                                </span>
-                            </th>
-                            <th className="pb-2">
-                                RAW MATERIAL{" "}
-                                <span className="text-red-500">
-                                    *
-                                </span>
-                            </th>
-                            <th className="pb-2">
-                                REQUIRED QTY & UOM{" "}
-                                <span className="text-red-500">
-                                    *
-                                </span>
-                            </th>
-                            <th className="pb-2">REMARKS</th>
-                            <th className="pb-2" />
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line-soft">
-                        {fields.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="px-4 py-3 text-center text-ink-subtle bg-card-2 rounded border border-line-soft font-medium">
-                                    No raw materials added. Click 'Add Material Row' to include materials.
-                                </td>
-                            </tr>
-                        )}
-                        {fields.map((item, index) => (
-                            <RawMaterialRowInner
-                                key={item.id}
-                                productIndex={productIndex}
-                                index={index}
-                                control={control}
-                                remove={remove}
-                                storeOptions={storeOptions}
-                                errors={errors?.rawMaterials?.[index]}
-                                watch={watch}
-                                rowState={
-                                    rowRmStates[item.id] ?? {
-                                        options: [],
-                                        loading: false,
-                                        fetchedForStoreId: null,
-                                    }
-                                }
-                                onStoreChange={(idx, storeId) => handleStoreChange(productIndex, idx, storeId, item.id)}
-                                onRmChange={(idx, rmValue) => handleRmChange(productIndex, idx, rmValue, item.id)}
-                                fetchRawMaterialsForStore={fetchRawMaterialsForStore}
-                                fieldId={item.id}
-                                setValue={setValue}
-                            />
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                columns={columns}
+                data={fields}
+                rowKey={(row) => row.id}
+                minHeightClassName="min-h-[60px]"
+                density="default"
+                emptyMessage="No raw materials added. Click 'Add Material Row' to include materials."
+            />
         </div>
     );
 });
@@ -632,24 +574,24 @@ const ProductionOrderCreate: React.FC = () => {
     }, []);
 
     // Called by RawMaterialRowInner when user picks a new Store
-    const handleStoreChange = (productIndex: number, index: number, newStoreId: string, fieldId: string) => {
+    const handleStoreChange = useCallback((productIndex: number, index: number, newStoreId: string, fieldId: string) => {
         // Clear the raw material and UOM fields for this row
         setValue(`products.${productIndex}.rawMaterials.${index}.rawMaterialId` as any, "");
         setValue(`products.${productIndex}.rawMaterials.${index}.uom` as any, "KG");
 
         // Fetch materials for the new store
         fetchRawMaterialsForStore(newStoreId, fieldId);
-    };
+    }, [setValue, fetchRawMaterialsForStore]);
 
     // Called by RawMaterialRowInner when user picks a Raw Material
-    const handleRmChange = (productIndex: number, index: number, rmValue: string, fieldId: string) => {
+    const handleRmChange = useCallback((productIndex: number, index: number, rmValue: string, fieldId: string) => {
         const selected = rowRmStates[fieldId]?.options.find(
             (o) => o.value === rmValue
         );
         if (selected?.rawUom) {
             setValue(`products.${productIndex}.rawMaterials.${index}.uom` as any, selected.rawUom);
         }
-    };
+    }, [rowRmStates, setValue]);
 
     // â”€â”€ Load Dependencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const [products, setProducts] = useState<any[]>([]);
@@ -712,7 +654,6 @@ const ProductionOrderCreate: React.FC = () => {
                 if (!isEditMode) {
                     if (items.length > 0) {
                         const newProducts = items.map((item: any) => {
-                            const targetQty = Number(item.quantity) || 0;
                             return {
                                 productItemId: item.productId?.toString() || "",
                                 targetQty: item.quantity ? Number(item.quantity) : 0,
@@ -960,9 +901,9 @@ const ProductionOrderCreate: React.FC = () => {
                         products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
                             productItemId: p.productItemId?.toString() || p.productId?.toString() || "",
                             targetQty: Number(p.targetQty || p.quantity || 0),
-                            damageQty: Number((fullOrder as any).damageQty) || 0,
-                            uom: fullOrder.uom || "PCS",
-                            sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
+                            damageQty: Number(p.damageQty || (fullOrder as any).damageQty) || 0,
+                            uom: p.uom || fullOrder.uom || "PCS",
+                            sourceSalesOrderLineId: p.sourceSalesOrderLineId?.toString() || fullOrder.sourceSalesOrderLineId || "",
                             rawMaterials: rmRows
                         })) : [{
                             productItemId: fullOrder.productItemId?.toString() || "",
@@ -975,8 +916,7 @@ const ProductionOrderCreate: React.FC = () => {
                     });
                     setRowRmStates({});
                 })
-                .catch((err) => {
-                    console.error("âŒ Failed to fetch order details for edit:", err);
+                .catch(() => {
                     toast.error("Failed to load production order details");
                 });
         } else {
@@ -1289,7 +1229,6 @@ const ProductionOrderCreate: React.FC = () => {
                                                     productIndex={index}
                                                     productName={products.find(p => p.id?.toString() === watchProducts?.[index]?.productItemId)?.productName}
                                                     control={control}
-                                                    watch={watch}
                                                     errors={errors.products?.[index]}
                                                     storeOptions={storeOptions}
                                                     rowRmStates={rowRmStates}

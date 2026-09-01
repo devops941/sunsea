@@ -33,10 +33,9 @@ export class GoodsDispatchService {
     dateTo?: string;
   }) {
     const where: any = {
-      // ✅ STEP 7–8: IN_PRODUCTION and later statuses are eligible for dispatch
-      // FG stock is NOT created at COMPLETED — it is created here at dispatch receipt
-      // IN_PROGRESS is included because syncProductionOrderQuantities sets it when target not yet met
-      status: { in: ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
+      // Dispatch is only allowed after production is fully completed
+      // POST_PRODUCTION is still in-progress — dispatch only from READY_FOR_DISPATCH onwards
+      status: { in: ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
     };
 
     if (filters.productItemId) where.productItemId = BigInt(filters.productItemId);
@@ -96,38 +95,32 @@ export class GoodsDispatchService {
         0
       );
 
-      // Calculate dispatchable produced qty
-      let dispatchableProducedQty = 0;
-      if (["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
-        // Only count plans that have truly finished production and are ready for dispatch:
-        // - COMPLETED plans (went through full post-production workflow)
-        // - SHORT_CLOSED plans (explicitly short-closed, production done)
-        // - STOPPED plans ONLY if they produced >= their planned qty (cascade-stopped after completing production)
-        //   Partial STOPPED plans (cascade-stopped mid-production, produced < planned) are NOT yet dispatchable
+      // Net qty after removing scrap and defects
+      const scrapQty = Number(o.scrapQty || 0);
+      const rejectedQty = Number(o.rejectedQty || 0);
+      const netProducedQty = Math.max(0, Number(o.producedQty) - scrapQty - rejectedQty);
+
+      // Calculate dispatchable produced qty (net of scrap/defects)
+      let dispatchableProducedQty = netProducedQty;
+
+      if (["PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
         const dispatchablePlans = o.dailyProductionPlans.filter((p: any) => {
           if (p.status === "COMPLETED" || p.status === "SHORT_CLOSED") return true;
           if (p.status === "STOPPED") {
             const planProduced = p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced), 0);
             const planPlanned = Number(p.plannedQty || 0);
-            // Only count STOPPED plans that completed their planned production
             return planProduced >= planPlanned && planPlanned > 0;
           }
           return false;
         });
-        dispatchableProducedQty = dispatchablePlans.reduce((sum: number, p: any) => {
+        let planSum = dispatchablePlans.reduce((sum: number, p: any) => {
           return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
         }, 0);
-        // Fallback: if no dispatchable plans found but PO has producedQty, use PO value
-        if (dispatchableProducedQty === 0 && Number(o.producedQty) > 0) {
-          dispatchableProducedQty = Number(o.producedQty);
-        }
-        // Safety: never exceed PO's total producedQty
-        dispatchableProducedQty = Math.min(dispatchableProducedQty, Number(o.producedQty));
-      } else {
-        // For fully completed PO, everything produced is dispatchable
-        dispatchableProducedQty = Number(o.producedQty);
+        // Fallback to netProducedQty if no dispatchable plans found
+        if (planSum === 0 && netProducedQty > 0) planSum = netProducedQty;
+        // Safety: never exceed net produced qty
+        dispatchableProducedQty = Math.min(planSum, netProducedQty);
       }
-
 
       const pendingQty = Math.max(0, dispatchableProducedQty - totalDispatched);
       return {
@@ -173,11 +166,11 @@ export class GoodsDispatchService {
       }
 
       // ✅ STEP 7–8: IN_PRODUCTION and later statuses can be dispatched
-      if (!['IN_PROGRESS', 'IN_PRODUCTION', 'POST_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
+      if (!['READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
         throw new ApiError(
           400,
           `Production Order ${item.productionOrderId} is not eligible for dispatch. ` +
-          `Status must be READY_FOR_DISPATCH. Current status: ${po.status}`
+          `Production must be fully completed before dispatch. Current status: ${po.status}`
         );
       }
 
@@ -529,9 +522,8 @@ export class GoodsDispatchService {
 
             const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(poRecord.status);
             const isFullyDispatched = targetQty > 0 && (
-              totalDispatched >= targetQty || 
-              (isShortClosed && totalDispatched >= producedQty) ||
-              (producedQty >= targetQty && totalDispatched >= producedQty)
+              totalDispatched >= targetQty ||
+              (producedQty > 0 && totalDispatched >= producedQty)
             );
             const newPoStatus = isFullyDispatched ? "DISPATCHED" : (isShortClosed ? poRecord.status : "PARTIAL_COMPLETED");
 

@@ -97,6 +97,7 @@ router.get(
   "/:productionOrderId/history",
   authMiddleware,
   requirePermission("production_orders.view"),
+  validateMiddleware(productionOrderIdSchema),
   productionOrderController.getHistory
 );
 

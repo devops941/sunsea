@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { FaSave, FaArrowLeft, FaCheck } from "react-icons/fa";
+import { FaSave, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import TextInput from "../../../components/form/TextInput/TextInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
-import BackButton from "../../../components/ui/BackButton/BackButton";
-import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { usePermission } from "../../../hooks/usePermission";
 
 const WeeklyMachineScheduleCreate: React.FC = () => {
@@ -32,10 +31,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     const [selectedOrders, setSelectedOrders] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-
-
     useEffect(() => {
-
         const loadProductionOrders = async () => {
             setLoadingPo(true);
             try {
@@ -43,25 +39,20 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 const list = res.data || res || [];
                 const poList = Array.isArray(list) ? list : (list.data || []);
                 setProductionOrders(poList);
-            } catch (err) {
-                console.error("Failed to load production orders", err);
+            } catch {
+                // silently fail
             } finally {
                 setLoadingPo(false);
             }
         };
-
         loadProductionOrders();
     }, [dispatch]);
 
     useEffect(() => {
         if (location.state) {
             const item = location.state as any;
-            if (item.weekStartDate) {
-                setWeekStartDate(item.weekStartDate.split('T')[0]);
-            }
-            if (item.weekEndDate) {
-                setWeekEndDate(item.weekEndDate.split('T')[0]);
-            }
+            if (item.weekStartDate) setWeekStartDate(item.weekStartDate.split('T')[0]);
+            if (item.weekEndDate) setWeekEndDate(item.weekEndDate.split('T')[0]);
         }
     }, [location.state]);
 
@@ -73,20 +64,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 const day = date.getDay();
                 const diff = date.getDate() - day + (day === 0 ? -6 : 1);
                 const mondayDate = new Date(date.setDate(diff));
-
                 const yyyy = mondayDate.getFullYear();
                 const mm = String(mondayDate.getMonth() + 1).padStart(2, '0');
                 const dd = String(mondayDate.getDate()).padStart(2, '0');
-                const formattedStart = `${yyyy}-${mm}-${dd}`;
-
-                setWeekStartDate(formattedStart);
-
+                setWeekStartDate(`${yyyy}-${mm}-${dd}`);
                 const endDate = new Date(mondayDate);
                 endDate.setDate(mondayDate.getDate() + 6);
-                const endYyyy = endDate.getFullYear();
-                const endMm = String(endDate.getMonth() + 1).padStart(2, '0');
-                const endDd = String(endDate.getDate()).padStart(2, '0');
-                setWeekEndDate(`${endYyyy}-${endMm}-${endDd}`);
+                setWeekEndDate(`${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`);
             }
         } else {
             setWeekStartDate("");
@@ -99,17 +83,15 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
             setAlreadyScheduled([]);
             return;
         }
-
         const fetchScheduled = async () => {
             try {
                 const res: any = await weeklyProgramService.getAll({ weekStartDate });
                 const list = res.data || res || [];
                 setAlreadyScheduled(Array.isArray(list) ? list : (list.data || []));
-            } catch (err) {
-                console.error("Failed to load scheduled programs", err);
+            } catch {
+                // silently fail
             }
         };
-
         fetchScheduled();
     }, [weekStartDate]);
 
@@ -125,70 +107,48 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         setSelectedOrders(prev => ({ ...prev, [poId]: !prev[poId] }));
     };
 
-
-
-
-
     const handleSubmit = async () => {
         const selectedIds = Object.keys(selectedOrders).filter(id => selectedOrders[id]);
-
         if (selectedIds.length === 0) {
             toast.error("Please select at least one order to allocate.");
             return;
         }
-
         setIsSubmitting(true);
         try {
-
-
             for (let i = 0; i < selectedIds.length; i++) {
                 const poId = selectedIds[i];
                 const po = displayOrders.find((o: any) => o.productionOrderId === poId);
                 if (!po) continue;
-
                 const qty = Number(po.targetQty) || 0;
                 if (qty <= 0) continue;
-
                 const actualId = await weeklyProgramService.fetchNextId();
-
                 const validPriorities = ["LOW", "MEDIUM", "HIGH", "URGENT"];
-                const mappedPriority = (po.priority && typeof po.priority === 'string' && validPriorities.includes(po.priority.toUpperCase()))
+                const mappedPriority = (po.priority && validPriorities.includes(po.priority.toUpperCase()))
                     ? po.priority.toUpperCase()
                     : "MEDIUM";
-
-                const payload = {
+                await dispatch(createWeeklyProgram({
                     weeklyProgramId: actualId,
                     productionOrderId: po.productionOrderId,
                     weekStartDate,
                     weekEndDate,
-                    machineId: null, // Target machine remains null until production start
-                    dayOfWeek: 1, // Default to Monday
-                    shiftId: null, // Shift remains null until production start
+                    machineId: null,
+                    dayOfWeek: 1,
+                    shiftId: null,
                     plannedQty: qty,
                     plannedHours: 0,
                     setupHours: 0,
                     sequenceNo: i + 1,
                     priority: mappedPriority,
                     status: "PLANNED"
-                };
-
-                await dispatch(createWeeklyProgram(payload)).unwrap();
+                })).unwrap();
             }
-
             toast.success("Orders successfully allocated to the week!");
             navigate("/weekly-machine-schedules");
         } catch (err: any) {
-            console.error("CREATE ERROR =>", err);
             let errMsg = "Failed to save schedule.";
-            if (typeof err === "string") {
-                errMsg = err;
-            } else if (err?.message && err.message !== "Rejected") {
-                errMsg = err.message;
-            } else if (err?.response?.data?.message) {
-                errMsg = err.response.data.message;
-            } else if (err?.response?.data?.errors?.length > 0) {
-                errMsg = err.response.data.errors.map((e: any) => `${e.path}: ${e.message}`).join(", ");
-            }
+            if (typeof err === "string") errMsg = err;
+            else if (err?.message && err.message !== "Rejected") errMsg = err.message;
+            else if (err?.response?.data?.message) errMsg = err.response.data.message;
             toast.error(errMsg);
         } finally {
             setIsSubmitting(false);
@@ -198,133 +158,129 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     const selectedCount = Object.values(selectedOrders).filter(Boolean).length;
 
     return (
-        <div className="inner-container">
-            <div className="p-4 md:p-6 min-h-screen bg-card"><div className="w-full">
-                <div className="page-header mb-4">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-ink">Allocate Weekly Schedule</h2>
-
-                        </div>
-                        <div>
-                            <BackButton text="Back to List" to="/weekly-machine-schedules" />
-                        </div>
-                    </div>
+        <div className="w-full bg-card rounded-2xl shadow-sm border border-line" style={{ maxWidth: 1200 }}>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 border-b border-line">
+                <div>
+                    <h2 className="text-xl font-bold text-ink">Allocate Weekly Schedule</h2>
+                    <p className="text-xs text-ink-subtle mt-0.5">Select a week and assign ready production orders</p>
                 </div>
+                <BackButton text="Back to List" to="/weekly-machine-schedules" />
+            </div>
 
-                <div className="  mb-6">
-                    <div className="p-4 md:p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                            <div className="md:col-span-6 lg:col-span-4">
-                                <DatePickerCalendar
-                                    label="Week Start Date"
-                                    name="weekStartDate"
-                                    value={weekStartDate ? new Date(weekStartDate) : null}
-                                    required
-                                    onChange={(e: any) => handleDateChange(e)}
-                                />
-                            </div>
-                            <div className="md:col-span-6 lg:col-span-4">
-                                <DatePickerCalendar
-                                    label="Week End Date"
-                                    name="weekEndDate"
-                                    value={weekEndDate ? new Date(weekEndDate) : null}
-                                    disabled
-                                />
-                            </div>
-                        </div>
-                    </div>
+            {/* Date Filters */}
+            <div className="p-6 border-b border-line bg-card-2/40 overflow-visible">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+                    <DatePickerCalendar
+                        label="Week Start Date"
+                        name="weekStartDate"
+                        value={weekStartDate ? new Date(weekStartDate) : null}
+                        required
+                        onChange={(e: any) => handleDateChange(e)}
+                    />
+                    <DatePickerCalendar
+                        label="Week End Date"
+                        name="weekEndDate"
+                        value={weekEndDate ? new Date(weekEndDate) : null}
+                        disabled
+                    />
                 </div>
+            </div>
 
-                {weekStartDate ? (
-                    <div className="bg-card rounded-2xl shadow-xs border border-line-soft mb-6 overflow-hidden">
-                        <div className="p-0">
-                            {loadingPo ? (
-                                <div className="text-center p-10 text-ink-subtle font-medium">Loading...</div>
-                            ) : (displayOrders.length > 0 || alreadyScheduled.length > 0) ? (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm text-ink">
-                                        <thead className="bg-card-2 border-b border-line-soft text-xs font-extrabold text-ink uppercase tracking-wider">
-                                            <tr>
-                                                <th className="px-4 py-3" style={{ width: "50px", textAlign: "center" }}>
-                                                    <FaCheck className="text-ink-subtle mx-auto" />
-                                                </th>
-                                                <th className="px-4 py-3">Production Order</th>
-                                                <th className="px-4 py-3">Product</th>
-
-                                                <th className="px-4 py-3">Qty</th>
-                                                <th className="px-4 py-3">Status / Priority</th>
+            {/* Content Area */}
+            {weekStartDate ? (
+                <>
+                    {loadingPo ? (
+                        <div className="text-center py-12 text-ink-subtle text-sm font-medium">
+                            Loading production orders...
+                        </div>
+                    ) : (displayOrders.length > 0 || alreadyScheduled.length > 0) ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm text-ink">
+                                <thead className="bg-card-2 border-b border-line-soft text-xs font-extrabold text-ink uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-4 py-3 text-center" style={{ width: 48 }}>
+                                            <FaCheck className="text-ink-subtle mx-auto" size={11} />
+                                        </th>
+                                        <th className="px-4 py-3">Production Order</th>
+                                        <th className="px-4 py-3">Product</th>
+                                        <th className="px-4 py-3">Qty</th>
+                                        <th className="px-4 py-3">Priority / Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-line-soft">
+                                    {displayOrders.map((po: any) => {
+                                        const isSelected = !!selectedOrders[po.productionOrderId];
+                                        return (
+                                            <tr
+                                                key={po.productionOrderId}
+                                                className={`hover:bg-card-2 transition-colors cursor-pointer ${isSelected ? "bg-primary/10 border-l-4 border-l-primary" : ""}`}
+                                                onClick={() => handleToggleSelect(po.productionOrderId)}
+                                            >
+                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="form-check-input accent-primary"
+                                                        style={{ cursor: "pointer", width: "1.1rem", height: "1.1rem" }}
+                                                        checked={isSelected}
+                                                        onChange={() => handleToggleSelect(po.productionOrderId)}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 font-bold text-ink">{po.productionOrderId}</td>
+                                                <td className="px-4 py-3 font-medium text-ink">{po.productItem?.productName || "-"}</td>
+                                                <td className="px-4 py-3 font-semibold text-ink">
+                                                    {Number(po.targetQty)} <span className="text-ink-muted text-xs">PCS</span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <StatusBadge status={po.priority || 'MEDIUM'} />
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-line-soft">
-                                            {/* Render Pending Orders first */}
-                                            {displayOrders.map((po: any) => {
-                                                const targetQty = Number(po.targetQty);
-                                                const isSelected = !!selectedOrders[po.productionOrderId];
+                                        );
+                                    })}
 
-                                                return (
-                                                    <tr key={po.productionOrderId} className={`hover:bg-card-2 transition-colors ${isSelected ? "bg-primary/15 border-l-4 border-l-primary" : ""}`}>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="form-check-input accent-primary"
-                                                                style={{ cursor: "pointer", width: "1.2rem", height: "1.2rem" }}
-                                                                checked={isSelected}
-                                                                onChange={() => handleToggleSelect(po.productionOrderId)}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-3 font-bold text-ink">{po.productionOrderId}</td>
-                                                        <td className="px-4 py-3 font-semibold text-ink">{po.productItem?.productName || "-"}</td>
+                                    {alreadyScheduled.length > 0 && alreadyScheduled.map((program: any) => (
+                                        <tr key={`sched-${program.weeklyProgramId}`} className="bg-card-2/40 text-ink-subtle">
+                                            <td className="px-4 py-3" />
+                                            <td className="px-4 py-3 font-bold opacity-60">{program.productionOrderId}</td>
+                                            <td className="px-4 py-3 opacity-60">{program.productionOrder?.productItem?.productName || "-"}</td>
+                                            <td className="px-4 py-3 opacity-60">
+                                                {Number(program.plannedQty)} <span className="text-xs">PCS</span>
+                                            </td>
+                                            <td className="px-4 py-3 opacity-60">
+                                                <StatusBadge status={program.status || 'SCHEDULED'} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-ink-subtle text-sm font-medium">
+                            No ready production orders found for this week.
+                        </div>
+                    )}
 
-                                                        <td className="px-4 py-3 font-semibold text-ink">{targetQty} <span className="small text-ink-muted">PCS</span></td>
-                                                        <td className="px-4 py-3"><StatusBadge status={po.priority || 'MEDIUM'} /></td>
-                                                    </tr>
-                                                );
-                                            })}
-
-                                            {/* Render Already Scheduled Orders below them if week is selected */}
-                                            {weekStartDate && alreadyScheduled.length > 0 && alreadyScheduled.map((program: any) => (
-                                                <tr key={`sched-${program.weeklyProgramId}`} className="hover:bg-card-2 transition-colors text-ink-subtle bg-card-2/40">
-                                                    <td className="px-4 py-3 text-center">
-                                                        {/* No checkbox for already scheduled items */}
-                                                    </td>
-                                                    <td className="px-4 py-3 font-bold text-ink opacity-70">{program.productionOrderId}</td>
-                                                    <td className="px-4 py-3 opacity-70">{program.productionOrder?.productItem?.productName || "-"}</td>
-
-                                                    <td className="px-4 py-3 opacity-70">{Number(program.plannedQty)} <span className="small">PCS</span></td>
-                                                    <td className="px-4 py-3 opacity-70"><StatusBadge status={program.status || 'SCHEDULED'} /></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="text-center p-5 text-ink-subtle font-medium">
-                                    No ready production orders (RM_AVAILABLE) found for scheduling.
-                                </div>
+                    {/* Footer Actions */}
+                    {selectedCount > 0 && (
+                        <div className="flex justify-end items-center gap-3 p-5 border-t border-line bg-card-2/40">
+                            <span className="text-sm font-bold text-primary">{selectedCount} order{selectedCount > 1 ? "s" : ""} selected</span>
+                            {can("weekly_programs.create") && (
+                                <CustomButton
+                                    text={isSubmitting ? "Saving..." : "Confirm & Allocate"}
+                                    icon={FaSave}
+                                    onClick={handleSubmit}
+                                    disabled={isSubmitting}
+                                />
                             )}
                         </div>
-                        {selectedCount > 0 && (
-                            <div className="flex justify-end items-center gap-3 p-6 border-t border-line-soft bg-card-2 rounded-b-2xl">
-                                <span className="font-bold text-primary">{selectedCount} Selected</span>
-                                {can("weekly_programs.create") && (
-                                    <CustomButton
-                                        text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
-                                        icon={FaSave}
-                                        onClick={handleSubmit}
-                                        disabled={isSubmitting}
-                                    />
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="text-center p-10 border-2 border-dashed border-line-soft rounded-2xl bg-card text-ink-subtle mb-6 shadow-xs">
-                        <div className="text-lg font-medium mb-1">Waiting for Week Start Date</div>
-                        <div className="text-sm opacity-80">Please select a Week Start Date above to view and allocate ready production orders.</div>
-                    </div>
-                )}
-            </div></div>
+                    )}
+                </>
+            ) : (
+                <div className="text-center py-16 text-ink-subtle">
+                    <div className="text-base font-semibold mb-1">Waiting for Week Start Date</div>
+                    <div className="text-sm opacity-70">Select a Week Start Date above to view ready production orders.</div>
+                </div>
+            )}
         </div>
     );
 };

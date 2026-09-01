@@ -415,7 +415,7 @@ const HourlyWorkReportList: React.FC = () => {
                             {group.hours.map((h: any) => {
                                 const hasIssues = h.scrapQty > 0 || h.downtime > 0 || h.rejectQty > 0;
                                 return (
-                                    <div key={h.hourlyProductionId} className="flex items-center p-4 rounded-xl border relative" style={{ background: hasIssues ? "#fff5f5" : "#f8f9fa", borderColor: hasIssues ? "#ffc9c9" : "#dee2e6" }}>
+                                    <div key={h.hourlyProductionId} className={`flex items-center p-4 rounded-xl border relative ${hasIssues ? "bg-red-500/5 border-red-500/30" : "bg-card-2 border-line-soft"}`}>
                                         {hasIssues && <div className="absolute left-0 top-0 bottom-0 rounded-l-xl w-1.5 bg-red-500"></div>}
                                         {!hasIssues && <div className="absolute left-0 top-0 bottom-0 rounded-l-xl w-1.5 bg-emerald-500"></div>}
                                         <div className="mr-6 text-center ml-3 min-w-[60px]">
@@ -473,7 +473,7 @@ const HourlyWorkReportList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
