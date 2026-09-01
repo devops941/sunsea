@@ -113,7 +113,7 @@ const MachineList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
                         <h2 className="text-base font-bold text-ink">
@@ -162,16 +162,27 @@ const MachineList: React.FC = () => {
                                     <span className="text-ink-subtle font-mono text-xs">{String(startIndex + index + 1).padStart(2, '0')}</span>
                                 ),
                             },
-                            { header: "MACHINE ID", accessor: "machineId", width: "130px" },
-                            { header: "MACHINE NAME", accessor: "machineName", width: "180px" },
-                            { header: "TECH TYPE", width: "140px", render: (item) => item.technologyType || "—" },
-                            { header: "MACHINE TYPE", width: "140px", render: (item) => item.machineType || "—" },
+                            { header: "MACHINE ID", accessor: "machineId", width: "110px" },
+                            { header: "MACHINE NAME", accessor: "machineName", width: "160px" },
+                            {
+                                header: "TECH TYPE", width: "150px", render: (item) => {
+                                    const val = item.technologyType || "—";
+                                    return <span className="block truncate" title={val}>{val}</span>;
+                                }
+                            },
+                            {
+                                header: "MACHINE TYPE", width: "120px", render: (item) => {
+                                    const val = item.machineType || "—";
+                                    return <span className="block truncate" title={val}>{val}</span>;
+                                }
+                            },
                             {
                                 header: "MACHINE INCHARGE",
                                 render: (item) => {
                                     if (!item.operatorId) return "—";
                                     const emp = employees.find(e => e.id === item.operatorId);
-                                    return emp ? emp.fullName : item.operatorId;
+                                    const val = emp ? emp.fullName : item.operatorId;
+                                    return <span className="block truncate" title={val}>{val}</span>;
                                 }
                             },
                             {

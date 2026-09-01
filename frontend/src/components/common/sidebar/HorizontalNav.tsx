@@ -8,6 +8,7 @@ import { FaChevronDown, FaChevronRight } from "react-icons/fa";
 import { FiLogOut } from "react-icons/fi";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ThemeToggle from "../ThemeToggle";
+import LiveBadge from "../../../components/ui/LiveBadge/LiveBadge";
 
 const HorizontalNav = () => {
   const { can } = usePermission();
@@ -177,8 +178,11 @@ const HorizontalNav = () => {
         </ul>
       </div>
 
-      {/* ── RIGHT: Theme switch & Logout ── */}
+      {/* ── RIGHT: Live status, Profile, Theme switch & Logout ── */}
       <div className="flex items-center gap-2.5 pl-3 shrink-0">
+        {/* Live Status Indicator */}
+        <LiveBadge />
+
         {user && (() => {
           const name = user.fullName || user.username || "User";
           const role = formatRole(user);

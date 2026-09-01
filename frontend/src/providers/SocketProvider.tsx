@@ -58,12 +58,25 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     socketInstance.io.on("reconnect_attempt", (n) => {
       console.log(`🟡 Socket reconnect attempt ${n}`);
+      setIsConnected(false);
     });
+
     socketInstance.io.on("reconnect", (n) => {
       console.log(`🟢 Socket reconnected after ${n} attempts`);
+      setIsConnected(true);
     });
+
     socketInstance.on("connect_error", (err) => {
       console.warn("⚠️ Socket connect error:", err?.message ?? err);
+      setIsConnected(false);
+    });
+
+    socketInstance.io.on("reconnect_error", (err) => {
+      setIsConnected(false);
+    });
+
+    socketInstance.io.on("reconnect_failed", () => {
+      setIsConnected(false);
     });
 
     setSocket(socketInstance);
