@@ -432,7 +432,7 @@ const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
               <button
                 onClick={() => navigate("/accounts/vouchers")}
-                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Sales</span>
@@ -446,7 +446,7 @@ const DashboardPage: React.FC = () => {
 
               <button
                 onClick={() => navigate("/invoice")}
-                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Purchase</span>
@@ -460,7 +460,7 @@ const DashboardPage: React.FC = () => {
 
               <button
                 onClick={() => navigate("/accounts/receivable")}
-                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Receivable</span>
@@ -475,7 +475,7 @@ const DashboardPage: React.FC = () => {
 
               <button
                 onClick={() => navigate("/accounts/payable")}
-                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Payable</span>
@@ -490,7 +490,7 @@ const DashboardPage: React.FC = () => {
 
               <button
                 onClick={() => navigate("/accounts/bank-accounts?filter=cash")}
-                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Cash</span>
@@ -504,7 +504,7 @@ const DashboardPage: React.FC = () => {
 
               <button
                 onClick={() => navigate("/accounts/bank-accounts?filter=bank")}
-                className="text-left bg-card border border-line-soft rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Bank</span>
@@ -516,7 +516,7 @@ const DashboardPage: React.FC = () => {
                 <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.bankAccountCount || 0} accounts</div>
               </button>
 
-              {/* <div className="bg-card border border-line-soft rounded-lg p-3">
+              {/* <div className="bg-card border border-line-soft rounded-lg shadow-sm p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Stock Value</span>
                   <FaWarehouse className="text-cyan-500 text-xs" />
@@ -532,7 +532,7 @@ const DashboardPage: React.FC = () => {
                 Each card has fixed header (+ footer for txns) with scrollable body. */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4 mb-3 sm:mb-4" style={{ height: "340px" }}>
               {/* Alerts (1 col of 5) */}
-              <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
                 <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                   <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Alerts</div>
                   {accountsSummary.alerts.length > 0 && (
@@ -549,7 +549,7 @@ const DashboardPage: React.FC = () => {
                   ) : (
                     accountsSummary.alerts.map((a, i) => {
                       const styles = a.level === "danger"
-                        ? "bg-rose-500/10 border-rose-500/20 text-rose-500 hover:bg-rose-500/15"
+                        ? "bg-rose-500/10 border-rose-500/20 text-amber-500 hover:bg-rose-500/15"
                         : a.level === "warn"
                         ? "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/15"
                         : "bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/15";
@@ -583,7 +583,7 @@ const DashboardPage: React.FC = () => {
               </div>
 
               {/* Recent Transactions (2 cols of 5) */}
-              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
                 <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                   <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Transactions</div>
                   <button onClick={() => navigate("/accounts/ledger-statement")} className="text-[11px] font-semibold text-blue-500 hover:underline">
@@ -640,7 +640,7 @@ const DashboardPage: React.FC = () => {
               </div>
 
               {/* Sales Person Location Map (2 cols of 5) */}
-              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
                 <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                   <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle flex items-center gap-1.5">
                     <FaMapMarkerAlt className="text-emerald-500 text-[10px]" /> Sales Person Location
@@ -680,7 +680,7 @@ const DashboardPage: React.FC = () => {
                         </div>
                         {/* Expanded tooltip on hover */}
                         <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col items-center z-20">
-                          <div className="bg-card border border-line-soft rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                          <div className="bg-card border border-line-soft rounded-lg shadow-sm px-3 py-2 shadow-xl whitespace-nowrap">
                             <p className="text-[11px] font-bold text-ink">{pin.name}</p>
                             <p className="text-[10px] text-ink-subtle">{pin.area}</p>
                             <div className="flex items-center gap-1 mt-1">
@@ -716,7 +716,7 @@ const DashboardPage: React.FC = () => {
            ROW 2.5  –  Sales/Purchase Trend + Customer Product Report
            ══════════════════════════════════════════════════════ */}
         {showTrend && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ height: "460px" }}>
             {/* Sales & Purchase Trend Chart */}
             <SalesPurchaseTrendChart
               salesOrders={salesOrders}
@@ -724,8 +724,9 @@ const DashboardPage: React.FC = () => {
               productionOrders={productionOrders}
             />
 
-            {/* Customer Product Purchase Report */}
-            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+            {/* Customer Product Purchase Report — fixed height so header &
+               footer stay pinned while only the tbody scrolls. */}
+            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden h-full min-h-0">
               <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle flex items-center gap-1.5">
                   <FaShoppingCart className="text-indigo-500 text-[10px]" /> Product Purchase Report
@@ -795,7 +796,7 @@ const DashboardPage: React.FC = () => {
 
           {/* Today's Tasks */}
           {showTasks && (
-            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
               <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Today's Tasks</div>
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 uppercase">Live</span>
@@ -837,7 +838,7 @@ const DashboardPage: React.FC = () => {
 
           {/* Top Products */}
           {showTopProducts && (
-            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
               <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Top Products</div>
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-500 border border-teal-500/30 uppercase">By stock</span>
@@ -878,7 +879,7 @@ const DashboardPage: React.FC = () => {
 
           {/* Recent Sales Orders */}
           {showRecentSales && (
-            <div className="bg-card border border-line-soft rounded-lg flex flex-col overflow-hidden">
+            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
               <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Sales Orders</div>
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/30 uppercase">Latest 5</span>

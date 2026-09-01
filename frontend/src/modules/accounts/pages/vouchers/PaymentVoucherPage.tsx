@@ -232,9 +232,16 @@ const PaymentVoucherPage: React.FC = () => {
         className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
         style={{ height: "calc(100vh - 240px)" }}
       >
-        {vouchers.length === 0 && !loading ? (
+        {vouchers.length === 0 ? (
           <div className="p-8 text-center text-xs text-ink-subtle">
-            No payment vouchers found in this date range.
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <FaSync className="animate-spin text-red-500 text-[10px]" />
+                Loading payment vouchers…
+              </span>
+            ) : (
+              "No payment vouchers found in this date range."
+            )}
           </div>
         ) : (
           <div className="overflow-auto flex-1">
