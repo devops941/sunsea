@@ -16,9 +16,9 @@ import {
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 
+import { Search } from "lucide-react";
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -318,21 +318,26 @@ const StockAdjustmentList: React.FC = () => {
   const totalPages = meta?.totalPages || 1;
 
   return (
-    <div className="p-4 md:p-1 ">
-      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+    <div>
+      <div className="max-w-[1300px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-ink">Stock Adjustments</h2>
+            <h2 className="text-base font-bold text-ink">Stock Adjustments</h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {/* Search */}
-            <SearchInput
-              value={searchTerm}
-              onChange={handleSearch}
-              placeholder="Search by No, Reason, PO..."
-            />
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
+              <input
+                type="text"
+                className="w-full pl-9 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+                placeholder="Search by No, Reason, PO..."
+                value={searchTerm}
+                onChange={handleSearch}
+              />
+            </div>
 
             {/* Filter Popover */}
             <FilterPopover
@@ -428,14 +433,15 @@ const StockAdjustmentList: React.FC = () => {
           rowKey={(item) => item.id}
           loading={loading}
           emptyMessage="No stock adjustments found."
-          pagination={{
-            currentPage,
-            totalPages,
-            onPageChange: (page) => setCurrentPage(page),
-          }}
+          pagination={
+            totalPages > 1
+              ? { currentPage, totalPages, onPageChange: (page) => setCurrentPage(page) }
+              : undefined
+          }
           columns={[
             {
               header: "ADJUSTMENT NO",
+              width: "140px",
               accessor: "adjustmentNumber",
               render: (item) => (
                 <div>
@@ -446,6 +452,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "TYPE",
+              width: "120px",
               render: (item) => {
                 const info = getStockAdjustmentTypeInfo(item);
                 return (
@@ -463,6 +470,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "SOURCE",
+              width: "110px",
               render: (item) => {
                 const src = getStockAdjustmentSourceInfo(item);
                 return (
@@ -481,6 +489,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "PRODUCT",
+              width: "minmax(140px, 1fr)",
               render: (item) => {
                 const product = item.productionOrder?.productItem || item.items?.[0]?.product;
                 const rawMaterial = item.items?.[0]?.rawMaterial;
@@ -517,6 +526,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ORIGINAL QTY",
+              width: "110px",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.currentQty == null) return <span className="text-ink-subtle">—</span>;
@@ -535,6 +545,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ADJUSTED QTY",
+              width: "130px",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.adjustedQty == null) return <span className="text-ink-subtle">—</span>;
@@ -563,16 +574,17 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "REASON",
+              width: "minmax(150px, 1fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 const displayReason = getAdjustmentDisplayReason(item);
                 const fullTooltip = firstItem?.remarks || displayReason;
 
                 return (
-                  <div>
+                  <div className="min-w-0">
                     <span
                       title={fullTooltip}
-                      className="inline-block max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap text-ink-muted font-medium"
+                      className="block truncate text-ink-muted font-medium"
                     >
                       {displayReason}
                     </span>
@@ -585,6 +597,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ACTIONS",
+              width: "80px",
               render: (item: any) => (
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <ViewButton onClick={() => navigate(`/inventory/stock-adjustments/view/${item.id}`)} />

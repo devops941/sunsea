@@ -7,8 +7,8 @@ import { fetchRawMaterialStocks, rawMaterialStockCreated, rawMaterialStockUpdate
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { Search } from "lucide-react";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import { formatLocationAddress } from "../../../utils/addressUtils";
@@ -172,21 +172,25 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     ];
 
     return (
-        <div className="p-4 md:p-6">
-            <div className="rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div>
+            <div className="max-w-[1300px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Stock Ledger Management</h2>
-                        <p className="text-sm text-ink-subtle mt-1">Raw material stock levels and balances</p>
+                        <h2 className="text-base font-bold text-ink">Stock Ledger Management</h2>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-                        <SearchInput
-                            value={searchTerm}
-                            onChange={handleSearch}
-                            placeholder="Search stock..."
-                        />
+                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        <div className="relative w-full md:w-56">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
+                            <input
+                                type="text"
+                                className="w-full pl-9 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+                                placeholder="Search stock..."
+                                value={searchTerm}
+                                onChange={handleSearch}
+                            />
+                        </div>
                         <FilterPopover
                             activeFilterCount={activeFilterCount}
                             hasActiveFilters={hasActiveFilters}
@@ -233,10 +237,10 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             />
                         )}
                     </div>
-                    
                 </div>
 
                 {/* Table */}
+                <div className="p-0 overflow-hidden rounded-b-2xl">
                 <DataTable
                     data={data || []}
                     rowKey={(item) => item.rawMaterialId || item.id}
@@ -334,8 +338,6 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                         }
                     ]}
                 />
-                <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
-                    Total: {total} record(s)
                 </div>
             </div>
 

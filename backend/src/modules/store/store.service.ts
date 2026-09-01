@@ -148,7 +148,15 @@ class StoreService {
         location: true,
         incharge: {
           select: {
+            id: true,
+            empCode: true,
             fullName: true,
+            roleId: true,
+            user: {
+              select: {
+                roleId: true,
+              },
+            },
           },
         },
         _count: {

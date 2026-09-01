@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import CustomButton from "../Button/Button";
 
@@ -22,8 +23,21 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
   hasActiveFilters,
 }) => {
   const [show, setShow] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const filterBtnRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (filterBtnRef.current) {
+      const rect = filterBtnRef.current.getBoundingClientRect();
+      setPopoverStyle({
+        position: "fixed",
+        top: `${rect.bottom + 8}px`,
+        right: `${window.innerWidth - rect.right}px`,
+        zIndex: 99999,
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -55,6 +69,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
 
   const handleToggle = () => {
     if (!show) {
+      updatePosition();
       if (onOpen) onOpen();
     } else {
       if (onClose) onClose();
@@ -82,10 +97,11 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
         className={hasActiveFilters ? "!bg-green-600 hover:!bg-green-700 !text-white !border-green-600" : ""}
       />
 
-      {show && (
+      {show && createPortal(
         <div
           ref={popoverRef}
-          className="absolute top-full right-0 mt-2 w-[300px] bg-card border border-line-soft rounded-2xl shadow-xl p-4 z-50 text-ink"
+          style={popoverStyle}
+          className="w-[300px] bg-card border border-line-soft rounded-2xl shadow-2xl p-4 text-ink"
         >
           <div className="flex items-center justify-between mb-4">
             <span className="font-bold text-primary text-sm">Filter</span>
@@ -119,7 +135,8 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

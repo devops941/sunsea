@@ -42,20 +42,6 @@ interface RowRawMaterialState {
 }
 
 
-const DISPATCH_TYPE_OPTIONS = [
-    { label: "Priority", value: "priority" },
-    { label: "Standard", value: "standard" },
-];
-
-const ORDER_TYPE_OPTIONS = [
-    { label: "STANDARD", value: "STANDARD" },
-    { label: "REWORK", value: "REWORK" },
-    { label: "SPECIAL", value: "SPECIAL" },
-    { label: "B2B (GST Registered)", value: "B2B" },
-    { label: "B2C (Consumer)", value: "B2C" },
-    { label: "Export", value: "Export" },
-    { label: "Telephonic Enquiry", value: "telephone" },
-];
 
 
 const salesOrderColumns: DataTableColumn<any>[] = [
@@ -97,8 +83,8 @@ const productionOrderSchema = z.object({
     productionOrderId: z.string().min(1, "Order No is required"),
     orderDate: z.string().min(1, "Order Date is required"),
     dueDate: z.string().min(1, "Due Date is required"),
-    priority: z.string().min(1, "Priority is required"),
-    orderType: z.string().min(1, "Order Type is required"),
+    priority: z.string().optional(),
+    orderType: z.string().optional(),
     batchNo: z.string().optional(),
     lotNo: z.string().optional(),
     sourceStoreId: z.string().optional(),
@@ -414,7 +400,7 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     return (
         <div className="md:col-span-12 mt-3 relative min-h-[150px]">
             {isCalculatingRM && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[2px] rounded-lg overflow-hidden">
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/80 backdrop-blur-[2px] rounded-lg overflow-hidden">
                     <div className="scale-[0.6] origin-center -mt-6">
                         <CommonLoader text="Calculating..." fullScreen={false} />
                     </div>
@@ -1113,23 +1099,20 @@ const ProductionOrderCreate: React.FC = () => {
     };
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
+        <div className="max-w-[1024px] xl:mr-auto">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="px-6 py-5 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-ink">
-                            {isEditMode
-                                ? "Edit Production Order"
-                                : "Create Production Order"}
-                        </h2>
-                        <BackButton text="Back to List" to="/production-orders" />
-                    </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                    <h2 className="text-xl font-bold text-ink flex items-start">
+                        {isEditMode ? "Edit Production Order" : "Create Production Order"}
+                        <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("productionOrderId")}</span>
+                    </h2>
+                    <BackButton text="Back to List" to="/production-orders" />
                 </div>
 
                 <form
                     onSubmit={handleSubmit(onSubmit)}
-                    className="px-6 py-5 space-y-6"
+                    className="p-5 lg:p-6 space-y-6"
                     noValidate
                 >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -1234,230 +1217,152 @@ const ProductionOrderCreate: React.FC = () => {
                             </div>
                             <div className="p-0">
                                 {productFields.map((prodItem, index) => (
-                                    <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-t border-line-soft" : ""}>
+                                    <div key={prodItem.id} className={index > 0 ? "mt-6 pt-6 border-t border-line-soft" : ""}>
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-lg font-bold text-ink border-b border-line-soft pb-2 grow">Product {index + 1}</h3>
+                                            <h3 className="text-sm font-bold text-ink-muted">Product {index + 1}</h3>
                                             {!watchSalesOrderId && productFields.length > 1 && (
                                                 <DeleteButton onClick={() => removeProduct(index)} />
                                             )}
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                                            <div className="md:col-span-5">
-                                                <Controller
-                                                    name={`products.${index}.productItemId` as const}
-                                                    control={control}
-                                                    render={({ field }) => (
-                                                        <SelectInput
-                                                            label="Finished Product"
-                                                            name={field.name}
-                                                            value={field.value}
-                                                            options={products.map((p) => {
-                                                                const isSelected = watchProducts?.some(
-                                                                    (wp: any, wpIdx: number) => wpIdx !== index && wp.productItemId === p.id?.toString()
-                                                                );
-                                                                return {
-                                                                    label: p.productName || p.productCode || p.id?.toString(),
-                                                                    value: p.id?.toString() || "",
-                                                                    disabled: isSelected
-                                                                };
-                                                            })}
-                                                            defaultOptionLabel="Select Finished Product"
-                                                            onChange={async (e) => {
-                                                                field.onChange(e);
-                                                                const p = products.find((x) => x.id?.toString() === e.target.value);
-                                                                if (p) {
-                                                                    setValue(`products.${index}.uom` as any, p.uom?.name || p.uom?.uomCode || "ea");
-                                                                }
-                                                            }}
-                                                            required
-                                                            disabled={!!watchSalesOrderId}
-                                                            error={errors.products?.[index]?.productItemId?.message}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="md:col-span-3">
-                                                <Controller
-                                                    name={`products.${index}.targetQty` as const}
-                                                    control={control}
-                                                    render={({ field }) => (
-                                                        <TextInput
-                                                            label="Target Qty"
-                                                            name={field.name}
-                                                            type="number"
-                                                            min="0"
-                                                            step="any"
-                                                            value={field.value !== undefined ? String(field.value) : ""}
-                                                            onChange={(e) => field.onChange(Number(e.target.value))}
-                                                            required
-                                                            disabled={!!watchSalesOrderId}
-                                                            error={errors.products?.[index]?.targetQty?.message}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
-
-                                            <div className="md:col-span-2">
-                                                <Controller
-                                                    name={`products.${index}.uom` as const}
-                                                    control={control}
-                                                    render={({ field }) => (
-                                                        <UOMSelect
-                                                            label="UOM"
-                                                            name={field.name}
-                                                            value={field.value}
-                                                            onChange={field.onChange}
-                                                            required
-                                                            disabled={!!watchSalesOrderId}
-                                                            error={errors.products?.[index]?.uom?.message}
-                                                            category={["length", "mass", "each"]}
-                                                            allowedCodes={[
-                                                                "ea"
-                                                            ]}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
-                                            <ProductRawMaterialsSection
-                                                productIndex={index}
-                                                productName={products.find(p => p.id?.toString() === watchProducts?.[index]?.productItemId)?.productName}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
+                                            <Controller
+                                                name={`products.${index}.productItemId` as const}
                                                 control={control}
-                                                watch={watch}
-                                                errors={errors.products?.[index]}
-                                                storeOptions={storeOptions}
-                                                rowRmStates={rowRmStates}
-                                                handleStoreChange={handleStoreChange}
-                                                handleRmChange={handleRmChange}
-                                                fetchRawMaterialsForStore={fetchRawMaterialsForStore}
-                                                setValue={setValue}
-                                                isCalculatingRM={isCalculatingRM}
+                                                render={({ field }) => (
+                                                    <SelectInput
+                                                        label="Finished Product"
+                                                        name={field.name}
+                                                        value={field.value}
+                                                        options={products.map((p) => {
+                                                            const isSelected = watchProducts?.some(
+                                                                (wp: any, wpIdx: number) => wpIdx !== index && wp.productItemId === p.id?.toString()
+                                                            );
+                                                            return {
+                                                                label: p.productName || p.productCode || p.id?.toString(),
+                                                                value: p.id?.toString() || "",
+                                                                disabled: isSelected
+                                                            };
+                                                        })}
+                                                        defaultOptionLabel="Select Finished Product"
+                                                        onChange={async (e) => {
+                                                            field.onChange(e);
+                                                            const p = products.find((x) => x.id?.toString() === e.target.value);
+                                                            if (p) {
+                                                                setValue(`products.${index}.uom` as any, p.uom?.name || p.uom?.uomCode || "ea");
+                                                            }
+                                                        }}
+                                                        required
+                                                        horizontal
+                                                        disabled={!!watchSalesOrderId}
+                                                        error={errors.products?.[index]?.productItemId?.message}
+                                                    />
+                                                )}
                                             />
+                                            <Controller
+                                                name={`products.${index}.targetQty` as const}
+                                                control={control}
+                                                render={({ field }) => (
+                                                    <TextInput
+                                                        label="Target Qty"
+                                                        name={field.name}
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        value={field.value !== undefined ? String(field.value) : ""}
+                                                        onChange={(e) => field.onChange(Number(e.target.value))}
+                                                        required
+                                                        horizontal
+                                                        disabled={!!watchSalesOrderId}
+                                                        error={errors.products?.[index]?.targetQty?.message}
+                                                    />
+                                                )}
+                                            />
+                                            <Controller
+                                                name={`products.${index}.uom` as const}
+                                                control={control}
+                                                render={({ field }) => (
+                                                    <input type="hidden" name={field.name} value={field.value || "ea"} />
+                                                )}
+                                            />
+                                            <div className="sm:col-span-2">
+                                                <ProductRawMaterialsSection
+                                                    productIndex={index}
+                                                    productName={products.find(p => p.id?.toString() === watchProducts?.[index]?.productItemId)?.productName}
+                                                    control={control}
+                                                    watch={watch}
+                                                    errors={errors.products?.[index]}
+                                                    storeOptions={storeOptions}
+                                                    rowRmStates={rowRmStates}
+                                                    handleStoreChange={handleStoreChange}
+                                                    handleRmChange={handleRmChange}
+                                                    fetchRawMaterialsForStore={fetchRawMaterialsForStore}
+                                                    setValue={setValue}
+                                                    isCalculatingRM={isCalculatingRM}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-2">
-                                    <div className="md:col-span-3">
-                                        <Controller
-                                            name="orderDate"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <DatePickerCalendar
-                                                    label="Order Date"
-                                                    name={field.name}
-                                                    value={field.value ? field.value.substring(0, 10) : ""}
-                                                    onChange={(e) => field.onChange(e.target.value)}
-                                                    required
-                                                    disabled={!!watchSalesOrderId}
-                                                    error={errors.orderDate?.message}
-                                                />
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="md:col-span-3">
-                                        <Controller
-                                            name="dueDate"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <DatePickerCalendar
-                                                    label="Due Date"
-                                                    name={field.name}
-                                                    value={field.value ? field.value.substring(0, 10) : ""}
-                                                    onChange={(e) => field.onChange(e.target.value)}
-                                                    required
-                                                    minDate={watch("orderDate")}
-                                                    error={errors.dueDate?.message}
-                                                />
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="md:col-span-3">
-                                        <Controller
-                                            name="priority"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <SelectInput
-                                                    label="Dispatch Type"
-                                                    name={field.name}
-                                                    value={field.value}
-                                                    options={DISPATCH_TYPE_OPTIONS}
-                                                    defaultOptionLabel="Select Dispatch Type"
-                                                    onChange={field.onChange}
-                                                    required
-                                                    disabled={!!watchSalesOrderId}
-                                                    error={errors.priority?.message}
-                                                />
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="md:col-span-3">
-                                        <Controller
-                                            name="orderType"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <SelectInput
-                                                    label="Order Type"
-                                                    name={field.name}
-                                                    value={field.value}
-                                                    options={ORDER_TYPE_OPTIONS}
-                                                    defaultOptionLabel="Select Order Type"
-                                                    onChange={field.onChange}
-                                                    required
-                                                    disabled={!!watchSalesOrderId}
-                                                    error={errors.orderType?.message}
-                                                />
-                                            )}
-                                        />
-                                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5 mt-6 pt-6 border-t border-line-soft">
+                                    <Controller
+                                        name="orderDate"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <DatePickerCalendar
+                                                label="Order Date"
+                                                name={field.name}
+                                                value={field.value ? field.value.substring(0, 10) : ""}
+                                                onChange={(e) => field.onChange(e.target.value)}
+                                                required
+                                                horizontal
+                                                disabled={!!watchSalesOrderId}
+                                                error={errors.orderDate?.message}
+                                            />
+                                        )}
+                                    />
+                                    <Controller
+                                        name="dueDate"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <DatePickerCalendar
+                                                label="Due Date"
+                                                name={field.name}
+                                                value={field.value ? field.value.substring(0, 10) : ""}
+                                                onChange={(e) => field.onChange(e.target.value)}
+                                                required
+                                                horizontal
+                                                minDate={watch("orderDate")}
+                                                error={errors.dueDate?.message}
+                                            />
+                                        )}
+                                    />
                                 </div>
                             </div>
                         </div>
 
 
                         {/* ── 2. General Details ──────────────────────────── */}
-                        <div className="md:col-span-12 lg:col-span-12 p-4 md:p-6">
-
-                            <h6 className="text-lg font-bold text-ink mb-6">
-                                2. General Details
-                            </h6>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Controller
-                                    name="productionOrderId"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <CtrlText
-                                            field={field}
-                                            label="Production Order ID"
-                                            placeholder="Auto Generated"
-                                            required
-                                            disabled
-                                            error={
-                                                errors.productionOrderId?.message
-                                            }
-                                        />
-                                    )}
-                                />
-
-                                <Controller
-                                    name="remarks"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextArea
-                                            label="Remarks"
-                                            name={field.name}
-                                            value={field.value ?? ""}
-                                            placeholder="Any remarks for this order"
-                                            rows={2}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                />
-                            </div>
+                        <div className="md:col-span-12">
+                            
+                            <Controller
+                                name="remarks"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextArea
+                                        label="Narration "
+                                        name={field.name}
+                                        value={field.value ?? ""}
+                                        placeholder="Any remarks for this order"
+                                        rows={2}
+                                        onChange={field.onChange}
+                                    />
+                                )}
+                            />
                         </div>
                     </div>
 
                     {/* ── Form Actions ──────────────────────────────────────── */}
-                    <div className="form-actions pb-4 pr-3 flex justify-end gap-3 mt-4 pt-3 border-t border-line-soft">
+                    <div className="flex justify-end gap-3 px-5 py-4 border-t border-line -mx-5 lg:-mx-6 -mb-6">
                         <CustomButton
                             text="Clear Form"
                             icon={FaEraser}

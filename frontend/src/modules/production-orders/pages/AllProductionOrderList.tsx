@@ -124,78 +124,23 @@ const AllProductionOrderList: React.FC = () => {
     const columns = [
         {
             header: "#",
+            width: "50px",
             render: (_: any, index: number) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
         },
         {
             header: "PO NO",
+            width: "minmax(130px, 1fr)",
             render: (item: any) => <span className="font-semibold text-ink">{item.productionOrderId}</span>
         },
         {
-            header: "SO NO",
-            render: (item: any) => (
-                item.salesOrderDetails?.orderNo || item.sourceSalesOrderId ? (
-                    <span className="font-medium text-ink-muted">{item.salesOrderDetails?.orderNo || item.sourceSalesOrderId}</span>
-                ) : (
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-card-2 text-ink-muted">Direct Order</span>
-                )
-            )
-        },
-        {
-            header: "CUSTOMER",
-            render: (item: any) => item.salesOrderDetails?.customerName || <span className="text-ink-subtle italic text-xs">N/A (Direct)</span>
-        },
-        {
             header: "TOTAL PRODUCTS",
+            width: "120px",
             render: (item: any) => <span className="text-ink-muted">{item.totalProducts ?? 1}</span>
         },
         {
             header: "TOTAL QTY",
+            width: "110px",
             render: (item: any) => <span className="text-ink-muted">{item.totalProductionQuantity ?? item.targetQty}</span>
-        },
-        {
-            header: "RAW MATERIALS",
-            render: (item: any) => {
-                if (!item.items || item.items.length === 0) return <span className="text-ink-subtle">N/A</span>;
-                const rawMaterials = item.items.flatMap((po: any) => po.draftRawMaterials || []);
-                const visibleRMs = rawMaterials.slice(0, 2);
-                const hiddenRMs = rawMaterials.slice(2);
-                const productionStartedStatuses = ["WEEKLY_SCHEDULED", "DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "DISPATCHED", "CLOSED", "CANCELLED"];
-                const inProduction = productionStartedStatuses.includes(item.status);
-
-                return (
-                    <div className="flex flex-wrap gap-1 items-center">
-                        {visibleRMs.map((rm: any, rmIdx: number) => {
-                            const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-                            const name = stockRm?.materialName || rm.rawMaterialId;
-                            const availableStock = stockRm ? Number(stockRm.onHandQty || 0) : 0;
-                            const reqQty = Number(rm.requiredQty || 0);
-                            const isAvailable = inProduction || availableStock >= reqQty;
-                            return (
-                                <StatusBadge
-                                    key={`${item.productionOrderId}-${rmIdx}`}
-                                    status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"}
-                                    customText={name}
-                                    title={inProduction ? name : `Req: ${reqQty.toFixed(2)}, Avail: ${availableStock.toFixed(2)}`}
-                                    className="fw-normal"
-                                />
-                            );
-                        })}
-                        {hiddenRMs.length > 0 && (
-                            <StatusBadge
-                                status=""
-                                customText={`+${hiddenRMs.length} more`}
-                                customColor={{ bg: '#e9ecef', text: '#495057' }}
-                                className="fw-normal"
-                                title={hiddenRMs.map((rm: any) => {
-                                    const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-                                    return stockRm?.materialName || rm.rawMaterialId;
-                                }).join(', ')}
-                                style={{ cursor: 'help' }}
-                            />
-                        )}
-                    </div>
-                );
-            }
         },
         // {
         //     header: "COLOR",
@@ -208,6 +153,7 @@ const AllProductionOrderList: React.FC = () => {
         // },
         {
             header: "STATUS",
+            width: "190px",
             render: (item: any) => {
                 const s = item.status || 'CREATED';
                 if (s === 'DISPATCHED') {
@@ -218,10 +164,12 @@ const AllProductionOrderList: React.FC = () => {
         },
         {
             header: "CREATED DATE",
+            width: "130px",
             render: (item: any) => <span className="text-ink-muted">{formatDate(item.createdAt)}</span>
         },
         {
             header: "ACTIONS",
+            width: "80px",
             render: (item: any) => (
                 <div className="flex items-center gap-2">
                     <ViewButton onClick={() => handleOpenView(item)} />

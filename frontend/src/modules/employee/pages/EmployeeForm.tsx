@@ -1058,6 +1058,7 @@ const EmployeeForm: React.FC = () => {
             )}
           </div>
           <TextInput
+            horizontal
             label="Official Email Address"
             name="officialEmail"
             type="email"

@@ -74,7 +74,7 @@ export const MachineAssignmentForm: React.FC = () => {
         machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
         shiftService.fetchAll().catch(() => []),
       ]);
-      const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
+      const machineList = Array.isArray(mRes) ? mRes : (mRes.machines || mRes.data || []);
       setMachines(machineList.filter((m: any) => m.isActive !== false));
       const roleList = (rRes.data || []).filter((r: any) =>
         !r.name?.toLowerCase().includes("super admin") &&

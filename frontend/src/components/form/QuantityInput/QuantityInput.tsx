@@ -113,7 +113,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
           disabled={disabled || !primaryUom}
           placeholder="0.00"
           step={step || "any"}
-          className={`flex-1 w-full bg-transparent px-3 py-2 text-[15px] font-semibold text-ink placeholder:text-ink-subtle/80 placeholder:font-normal focus:outline-none border-r border-line-soft h-full ${disabled ? "bg-card-2/50 opacity-60 cursor-not-allowed text-ink-subtle" : ""}`}
+          className={`flex-1 min-w-0 bg-transparent px-2 py-2 text-sm font-semibold text-ink placeholder:text-ink-subtle placeholder:font-normal focus:outline-none border-r border-line-soft h-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${disabled ? "bg-card-2/50 opacity-60 cursor-not-allowed text-ink-subtle" : ""}`}
         />
         {uomList.length > 1 ? (
           <select
@@ -125,7 +125,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
               onChange({ target: { name, value: displayValue, uom: val } });
             }}
             disabled={disabled}
-            className="px-2 text-sm font-medium text-ink bg-card-2 border-0 focus:outline-none h-full cursor-pointer min-w-17.5"
+            className="px-1 text-xs font-medium text-ink bg-card-2 border-0 focus:outline-none h-full cursor-pointer w-[46px] flex-shrink-0"
           >
             {uomList.map((u) => {
               const display = u.toLowerCase() === 'ea' ? 'pcs' : u;
@@ -137,7 +137,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
             })}
           </select>
         ) : (
-          <span className="px-3 text-sm font-medium text-ink-muted bg-card-2 flex items-center justify-center min-w-15 h-full border-l border-line-soft">
+          <span className="px-1 text-xs font-medium text-ink-muted bg-card-2 flex items-center justify-center w-[46px] flex-shrink-0 h-full border-l border-line-soft">
             {activeUom ? (activeUom.toLowerCase() === 'ea' ? 'pcs' : activeUom) : "UOM"}
           </span>
         )}

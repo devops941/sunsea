@@ -150,6 +150,11 @@ const StorageStoreForm: React.FC = () => {
                             gstPlace: storeData.gstPlace || "",
                             isActive: storeData.isActive ?? true,
                         });
+
+                        const inchargeRoleId = (storeData.incharge as any)?.roleId || (storeData.incharge as any)?.user?.roleId;
+                        if (inchargeRoleId) {
+                            setSelectedRoleId(String(inchargeRoleId));
+                        }
                     }
                 } catch (err: any) {
                     toast.error(err?.message || "Failed to load store details");
@@ -172,6 +177,17 @@ const StorageStoreForm: React.FC = () => {
         initializeForm();
         return () => { isMounted = false; };
     }, [id, isEditMode, fetchDependencies, navigate]);
+
+    // Auto-detect role for the incharge employee in edit mode
+    useEffect(() => {
+        if (formData.inchargeId && !selectedRoleId && employees && employees.length > 0) {
+            const matchedEmployee = employees.find((emp: any) => String(emp.id) === String(formData.inchargeId));
+            const rId = matchedEmployee?.roleId || matchedEmployee?.user?.roleId || matchedEmployee?.role?.id;
+            if (rId) {
+                setSelectedRoleId(String(rId));
+            }
+        }
+    }, [formData.inchargeId, selectedRoleId, employees]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const target = e.target;
@@ -343,7 +359,7 @@ const StorageStoreForm: React.FC = () => {
                                 options={[
                                     { label: "Select an incharge", value: "" },
                                     ...(employees || [])
-                                        .filter((emp: any) => !selectedRoleId || String(emp.roleId || emp.user?.roleId) === selectedRoleId)
+                                        .filter((emp: any) => !selectedRoleId || String(emp.roleId || emp.user?.roleId || emp.role?.id) === selectedRoleId)
                                         .map((emp: any) => ({
                                             label: `${emp.fullName} (${emp.empCode})`,
                                             value: emp.id?.toString() || ""

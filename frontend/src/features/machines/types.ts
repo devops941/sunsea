@@ -15,6 +15,9 @@ export interface Machine {
 }
 export interface MachineState {
   data: Machine[];
+  total: number;
+  page: number;
+  totalPages: number;
   loading: boolean;
   error: string | null;
 }

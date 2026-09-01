@@ -126,30 +126,10 @@ const ProductionOrderHistoryView: React.FC = () => {
                     <div className="space-y-6">
                         {/* General Details Grid */}
                         <div className="bg-card-2 p-6 rounded-xl border border-line">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-y-6 gap-x-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-y-6 gap-x-6">
                                 <div>
                                     <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Order No</div>
                                     <div className="font-semibold text-ink text-base">{displayOrder?.productionOrderId}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Sales Order No</div>
-                                    <div className="font-semibold text-ink text-base">
-                                        {displayOrder?.salesOrderDetails?.orderNo || displayOrder?.sourceSalesOrderId ? (
-                                            displayOrder?.salesOrderDetails?.orderNo || displayOrder?.sourceSalesOrderId
-                                        ) : (
-                                            <span className="px-2 py-0.5 rounded-full bg-line text-ink-muted text-xs font-semibold">Direct Order</span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Customer</div>
-                                    <div className="font-semibold text-ink text-base">
-                                        {displayOrder?.salesOrderDetails?.customerName ? (
-                                            displayOrder?.salesOrderDetails?.customerName
-                                        ) : (
-                                            <span className="text-ink-subtle italic text-sm">N/A (Direct)</span>
-                                        )}
-                                    </div>
                                 </div>
                                 <div>
                                     <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Order Date</div>
@@ -158,14 +138,6 @@ const ProductionOrderHistoryView: React.FC = () => {
                                 <div>
                                     <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Due Date</div>
                                     <div className="font-semibold text-ink text-base">{formatDate(displayOrder?.dueDate)}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Priority</div>
-                                    <div className="font-semibold text-ink text-base">{displayOrder?.priority || "-"}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Order Type</div>
-                                    <div className="font-semibold text-ink text-base">{displayOrder?.orderType || "-"}</div>
                                 </div>
                                 <div>
                                     <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Status</div>
@@ -300,7 +272,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                     return createdA - createdB;
                                 });
                                 sortedPlans.forEach((plan: any) => {
-                                    const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
+                                    const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => acc + Math.max(0, Number(curr.qtyProduced || 0) - Number(curr.rejectQty || 0) - Number(curr.scrapQty || 0)), 0) || 0;
                                     // For permanently stopped plans (PO = COMPLETED_WITH_SHORTFALL) with no hourly logs,
                                     // use 0 — do NOT fall back to plannedQty, as nothing was actually produced.
                                     // For other COMPLETED plans with no logs (legacy/edge case), fall back to plannedQty.
@@ -334,7 +306,12 @@ const ProductionOrderHistoryView: React.FC = () => {
                                         </h4>
                                         {(() => {
                                             const targetVal = Number(fullOrder?.targetQty || displayOrder?.targetQty || 0);
-                                            const producedVal = Number(fullOrder?.producedQty || displayOrder?.producedQty || 0);
+                                            // Net produced = sum of (qtyProduced - rejectQty - scrapQty) across all hourly logs
+                                            const producedVal = fullOrder?.dailyProductionPlans?.length > 0
+                                                ? fullOrder.dailyProductionPlans.reduce((total: number, plan: any) =>
+                                                    total + (plan.hourlyProductions?.reduce((acc: number, h: any) =>
+                                                        acc + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0) || 0), 0)
+                                                : Number(fullOrder?.producedQty || displayOrder?.producedQty || 0);
                                             const hasShortfallStop = fullOrder?.status === "COMPLETED_WITH_SHORTFALL";
                                             
                                             return (
@@ -400,8 +377,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                                     <td className="px-5 py-4 font-medium text-ink">{plan.date}</td>
                                                                     <td className="px-5 py-4 text-ink-muted">{plan.shiftName}</td>
                                                                     <td className="px-5 py-4 text-ink-muted">{plan.machineName}</td>
-                                                                    <td className="px-5 py-4 font-semibold text-ink-muted">{Number(plan.plannedQty || 0).toFixed(2)}</td>
-                                                                    <td className="px-5 py-4 font-bold text-green-600">{Number(plan.producedQty || 0).toFixed(2)}</td>
+                                                                    <td className="px-5 py-4 font-semibold text-ink-muted">{Number(plan.plannedQty || 0)}</td>
+                                                                    <td className="px-5 py-4 font-bold text-green-600">{Number(plan.producedQty || 0)}</td>
                                                                     <td className="px-5 py-4">
                                                                         <StatusBadge status={plan.status} />
                                                                     </td>
@@ -416,8 +393,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                             <td className="px-5 py-4 font-medium text-ink">{new Date(displayOrder?.orderDate).toLocaleDateString()}</td>
                                                             <td className="px-5 py-4 text-ink-muted">General Shift</td>
                                                             <td className="px-5 py-4 text-ink-muted">{fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || (displayOrder as any)?.machineName || (displayOrder as any)?.machineMachineId || '-'}</td>
-                                                            <td className="px-5 py-4 font-semibold text-ink-muted">{Number(displayOrder?.targetQty || 0).toFixed(2)}</td>
-                                                            <td className="px-5 py-4 font-bold text-green-600">{Number(displayOrder?.producedQty || 0).toFixed(2)}</td>
+                                                            <td className="px-5 py-4 font-semibold text-ink-muted">{Number(displayOrder?.targetQty || 0)}</td>
+                                                            <td className="px-5 py-4 font-bold text-green-600">{Number(displayOrder?.producedQty || 0)}</td>
                                                             <td className="px-5 py-4">
                                                                 <StatusBadge status={displayOrder?.status} />
                                                             </td>

@@ -63,7 +63,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
       let style: React.CSSProperties = {
         position: "fixed",
         left: `${rect.left}px`,
-        width: `${rect.width}px`,
+        width: `${Math.max(rect.width, 180)}px`,
         zIndex: 100000,
       };
 
@@ -205,7 +205,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
   };
 
   return (
-    <div className={`${noMargin ? "" : "mb-0.5 "}group ${horizontal ? "flex items-center gap-3" : "flex flex-col"} w-full`} ref={wrapperRef}>
+    <div className={`${noMargin ? "" : "mb-0.5 "}group ${horizontal ? "flex items-start gap-3" : "flex flex-col"} w-full`} ref={wrapperRef}>
       {!hideLabel && (
         <label className={`
           flex items-center gap-1.5
@@ -214,7 +214,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
           transition-colors duration-250
           ${error ? "text-red-400" : "text-ink"}
           group-focus-within:text-primary
-          ${horizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}
+          ${horizontal ? "shrink-0 w-[140px] mb-0 pt-[10px]" : "mb-2"}
         `}>
           {icon && (
             <span className={`
@@ -271,7 +271,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
                 text-xs sm:text-[15px] font-semibold flex items-center justify-between
                 transition-all duration-250 text-left
                 [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-ink)]
-                ${value ? "text-ink" : "text-ink-subtle font-normal"}
+                ${selectedOption ? "text-ink" : "text-ink-subtle font-normal"}
                 ${error
                   ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
                   : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
@@ -297,7 +297,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
                 border rounded-md outline-none
                 text-xs sm:text-[15px] font-semibold flex items-center justify-between
                 transition-all duration-250 text-left
-                ${value ? "text-ink" : "text-ink-subtle font-normal"}
+                ${selectedOption ? "text-ink" : "text-ink-subtle"}
                 ${error
                   ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
                   : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
@@ -340,14 +340,15 @@ const SelectInput: React.FC<SelectInputProps> = ({
                       key={index}
                       onClick={() => handleSelect(option.value, option.disabled)}
                       className={`
-                        px-4 py-2.5 text-sm cursor-pointer
+                        px-4 py-2.5 text-sm
                         transition-colors duration-150
-                        ${option.disabled ? "opacity-50 cursor-not-allowed text-ink-subtle" : ""}
-                        ${index === highlightedIndex
-                          ? "bg-primary/20 text-primary font-semibold"
-                          : String(value) === String(option.value)
-                            ? "bg-primary/10 text-primary font-semibold"
-                            : "text-ink hover:bg-card-2"
+                        ${option.disabled
+                          ? "opacity-40 cursor-not-allowed text-ink-subtle select-none bg-transparent"
+                          : index === highlightedIndex
+                            ? "bg-primary/20 text-primary font-semibold cursor-pointer"
+                            : String(value) === String(option.value)
+                              ? "bg-primary/10 text-primary font-semibold cursor-pointer"
+                              : "text-ink hover:bg-card-2 cursor-pointer"
                         }
                       `}
                     >

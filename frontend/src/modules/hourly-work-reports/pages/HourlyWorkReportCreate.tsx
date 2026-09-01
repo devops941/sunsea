@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Form } from 'react-bootstrap';
 
-import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaBoxOpen, FaPlus } from "react-icons/fa";
+import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -55,41 +55,6 @@ const normalizeUom = (uom: string): string => {
     return u;
 };
 
-const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string): number => {
-    if (!baseUomStr || !selectedUom) return qty;
-    const uoms = baseUomStr.split(",").map(u => normalizeUom(u));
-    const primary = uoms[0];
-    const selected = normalizeUom(selectedUom);
-    if (primary === selected) return qty;
-
-    // Weight: kg ↔ g ↔ t
-    if (primary === "kg" && selected === "g") return qty / 1000;
-    if (primary === "kg" && selected === "t") return qty * 1000;
-    if (primary === "g" && selected === "kg") return qty * 1000;
-    if (primary === "g" && selected === "t") return qty * 1_000_000;
-    if (primary === "t" && selected === "kg") return qty / 1000;
-    if (primary === "t" && selected === "g") return qty / 1_000_000;
-
-    // Volume: l ↔ ml
-    if (primary === "l" && selected === "ml") return qty / 1000;
-    if (primary === "ml" && selected === "l") return qty * 1000;
-
-    // Length: m ↔ cm ↔ mm
-    if (primary === "m" && selected === "cm") return qty / 100;
-    if (primary === "m" && selected === "mm") return qty / 1000;
-    if (primary === "cm" && selected === "m") return qty * 100;
-    if (primary === "cm" && selected === "mm") return qty / 10;
-    if (primary === "mm" && selected === "m") return qty * 1000;
-    if (primary === "mm" && selected === "cm") return qty * 10;
-
-    // Count: pcs ↔ dz ↔ box
-    if (primary === "dz" && selected === "pcs") return qty / 12;
-    if (primary === "pcs" && selected === "dz") return qty * 12;
-    if (primary === "box" && selected === "pcs") return qty / 12;
-    if (primary === "pcs" && selected === "box") return qty * 12;
-
-    return qty;
-};
 
 const HourlyWorkReportCreate: React.FC = () => {
     const navigate = useNavigate();
@@ -133,13 +98,10 @@ const HourlyWorkReportCreate: React.FC = () => {
     // Added states for Daily Production Plan dropdown and Operator lookup
     const [dailyPlans, setDailyPlans] = useState<any[]>([]);
     const [selectedDailyPlanId, setSelectedDailyPlanId] = useState("");
-    const [operatorName, setOperatorName] = useState("");
     const [availableOperators, setAvailableOperators] = useState<any[]>([]);
-    const [shiftInchargeName, setShiftInchargeName] = useState("");
     const [planError, setPlanError] = useState<string | null>(null);
 
     // Wastage Audit State
-    const [logWastage, setLogWastage] = useState(false);
     const [wastages, setWastages] = useState<any[]>([]);
     const [wastageStores, setWastageStores] = useState<any[]>([]);
     const [rawMaterialStores, setRawMaterialStores] = useState<any[]>([]);
@@ -223,9 +185,7 @@ const HourlyWorkReportCreate: React.FC = () => {
     useEffect(() => {
         if (!dailyPlanId) {
             setActivePlan(null);
-            setOperatorName("");
             setAvailableOperators([]);
-            setShiftInchargeName("");
             setOperatorId("");
             setPlanError(null);
             return;
@@ -240,9 +200,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                 if (!plan) {
                     toast.error("Daily Production Plan not found");
                     setActivePlan(null);
-                    setOperatorName("");
                     setAvailableOperators([]);
-                    setShiftInchargeName("");
                     setOperatorId("");
                     return;
                 }
@@ -252,15 +210,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                 setProductionDate(plan.productionDate?.split("T")[0]);
 
                 if (!plan.operators || plan.operators.length === 0) {
-                    setOperatorName("");
                     setAvailableOperators([]);
-                    setShiftInchargeName(plan.shiftIncharge?.fullName || "");
                     setOperatorId("");
                     setPlanError("The selected Daily Production Plan does not have an assigned operator.");
                 } else {
-                    setOperatorName(plan.operators.map((op: any) => op.fullName).join(", "));
                     setAvailableOperators(plan.operators);
-                    setShiftInchargeName(plan.shiftIncharge?.fullName || "");
                     // Reset manual-selection flag since this is a plan change (new context)
                     userSelectedOperator.current = false;
                     // Only auto-select if there's exactly one operator (no choice to make).
@@ -291,9 +245,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                 console.error("Failed to fetch daily plan:", err);
                 toast.error("Failed to load daily plan details");
                 setActivePlan(null);
-                setOperatorName("");
                 setAvailableOperators([]);
-                setShiftInchargeName("");
                 setOperatorId("");
             })
             .finally(() => {
@@ -484,12 +436,6 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     const isFinalHour = hourOptions.length > 0 && Number(hourIndex) === hourOptions.length;
 
-    useEffect(() => {
-        if (isFinalHour) {
-            setLogWastage(true);
-        }
-    }, [isFinalHour]);
-
     // Auto-select the next available hour if the currently selected one is disabled
     useEffect(() => {
         if (!hourOptions || hourOptions.length === 0) return;
@@ -669,8 +615,6 @@ const HourlyWorkReportCreate: React.FC = () => {
                 res = await dispatch(createHourlyProduction(payload)).unwrap();
                 toast.success("Hourly Production entry saved successfully!");
             }
-            const actualProductId = activePlan?.productId || activePlan?.productItemId || activePlan?.productionOrder?.productItemId || activePlan?.productionOrder?.productId;
-
             // Handle Stop Plan Early
             if (stopPlanEarly && dailyPlanId) {
                 try {
@@ -721,10 +665,9 @@ const HourlyWorkReportCreate: React.FC = () => {
         }
     };
 
-    const activeProductionOrderId = activePlan?.productionOrderId;
     const shiftProducedQty = existingLogs
         .filter(log => log.dailyPlanId === dailyPlanId && Number(log.hourIndex) > 0)
-        .reduce((sum, log) => sum + Number(log.qtyProduced || 0), 0);
+        .reduce((sum, log) => sum + Math.max(0, Number(log.qtyProduced || 0) - Number(log.rejectQty || 0) - Number(log.scrapQty || 0)), 0);
 
     const remainingQtyForShift = activePlan
         ? Math.max(0, Number(activePlan.plannedQty || 0) - shiftProducedQty)
@@ -732,11 +675,11 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     return (
 
-        <div className="min-h-screen">
+        <div className="max-w-[1024px] xl:mr-auto">
             <form onSubmit={handleSubmit} className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-line-soft">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-5 py-3 border-b border-line-soft">
                     <div>
-                        <h2 className="text-2xl font-extrabold text-ink tracking-tight m-0">Hourly Production Entry</h2>
+                        <h2 className="text-base font-bold text-ink m-0">Hourly Production Entry</h2>
                     </div>
                     <div className="flex justify-end">
                         <BackButton to="/daily-machine-planning" text="Back to Planning" />
@@ -744,7 +687,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                 </div>
 
                 {planError && (
-                    <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center gap-3">
+                    <div className="mx-5 mt-3 p-3 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center gap-3">
                         <div className="text-red-400 font-bold text-lg">⚠️</div>
                         <div>
                             <p className="font-bold text-red-300 text-sm">Plan Verification Failed</p>
@@ -752,15 +695,15 @@ const HourlyWorkReportCreate: React.FC = () => {
                         </div>
                     </div>
                 )}
-                <div className="flex flex-col md:flex-row gap-6 p-6">
+                <div className="flex flex-col md:flex-row gap-4 px-5 py-4">
 
                     {/* Left Side: Plan Details */}
-                    <div className="w-full md:w-5/12 lg:w-4/12 flex flex-col gap-6 sticky top-6 self-start">
+                    <div className="w-full md:w-5/12 lg:w-4/12 flex flex-col gap-3 sticky top-6 self-start">
                         <div>
-                            <h6 className="font-extrabold text-lg text-ink m-0">Plan Details</h6>
+                            <h6 className="font-bold text-xs text-ink-muted m-0 uppercase tracking-wider">Plan Details</h6>
                         </div>
                         <div>
-                            <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-3">
                                 {/* Daily Production Plan dropdown when not prefilled */}
                                 {!isPreFilled ? (
                                     <div>
@@ -814,61 +757,53 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 </div>
 
                             </div>
-
-                            <div className="mt-6 pt-6 border-t border-line-soft">
-                                {loadingPlan ? (
-                                    <div className="text-center py-4">
-                                        <div className="animate-spin rounded-full border-2 border-primary border-t-transparent h-4 w-4 mr-2 inline-block align-middle"></div>
-                                        <span className="text-ink-subtle text-xs font-semibold">Loading active plan...</span>
-                                    </div>
-                                ) : activePlan ? (
-                                    <div className="p-5 rounded-2xl bg-indigo-500/15 border border-indigo-500/30">
-                                        <div className="flex items-center gap-2 mb-4 font-bold text-sm tracking-wider text-indigo-400">
-                                            <FaCheckCircle className="text-xl" />
-                                            <span>ACTIVE PLAN LOADED</span>
-                                        </div>
-                                        <div className="mb-3">
-                                            <span className="text-ink-subtle text-xs font-bold block">Production Order</span>
-                                            <strong className="text-lg text-primary font-black">{activePlan.productionOrderId}</strong>
-                                        </div>
-                                        <div className="mb-3">
-                                            <span className="text-ink-subtle text-xs font-bold block">Product</span>
-                                            <strong className="text-sm text-ink font-bold">{activePlan.productName}</strong>
-                                            {activePlan.productCode && <span className="text-ink-subtle text-xs block font-mono"> ({activePlan.productCode})</span>}
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-line-soft text-center">
-                                            <div className="bg-card-2 p-2 rounded-xl border border-line-soft">
-                                                <span className="text-ink-subtle block text-[10px] tracking-wider font-extrabold">TARGET</span>
-                                                <strong className="text-sm text-ink font-bold">{activePlan.plannedQty}</strong>
-                                            </div>
-                                            <div className="bg-emerald-500/15 p-2 rounded-xl border border-emerald-500/30">
-                                                <span className="text-emerald-400 block text-[10px] tracking-wider font-extrabold">PRODUCED</span>
-                                                <strong className="text-sm text-emerald-300 font-bold">{shiftProducedQty}</strong>
-                                            </div>
-                                            <div className="bg-amber-500/15 p-2 rounded-xl border border-amber-500/30">
-                                                <span className="text-amber-400 block text-[10px] tracking-wider font-extrabold">REMAINING</span>
-                                                <strong className="text-sm text-amber-300 font-bold">{remainingQtyForShift}</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="bg-amber-500/15 text-amber-300 p-4 rounded-xl flex items-start gap-3 border border-amber-500/30 shadow-xs">
-                                        <FaInfoCircle className="mt-1 text-amber-400" />
-                                        <div>
-                                            <strong className="font-bold">No Plan Active</strong>
-                                            <p className="mb-0 text-xs text-amber-300/90 font-medium">Please choose a valid Machine, Date, and Shift that has been planned in the weekly schedule.</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     </div>
 
-                    {/* Right Side: Hourly Entry Log */}
-                    <div className="w-full md:w-7/12 lg:w-8/12 flex flex-col">
-                        <h6 className="font-extrabold text-lg text-ink mb-6">Hourly Entry Log</h6>
+                    {/* Right Side: Active Plan + Hourly Entry Log */}
+                    <div className="w-full md:w-7/12 lg:w-8/12 flex flex-col gap-3">
+                        {/* Active Plan Card — horizontal layout at top */}
+                        {loadingPlan ? (
+                            <div className="text-center py-3">
+                                <div className="animate-spin rounded-full border-2 border-primary border-t-transparent h-4 w-4 mr-2 inline-block align-middle"></div>
+                                <span className="text-ink-subtle text-xs font-semibold">Loading active plan...</span>
+                            </div>
+                        ) : activePlan ? (
+                            <div className="p-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-between gap-4">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 mb-2 font-bold text-xs tracking-wider text-indigo-400">
+                                        <FaCheckCircle />
+                                        <span>ACTIVE PLAN LOADED</span>
+                                    </div>
+                                    <strong className="text-base text-primary font-black block leading-tight">{activePlan.productionOrderId}</strong>
+                                    <span className="text-sm text-ink font-bold block truncate">{activePlan.productName}</span>
+                                    {activePlan.productCode && <span className="text-ink-subtle text-xs font-mono">({activePlan.productCode})</span>}
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-center shrink-0">
+                                    <div className="bg-card-2 px-3 py-2 rounded-xl border border-line-soft">
+                                        <span className="text-ink-subtle block text-[10px] tracking-wider font-extrabold">TARGET</span>
+                                        <strong className="text-sm text-ink font-bold">{activePlan.plannedQty}</strong>
+                                    </div>
+                                    <div className="bg-emerald-500/15 px-3 py-2 rounded-xl border border-emerald-500/30">
+                                        <span className="text-emerald-400 block text-[10px] tracking-wider font-extrabold">PRODUCED</span>
+                                        <strong className="text-sm text-emerald-300 font-bold">{shiftProducedQty}</strong>
+                                    </div>
+                                    <div className="bg-amber-500/15 px-3 py-2 rounded-xl border border-amber-500/30">
+                                        <span className="text-amber-400 block text-[10px] tracking-wider font-extrabold">REMAINING</span>
+                                        <strong className="text-sm text-amber-300 font-bold">{remainingQtyForShift}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-amber-500/15 text-amber-300 px-4 py-2.5 rounded-xl flex items-center gap-3 border border-amber-500/30">
+                                <FaInfoCircle className="text-amber-400 shrink-0" />
+                                <p className="mb-0 text-xs text-amber-300/90 font-medium">No active plan. Select a valid Daily Production Plan to begin.</p>
+                            </div>
+                        )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                        <h6 className="font-bold text-xs text-ink-muted mb-0 uppercase tracking-wider">Hourly Entry Log</h6>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                             <div className="flex flex-col">
                                 <SelectInput
                                     label="Hour index of Shift"
@@ -890,7 +825,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     
                                     if (limit > 0 && nextRequiredHour > limit && limit < hourOptions.length && !editingLogId) {
                                         return (
-                                            <div className="mt-2 text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
+                                            <div className="mt-2 text-xs text-amber-400 bg-amber-500/10 p-2 rounded border border-amber-500/30">
                                                 <strong>Plan Completed:</strong> {limit} hours planned and logged. Remaining shift hours can be allocated to a new plan.
                                             </div>
                                         );
@@ -1059,15 +994,17 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
 
-                        {/* Stop Section — shown on all hours when a dailyPlanId is present */}
-                        {hourOptions.length > 0 && dailyPlanId && (
-                            <div className="mt-8 pt-6 border-t border-slate-200">
+                {/* Stop Section — full width */}
+                {hourOptions.length > 0 && dailyPlanId && (
+                    <div className="px-5 pt-4 pb-4 border-t border-line-soft">
                                 <Form.Check
                                     type="switch"
                                     id="stop-plan-early-switch"
                                     label={
-                                        <span className="font-semibold text-red-600 ml-3 text-base">
+                                        <span className="font-semibold text-red-400 ml-3 text-sm">
                                             {Number(hourIndex) === hourOptions.length
                                                 ? "Permanently Stop this Production Order"
                                                 : "Stop Production Plan after this hour"}
@@ -1086,7 +1023,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     }}
                                 />
                                 {stopPlanEarly && (
-                                    <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full flex flex-col gap-4">
+                                    <div className="mt-3 p-4 rounded-xl border border-line-soft/50 w-full flex flex-col gap-3">
                                         <div className="w-full">
                                             <TextInput
                                                 label="Reason for Stopping"
@@ -1106,50 +1043,50 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         {/* Non-final hour: let user choose between Complete Stop and Carry Forward */}
                                         {Number(hourIndex) < hourOptions.length && (
                                             <div className="w-full">
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                                <label className="block text-xs font-bold text-ink-muted uppercase mb-2">
                                                     Stop Action Type *
                                                 </label>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                                                     <div
                                                         className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "FORCE_COMPLETE"
-                                                                ? "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20"
-                                                                : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                                                ? "border-rose-500 bg-rose-500/10 ring-2 ring-rose-500/20"
+                                                                : "border-line-soft hover:border-line hover:bg-card-2"
                                                             }`}
                                                         onClick={() => setStopOption("FORCE_COMPLETE")}
                                                     >
-                                                        <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                                                        <div className="flex items-center gap-2 font-semibold text-ink text-sm">
                                                             <input
                                                                 type="radio"
                                                                 name="stopOption"
                                                                 checked={stopOption === "FORCE_COMPLETE"}
                                                                 onChange={() => setStopOption("FORCE_COMPLETE")}
-                                                                className="text-rose-600 focus:ring-rose-500"
+                                                                className="text-rose-500 focus:ring-rose-500"
                                                             />
                                                             Completed Stop
                                                         </div>
-                                                        <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                                                        <span className="text-[11px] text-ink-subtle mt-1 pl-5">
                                                             Stop production without carrying forward any quantity.
                                                         </span>
                                                     </div>
 
                                                     <div
                                                         className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "CARRY_FORWARD"
-                                                                ? "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20"
-                                                                : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                                                ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/20"
+                                                                : "border-line-soft hover:border-line hover:bg-card-2"
                                                             }`}
                                                         onClick={() => setStopOption("CARRY_FORWARD")}
                                                     >
-                                                        <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                                                        <div className="flex items-center gap-2 font-semibold text-ink text-sm">
                                                             <input
                                                                 type="radio"
                                                                 name="stopOption"
                                                                 checked={stopOption === "CARRY_FORWARD"}
                                                                 onChange={() => setStopOption("CARRY_FORWARD")}
-                                                                className="text-amber-600 focus:ring-amber-500"
+                                                                className="text-amber-500 focus:ring-amber-500"
                                                             />
                                                             Stop & Carry Forward
                                                         </div>
-                                                        <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                                                        <span className="text-[11px] text-ink-subtle mt-1 pl-5">
                                                             Carry forward the remaining <strong>{Math.max(0, remainingQtyForShift - (Number(qtyProduced) || 0))} pcs</strong> to a new daily plan.
                                                         </span>
                                                     </div>
@@ -1159,29 +1096,27 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                                         {/* Final hour: always Complete Stop — just show info */}
                                         {Number(hourIndex) === hourOptions.length && (
-                                            <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-700 leading-relaxed">
+                                            <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-xs text-rose-400 leading-relaxed">
                                                 <strong>Complete Stop:</strong> The Production Order will be permanently locked. No new daily plans can be created for this PO. All produced quantity will proceed to post-production and dispatch.
                                             </div>
                                         )}
                                     </div>
                                 )}
                             </div>
-                        )}
+                )}
 
-                        {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
-                            <div className="mt-8 pt-6 border-t border-line-soft">
+                {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
+                    <div className="px-5 pt-4 pb-4 border-t border-line-soft">
                                 {/* Info Banner */}
-                                <div className="bg-amber-500/15 border border-amber-500/30 p-4 flex items-start gap-3 rounded-xl mb-5">
-                                    <div>
-                                        <span className="text-sm font-bold text-amber-400 block mb-1">
-                                            {stopPlanEarly ? "🛑 Production Stopped — Log Wastage (Optional)" : "Final Hour — Log Shift Wastage (Required)"}
-                                        </span>
-                                        <p className="text-xs text-amber-300/90 font-medium leading-relaxed mb-0">
-                                            {stopPlanEarly
-                                                ? "Wastage logging is optional when stopping early. Add rows below only if wastage occurred."
-                                                : "Since this is the final hour, please log all wastage products for this shift. At least one entry is required."}
-                                        </p>
-                                    </div>
+                                <div className="bg-amber-500/10 border border-amber-500/25 px-3 py-2 flex items-center gap-2 rounded-lg mb-3">
+                                    <span className="text-xs font-bold text-amber-400 shrink-0">
+                                        {stopPlanEarly ? "🛑 Log Wastage (Optional)" : "Final Hour — Log Wastage (Required)"}
+                                    </span>
+                                    <span className="text-xs text-amber-300/80 font-medium">
+                                        {stopPlanEarly
+                                            ? "Add rows below only if wastage occurred."
+                                            : "At least one wastage entry is required."}
+                                    </span>
                                 </div>
 
                                 {/* Wastage error (when final hour + no rows) */}
@@ -1352,11 +1287,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-                        )}
+                )}
 
-                        {/* Returned Raw Materials */}
-                        {(isFinalHour || stopPlanEarly) && (
-                            <div className="mt-4 p-5 border border-line-soft rounded-2xl bg-card-2 shadow-xs">
+                {/* Returned Raw Materials */}
+                {(isFinalHour || stopPlanEarly) && (
+                    <div className="mx-5 mb-4 p-4 border border-line-soft rounded-2xl bg-card-2 shadow-xs">
                                 <div className="flex justify-between items-center mb-3">
                                     <div className="flex items-center gap-2">
                                         <div>
@@ -1437,10 +1372,16 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                                 if (r.materialName?.toLowerCase().startsWith("wastage")) return false;
                                                                                 return rm.storeId ? String(r.storeId) === String(rm.storeId) : true;
                                                                             })
-                                                                            .map((r: any) => ({
-                                                                                value: r.rawMaterialId,
-                                                                                label: `${r.rawMaterialId} - ${r.materialName}`
-                                                                            }))
+                                                                            .map((r: any) => {
+                                                                                const isSelectedInOtherRow = rawMaterialsUsed.some(
+                                                                                    (otherRm, otherIdx) => otherIdx !== index && otherRm.rawMaterialId === r.rawMaterialId
+                                                                                );
+                                                                                return {
+                                                                                    value: r.rawMaterialId,
+                                                                                    label: `${r.rawMaterialId} - ${r.materialName}`,
+                                                                                    disabled: isSelectedInOtherRow
+                                                                                };
+                                                                            })
                                                                     ]}
                                                                     onChange={(e) => {
                                                                         const newRm = [...rawMaterialsUsed];
@@ -1510,11 +1451,9 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                    </div>
-                </div>
 
                 {/* Action Buttons */}
-                <div className="flex justify-end items-center gap-3 px-6 py-5 border-t border-slate-200">
+                <div className="flex justify-end items-center gap-3 px-5 py-3 border-t border-line-soft">
                     <CustomButton
                         text="Reset Fields"
                         icon={FaEraser}
@@ -1549,8 +1488,8 @@ const HourlyWorkReportCreate: React.FC = () => {
                     navigate("/daily-machine-planning");
                 }}
                 title={
-                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
-                        <FaTrophy className="text-xl text-indigo-500 animate-pulse" />
+                    <div className="flex items-center gap-2 text-indigo-400 font-bold">
+                        <FaTrophy className="text-xl text-indigo-400 animate-pulse" />
                         <span>New Production High Reached!</span>
                     </div>
                 }
@@ -1566,59 +1505,61 @@ const HourlyWorkReportCreate: React.FC = () => {
             >
                 <div className="text-center py-4">
                     <div className="flex justify-center mb-5">
-                        <div className="p-4 bg-indigo-50 rounded-full text-indigo-600 animate-bounce shadow-sm">
+                        <div className="p-4 bg-indigo-500/15 rounded-full text-indigo-400 animate-bounce">
                             <FaCrown size={44} />
                         </div>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Congratulations!</h3>
-                    <p className="text-slate-500 text-sm max-w-sm mx-auto mb-6">
-                        You have recorded a new highest production capacity for this product on this machine!
+                    <h3 className="text-2xl font-bold text-ink mb-2">Congratulations!</h3>
+                    <p className="text-ink-subtle text-sm max-w-sm mx-auto mb-6">
+                        {newHighDetails?.previousCapacity > 0
+                            ? "You have recorded a new highest production capacity for this product on this machine!"
+                            : "First production capacity record set for this product on this machine!"}
                     </p>
 
-                    <div className="inline-block bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 mb-6 min-w-[240px]">
-                        <div className="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-1">
+                    <div className="inline-block bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-6 mb-6 min-w-[240px]">
+                        <div className="text-xs uppercase tracking-wider text-indigo-400 font-semibold mb-1">
                             New Capacity High
                         </div>
-                        <div className="text-4xl font-extrabold text-indigo-600 flex items-center justify-center gap-2">
+                        <div className="text-4xl font-extrabold text-indigo-400 flex items-center justify-center gap-2">
                             <span>{newHighDetails?.newCapacity}</span>
-                            <span className="text-lg font-normal text-indigo-500">
+                            <span className="text-lg font-normal text-indigo-400/70">
                                 {activePlan?.uom || "units"}
                             </span>
                         </div>
                         {newHighDetails?.previousCapacity > 0 && (
-                            <div className="text-xs text-slate-500 mt-2 bg-indigo-100/50 py-1 px-3 rounded-full inline-block">
-                                Previous High: <span className="font-semibold text-slate-700">{newHighDetails.previousCapacity} {activePlan?.uom || "units"}</span>
+                            <div className="text-xs text-ink-subtle mt-2 bg-indigo-500/15 py-1 px-3 rounded-full inline-block">
+                                Previous High: <span className="font-semibold text-ink">{newHighDetails.previousCapacity} {activePlan?.uom || "units"}</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto bg-slate-50 p-5 rounded-2xl border border-slate-100 text-sm">
+                    <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto bg-card-2 p-5 rounded-2xl border border-line-soft text-sm">
                         <div className="flex items-start gap-2.5">
-                            <FaCalendarAlt className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <FaCalendarAlt className="text-indigo-400 mt-0.5 text-base flex-shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Date</span>
-                                <strong className="text-slate-700 font-semibold">{newHighDetails?.date}</strong>
+                                <span className="text-ink-subtle text-xs block font-medium">Date</span>
+                                <strong className="text-ink font-semibold">{newHighDetails?.date}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">
-                            <FaCogs className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <FaCogs className="text-indigo-400 mt-0.5 text-base flex-shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Machine</span>
-                                <strong className="text-slate-700 font-semibold truncate block max-w-[150px]" title={newHighDetails?.machineName}>{newHighDetails?.machineName}</strong>
+                                <span className="text-ink-subtle text-xs block font-medium">Machine</span>
+                                <strong className="text-ink font-semibold truncate block max-w-[150px]" title={newHighDetails?.machineName}>{newHighDetails?.machineName}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">
-                            <FaClock className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <FaClock className="text-indigo-400 mt-0.5 text-base flex-shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Shift</span>
-                                <strong className="text-slate-700 font-semibold">{newHighDetails?.shiftName}</strong>
+                                <span className="text-ink-subtle text-xs block font-medium">Shift</span>
+                                <strong className="text-ink font-semibold">{newHighDetails?.shiftName}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">
-                            <FaUsers className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <FaUsers className="text-indigo-400 mt-0.5 text-base flex-shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Operators</span>
-                                <strong className="text-slate-700 font-semibold block truncate max-w-[150px]" title={newHighDetails?.operators}>
+                                <span className="text-ink-subtle text-xs block font-medium">Operators</span>
+                                <strong className="text-ink font-semibold block truncate max-w-[150px]" title={newHighDetails?.operators}>
                                     {newHighDetails?.operators}
                                 </strong>
                             </div>

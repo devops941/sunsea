@@ -290,38 +290,88 @@ const GoodsDispatchView: React.FC = () => {
               <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
                 <h3 className="font-extrabold text-ink text-base">Status History</h3>
               </div>
-              <div className="p-5 space-y-6">
-                <div className="relative pl-6 border-l-2 border-line-soft">
-                  <div className="absolute w-3 h-3 bg-ink-subtle rounded-full -left-[7px] top-1"></div>
-                  <p className="text-sm font-bold text-ink">Dispatch Created</p>
-                  <p className="text-xs text-ink-subtle font-semibold mt-0.5">{formatDateTime(dispatchData.createdAt)}</p>
-                </div>
-                
-                {dispatchData.gateApprovedAt && (
-                  <div className={`relative pl-6 border-l-2 ${dispatchData.status === 'GATE_REJECTED' ? 'border-red-500/30' : 'border-line-soft'}`}>
-                    <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 ${dispatchData.status === 'GATE_REJECTED' ? 'bg-red-500' : 'bg-primary'}`}></div>
-                    <p className="text-sm font-bold text-ink">
-                      {dispatchData.status === 'GATE_REJECTED' ? 'Gate Rejected' : 'Gate Approved'}
-                    </p>
-                    <p className="text-xs text-ink-subtle font-semibold mt-0.5">{formatDateTime(dispatchData.gateApprovedAt)}</p>
-                    {dispatchData.gateRemarks && (
-                      <p className="text-xs text-ink-subtle mt-1 italic">"{dispatchData.gateRemarks}"</p>
-                    )}
-                  </div>
-                )}
+              <div className="p-5">
+                {(() => {
+                  const steps = [
+                    {
+                      label: "Dispatch Created",
+                      date: dispatchData.createdAt,
+                      done: true,
+                      rejected: false,
+                      remarks: null,
+                      color: "bg-primary",
+                    },
+                    {
+                      label: dispatchData.status === "GATE_REJECTED" ? "Gate Rejected" : "Gate Approved",
+                      date: dispatchData.gateApprovedAt,
+                      done: !!dispatchData.gateApprovedAt,
+                      rejected: dispatchData.status === "GATE_REJECTED",
+                      remarks: dispatchData.gateRemarks,
+                      color: dispatchData.status === "GATE_REJECTED" ? "bg-red-500" : "bg-primary",
+                    },
+                    {
+                      label: dispatchData.status === "STORE_REJECTED" ? "Store Rejected" : "Warehouse Received",
+                      date: dispatchData.storeReceivedAt,
+                      done: !!dispatchData.storeReceivedAt,
+                      rejected: dispatchData.status === "STORE_REJECTED",
+                      remarks: dispatchData.storeRemarks,
+                      color: dispatchData.status === "STORE_REJECTED" ? "bg-red-500" : "bg-emerald-500",
+                    },
+                  ];
 
-                {dispatchData.storeReceivedAt && (
-                  <div className="relative pl-6 border-transparent">
-                    <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 ${dispatchData.status === 'STORE_REJECTED' ? 'bg-red-500' : 'bg-emerald-500'}`}></div>
-                    <p className="text-sm font-bold text-ink">
-                      {dispatchData.status === 'STORE_REJECTED' ? 'Store Rejected' : 'Warehouse Received'}
-                    </p>
-                    <p className="text-xs text-ink-subtle font-semibold mt-0.5">{formatDateTime(dispatchData.storeReceivedAt)}</p>
-                    {dispatchData.storeRemarks && (
-                      <p className="text-xs text-ink-subtle mt-1 italic">"{dispatchData.storeRemarks}"</p>
-                    )}
-                  </div>
-                )}
+                  return (
+                    <div className="flex flex-col gap-0">
+                      {steps.map((step, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          {/* Left: circle + vertical connector */}
+                          <div className="flex flex-col items-center">
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-extrabold shadow-sm shrink-0
+                                ${step.done ? step.color : "bg-card-2 border-2 border-line-soft"}`}
+                            >
+                              {step.done ? (
+                                step.rejected ? (
+                                  <FaTimes className="w-3 h-3" />
+                                ) : (
+                                  <FaCheck className="w-3 h-3" />
+                                )
+                              ) : (
+                                <span className="w-2 h-2 rounded-full bg-line-soft" />
+                              )}
+                            </div>
+                            {/* Vertical connector line */}
+                            {idx < steps.length - 1 && (
+                              <div
+                                className={`w-0.5 flex-1 min-h-[28px] mt-1 ${
+                                  steps[idx + 1].done
+                                    ? steps[idx + 1].rejected
+                                      ? "bg-red-500/40"
+                                      : "bg-primary/40"
+                                    : "bg-line-soft"
+                                }`}
+                              />
+                            )}
+                          </div>
+
+                          {/* Right: label + date + remarks */}
+                          <div className={`pb-4 ${idx === steps.length - 1 ? "pb-0" : ""}`}>
+                            <p className={`text-[12px] font-extrabold leading-tight ${step.rejected ? "text-red-400" : step.done ? "text-ink" : "text-ink-subtle"}`}>
+                              {step.label}
+                            </p>
+                            {step.date && (
+                              <p className="text-[11px] text-ink-subtle font-semibold mt-0.5 leading-tight">
+                                {formatDateTime(step.date)}
+                              </p>
+                            )}
+                            {step.remarks && (
+                              <p className="text-[11px] text-ink-subtle mt-1 italic leading-tight">"{step.remarks}"</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

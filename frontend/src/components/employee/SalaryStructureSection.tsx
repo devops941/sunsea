@@ -661,7 +661,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
               </div>
 
               {form.pfApplicable && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-card-2 rounded-xl border border-line-soft">
                   <TextInput
                     label="UAN Number"
                     name="uanNumber"
@@ -675,7 +675,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
               )}
 
               {form.esiApplicable && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-green-50 rounded-xl border border-green-100">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-card-2 rounded-xl border border-line-soft">
                   <TextInput
                     label="ESIC Number"
                     name="esiNumber"
