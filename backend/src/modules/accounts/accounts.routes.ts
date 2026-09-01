@@ -11,6 +11,8 @@ router.get("/ledger-statement/multi", (req, res, next) => accountsController.get
 router.get("/ledgers/:id/statement", (req, res, next) => accountsController.getLedgerStatement(req, res, next));
 
 router.get("/bank-accounts", (req, res, next) => accountsController.getBankAccounts(req, res, next));
+router.post("/ledgers/:id/opening-balance", (req, res, next) => accountsController.setBankOpeningBalance(req, res, next));
+router.post("/repair-opening-vouchers", (req, res, next) => accountsController.repairPartyOpeningBalanceVouchers(req, res, next));
 
 router.get("/payable", (req, res, next) => accountsController.getPayableSummaries(req, res, next));
 router.get("/payable/:supplierId", (req, res, next) => accountsController.getSupplierPayableDetail(req, res, next));

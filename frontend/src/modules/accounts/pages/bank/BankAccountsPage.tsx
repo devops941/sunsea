@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FaUniversity, FaPlus, FaArrowRight, FaTimes, FaSync, FaMoneyBillWave } from "react-icons/fa";
+import { FaUniversity, FaPlus, FaArrowRight, FaTimes, FaSync, FaMoneyBillWave, FaPen, FaTools } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
 import { accountService } from "../../../../services/accountService";
@@ -44,6 +44,12 @@ const BankAccountsPage: React.FC = () => {
   const [newCode, setNewCode] = useState("");
   const [newGroup, setNewGroup] = useState("Bank Accounts");
   const [newOpeningBalance, setNewOpeningBalance] = useState<string>("");
+
+  // Edit-opening-balance modal state
+  const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
+  const [editOpeningBalance, setEditOpeningBalance] = useState<string>("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [repairRunning, setRepairRunning] = useState(false);
 
   const cacheKey = `accounts:bank-accounts`;
 
@@ -162,6 +168,31 @@ const BankAccountsPage: React.FC = () => {
           </h2>
           <div className="flex items-center gap-1.5">
             <button
+              onClick={async () => {
+                if (repairRunning) return;
+                setRepairRunning(true);
+                try {
+                  const res = await accountService.repairPartyOpeningVouchers();
+                  toast.success(
+                    res.removed > 0
+                      ? `Repaired ${res.removed} legacy opening-balance voucher(s)`
+                      : "No legacy opening-balance vouchers to repair"
+                  );
+                  invalidateCache(cacheKey);
+                  refresh();
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.message || err?.message || "Repair failed");
+                } finally {
+                  setRepairRunning(false);
+                }
+              }}
+              disabled={repairRunning}
+              title="One-time cleanup: removes legacy customer/supplier opening JVs that wrongly hit a bank ledger"
+              className="flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs font-semibold border border-amber-300 disabled:opacity-50"
+            >
+              <FaTools className={repairRunning ? "animate-spin text-amber-600" : ""} /> Repair
+            </button>
+            <button
               onClick={refresh}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
             >
@@ -235,13 +266,27 @@ const BankAccountsPage: React.FC = () => {
                   <h3 className="text-sm font-bold text-ink truncate">{acc.name}</h3>
                   <p className="text-[10px] uppercase tracking-wide font-mono text-ink-subtle mt-0.5">{acc.code}</p>
                 </div>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                  isCashAccount(acc.group, acc.name)
-                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                    : "bg-blue-500/10 text-blue-500 border border-blue-500/20"
-                }`}>
-                  {isCashAccount(acc.group, acc.name) ? "Cash" : "Bank"}
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingBank(acc);
+                      setEditOpeningBalance("");
+                    }}
+                    title="Set / edit opening balance"
+                    className="p-1 rounded border border-line text-ink-subtle hover:text-blue-600 hover:border-blue-500/40 transition-colors"
+                  >
+                    <FaPen className="text-[9px]" />
+                  </button>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    isCashAccount(acc.group, acc.name)
+                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                      : "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                  }`}>
+                    {isCashAccount(acc.group, acc.name) ? "Cash" : "Bank"}
+                  </span>
+                </div>
               </div>
               <div className="border-t border-line pt-2">
                 <p className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Current Balance</p>
@@ -360,6 +405,91 @@ const BankAccountsPage: React.FC = () => {
                   className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {submitting ? <><FaSync className="animate-spin text-[10px]" /> Creating...</> : <><FaPlus className="text-[10px]" /> Create Account</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Opening Balance Modal */}
+      {editingBank && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-line rounded-lg shadow-2xl w-[480px] max-w-[95vw] overflow-hidden">
+            <div className="px-4 py-2.5 bg-blue-600 text-white flex items-center gap-2">
+              <FaPen className="text-xs" />
+              <h2 className="text-sm font-bold flex-1">Set Opening Balance — {editingBank.name}</h2>
+              <button
+                onClick={() => { setEditingBank(null); setEditOpeningBalance(""); }}
+                className="text-white/80 hover:text-white"
+              >
+                <FaTimes className="text-sm" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const amt = parseFloat(editOpeningBalance);
+                if (!Number.isFinite(amt) || amt < 0) {
+                  toast.error("Enter a valid non-negative opening balance");
+                  return;
+                }
+                setEditSubmitting(true);
+                try {
+                  await accountService.setBankOpeningBalance(editingBank.id, amt);
+                  toast.success(
+                    amt > 0
+                      ? `Opening balance of ${editingBank.name} set to ₹${amt.toLocaleString("en-IN")}`
+                      : `Opening balance of ${editingBank.name} cleared`
+                  );
+                  setEditingBank(null);
+                  setEditOpeningBalance("");
+                  invalidateCache(cacheKey);
+                  refresh();
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.message || err?.message || "Failed to set opening balance");
+                } finally {
+                  setEditSubmitting(false);
+                }
+              }}
+              className="p-4 space-y-3"
+            >
+              <div>
+                <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                  Actual Opening Balance (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 150000.00"
+                  value={editOpeningBalance}
+                  onChange={(e) => setEditOpeningBalance(e.target.value)}
+                  className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="text-[10px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
+                💡 A JV will auto-post: <b>Debit</b> {editingBank.name} ₹{parseFloat(editOpeningBalance) || 0}
+                {" · "}<b>Credit</b> Opening Balance Equity. Any previous opening JV for this account is replaced.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => { setEditingBank(null); setEditOpeningBalance(""); }}
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {editSubmitting ? <><FaSync className="animate-spin text-[10px]" /> Saving...</> : "Save Opening Balance"}
                 </button>
               </div>
             </form>

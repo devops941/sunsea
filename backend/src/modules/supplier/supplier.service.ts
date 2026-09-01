@@ -68,21 +68,19 @@ class SupplierService {
 
     const createdSupplier = await supplierRepository.create(insertData);
 
-    // Auto-create AccountLedger under Sundry Creditors
+    // Auto-create AccountLedger under Sundry Creditors.
+    // Opening balance always posts to Opening Balance Equity — bank ledgers are
+    // never touched at supplier creation. Real advances must be entered via a
+    // separate Payment Voucher.
     try {
       await accountsService.ensureSupplierLedger(createdSupplier);
       const opBal = Number(createdSupplier.openingBalance || 0);
       if (opBal > 0) {
         const opType = (data.openingBalanceType || "CREDIT").toUpperCase() as "DEBIT" | "CREDIT";
-        const paidThroughLedgerId = (data as any).openingBalancePaidThroughLedgerId
-          ? Number((data as any).openingBalancePaidThroughLedgerId)
-          : null;
         await voucherPostingService.postSupplierOpeningBalanceVoucher(
           { id: createdSupplier.id, supplierCode: createdSupplier.supplierCode, legalName: createdSupplier.legalName },
           opBal,
-          opType,
-          undefined,
-          paidThroughLedgerId
+          opType
         );
       }
     } catch (err) {

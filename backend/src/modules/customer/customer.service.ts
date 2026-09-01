@@ -53,22 +53,19 @@ class CustomerService {
       },
     });
 
-    // Auto-create AccountLedger under Sundry Debtors
+    // Auto-create AccountLedger under Sundry Debtors.
+    // Opening balance always posts to Opening Balance Equity — bank ledgers are
+    // never touched at customer creation. Real advances must be entered via a
+    // separate Receipt Voucher.
     try {
       await accountsService.ensureCustomerLedger(newCustomer);
       const opBal = Number(newCustomer.openingBalance || 0);
       if (opBal > 0) {
         const opType = (data.openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
-        // Optional: user picked a bank/cash account where the advance actually landed
-        const paidThroughLedgerId = (data as any).openingBalancePaidThroughLedgerId
-          ? Number((data as any).openingBalancePaidThroughLedgerId)
-          : null;
         await voucherPostingService.postCustomerOpeningBalanceVoucher(
           { id: newCustomer.id, customerCode: newCustomer.customerCode, firmName: newCustomer.firmName },
           opBal,
-          opType,
-          undefined,
-          paidThroughLedgerId
+          opType
         );
       }
     } catch (err) {
