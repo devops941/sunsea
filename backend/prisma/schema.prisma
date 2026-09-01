@@ -1647,6 +1647,7 @@ model SalesInvoiceItem {
   igstRate         Decimal           @default(0) @map("igst_rate") @db.Decimal(5, 2)
   igstAmount       Decimal           @default(0) @map("igst_amount") @db.Decimal(14, 2)
   lineTotal        Decimal           @map("line_total") @db.Decimal(12, 2)
+  weight           Decimal?          @default(0) @db.Decimal(12, 3)
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   discountAmount   Decimal           @default(0) @map("discount_amount") @db.Decimal(14, 2)

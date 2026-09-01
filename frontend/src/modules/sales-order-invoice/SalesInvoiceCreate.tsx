@@ -37,6 +37,7 @@ interface InvoiceLineItem {
   itemName: string;
   qty: number;
   rate: number;
+  weight: number;
   discountAmount: number;
   taxPercent: number;
   amount: number;
@@ -62,6 +63,7 @@ const emptyLine = (): InvoiceLineItem => ({
   itemName: "",
   qty: 1,
   rate: 0,
+  weight: 0,
   discountAmount: 0,
   taxPercent: 0,
   amount: 0,
@@ -209,6 +211,7 @@ const SalesInvoiceForm: React.FC = () => {
             itemName: item.product?.productName || "Unknown Item",
             qty: Number(item.quantity) || 0,
             rate: Number(item.unitPrice) || 0,
+            weight: Number(item.weight) || 0,
             discountAmount: Number(item.discountAmount) || 0,
             taxPercent: Number(item.taxRate) || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0) + Number(item.igstRate || 0)),
             amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
@@ -387,12 +390,19 @@ const SalesInvoiceForm: React.FC = () => {
       const amount = orderQty * unitPrice;
       const taxAmount = (amount * taxPercent) / 100;
 
+      // Calculate weight from component products
+      let weightPerUnit = 0;
+      spComps.forEach((c: any) => {
+        weightPerUnit += Number(c.componentProduct?.weightPerPiece || 0) * Number(c.quantity || 1);
+      });
+
       result.push({
         id: crypto.randomUUID(),
         itemId: spIdStr,
         itemName: sp?.salesProductName || sp?.salesProductCode || `Sales Product #${spIdStr}`,
         qty: orderQty,
         rate: unitPrice,
+        weight: weightPerUnit * orderQty,
         discountAmount: 0,
         taxPercent,
         amount,
@@ -421,7 +431,7 @@ const SalesInvoiceForm: React.FC = () => {
         id: crypto.randomUUID(),
         itemId: String(item.productId || ""),
         itemName: item.product?.productName || item.productName || "Unknown Item",
-        qty, rate, discountAmount: 0, taxPercent, amount, taxAmount, total: amount + taxAmount,
+        qty, rate, weight: Number(item.product?.weightPerPiece || 0) * qty, discountAmount: 0, taxPercent, amount, taxAmount, total: amount + taxAmount,
       });
     });
 
@@ -505,6 +515,7 @@ const SalesInvoiceForm: React.FC = () => {
             updated.amount = updated.qty * updated.rate;
           }
         } else if (field === "qty" || field === "rate" || field === "discountAmount") {
+          const oldQty = line.qty || 1;
           const qty = field === "qty" ? Number(value) : updated.qty;
           const rate = field === "rate" ? Number(value) : updated.rate;
           const disc = field === "discountAmount" ? Number(value) : updated.discountAmount;
@@ -512,6 +523,11 @@ const SalesInvoiceForm: React.FC = () => {
           updated.rate = rate;
           updated.discountAmount = disc;
           updated.amount = qty * rate;
+          // Recalculate weight proportionally when qty changes
+          if (field === "qty" && line.weight > 0) {
+            const weightPerUnit = line.weight / oldQty;
+            updated.weight = weightPerUnit * qty;
+          }
         } else if (field === "amount") {
           const amt = Number(value);
           updated.amount = amt;
@@ -634,6 +650,7 @@ const SalesInvoiceForm: React.FC = () => {
             productId: l.itemId,
             qty: l.qty,
             rate: l.rate,
+            weight: l.weight || 0,
             discountAmount: l.discountAmount,
             taxPercent: l.taxPercent,
             amount: l.amount,
@@ -801,6 +818,7 @@ const SalesInvoiceForm: React.FC = () => {
                   <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">Qty</th>
                   <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Unit Price</th>
                   <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">GST %</th>
+                  <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-24">Weight (kg)</th>
                   <th className="py-2 px-1 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Total</th>
                   <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
                 </tr>
@@ -847,6 +865,10 @@ const SalesInvoiceForm: React.FC = () => {
                       <TextInput name={`tax-${line.id}`} type="number" value={String(line.taxPercent)} disabled={isLocked} min={0} max={100} step={0.01} placeholder="0"
                         onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))} />
                     </td>
+                    <td className="py-1 px-1 w-24">
+                      <TextInput name={`weight-${line.id}`} type="number" min="0" step="0.01" value={String(line.weight || 0)} disabled={isLocked}
+                        onChange={(e) => updateLine(line.id, "weight", Number(e.target.value))} placeholder="0" />
+                    </td>
                     <td className="py-2 px-1 text-right font-bold whitespace-nowrap">
                       {line.amount > 0 ? (
                         <div>
@@ -863,7 +885,7 @@ const SalesInvoiceForm: React.FC = () => {
                   {hasComps && isExpanded && (
                     <tr className="bg-card-2/50">
                       <td></td>
-                      <td colSpan={6} className="px-3 py-2">
+                      <td colSpan={7} className="px-3 py-2">
                         <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
                           <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
                             <div className="w-4" />
@@ -884,7 +906,25 @@ const SalesInvoiceForm: React.FC = () => {
                                       const lineSet = new Set(prev[line.id] || []);
                                       if (lineSet.has(compId)) lineSet.delete(compId);
                                       else lineSet.add(compId);
-                                      return { ...prev, [line.id]: lineSet };
+                                      const newExcluded = { ...prev, [line.id]: lineSet };
+                                      // Recalculate weight and rate based on included components
+                                      setLines(prevLines => prevLines.map(l => {
+                                        if (l.id !== line.id) return l;
+                                        let w = 0;
+                                        let ratePerUnit = 0;
+                                        spComps.forEach((c: any) => {
+                                          if (!lineSet.has(String(c.componentProductId))) {
+                                            w += Number(c.componentProduct?.weightPerPiece || 0) * Number(c.quantity || 1);
+                                            ratePerUnit += Number(c.componentProduct?.rate || 0) * Number(c.quantity || 1);
+                                          }
+                                        });
+                                        const newRate = ratePerUnit;
+                                        const newAmount = newRate * l.qty;
+                                        const taxableAmount = newAmount - (l.discountAmount || 0);
+                                        const newTaxAmount = (taxableAmount * l.taxPercent) / 100;
+                                        return { ...l, weight: w * l.qty, rate: newRate, amount: newAmount, taxAmount: newTaxAmount, total: taxableAmount + newTaxAmount };
+                                      }));
+                                      return newExcluded;
                                     });
                                   }}
                                   className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
