@@ -17,7 +17,7 @@ const MachineAssignmentViewModal: React.FC<MachineAssignmentViewModalProps> = ({
         <div className="w-full mt-2">
             <DataTable
                 data={assignment.operators ?? []}
-                rowKey={(_op: any, i: number) => i}
+                rowKey={(op: any) => op?.employeeId ?? op?.id ?? Math.random()}
                 emptyMessage="No operators assigned"
                 minHeightClassName=""
                 density="compact"
