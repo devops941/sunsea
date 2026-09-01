@@ -402,6 +402,10 @@ class AccountsService {
     try {
       const { voucherPostingService } = require("./voucherPosting.service");
       await voucherPostingService.syncUnpostedVouchers();
+      // Ensure opening-balance JVs exist for every customer/supplier that has
+      // a non-zero opening. Without this the statement is missing rows for
+      // legacy party records that never triggered a manual post.
+      await voucherPostingService.syncMissingOpeningBalanceVouchers();
     } catch (err) {
       console.error("[AccountsService] Sync unposted vouchers failed:", err);
     }
@@ -597,6 +601,7 @@ class AccountsService {
     try {
       const { voucherPostingService } = require("./voucherPosting.service");
       await voucherPostingService.syncUnpostedVouchers();
+      await voucherPostingService.syncMissingOpeningBalanceVouchers();
     } catch (err) {
       console.error("[AccountsService] Sync unposted vouchers failed:", err);
     }
@@ -645,19 +650,19 @@ class AccountsService {
       };
     }
 
+    // Include EVERY journal item that touches any effective ledger — including
+    // opening balance JVs. Excluding them (as we used to) meant that when
+    // openings from multiple customers/suppliers cancelled each other, the
+    // "Sundry Debtors" / "Selected Accounts" / "Current Assets" views returned
+    // an empty table even though real opening entries existed on the books.
+    // Matches Busy behaviour: every posted JV is a row, running balance follows.
     const journalItems = await prisma.journalItem.findMany({
       where: {
         OR: [
           { debitLedgerId: { in: effectiveIds } },
           { creditLedgerId: { in: effectiveIds } },
         ],
-        voucher: {
-          ...dateFilter,
-          OR: [
-            { refDocType: null },
-            { refDocType: { notIn: ["SUPPLIER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE"] } },
-          ],
-        },
+        voucher: dateFilter,
       },
       include: {
         voucher: true,
@@ -667,25 +672,15 @@ class AccountsService {
       orderBy: [{ voucher: { date: "asc" } }, { voucher: { id: "asc" } }],
     });
 
-    // Aggregate opening balance from party ledgers.
+    // Aggregate opening balance (header banner only). The individual opening
+    // JVs are now rendered as regular rows in the entries list below, so this
+    // number is used purely as a summary shown at the top of the statement.
     //
-    // IMPORTANT SIGN CONVENTION:
-    // Each subsequent journal item updates `runningBalance` using ITS OWN
-    // ledger-type formula:  Asset/Expense → debit − credit, Liability/Income/Equity → credit − debit.
-    // Both formulas produce a POSITIVE number when the balance grows in the
-    // ledger's natural direction (asset debit grows / liability credit grows).
-    //
-    // Therefore the opening must also be added in its NATURAL direction — i.e.
-    // as a plain positive number — otherwise the initial balance would go into
-    // the aggregate "backwards" and every subsequent purchase (which correctly
-    // adds +credit for a supplier liability) would then look like the opening
-    // was being CANCELLED OUT.  The earlier `-opening` for non-asset ledgers
-    // was the bug the user reported: opening ₹2,000 for a supplier appeared as
-    // −₹2,000 in Sundry Creditors, then a ₹110 purchase moved it to −₹1,890
-    // instead of the correct ₹2,110.
     // Per-account tracking — needed so the frontend can render Busy-style
-    // "Closing Balance" rows per account (opening + all its movements),
-    // not just the aggregate net movement.
+    // "Closing Balance" rows per account. `opening` holds the signed opening
+    // in natural direction (positive = same side as ledger's natural side).
+    // `running` starts at 0 because the opening JV itself will be one of the
+    // journal items iterated below — starting from `opening` would double-count.
     type AccountAgg = {
       id: number;
       name: string;
@@ -696,8 +691,6 @@ class AccountsService {
     const perAccount = new Map<number, AccountAgg>();
 
     let openingBalance = 0;
-    let hasLiability = false;
-    let hasAsset = false;
     for (const ledger of ledgers) {
       let opening = 0;
       let openingType: "DEBIT" | "CREDIT" = "DEBIT";
@@ -708,8 +701,6 @@ class AccountsService {
         opening = Number((ledger.supplier as any).openingBalance || 0);
         openingType = String((ledger.supplier as any).openingBalanceType || "CREDIT").toUpperCase() === "DEBIT" ? "DEBIT" : "CREDIT";
       }
-      // Adjust to natural sign: if opening is on the ledger's opposite side (advance received/paid),
-      // it counts as a NEGATIVE balance in that ledger's natural direction.
       const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
       const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
       const signedOpening = openingType === naturalSide ? opening : -opening;
@@ -719,37 +710,8 @@ class AccountsService {
         name: ledger.name,
         isAssetOrExpense,
         opening: signedOpening,
-        running: signedOpening,
+        running: 0,
       });
-      if (ledger.type === LedgerType.LIABILITY || ledger.type === LedgerType.INCOME || ledger.type === LedgerType.EQUITY) hasLiability = true;
-      if (ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE) hasAsset = true;
-    }
-
-    // The "natural" side for this aggregate:
-    //   all suppliers / Sundry Creditors → CREDIT natural
-    //   all customers / Sundry Debtors   → DEBIT natural
-    //   mixed → DEBIT (default)
-    const naturalSideIsCredit = hasLiability && !hasAsset;
-
-    // Rendering rule for opening row:
-    //   • If `openingBalance` sign matches the natural side → put full amount there
-    //   • If it doesn't → put on the OPPOSITE side (advance / reversed position)
-    //
-    // Concretely, for Sundry Debtors (natural=DEBIT):
-    //   openingBalance = +6,800 → Dr 6,800 (customers owe us net)
-    //   openingBalance = −6,800 → Cr 6,800 (customers gave us net advance)
-    // The `runningBalance` keeps the signed value so subsequent items apply
-    // math consistently.
-    let openingDebit = 0;
-    let openingCredit = 0;
-    if (openingBalance > 0) {
-      // Positive number sits on the natural side
-      if (naturalSideIsCredit) openingCredit = openingBalance;
-      else openingDebit = openingBalance;
-    } else if (openingBalance < 0) {
-      // Negative means the balance is on the OPPOSITE of natural
-      if (naturalSideIsCredit) openingDebit = -openingBalance;
-      else openingCredit = -openingBalance;
     }
 
     // Use the EXPANDED set (children of aggregate parents included), not
@@ -759,28 +721,8 @@ class AccountsService {
     // and every entry would render with debit=0 credit=0 despite the
     // WHERE clause correctly matching child ledgers.
     const selectedIds = expandedIdSet;
-    let runningBalance = openingBalance;
+    let runningBalance = 0;
     const entries: any[] = [];
-
-    if (Math.abs(openingBalance) > 0.01) {
-      entries.push({
-        id: `opening-multi`,
-        voucherNo: "-",
-        voucherType: "OPENING",
-        date: options.startDate || (journalItems.length > 0 ? journalItems[0].voucher.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
-        narration: openingBalance < 0
-          ? (naturalSideIsCredit ? "Net advance paid to suppliers" : "Net advance received from customers")
-          : "Combined Opening Balance",
-        particulars: `Opening Balance (${ids.length} accounts)`,
-        // Marked so the frontend can render it as a top-level row (or a
-        // dedicated "OPENING BALANCE" section) instead of an ugly
-        // "*** — ***" placeholder header.
-        accountName: "OPENING BALANCE",
-        debit: openingDebit,
-        credit: openingCredit,
-        runningBalance: openingBalance,
-      });
-    }
 
     // Diagnostic: log selection membership + amounts for a few items so we
     // can spot cases where an entry appears in the list but its debit/credit
