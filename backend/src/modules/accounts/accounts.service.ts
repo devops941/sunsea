@@ -179,20 +179,60 @@ class AccountsService {
     // In addition to the ledger's own `group`, party ledgers also appear
     // under their customer grade/type as pseudo-groups so the user can
     // pick "Grade A" or "Retailer" straight from the group picker.
+    //
+    // Fetch the FULL ledger set for grouping — the paginated `ledgers`
+    // above would miss any ledger past the current page, so newly-created
+    // customers can look like they have no grade. Grouping is a compact
+    // index (only fields we need) so full-table scan is cheap.
     let grouped: Array<{ group: string; ledgers: typeof ledgers }> | null = null;
     if (params.grouped) {
+      const allForGroup = await prisma.accountLedger.findMany({
+        where,
+        orderBy: { code: "asc" },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              firmName: true,
+              customerCode: true,
+              customerGrade: { select: { name: true } },
+              customerType: { select: { name: true } },
+            },
+          },
+          supplier: { select: { id: true, legalName: true, supplierCode: true } },
+        },
+      });
       const buckets: Record<string, typeof ledgers> = {};
       const push = (key: string, l: typeof ledgers[number]) => {
         if (!buckets[key]) buckets[key] = [];
         // Avoid double-listing the same ledger under the same key
         if (!buckets[key].some((x) => x.id === l.id)) buckets[key].push(l);
       };
-      for (const l of ledgers) {
+      for (const l of allForGroup) {
         push(l.group || "Others", l);
         const gradeName = (l as any).customer?.customerGrade?.name as string | undefined;
         const typeName = (l as any).customer?.customerType?.name as string | undefined;
         if (gradeName) push(gradeName, l);
         if (typeName) push(typeName, l);
+      }
+      // Also include EVERY grade / type from the master tables even when
+      // no customer is assigned yet, so newly-created grades appear in
+      // the group picker straight away (empty bucket until a customer
+      // uses that grade).
+      try {
+        const [allGrades, allTypes] = await Promise.all([
+          prisma.customerGrade.findMany({ select: { name: true } }),
+          prisma.customerType.findMany({ select: { name: true } }),
+        ]);
+        for (const g of allGrades) if (g.name && !buckets[g.name]) buckets[g.name] = [];
+        for (const t of allTypes) if (t.name && !buckets[t.name]) buckets[t.name] = [];
+        console.log("[getLedgers.grouped]", {
+          gradesFromTable: allGrades.map((g) => g.name),
+          typesFromTable: allTypes.map((t) => t.name),
+          finalBucketCount: Object.keys(buckets).length,
+        });
+      } catch (err) {
+        console.error("[getLedgers.grouped] master seed failed:", err);
       }
       grouped = Object.entries(buckets)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -643,6 +683,18 @@ class AccountsService {
     // was the bug the user reported: opening ₹2,000 for a supplier appeared as
     // −₹2,000 in Sundry Creditors, then a ₹110 purchase moved it to −₹1,890
     // instead of the correct ₹2,110.
+    // Per-account tracking — needed so the frontend can render Busy-style
+    // "Closing Balance" rows per account (opening + all its movements),
+    // not just the aggregate net movement.
+    type AccountAgg = {
+      id: number;
+      name: string;
+      isAssetOrExpense: boolean;
+      opening: number;   // signed in the ledger's natural direction
+      running: number;   // signed running balance
+    };
+    const perAccount = new Map<number, AccountAgg>();
+
     let openingBalance = 0;
     let hasLiability = false;
     let hasAsset = false;
@@ -660,7 +712,15 @@ class AccountsService {
       // it counts as a NEGATIVE balance in that ledger's natural direction.
       const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
       const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
-      openingBalance += openingType === naturalSide ? opening : -opening;
+      const signedOpening = openingType === naturalSide ? opening : -opening;
+      openingBalance += signedOpening;
+      perAccount.set(ledger.id, {
+        id: ledger.id,
+        name: ledger.name,
+        isAssetOrExpense,
+        opening: signedOpening,
+        running: signedOpening,
+      });
       if (ledger.type === LedgerType.LIABILITY || ledger.type === LedgerType.INCOME || ledger.type === LedgerType.EQUITY) hasLiability = true;
       if (ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE) hasAsset = true;
     }
@@ -692,7 +752,13 @@ class AccountsService {
       else openingCredit = -openingBalance;
     }
 
-    const selectedIds = new Set(ids);
+    // Use the EXPANDED set (children of aggregate parents included), not
+    // the raw request IDs. Otherwise a user selecting an aggregate parent
+    // like "Sundry Debtors" would fail the isSelectedDebit/Credit checks
+    // below (parent ID is not on any journal item — only its children are),
+    // and every entry would render with debit=0 credit=0 despite the
+    // WHERE clause correctly matching child ledgers.
+    const selectedIds = expandedIdSet;
     let runningBalance = openingBalance;
     const entries: any[] = [];
 
@@ -730,10 +796,15 @@ class AccountsService {
       const debit = isSelectedDebit ? amt : 0;
       const credit = isSelectedCredit ? amt : 0;
 
-      if (isAssetOrExpense) {
-        runningBalance += debit - credit;
-      } else {
-        runningBalance += credit - debit;
+      const delta = isAssetOrExpense ? (debit - credit) : (credit - debit);
+      runningBalance += delta;
+      // Also apply the same delta to the individual account's running
+      // balance so we can return per-account closing balances for the
+      // Busy-style "Closing Balance" row per account section.
+      const selectedLedgerId = isSelectedDebit ? item.debitLedgerId : item.creditLedgerId;
+      if (selectedLedgerId) {
+        const agg = perAccount.get(selectedLedgerId);
+        if (agg) agg.running += delta;
       }
 
       entries.push({
@@ -767,6 +838,24 @@ class AccountsService {
       );
     }
 
+    // Per-account opening / closing balances keyed by account NAME (matches
+    // what entries carry as `accountName`, so the frontend can look up the
+    // group's balance in O(1) when rendering the per-account footer row).
+    // Closing is expressed as a positive number + Dr/Cr side (natural side
+    // of the ledger). `runningRaw` keeps the signed value for internal use.
+    const accountBalances: Record<string, { name: string; opening: number; openingSide: "Dr" | "Cr"; closing: number; closingSide: "Dr" | "Cr" }> = {};
+    for (const agg of perAccount.values()) {
+      const naturalSide: "Dr" | "Cr" = agg.isAssetOrExpense ? "Dr" : "Cr";
+      const oppositeSide: "Dr" | "Cr" = agg.isAssetOrExpense ? "Cr" : "Dr";
+      accountBalances[agg.name] = {
+        name: agg.name,
+        opening: Math.abs(agg.opening),
+        openingSide: agg.opening >= 0 ? naturalSide : oppositeSide,
+        closing: Math.abs(agg.running),
+        closingSide: agg.running >= 0 ? naturalSide : oppositeSide,
+      };
+    }
+
     return {
       mode: "multi" as const,
       label: options.label || `${ledgers.length} accounts`,
@@ -777,6 +866,7 @@ class AccountsService {
       openingBalance,
       closingBalance: runningBalance,
       entries: filteredEntries,
+      accountBalances,
     };
   }
 

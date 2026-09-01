@@ -211,6 +211,34 @@ export const LedgerStatementPage: React.FC = () => {
   const [sidebarSearch, setSidebarSearch] = useState<string>("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  // Route-change reset: navigating between /ledger-statement and
+  // /ledger-statement/merged does NOT remount this component, so the
+  // dialog state initializers only run once at first mount and end up
+  // showing the wrong panel after a sidebar switch. Watch `isMerged`
+  // and re-open the correct entry dialog (Merged → Merged Ledger,
+  // Account-Wise → Format) whenever the route flips.
+  useEffect(() => {
+    if (isMerged) {
+      setShowFormatDialog(false);
+      setShowModeDialog(false);
+      setShowOptionsDialog(false);
+      setShowMergedDialog(true);
+      // Wipe any prior committed selection so the merged flow starts clean
+      setSelectedLedgerId(null);
+      setSelectedGroup(null);
+      setSelectedLedgerIds(new Set());
+    } else {
+      setShowMergedDialog(false);
+      setShowOptionsDialog(false);
+      setShowModeDialog(false);
+      setShowFormatDialog(true);
+      setSelectedLedgerId(null);
+      setSelectedGroup(null);
+      setSelectedLedgerIds(new Set());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMerged]);
+
   // Progressive URL writer. Rather than a state-sync effect, each step
   // in the setup flow calls this explicitly with the delta it just
   // committed — Format click writes { fmt }, Mode click adds { mode },
@@ -439,7 +467,7 @@ export const LedgerStatementPage: React.FC = () => {
          when navigating to /accounts/ledger-statement/merged. Skips the
          Format + Mode dialogs and offers Group / Selected only. */}
       {showMergedDialog && (
-        <div className="fixed top-[80px] left-4 z-50 w-[420px] max-w-[95vw]">
+        <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden">
             <div className="text-white text-[11px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center">
               Merged Ledger !
@@ -506,7 +534,7 @@ export const LedgerStatementPage: React.FC = () => {
          Standard / T-Format". Appears first when the page opens. Once
          chosen, closes and hands off to the Mode picker. */}
       {showFormatDialog && (
-        <div className="fixed top-[80px] left-4 z-50 w-[380px] max-w-[95vw]">
+        <div className="fixed top-[80px] left-4 z-30 w-[380px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-lg shadow-2xl w-full overflow-hidden">
             <div className="px-4 py-2 bg-red-600/90 text-white flex items-center gap-2 border-b border-line">
               <FaBook className="text-sm" />
@@ -584,7 +612,7 @@ export const LedgerStatementPage: React.FC = () => {
       {/* Step 2: Busy-style Mode selection — "Ledger to be shown for".
          Appears after Format is chosen. Left-side panel (no backdrop). */}
       {showModeDialog && (
-        <div className="fixed top-[80px] left-4 z-50 w-[380px] max-w-[95vw]">
+        <div className="fixed top-[80px] left-4 z-30 w-[380px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-lg shadow-2xl w-full overflow-hidden">
             <div className="px-4 py-2.5 bg-blue-600/90 text-white flex items-center gap-2">
               <FaBook className="text-sm" />
@@ -678,7 +706,7 @@ export const LedgerStatementPage: React.FC = () => {
          Receipt add pages: text-[11px], 12-col grid, px-2 py-1 inputs,
          tight vertical rhythm. */}
       {showOptionsDialog && (
-        <div className="fixed top-[80px] left-4 z-50 w-2xl max-w-2xl" style={{ maxHeight: "calc(100vh - 100px)" }}>
+        <div className="fixed top-[80px] left-4 z-30 w-2xl max-w-2xl" style={{ maxHeight: "calc(100vh - 100px)" }}>
           <div className="bg-card border border-line rounded-md shadow-sm w-full overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 100px)" }}>
             {/* Busy-style header bar (red, centered, uppercase, tight) */}
             <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
@@ -1918,10 +1946,12 @@ export const LedgerStatementPage: React.FC = () => {
                     }
                     let rowCursor = 0;
                     let usedRowsCount = 0;
+                    // Per-account opening/closing balances from backend, keyed
+                    // by account name. Used to render Busy-style "Closing
+                    // Balance" per section with the actual account balance
+                    // (opening + all movements), not just net movement.
+                    const acctBalances = (statement as any).accountBalances || {};
                     const groupOutput = groups.map((g, gi) => {
-                      const sumDr = g.rows.reduce((s, r) => s + (r.debit || 0), 0);
-                      const sumCr = g.rows.reduce((s, r) => s + (r.credit || 0), 0);
-                      const net = sumDr - sumCr;
                       // 1 header + N rows + 1 footer
                       usedRowsCount += 2 + g.rows.length;
                       const groupRows = g.rows.map((r) => {
@@ -1929,6 +1959,9 @@ export const LedgerStatementPage: React.FC = () => {
                         rowCursor++;
                         return el;
                       });
+                      const bal = acctBalances[g.name] as
+                        | { closing: number; closingSide: "Dr" | "Cr" }
+                        | undefined;
                       return (
                         <React.Fragment key={`grp-${gi}-${g.name}`}>
                           <tr className="bg-blue-500/10">
@@ -1941,17 +1974,15 @@ export const LedgerStatementPage: React.FC = () => {
                           </tr>
                           {groupRows}
                           <tr className="bg-card-2/50 border-b border-line-soft">
-                            <td colSpan={3 + narrCol} className={`${cellBase} text-[10px] italic text-ink-subtle text-right`}>
-                              Net movement
-                            </td>
-                            <td className={`${cellBase} text-right font-mono text-ink text-[11px] whitespace-nowrap`}>
-                              ₹ {sumDr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td className={`${cellBase} text-right font-mono text-amber-500 text-[11px] font-semibold whitespace-nowrap`}>
-                              ₹ {sumCr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <td colSpan={6 + narrCol} className={`${cellBase} text-[11px] font-bold text-blue-400 text-right`}>
+                              Closing Balance
                             </td>
                             <td className="px-2 py-1 text-right font-mono font-bold text-blue-500 text-[11px] whitespace-nowrap">
-                              {net >= 0 ? "" : "-"}₹ {Math.abs(net).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {net >= 0 ? "Dr" : "Cr"}
+                              {bal ? (
+                                <>₹ {bal.closing.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {bal.closingSide}</>
+                              ) : (
+                                <>—</>
+                              )}
                             </td>
                           </tr>
                         </React.Fragment>
