@@ -325,6 +325,20 @@ const PurchaseOrderForm: React.FC = () => {
     }
   }, [user, isEdit]);
 
+  // Auto-populate billing address from company profile (always company address)
+  useEffect(() => {
+    if (company && !isEdit) {
+      setFormData((prev) => ({
+        ...prev,
+        billingAddressLine1: company.addressLine1 || "",
+        billingCity: company.city || "",
+        billingState: company.state || "",
+        billingPincode: company.zipcode || "",
+        billingCountry: company.country || "India",
+      }));
+    }
+  }, [company, isEdit]);
+
   // Load PO data for Edit Mode
   useEffect(() => {
     if (!isEdit || !id) return;
@@ -977,15 +991,26 @@ const PurchaseOrderForm: React.FC = () => {
               </div>
             </div>
 
-            {/* ── Section 2: Shipping Address ── */}
-            <div>
-              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Shipping Address</h3>
+            {/* ── Section 2: Billing & Shipping Address (Info Row) ── */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Billing Address - Company Address */}
+              <div className="bg-card-2 rounded-lg border border-line-soft px-4 py-2.5">
+                <h3 className="text-[11px] font-bold text-ink uppercase tracking-wide mb-1.5">Billing Address <span className="text-ink-subtle font-medium normal-case">(Company)</span></h3>
+                <p className="text-xs text-ink leading-relaxed">
+                  {[formData.billingAddressLine1, formData.billingCity, formData.billingState, formData.billingCountry, formData.billingPincode].filter(Boolean).join(", ") || <span className="text-ink-subtle italic">No address configured</span>}
+                </p>
               </div>
-              <AddressForm addressValue={formData.shippingAddressLine1 || ""} onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))} addressError={errors.shippingAddressLine1} countryValue={formData.shippingCountry || "India"} onCountryChange={(val) => setFormData(prev => ({ ...prev, shippingCountry: val }))} countryError={errors.shippingCountry} stateValue={formData.shippingState || ""} onStateChange={handleShippingStateChange} stateError={errors.shippingState} cityValue={formData.shippingCity || ""} onCityChange={handleShippingCityChange} cityError={errors.shippingCity} pincodeValue={formData.shippingPincode || ""} onPincodeChange={(val) => setFormData(prev => ({ ...prev, shippingPincode: val }))} pincodeError={errors.shippingPincode} disabled={isLocked} resetKey={shippingResetKey} />
+
+              {/* Shipping Address - Store Address */}
+              <div className="bg-card-2 rounded-lg border border-line-soft px-4 py-2.5">
+                <h3 className="text-[11px] font-bold text-ink uppercase tracking-wide mb-1.5">Shipping Address <span className="text-ink-subtle font-medium normal-case">(Store)</span></h3>
+                <p className="text-xs text-ink leading-relaxed">
+                  {[formData.shippingAddressLine1, formData.shippingCity, formData.shippingState, formData.shippingCountry, formData.shippingPincode].filter(Boolean).join(", ") || <span className="text-ink-subtle italic">Select a store to see address</span>}
+                </p>
+              </div>
             </div>
 
-            {/* ── Section 3: Order Items ── */}
+            {/* ── Section 4: Order Items ── */}
             <div>
               <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Order Items</h3>
@@ -1048,7 +1073,7 @@ const PurchaseOrderForm: React.FC = () => {
               </div>
             </div>
 
-            {/* ── Section 4: Remarks + Order Summary ── */}
+            {/* ── Section 5: Remarks + Order Summary ── */}
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
                 <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
