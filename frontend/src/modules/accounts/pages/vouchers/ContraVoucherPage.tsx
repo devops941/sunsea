@@ -229,9 +229,16 @@ const ContraVoucherPage: React.FC = () => {
         className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
         style={{ height: "calc(100vh - 240px)" }}
       >
-        {flatRows.length === 0 && !loading ? (
+        {flatRows.length === 0 ? (
           <div className="p-8 text-center text-xs text-ink-subtle">
-            No contra vouchers found in this date range.
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <FaSync className="animate-spin text-teal-500 text-[10px]" />
+                Loading contra vouchers…
+              </span>
+            ) : (
+              "No contra vouchers found in this date range."
+            )}
           </div>
         ) : (
           <div className="overflow-auto flex-1">

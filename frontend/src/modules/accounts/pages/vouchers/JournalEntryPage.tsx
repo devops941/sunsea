@@ -231,9 +231,19 @@ const JournalEntryPage: React.FC = () => {
         className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
         style={{ height: "calc(100vh - 240px)" }}
       >
-        {flatRows.length === 0 && !loading ? (
+        {/* Empty state as soon as we know there's no data — don't wait for
+           the loading flag to flip. Empty response is a valid, immediate
+           answer, not a "still loading" state. */}
+        {flatRows.length === 0 ? (
           <div className="p-8 text-center text-xs text-ink-subtle">
-            No journal vouchers found in this date range.
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <FaSync className="animate-spin text-purple-500 text-[10px]" />
+                Loading journal vouchers…
+              </span>
+            ) : (
+              "No journal vouchers found in this date range."
+            )}
           </div>
         ) : (
           <div className="overflow-auto flex-1">

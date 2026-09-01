@@ -27,20 +27,33 @@ export const useSocketSync = <T,>(
   React.useEffect(() => {
     if (!socket) return;
 
+    // Coalesce the `onAnyEvent` callback so 20 socket events in 30ms
+    // trigger only ONE refetch instead of 20 (matches the debounce inside
+    // useDetailCache / useListCache for consistency).
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const fireOnAny = () => {
+      if (!onAnyEventRef.current) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        onAnyEventRef.current?.();
+      }, 50);
+    };
+
     const handleCreated = (payload: T) => {
       if (actionsRef.current?.created) dispatch(actionsRef.current.created(payload));
-      if (onAnyEventRef.current) onAnyEventRef.current();
+      fireOnAny();
     };
 
     const handleUpdated = (payload: T) => {
       if (actionsRef.current?.updated) dispatch(actionsRef.current.updated(payload));
-      if (onAnyEventRef.current) onAnyEventRef.current();
+      fireOnAny();
     };
 
     const handleDeleted = (payload: any) => {
       const id = payload?.id !== undefined ? payload.id : payload;
       if (actionsRef.current?.deleted) dispatch(actionsRef.current.deleted(id));
-      if (onAnyEventRef.current) onAnyEventRef.current();
+      fireOnAny();
     };
 
     socket.on(`${moduleName}:created`, handleCreated);
@@ -48,6 +61,7 @@ export const useSocketSync = <T,>(
     socket.on(`${moduleName}:deleted`, handleDeleted);
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       socket.off(`${moduleName}:created`, handleCreated);
       socket.off(`${moduleName}:updated`, handleUpdated);
       socket.off(`${moduleName}:deleted`, handleDeleted);

@@ -28,6 +28,9 @@ interface DetailCacheEntry<T> {
 
 const MAX_ENTRIES = 100;
 const detailCache = new Map<string, DetailCacheEntry<any>>();
+// In-flight dedup: if two pages/hooks request the same key at the same time,
+// they share a single network Promise instead of firing duplicate fetches.
+const inflight = new Map<string, Promise<any>>();
 
 function evict() {
   if (detailCache.size < MAX_ENTRIES) return;
@@ -131,7 +134,18 @@ export function useDetailCache<T = any>({
     else if (hasCached)        setRefreshing(true);
 
     try {
-      const result = await fetcherRef.current(ctrl.signal);
+      // If another caller is already fetching this key, wait on their
+      // Promise instead of firing a second network request.
+      let pending = inflight.get(key) as Promise<T> | undefined;
+      if (!pending) {
+        pending = fetcherRef.current(ctrl.signal);
+        inflight.set(key, pending);
+        pending.finally(() => {
+          // Only clear if this Promise is still the one registered
+          if (inflight.get(key) === pending) inflight.delete(key);
+        });
+      }
+      const result = await pending;
       if (ctrl.signal.aborted) return;
       write(key, result);
       setData(result);
@@ -168,17 +182,17 @@ export function useDetailCache<T = any>({
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [doFetch]);
 
-  // Socket live-sync
+  // Socket live-sync — debounce burst events into single refetch.
   useEffect(() => {
     if (!socket) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onUpdated = (payload: any) => {
       const mid = socketMatchRef.current;
       if (mid != null && String(payload?.id) !== String(mid)) return;
-      const entry = read(cacheKeyRef.current);
-      if (entry) write(cacheKeyRef.current, entry.data);   // refresh timestamp=0 trick below
       const e = detailCache.get(cacheKeyRef.current);
       if (e) detailCache.set(cacheKeyRef.current, { ...e, timestamp: 0 });
-      doFetch(true);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { debounceTimer = null; doFetch(true); }, 50);
     };
     const onDeleted = (payload: any) => {
       const mid = socketMatchRef.current;
@@ -188,6 +202,7 @@ export function useDetailCache<T = any>({
     socket.on(`${socketModule}:updated`, onUpdated);
     socket.on(`${socketModule}:deleted`, onDeleted);
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       socket.off(`${socketModule}:updated`, onUpdated);
       socket.off(`${socketModule}:deleted`, onDeleted);
     };

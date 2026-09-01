@@ -27,8 +27,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Get base URL without /api path (e.g. http://localhost:5000)
     const baseUrl = import.meta.env.VITE_IMAGE_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || "http://localhost:5000";
 
-    // Initialize Socket.io connection
+    // Initialize Socket.io connection.
+    // Perf tuning:
+    //  - transports: ["websocket"] skips the HTTP polling handshake + upgrade
+    //    round-trip. Saves ~100-300ms on connect.
+    //  - reconnectionDelay: fast retry on drops for realtime feel
+    //  - timeout: fail fast so UI doesn't hang if the server is unreachable
     const socketInstance = io(baseUrl, {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionDelay: 300,
+      reconnectionDelayMax: 3000,
+      reconnectionAttempts: Infinity,
+      timeout: 8000,
       extraHeaders: {
         "Bypass-Tunnel-Reminder": "true", // Bypasses localtunnel warning page
         "ngrok-skip-browser-warning": "true", // Bypasses ngrok warning page
@@ -40,9 +51,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setIsConnected(true);
     });
 
-    socketInstance.on("disconnect", () => {
-      console.log("🔴 Socket disconnected");
+    socketInstance.on("disconnect", (reason) => {
+      console.log("🔴 Socket disconnected:", reason);
       setIsConnected(false);
+    });
+
+    socketInstance.io.on("reconnect_attempt", (n) => {
+      console.log(`🟡 Socket reconnect attempt ${n}`);
+    });
+    socketInstance.io.on("reconnect", (n) => {
+      console.log(`🟢 Socket reconnected after ${n} attempts`);
+    });
+    socketInstance.on("connect_error", (err) => {
+      console.warn("⚠️ Socket connect error:", err?.message ?? err);
     });
 
     setSocket(socketInstance);

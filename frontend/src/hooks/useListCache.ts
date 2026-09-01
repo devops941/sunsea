@@ -27,6 +27,9 @@ interface CacheEntry<T> {
 
 const MAX_ENTRIES = 50;
 const cache = new Map<string, CacheEntry<any>>();
+// In-flight dedup: same cacheKey requested by multiple hooks concurrently
+// share one Promise instead of firing parallel fetches.
+const inflight = new Map<string, Promise<{ data: any[]; total: number }>>();
 
 function evict() {
   if (cache.size < MAX_ENTRIES) return;
@@ -138,7 +141,16 @@ export function useListCache<T = any>({
       }
 
       try {
-        const result = await fetcherRef.current(ctrl.signal);
+        // Share in-flight Promise across concurrent callers for the same key
+        let pending = inflight.get(key) as Promise<{ data: T[]; total: number }> | undefined;
+        if (!pending) {
+          pending = fetcherRef.current(ctrl.signal);
+          inflight.set(key, pending);
+          pending.finally(() => {
+            if (inflight.get(key) === pending) inflight.delete(key);
+          });
+        }
+        const result = await pending;
         if (ctrl.signal.aborted) return;
 
         const entry: CacheEntry<T> = {
@@ -184,6 +196,9 @@ export function useListCache<T = any>({
     const fresh = entry && (Date.now() - entry.timestamp) < ttl;
 
     if (entry) {
+      // Cached empty arrays are valid — surface them immediately so the
+      // consuming page can render its "no data" state without waiting for
+      // another network roundtrip.
       setData([...entry.data]);
       setTotal(entry.total);
       setLoading(false);
@@ -208,14 +223,18 @@ export function useListCache<T = any>({
   }, [doFetch]);
 
   // ─── Socket live-sync ─────────────────────────────────────────
+  // Debounce burst events (e.g. bulk imports firing 50 :created in a row)
+  // into a single refetch. Uses trailing edge — user sees the final state.
   useEffect(() => {
     if (!socket) return;
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onEvent = () => {
       const key = cacheKeyRef.current;
       const entry = readCache(key, ttl);
       if (entry) writeCache(key, { ...entry, timestamp: 0 }); // force stale
-      doFetch(true);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { debounceTimer = null; doFetch(true); }, 50);
     };
 
     socket.on(`${socketModule}:created`, onEvent);
@@ -223,6 +242,7 @@ export function useListCache<T = any>({
     socket.on(`${socketModule}:deleted`, onEvent);
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       socket.off(`${socketModule}:created`, onEvent);
       socket.off(`${socketModule}:updated`, onEvent);
       socket.off(`${socketModule}:deleted`, onEvent);
