@@ -14,7 +14,7 @@ export const useEmployees = () => {
     deleted: employeeDeleted,
   });
 
-  const loadEmployees = useCallback((params?: { search?: string; designationId?: string | number; page?: number; limit?: number }) => {
+  const loadEmployees = useCallback((params?: { search?: string; departmentId?: string | number; roleId?: string | number; status?: string; page?: number; limit?: number }) => {
     dispatch(fetchEmployees(params));
   }, [dispatch]);
 

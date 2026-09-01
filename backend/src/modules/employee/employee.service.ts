@@ -179,15 +179,25 @@ class EmployeeService {
   async findAll(params: {
     search?: string;
     departmentId?: number;
+    roleId?: number;
+    status?: string;
     page?: number;
     limit?: number;
   }) {
-    const { search, departmentId, page = 1, limit = 10 } = params;
+    const { search, departmentId, roleId, status, page = 1, limit = 10 } = params;
 
     const where: any = {};
 
     if (departmentId) {
       where.departmentId = departmentId;
+    }
+
+    if (roleId) {
+      where.roleId = roleId;
+    }
+
+    if (status) {
+      where.status = status;
     }
 
     if (search) {

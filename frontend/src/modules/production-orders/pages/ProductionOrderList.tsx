@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaPlus, FaCalendarAlt, FaCheckCircle, FaShoppingCart, FaEye, FaChevronLeft, FaChevronRight, FaSyncAlt } from "react-icons/fa";
+import { FaPlus, FaCalendarAlt, FaCheckCircle, FaEye, FaSyncAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -8,12 +8,9 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
-
 import IconButton from "../../../components/ui/IconButton/IconButton";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import { MaterialIssueModal } from "../components/MaterialIssueModal";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -38,9 +35,6 @@ const ProductionOrderList: React.FC = () => {
     const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
     const [fullOrder, setFullOrder] = useState<any>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    const [showIssueModal, setShowIssueModal] = useState(false);
-    const [selectedProdForIssue, setSelectedProdForIssue] = useState<any>(null);
-
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string[]>([]);
 
@@ -412,100 +406,40 @@ const ProductionOrderList: React.FC = () => {
     const columns = [
         {
             header: "#",
+            width: "48px",
             render: (_: any, index: number) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
         },
         {
             header: "PO NO",
+            width: "110px",
             render: (item: any) => <span className="font-semibold text-ink">{item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}</span>
         },
         {
             header: "ORDER DATE",
+            width: "100px",
             render: (item: any) => <span className="text-ink-muted">{formatDate(item.orderDate)}</span>
         },
         {
             header: "EXPECTED DATE",
+            width: "110px",
             render: (item: any) => <span className="text-ink-muted">{item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : "-"}</span>
         },
         {
-            header: "CUSTOMER",
-            render: (item: any) => <span className="text-ink-muted">{item.customer?.firmName || "-"}</span>
-        },
-        {
             header: "PRODUCTS",
+            width: "minmax(0, 1fr)",
             render: (item: any) => <span className="text-ink-muted">{item.productionOrders && item.productionOrders.length > 0
                 ? item.productionOrders.map((po: any) => po.productItem?.productName || "Unknown Product").join(", ")
                 : item.items?.map((it: any) => it.product?.productName || "Unknown Product").join(", ") || "-"
             }</span>
         },
         {
-            header: "RAW MATERIALS",
-            render: (item: any) => {
-                const rawMaterials = item.productionOrders?.flatMap((po: any) => po.draftRawMaterials || []) || [];
-                const visibleRMs = rawMaterials.slice(0, 2);
-                const hiddenRMs = rawMaterials.slice(2);
-
-                if (rawMaterials.length === 0) return <span className="text-ink-subtle">N/A</span>;
-
-                return (
-                    <div className="flex flex-wrap gap-1 items-center">
-                        {visibleRMs.map((rm: any, rmIdx: number) => {
-                            const rmIdStr = rm.rawMaterialId?.toString();
-                            const stockRm = rawMaterialsMap.get(rmIdStr);
-                            const name = stockRm?.materialName || rmIdStr;
-                            let availableStock = stockRm
-                                ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)
-                                : 0;
-                            const reqQty = Number(rm.requiredQty || 0);
-
-                            const parentPO = item.productionOrders?.find((po: any) => {
-                                const rawMaterials = po.draftRawMaterials || [];
-                                return rawMaterials.some((drm: any) => drm.rawMaterialId === rm.rawMaterialId);
-                            });
-                            const isReservedStatus = parentPO
-                                ? ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(parentPO.status)
-                                : false;
-                            if (isReservedStatus && stockRm) {
-                                availableStock += reqQty;
-                            }
-
-                            const isAvailable = availableStock >= reqQty;
-                            return (
-                                <StatusBadge
-                                    key={`${item.id}-${rmIdx}`}
-                                    status="UNKNOWN"
-                                    customText={name}
-                                    customColor={{
-                                        bg: isAvailable ? '#d1fae5' : '#fee2e2',
-                                        text: isAvailable ? '#065f46' : '#b91c1c'
-                                    }}
-                                    title={`Req: ${reqQty.toFixed(2)}, Avail: ${availableStock.toFixed(2)}`}
-                                    className="fw-normal"
-                                />
-                            );
-                        })}
-                        {hiddenRMs.length > 0 && (
-                            <StatusBadge
-                                status="UNKNOWN"
-                                customText={`+${hiddenRMs.length} more`}
-                                customColor={{ bg: '#f1f3f4', text: '#5f6368' }}
-                                className="fw-normal"
-                                title={hiddenRMs.map((rm: any) => {
-                                    const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-                                    return stockRm?.materialName || rm.rawMaterialId;
-                                }).join(', ')}
-                                style={{ cursor: 'help' }}
-                            />
-                        )}
-                    </div>
-                );
-            }
-        },
-        {
             header: "STATUS",
+            width: "165px",
             render: (item: any) => <StatusBadge status={item.status} />
         },
         {
             header: "ACTIONS",
+            width: "160px",
             render: (item: any) => (
                 <div className="flex items-center gap-2 justify-start">
 
@@ -588,16 +522,14 @@ const ProductionOrderList: React.FC = () => {
                         />
                     )}
 
-                    {/* Edit & Delete */}
-                    {item.primaryPO && !["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED", "CANCELLED", "CANCELED", "DELETED"].includes(item.primaryPO.status?.toUpperCase()) && (
-                        <>
-                            {can("production_orders.edit") && (
-                                <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
-                            )}
-                            {item.isDirect && can("production_orders.delete") && (
-                                <DeleteButton onClick={() => triggerDelete(item.productionOrders.map((po: any) => po.productionOrderId))} />
-                            )}
-                        </>
+                    {/* Edit — only for CREATED (draft) orders */}
+                    {item.primaryPO && ["CREATED"].includes(item.primaryPO.status?.toUpperCase()) && can("production_orders.edit") && (
+                        <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
+                    )}
+
+                    {/* Delete — only for direct draft orders */}
+                    {item.primaryPO && ["CREATED"].includes(item.primaryPO.status?.toUpperCase()) && item.isDirect && can("production_orders.delete") && (
+                        <DeleteButton onClick={() => triggerDelete(item.productionOrders.map((po: any) => po.productionOrderId))} />
                     )}
                 </div>
             )
@@ -756,11 +688,11 @@ const ProductionOrderList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1100px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Production Order Management</h2>
+                        <h2 className="text-base font-bold text-ink">Production Order Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         {(can("weekly_programs.create") || can("weekly_programs.view")) && (

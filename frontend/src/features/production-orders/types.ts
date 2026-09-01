@@ -8,7 +8,7 @@ export interface ProductionOrderItem {
 }
 
 export interface ProductionOrder {
-  id?: number | string; // Often APIs map this to id or productionOrderId
+  id?: number | string;
   productionOrderId?: string;
   orderDate: string;
   dueDate: string;
@@ -45,7 +45,9 @@ export interface ProductionOrder {
 
 export interface ProductionOrderState {
   data: ProductionOrder[];
+  total: number;
+  page: number;
+  totalPages: number;
   loading: boolean;
   error: string | null;
 }
-

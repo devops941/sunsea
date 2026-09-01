@@ -160,11 +160,13 @@ class EmployeeController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
-    const { search, departmentId, page, limit } = req.query;
+    const { search, departmentId, roleId, status, page, limit } = req.query;
 
     const employees = await employeeService.findAll({
       search: search as string | undefined,
       departmentId: departmentId ? parseInt(departmentId as string, 10) : undefined,
+      roleId: roleId ? parseInt(roleId as string, 10) : undefined,
+      status: status as string | undefined,
       page: page ? parseInt(page as string, 10) : 1,
       limit: limit ? parseInt(limit as string, 10) : 10,
     });

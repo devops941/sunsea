@@ -243,26 +243,32 @@ const HourlyWorkReportList: React.FC = () => {
         },
         {
             header: "DATE",
+            width: "90px",
             render: (group) => <span className="font-medium text-ink-subtle">{new Date(group.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
         },
         {
             header: "MACHINE",
+            width: "90px",
             render: (group) => <span className="font-bold">{group.machineName}</span>
         },
         {
             header: "SHIFT",
+            width: "120px",
             render: (group) => <StatusBadge status="UNKNOWN" customText={group.shiftName} customColor={{ bg: '#f8f9fa', text: '#212529' }} />
         },
         {
             header: "PO ID",
+            width: "100px",
             render: (group) => <span className="font-semibold">{group.productionOrderId}</span>
         },
         {
             header: "PRODUCT",
-            render: (group) => <div className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">{group.productName}</div>
+            width: "minmax(100px, 1fr)",
+            render: (group) => <div className="truncate">{group.productName}</div>
         },
         {
             header: "HOURS LOGGED",
+            width: "100px",
             render: (group) => {
                 const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
                 if (isActiveNoEntry) {
@@ -273,10 +279,12 @@ const HourlyWorkReportList: React.FC = () => {
         },
         {
             header: "TARGET",
+            width: "90px",
             render: (group) => <span className="font-bold text-ink">{group.plannedQty} <span className="text-xs text-ink-subtle font-normal">{group.uom}</span></span>
         },
         {
             header: "TOTAL PRODUCED",
+            width: "110px",
             render: (group) => {
                 const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
                 if (isActiveNoEntry) {
@@ -287,6 +295,7 @@ const HourlyWorkReportList: React.FC = () => {
         },
         {
             header: "REJECT / SCRAP",
+            width: "105px",
             render: (group) => (
                 <>
                     <span className="text-red-500 text-xs font-semibold">R: {group.totalRejectQty}</span> <span className="text-ink-subtle mx-1">|</span> <span className="text-amber-500 text-xs font-semibold">S: {group.totalScrapQty}</span>
@@ -295,6 +304,7 @@ const HourlyWorkReportList: React.FC = () => {
         },
         {
             header: "DOWNTIME",
+            width: "90px",
             render: (group) => <span className="text-ink-subtle">{group.totalDowntime > 0 ? `${group.totalDowntime} Mins` : "-"}</span>
         },
         {

@@ -18,7 +18,6 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   rows?: number;
   inputClassName?: string;
   labelClassName?: string;
-  /** Place label and input side by side in one row */
   horizontal?: boolean;
   onChange?: (event: any) => void;
 }
@@ -72,7 +71,7 @@ const TextInput: React.FC<TextInputProps> = ({
   };
 
   return (
-    <div className={`${bottom ? "mb-[18px]" : ""} group ${horizontal ? "flex items-center gap-3" : ""}`}>
+    <div className={`${bottom ? "mb-[18px]" : ""} group ${horizontal ? "flex items-start gap-3" : ""}`}>
       {label && (
         <label
           htmlFor={name}
@@ -83,7 +82,7 @@ const TextInput: React.FC<TextInputProps> = ({
             transition-colors duration-250
             ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
-            ${horizontal ? "shrink-0 w-[140px] mb-0" : "mb-2"}
+            ${horizontal ? "shrink-0 w-[140px] mb-0 pt-[10px]" : "mb-2"}
             ${labelClassName}
           `}
         >
@@ -106,8 +105,6 @@ const TextInput: React.FC<TextInputProps> = ({
         </label>
       )}
 
-      {/* Wrap input + error together so error always sits below the input,
-          even when the outer container is a horizontal flex row. */}
       <div className={`flex flex-col ${horizontal ? "flex-1" : ""}`}>
         <div className="relative">
           {as === "textarea" ? (

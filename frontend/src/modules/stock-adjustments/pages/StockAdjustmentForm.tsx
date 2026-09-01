@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaPlus, FaMinus, FaTimes, FaInfoCircle, FaEraser } from "react-icons/fa";
+import { FaSave, FaPlus, FaMinus, FaInfoCircle, FaEraser } from "react-icons/fa";
+import { Search } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -14,6 +15,7 @@ import {
   fetchNextAdjustmentNumber,
 } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 import { fetchRawMaterials } from "../../../features/raw-materials/rawMaterialSlice";
+import { fetchRawMaterialStocks } from "../../../features/raw-materials/rawMaterialStockSlice";
 import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
@@ -25,22 +27,10 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { formatDate } from "../../../utils/dateUtils";
 
 // ──────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────
-const ADJUSTMENT_TYPES = [
-  { value: "PRODUCTION_MATERIAL_RETURN", label: "Production Material Return" },
-  { value: "STOCK_INCREASE", label: "Stock Increase" },
-  { value: "STOCK_DECREASE", label: "Stock Decrease" },
-  { value: "DAMAGE", label: "Damage" },
-  { value: "SCRAP", label: "Scrap" },
-  { value: "OPENING_STOCK", label: "Opening Stock" },
-  { value: "MANUAL_CORRECTION", label: "Manual Correction" },
-  { value: "OTHER", label: "Other" },
-];
-
 const REASON_OPTIONS = [
   { value: "Damaged Goods", label: "Damaged Goods" },
   { value: "Lost / Stolen", label: "Lost / Stolen" },
@@ -121,6 +111,7 @@ const StockAdjustmentForm: React.FC = () => {
     (state) => state.stockAdjustments
   );
   const { data: rawMaterials } = useAppSelector((state) => state.rawMaterials);
+  const { data: rmStocks = [] } = useAppSelector((state) => state.rawMaterialStocks);
   const { products } = useAppSelector((state) => state.products);
   const { data: stores } = useAppSelector((state) => state.stores);
   const { data: fgStocks = [] } = useAppSelector(
@@ -151,9 +142,10 @@ const StockAdjustmentForm: React.FC = () => {
   // ── Load reference data ─────────────────
   useEffect(() => {
     dispatch(fetchRawMaterials(undefined));
+    dispatch(fetchRawMaterialStocks({ limit: 1000 }));
     dispatch(fetchProducts(undefined));
     dispatch(fetchStores(undefined)); // Stock adjustment handles both RM and FG — show all stores
-    dispatch(fetchFinishedGoodsStocks({}));
+    dispatch(fetchFinishedGoodsStocks({ limit: 1000 }));
     dispatch(fetchProductionOrdersForIssue());
     return () => { dispatch(clearCurrent()); };
   }, [dispatch]);
@@ -387,24 +379,6 @@ const StockAdjustmentForm: React.FC = () => {
     setFormData({ ...formData, items: updatedItems });
   };
 
-  const addItem = () => {
-    setFormData({
-      ...formData,
-      items: [
-        ...formData.items,
-        {
-          itemType: "RAW_MATERIAL",
-          rawMaterialId: "",
-          productItemId: "",
-          storeId: "",
-          currentQty: 0,
-          adjustedQty: 0,
-          difference: 0,
-          remarks: "",
-        },
-      ],
-    });
-  };
 
   const removeItem = (index: number) => {
     setFormData({
@@ -509,14 +483,19 @@ const StockAdjustmentForm: React.FC = () => {
 
   const getRawMaterialStockQty = (rmId: string, targetStoreId?: string) => {
     if (!rmId) return 0;
-    const rm = rawMaterials.find((r: any) => r.rawMaterialId?.toString() === rmId.toString());
-    if (!rm) return 0;
-    if (targetStoreId && rm.storeId) {
-      if (rm.storeId.toString() !== targetStoreId.toString()) {
-        return 0;
-      }
+    // Use actual stock records (rmStocks) for accurate qty + store match
+    let matches = (rmStocks as any[]).filter(
+      (s: any) => s.rawMaterialId?.toString() === rmId.toString()
+    );
+    if (targetStoreId) {
+      matches = matches.filter((s: any) => s.storeId?.toString() === targetStoreId.toString());
     }
-    return Number(rm.onHandQty || 0);
+    if (matches.length > 0) {
+      return matches.reduce((sum: number, s: any) => sum + Number(s.onHandQty || 0), 0);
+    }
+    // Fallback to master data
+    const rm = rawMaterials.find((r: any) => r.rawMaterialId?.toString() === rmId.toString());
+    return Number(rm?.onHandQty || 0);
   };
 
   const getFinishedGoodStockQty = (productId: string, targetStoreId?: string) => {
@@ -630,11 +609,23 @@ const StockAdjustmentForm: React.FC = () => {
     let currentQty = 0;
 
     if (item.type === "FINISHED_GOODS") {
+      // Find the store where this FG has stock
+      const fgMatch = (fgStocks as any[]).find(
+        (f: any) => (f.productItemId || f.productId || f.product?.id || f.id)?.toString() === item.id?.toString()
+      );
+      if (fgMatch?.storeId) itemStoreId = fgMatch.storeId;
       currentQty = getFinishedGoodStockQty(item.id, itemStoreId);
     } else {
-      const rm = rawMaterials.find((r: any) => r.rawMaterialId?.toString() === item.id?.toString());
-      if (rm && rm.storeId) {
-        itemStoreId = rm.storeId;
+      // Find the store where this RM has stock (from actual stock records)
+      const stockRecord = (rmStocks as any[]).find(
+        (s: any) => s.rawMaterialId?.toString() === item.id?.toString()
+      );
+      if (stockRecord?.storeId) {
+        itemStoreId = stockRecord.storeId;
+      } else {
+        // Fallback to master data storeId
+        const rm = rawMaterials.find((r: any) => r.rawMaterialId?.toString() === item.id?.toString());
+        if (rm && (rm as any).storeId) itemStoreId = (rm as any).storeId;
       }
       currentQty = getRawMaterialStockQty(item.id, itemStoreId);
     }
@@ -667,7 +658,7 @@ const StockAdjustmentForm: React.FC = () => {
   };
 
   // ── Submit ──────────────────────────────
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -803,29 +794,26 @@ const StockAdjustmentForm: React.FC = () => {
   // ── Render ──────────────────────────────
   return (
     <div className="w-full mx-auto">
-      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1300px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
         {/* Page Header */}
-        <div className="px-6 py-4 border-b border-line">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-ink">
+        <div className="px-5 py-3 border-b border-line">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-bold text-ink">
               {isEditMode ? "Edit Stock Adjustment" : "New Stock Adjustment"}
             </h2>
             <BackButton text="Back" to="/inventory/stock-adjustments" />
           </div>
         </div>
 
-        <form onSubmit={(e) => e.preventDefault()} className="px-6 py-4 space-y-4" noValidate>
+        <form onSubmit={(e) => e.preventDefault()} className="px-5 py-4 space-y-4" noValidate>
           {/* Section 1: Adjustment Information */}
-          <div className="mb-6">
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-ink">Adjustment Details</h2>
-              <p className="text-sm text-ink-subtle mt-0.5">
-                Add items to adjust inventory levels. Each item can have a separate reason.
-              </p>
+          <div className="mb-4">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-ink-muted uppercase tracking-wider">Adjustment Details</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block mb-1 text-xs font-bold text-ink-muted uppercase tracking-wider">
+                <label className="block mb-2 text-xs font-bold text-ink-muted uppercase tracking-wider">
                   Date <span className="text-red-500">*</span>
                 </label>
                 <DatePickerCalendar
@@ -857,7 +845,7 @@ const StockAdjustmentForm: React.FC = () => {
           {/* Section 2: Production Order Selection (PMI Only) */}
           {isPMI && (
             <div className="pt-2">
-              <h6 className="text-base font-semibold text-gray-800 mb-3">2. Production Order Selection</h6>
+              <h6 className="text-sm font-bold text-ink-muted uppercase tracking-wider mb-3">Production Order Selection</h6>
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 items-start">
                 <div className="lg:col-span-2">
                   <SelectInput
@@ -902,7 +890,7 @@ const StockAdjustmentForm: React.FC = () => {
               </div>
 
               {!formData.productionOrderId && (
-                <div className="mt-3 p-3 bg-blue-950/40 border border-blue-800 text-blue-300 rounded-lg flex items-center gap-2 text-sm">
+                <div className="mt-3 p-3 bg-card-2 border border-line text-ink-muted rounded-lg flex items-center gap-2 text-sm">
                   <FaInfoCircle className="flex-shrink-0" />
                   <span>
                     Select a Production Order to load its reserved raw materials for issue.
@@ -916,7 +904,7 @@ const StockAdjustmentForm: React.FC = () => {
           {/* Section 3: Raw Materials to Issue (PMI Only) */}
           {isPMI && selectedPO && pmiItems.length > 0 && (
             <div className="pt-2 border-t border-line mt-4">
-              <h6 className="text-base font-semibold text-ink mb-3">3. Raw Materials to Issue</h6>
+              <h6 className="text-sm font-bold text-ink-muted uppercase tracking-wider mb-3">Raw Materials to Issue</h6>
               <div className="rounded-xl border border-line bg-card [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
                 <table className="min-w-full divide-y divide-line">
                   <thead className="bg-card-2">
@@ -1036,27 +1024,31 @@ const StockAdjustmentForm: React.FC = () => {
 
                     {isAddProductsOpen && (
                       <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-96 overflow-y-auto bg-card rounded-2xl shadow-2xl border border-line-soft p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                        <div className="flex gap-2 mb-2 [&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
-                          <div className="flex-1">
-                            <TextInput
-                              label=""
+                        <div className="flex gap-2 mb-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none" size={14} />
+                            <input
+                              autoFocus
+                              type="text"
                               name="productSearch"
                               placeholder="Search products or materials..."
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
-                              autoFocus
+                              className="w-full h-9 pl-8 pr-3 bg-card-2 border border-line-soft rounded-lg text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
                             />
                           </div>
-                          <SelectInput
-                            label=""
-                            hideLabel
-                            noMargin
-                            name="categoryFilterDropdown"
-                            value={selectedCategoryFilter}
-                            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                            options={categories.map((c) => ({ value: c, label: c }))}
-                            defaultOptionLabel="All"
-                          />
+                          <div className="[&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
+                            <SelectInput
+                              label=""
+                              hideLabel
+                              noMargin
+                              name="categoryFilterDropdown"
+                              value={selectedCategoryFilter}
+                              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                              options={categories.map((c) => ({ value: c, label: c }))}
+                              defaultOptionLabel="All"
+                            />
+                          </div>
                         </div>
                         <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
                           {filteredItemsForSelect.length > 0 ? (
@@ -1109,32 +1101,29 @@ const StockAdjustmentForm: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-line overflow-visible bg-card shadow-sm">
+              <div className="rounded-2xl border border-line overflow-hidden bg-card shadow-sm">
                 <table className="min-w-full divide-y divide-line">
                   <thead className="bg-card-2 border-b border-line">
                     <tr>
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider">
+                      <th className="px-3 py-2.5 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wider">
                         Product
                       </th>
-                      <th className="px-4 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[160px]">
+                      <th className="px-3 py-2.5 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wider min-w-[130px]">
                         Store
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider w-28">
+                      <th className="px-3 py-2.5 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wider w-20">
                         Current
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[240px]">
+                      <th className="px-3 py-2.5 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wider min-w-[200px]">
                         Adjust
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider w-28">
+                      <th className="px-3 py-2.5 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wider w-20">
                         New Total
                       </th>
-                      <th className="px-4 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[160px]">
+                      <th className="px-3 py-2.5 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wider min-w-[160px]">
                         Reason <span className="text-rose-500">*</span>
                       </th>
-                      <th className="px-4 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[200px]">
-                        Notes
-                      </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider w-12"></th>
+                      <th className="px-3 py-2.5 w-10"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -1152,12 +1141,9 @@ const StockAdjustmentForm: React.FC = () => {
                         return (
                           <tr key={index} className="hover:bg-card-2/50 transition-colors group">
                             {/* Product */}
-                            <td className="px-5 py-4 align-middle">
-                              <div className="font-bold text-ink text-sm">
+                            <td className="px-3 py-2.5 align-middle">
+                              <div className="font-semibold text-ink text-xs leading-snug">
                                 {item.name || "Unnamed Item"}
-                              </div>
-                              <div className="text-xs text-ink-subtle font-mono mt-0.5 uppercase tracking-wide">
-                                {item.itemCode || ""} • {item.categoryName || item.itemType || "ITEM"}
                               </div>
                               {errors[`items.${index}.itemSelection`] && (
                                 <div className="text-xs text-red-500 font-medium mt-1">{errors[`items.${index}.itemSelection`]}</div>
@@ -1165,7 +1151,7 @@ const StockAdjustmentForm: React.FC = () => {
                             </td>
 
                             {/* Store */}
-                            <td className="px-4 py-4 align-middle">
+                            <td className="px-3 py-2.5 align-middle">
                               <div className="[&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
                                 <SelectInput
                                   label=""
@@ -1187,27 +1173,27 @@ const StockAdjustmentForm: React.FC = () => {
                             </td>
 
                             {/* Current */}
-                            <td className="px-4 py-4 align-middle text-center">
-                              <span className="font-bold text-ink text-base">
+                            <td className="px-3 py-2.5 align-middle text-center">
+                              <span className="font-bold text-ink text-sm">
                                 {current}
                                 {baseUom}
                               </span>
                             </td>
 
                             {/* Adjust */}
-                            <td className="px-4 py-4 align-middle text-center">
-                              <div className="flex items-center justify-center gap-1.5 min-w-[220px]">
-                                <CustomButton
-                                  text=""
-                                  icon={FaMinus}
-                                  size="sm"
+                            <td className="px-3 py-2.5 align-middle text-center">
+                              <div className="flex items-center justify-center gap-0.5 min-w-[185px]">
+                                <button
+                                  type="button"
                                   onClick={() => {
                                     const numVal = Number(currentInputVal || 0);
                                     handleItemDifferenceChange(index, numVal - 1, selectedUom);
                                   }}
-                                  className="!bg-card-2 !text-ink hover:!bg-line !border !border-line !px-3 !h-10"
-                                />
-                                <div className="flex-1 min-w-[140px] [&_.mb-4]:!mb-0">
+                                  className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md bg-card-2 border border-line text-ink-muted hover:bg-line transition-colors text-xs"
+                                >
+                                  <FaMinus size={8} />
+                                </button>
+                                <div className="flex-1 [&_.mb-4]:!mb-0">
                                   <QuantityInput
                                     hideLabel={true}
                                     name={`difference-${index}`}
@@ -1225,22 +1211,22 @@ const StockAdjustmentForm: React.FC = () => {
                                     error={errors[`items.${index}.adjustedQty`]}
                                   />
                                 </div>
-                                <CustomButton
-                                  text=""
-                                  icon={FaPlus}
-                                  size="sm"
+                                <button
+                                  type="button"
                                   onClick={() => {
                                     const numVal = Number(currentInputVal || 0);
                                     handleItemDifferenceChange(index, numVal + 1, selectedUom);
                                   }}
-                                  className="!bg-card-2 !text-ink hover:!bg-line !border !border-line !px-3 !h-10"
-                                />
+                                  className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md bg-card-2 border border-line text-ink-muted hover:bg-line transition-colors text-xs"
+                                >
+                                  <FaPlus size={8} />
+                                </button>
                               </div>
                             </td>
 
                             {/* New Total */}
-                            <td className="px-4 py-4 align-middle text-center">
-                              <div className="font-bold text-ink text-base">
+                            <td className="px-3 py-2.5 align-middle text-center">
+                              <div className="font-bold text-ink text-sm">
                                 {newTotal}
                                 {baseUom}
                               </div>
@@ -1262,7 +1248,7 @@ const StockAdjustmentForm: React.FC = () => {
                             </td>
 
                             {/* Reason */}
-                            <td className="px-4 py-4 align-middle">
+                            <td className="px-3 py-2.5 align-middle">
                               <div className="[&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
                                 <SelectInput
                                   label=""
@@ -1281,21 +1267,8 @@ const StockAdjustmentForm: React.FC = () => {
                               </div>
                             </td>
 
-                            {/* Notes */}
-                            <td className="px-4 py-4 align-middle">
-                              <div className="[&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
-                                <TextInput
-                                  label=""
-                                  name={`notes-${index}`}
-                                  placeholder="Optional notes..."
-                                  value={item.notes || ""}
-                                  onChange={(e: any) => handleItemChange(index, "notes", e.target.value)}
-                                />
-                              </div>
-                            </td>
-
                             {/* Delete Action */}
-                            <td className="px-4 py-4 align-middle text-center">
+                            <td className="px-3 py-2.5 align-middle text-center">
                               <DeleteButton onClick={() => removeItem(index)} />
                             </td>
                           </tr>
@@ -1303,7 +1276,7 @@ const StockAdjustmentForm: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="text-center py-12 text-ink-subtle text-sm">
+                        <td colSpan={6} className="text-center py-12 text-ink-subtle text-sm">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <span>No items added for adjustment yet.</span>
                             <span
@@ -1329,7 +1302,7 @@ const StockAdjustmentForm: React.FC = () => {
           )}
 
           {/* Form Actions */}
-          <div className="flex items-center justify-between pt-6 mt-6 border-t border-line">
+          <div className="flex items-center justify-between pt-4 mt-4 border-t border-line">
             <div>
               {!isPMI && formData.items.length > 0 && (
                 <CustomButton

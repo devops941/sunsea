@@ -18,7 +18,7 @@ const machineSchema = z.object({
     machineName: z.string().trim().min(1, "Machine Name is required").max(100, "Maximum 100 characters allowed"),
     technologyType: z.string().min(1, "Technology Type is required"),
     machineType: z.string().min(1, "Machine Type is required"),
-    targetTemperature: z.coerce.number().optional().nullable(),
+    targetTemperature: z.coerce.number().min(0, "Temperature cannot be negative").max(999.99, "Temperature must be less than 1000°C").optional().nullable(),
     operatorId: z.string().min(1, "Machine Incharge is required").max(20, "Maximum 20 characters allowed"),
     isActive: z.boolean().optional(),
 });
@@ -42,6 +42,7 @@ const MachineForm: React.FC = () => {
     const [roles, setRoles] = useState<any[]>([]);
     const [inchargeRoleId, setInchargeRoleId] = useState("");
     const [employees, setEmployees] = useState<any[]>([]);
+    const [pendingOperatorId, setPendingOperatorId] = useState("");
 
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,6 +78,29 @@ const MachineForm: React.FC = () => {
     useEffect(() => { fetchRoles(); }, [fetchRoles]);
     useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
 
+    // Edit mode: detect which role the loaded operatorId belongs to
+    useEffect(() => {
+        if (!pendingOperatorId || roles.length === 0 || inchargeRoleId) return;
+        let cancelled = false;
+        const detectRole = async () => {
+            for (const role of roles) {
+                try {
+                    const res = await machineOperationAssignmentService.getEmployeesByRole(Number(role.id));
+                    const emps: any[] = res.data || [];
+                    if (emps.some((e: any) => String(e.id) === String(pendingOperatorId))) {
+                        if (!cancelled) {
+                            setInchargeRoleId(String(role.id));
+                            setEmployees(emps);
+                        }
+                        break;
+                    }
+                } catch { /* skip role */ }
+            }
+        };
+        detectRole();
+        return () => { cancelled = true; };
+    }, [pendingOperatorId, roles]);
+
     // Fetch next ID (create) or load existing machine (edit)
     useEffect(() => {
         if (isEdit && id) {
@@ -93,6 +117,7 @@ const MachineForm: React.FC = () => {
                         operatorId: s.operatorId || "",
                         isActive: s.isActive ?? true,
                     });
+                    if (s.operatorId) setPendingOperatorId(s.operatorId);
                 })
                 .catch(() => {
                     toast.error("Failed to load machine data.");

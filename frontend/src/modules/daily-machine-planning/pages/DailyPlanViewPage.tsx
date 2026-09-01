@@ -135,13 +135,22 @@ const DailyPlanViewPage: React.FC = () => {
   const weeklyProducedQty = viewPlan?.productionOrder
     ? (() => {
         const totalProduced = Array.isArray(viewPlan.hourlyProductions)
-          ? viewPlan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+          ? viewPlan.hourlyProductions.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
           : 0;
         return totalProduced;
       })()
     : 0;
   const weeklyOrderTargetQty = viewPlan?.productionOrder ? Number(viewPlan.productionOrder.targetQty || 0) : 0;
-  const weeklyOrderProducedQty = viewPlanOeeSummary?.producedQty ?? weeklyProducedQty;
+  // Net PO produced = sum of (qtyProduced - rejectQty - scrapQty) across ALL plans for this PO
+  const netPoProduced = poHistoryPlans.length > 0
+    ? poHistoryPlans.reduce((total: number, p: any) =>
+        total + (Array.isArray(p.hourlyProductions)
+          ? p.hourlyProductions.reduce((s: number, h: any) =>
+              s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
+          : 0), 0)
+    : null;
+  // Use goodQty (net: producedQty − rejectQty − scrapQty) from OEE summary when available
+  const weeklyOrderProducedQty = viewPlanOeeSummary?.goodQty ?? weeklyProducedQty;
   const weeklyOrderPct = weeklyOrderTargetQty > 0 ? Math.min(100, Math.round((weeklyOrderProducedQty / weeklyOrderTargetQty) * 100)) : 0;
   const weeklyProgramPct = weeklyTargetQty > 0 ? Math.min(100, Math.round((weeklyOrderProducedQty / weeklyTargetQty) * 100)) : 0;
 
@@ -196,7 +205,7 @@ const DailyPlanViewPage: React.FC = () => {
       align: "center",
       render: (plan: any) => {
         const producedQty = Array.isArray(plan.hourlyProductions)
-          ? plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+          ? plan.hourlyProductions.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
           : 0;
         return (
           <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
@@ -462,7 +471,7 @@ const DailyPlanViewPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-4 text-sm font-bold">
                   <span className="text-ink-subtle text-xs uppercase tracking-wider">Totals:</span>
                   <div className="flex flex-wrap gap-5 text-sm">
-                    <span className="text-emerald-600">✓ Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)}</span>
+                    <span className="text-emerald-600">✓ Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)}</span>
                     <span className="text-rose-500">✕ Reject: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.rejectQty || 0), 0)}</span>
                     <span className="text-amber-500">⚠ Scrap: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.scrapQty || 0), 0)}</span>
                     <span className="text-ink-subtle">↓ Downtime: {(() => { const t = viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</span>
@@ -470,8 +479,8 @@ const DailyPlanViewPage: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-4 text-sm pt-3 border-t border-line border-dashed">
                   <div className="flex gap-6 font-bold">
-                    <span className="text-ink-muted">Total Produced: <span className="text-emerald-600 ml-2">{viewPlanOeeSummary?.producedQty ?? viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)} pcs</span></span>
-                    <span className="text-ink-muted">Pending: <span className="text-amber-500 ml-2">{viewPlanOeeSummary?.remainingQty ?? (Number(viewPlan.plannedQty) - viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0))} pcs</span></span>
+                    <span className="text-ink-muted">Total Produced: <span className="text-emerald-600 ml-2">{weeklyOrderProducedQty} pcs</span></span>
+                    <span className="text-ink-muted">Pending: <span className="text-amber-500 ml-2">{Math.max(0, weeklyOrderTargetQty - weeklyOrderProducedQty)} pcs</span></span>
                   </div>
                   {viewPlan.carryForwardTo && viewPlan.carryForwardTo.length > 0 && (
                     <div className="flex items-center gap-2">
@@ -515,7 +524,7 @@ const DailyPlanViewPage: React.FC = () => {
                   {(() => {
                     const capacity = Number(viewPlan.plannedQty || 0);
                     const totalProduced = Array.isArray(viewPlan.hourlyProductions)
-                      ? viewPlan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+                      ? viewPlan.hourlyProductions.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
                       : 0;
                     const pending = Math.max(0, capacity - totalProduced);
                     const efficiency = capacity > 0 ? ((totalProduced / capacity) * 100).toFixed(0) : "0";
@@ -599,11 +608,7 @@ const DailyPlanViewPage: React.FC = () => {
                     Planned: {poHistoryPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0).toLocaleString()}
                   </div>
                   <div className="text-center text-sm font-bold text-emerald-700">
-                    Produced: {poHistoryPlans.reduce((s: number, p: any) => {
-                      const produced = Array.isArray(p.hourlyProductions)
-                        ? p.hourlyProductions.reduce((ss: number, h: any) => ss + Number(h.qtyProduced || 0), 0) : 0;
-                      return s + produced;
-                    }, 0).toLocaleString()}
+                    Produced: {weeklyOrderProducedQty.toLocaleString()}
                   </div>
                 </div>
               </div>

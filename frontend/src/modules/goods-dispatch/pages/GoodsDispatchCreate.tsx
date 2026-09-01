@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaSave, FaArrowLeft, FaCheck, FaPlus } from "react-icons/fa";
+import { FaSave, FaArrowLeft, FaPlus } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import {
@@ -17,9 +17,8 @@ import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import IndiaPhoneInput, { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
-import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -37,7 +36,7 @@ const GoodsDispatchCreate: React.FC = () => {
   const { eligibleOrders, loading } = useAppSelector((state) => state.goodsDispatch);
   const { data: stores = [] } = useAppSelector((state) => state.stores);
 
-  const [searchPo, setSearchPo] = useState("");
+  const [searchPo] = useState<string>("");
   const [selectedPOs, setSelectedPOs] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
@@ -196,73 +195,79 @@ const GoodsDispatchCreate: React.FC = () => {
     }
   };
 
-  const eligibleColumns: DataTableColumn<any>[] = [
+  const combinedColumns: DataTableColumn<any>[] = [
     {
       header: "PO Number",
+      width: "110px",
       accessor: "productionOrderId",
-      render: (item: any) => (
-        <span className="font-bold text-ink">{item.productionOrderId}</span>
-      ),
+      render: (item: any) => <span className="font-bold text-ink text-sm">{item.productionOrderId}</span>,
     },
     {
       header: "Product",
+      width: "minmax(130px, 1fr)",
       accessor: "productItem",
       render: (item: any) => (
         <div>
-          <div className="font-medium text-ink">{item.productItem?.productName}</div>
+          <div className="font-medium text-ink text-sm">{item.productItem?.productName}</div>
           {item.productItem?.productCode && (
             <div className="text-xs text-ink-subtle font-mono">{item.productItem?.productCode}</div>
           )}
         </div>
       ),
     },
-
     {
-      header: "Produced Qty",
-      accessor: "producedQty",
-      render: (item: any) => (
-        <span className="text-ink-muted">
-          {item.producedQty} {formatUOM(item.uom)}
-        </span>
-      ),
+      header: "Pending",
+      width: "100px",
+      accessor: "pendingDispatchQty",
+      render: (item: any) => <span className="font-bold text-[#5D87FF] text-sm">{item.pendingDispatchQty} {formatUOM(item.uom)}</span>,
     },
     {
-      header: "Target Store",
-      accessor: "destinationStoreId",
+      header: "Dispatch Qty",
+      width: "160px",
       render: (item: any) => {
-        const storeObj = stores.find((s: any) => s.storeId === item.destinationStoreId);
+        const selected = selectedPOs.find((p) => p.productionOrderId === item.productionOrderId);
+        if (!selected) return <span className="text-ink-subtle text-xs">—</span>;
         return (
-          <span className="text-ink-muted font-medium">
-            {storeObj ? storeObj.storeName : (item.destinationStoreId || "Unassigned")}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number" min="0.1" step="any" max={item.pendingDispatchQty}
+              value={selected.dispatchQty}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleQtyChange(item.productionOrderId, e.target.value, item.pendingDispatchQty)}
+              className="w-20 px-2 py-1 border border-line-soft rounded-md text-sm font-medium bg-card-2 text-ink focus:ring-1 focus:ring-primary outline-none"
+            />
+            <span className="text-xs text-ink-subtle">{formatUOM(item.uom)}</span>
+          </div>
         );
       },
     },
     {
-      header: "Pending Dispatch",
-      accessor: "pendingDispatchQty",
-      render: (item: any) => (
-        <span className="font-bold text-[#5D87FF]">
-          {item.pendingDispatchQty} {formatUOM(item.uom)}
-        </span>
-      ),
+      header: "Remarks",
+      width: "140px",
+      render: (item: any) => {
+        const selected = selectedPOs.find((p) => p.productionOrderId === item.productionOrderId);
+        if (!selected) return <span className="text-ink-subtle text-xs">—</span>;
+        return (
+          <input
+            type="text" placeholder="Optional"
+            value={selected.remarks || ""}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => handleRemarksChange(item.productionOrderId, e.target.value)}
+            className="w-full px-2 py-1 text-xs border border-line-soft rounded-md bg-card-2 text-ink placeholder:text-ink-subtle focus:ring-1 focus:ring-primary outline-none"
+          />
+        );
+      },
     },
     {
       header: "Action",
+      width: "90px",
       accessor: "id",
       render: (item: any) => {
         const isSelected = selectedPOs.some((p) => p.productionOrderId === item.productionOrderId);
         return isSelected ? (
-          <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold border border-green-200">
-            <FaCheck className="w-3 h-3" /> Added
-          </span>
+          <DeleteButton onClick={() => handleRemovePO(item.productionOrderId)} />
         ) : (
-          <CustomButton
-            text="Add"
-            icon={FaPlus}
-            onClick={() => handleSelectPO(item)}
-            className="!py-1 !px-3 text-xs"
-          />
+          <CustomButton text="Add" icon={FaPlus} onClick={() => handleSelectPO(item)} className="!py-1 !px-3 text-xs" />
         );
       },
     },
@@ -281,242 +286,64 @@ const GoodsDispatchCreate: React.FC = () => {
   );
 
   return (
-    <div className="w-full mx-auto p-4 md:p-6 min-h-screen space-y-6">
+    <div>
       <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-        {/* Page Header */}
-        <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
           <div>
-            <h2 className="text-xl font-bold text-ink">
-              Create Goods Dispatch
-            </h2>
-            <div className="text-sm text-ink-subtle mt-1">
-              Select completed production orders to dispatch to the warehouse
-            </div>
-          </div>
-          
-        </div>
-
-        <div className=" space-y-6">
-          {/* Top Section: Eligible Production Orders Table */}
-            <div className="p-4 md:p-6">
-              <DataTable
-                columns={eligibleColumns}
-                data={filteredEligibleOrders}
-                loading={loading}
-                rowKey={(item) => item.productionOrderId}
-                emptyMessage="No eligible production orders available for dispatch."
-              />
-            </div>
-
-          {/* Bottom Section: Split Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Half: Selected Items to Dispatch */}
-            <div className="bg-card rounded-xl shadow-sm border border-line overflow-hidden flex flex-col justify-between">
-              <div>
-                <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between bg-card-2/50">
-                  <h3 className="text-lg font-bold text-ink">
-                    2. Items to Dispatch
-                  </h3>
-                  <span className="bg-[#5D87FF]/10 text-[#5D87FF] px-3 py-1 rounded-full text-xs font-semibold">
-                    {selectedPOs.length} Selected
-                  </span>
-                </div>
-
-                <div className="p-4 md:p-6">
-                  {selectedPOs.length === 0 ? (
-                    <div className="text-center py-12 bg-card-2 rounded-lg border border-dashed border-line">
-                      <p className="text-ink-subtle font-medium">No production orders selected.</p>
-                      <p className="text-sm text-ink-subtle mt-1">
-                        Select orders from the table above using the "Add" button.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-lg border border-line">
-                      <table className="min-w-full divide-y divide-line">
-                        <thead className="bg-card-2 text-xs font-semibold text-ink-subtle uppercase tracking-wider">
-                          <tr>
-                            <th className="px-4 py-4 text-left">PO No</th>
-                            <th className="px-4 py-4 text-left">Product</th>
-                            <th className="px-4 py-4 text-center whitespace-nowrap">Pending</th>
-                            <th className="px-4 py-4 text-left whitespace-nowrap">Dispatch Qty *</th>
-                            <th className="px-4 py-4 text-center">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-card divide-y divide-line text-sm">
-                          {selectedPOs.map((po) => (
-                            <tr key={po.productionOrderId} className="hover:bg-card-2/50 transition-colors">
-                              <td className="px-4 py-4 font-semibold text-ink align-top">{po.productionOrderId}</td>
-                              <td className="px-4 py-4 text-ink-muted align-top">{po.productItem?.productName}</td>
-                              <td className="px-4 py-4 text-center text-ink-muted font-medium align-top">
-                                {po.pendingDispatchQty} {formatUOM(po.uom)}
-                              </td>
-                              <td className="px-4 py-3 align-top">
-                                <div className="flex flex-col gap-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="number"
-                                      min="0.1"
-                                      step="any"
-                                      max={po.pendingDispatchQty}
-                                      value={po.dispatchQty}
-                                      onChange={(e) =>
-                                        handleQtyChange(
-                                          po.productionOrderId,
-                                          e.target.value,
-                                          po.pendingDispatchQty
-                                        )
-                                      }
-                                      className="w-24 px-3 py-1.5 border border-line-soft rounded-md text-sm font-medium bg-card-2 text-ink focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
-                                    />
-                                    <span className="text-sm font-medium text-ink-subtle">{formatUOM(po.uom)}</span>
-                                  </div>
-                                  <input
-                                    type="text"
-                                    placeholder="Remarks (optional)"
-                                    value={po.remarks || ""}
-                                    onChange={(e) =>
-                                      handleRemarksChange(po.productionOrderId, e.target.value)
-                                    }
-                                    className="w-[180px] px-3 py-1.5 text-xs border border-line-soft rounded-md bg-card-2 text-ink placeholder:text-ink-subtle focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
-                                  />
-                                </div>
-                              </td>
-                              <td className="px-4 py-4 text-center align-top">
-                                <div className="flex justify-center">
-                                  <DeleteButton
-                                    onClick={() => handleRemovePO(po.productionOrderId)}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {selectedPOs.length > 0 && (
-                <div className="px-6 py-3 bg-card-2 border-t border-line-soft flex items-center justify-between text-sm font-semibold text-ink-muted">
-                  <span>Total Selected: {selectedPOs.length} Items</span>
-                  <span>Total Dispatch Qty: {totalDispatchQty} Units</span>
-                </div>
-              )}
-            </div>
-
-            {/* Right Half: Vehicle & Transport Details */}
-            <div className="bg-card rounded-xl shadow-sm border border-line-soft overflow-hidden">
-              <div className="px-6 py-4 border-b border-line-soft bg-card-2/50">
-                <h3 className="text-lg font-bold text-ink">
-                  3. Vehicle & Transport Details
-                </h3>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <DatePickerCalendar
-                    label="Dispatch Date *"
-                    name="dispatchDate"
-                    value={formData.dispatchDate}
-                    onChange={(e) => handleInputChange(e as any)}
-                    required
-                  />
-
-                  <SelectInput
-                    label="Destination Store *"
-                    name="destinationStoreId"
-                    value={formData.destinationStoreId}
-                    onChange={handleInputChange}
-                    required={true}
-                    error={formErrors.destinationStoreId}
-                    options={[
-                      { value: "", label: "Select Store" },
-                      ...stores.map((s) => ({ value: s.storeId, label: s.storeName })),
-                    ]}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <TextInput
-                    label="Vehicle Number *"
-                    name="vehicleNumber"
-                    value={formData.vehicleNumber}
-                    onChange={handleInputChange}
-                    placeholder="e.g. TN-XX-XXXX"
-                    required
-                    error={formErrors.vehicleNumber}
-                  />
-                  <TextInput
-                    label="Driver Name *"
-                    name="driverName"
-                    value={formData.driverName}
-                    onChange={handleInputChange}
-                    placeholder="Driver Name"
-                    required
-                    error={formErrors.driverName}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <IndiaPhoneInput
-                    label="Driver Mobile"
-                    name="driverMobile"
-                    value={formData.driverMobile}
-                    onChange={(e: any) => handleInputChange(e)}
-                    required={false}
-                    error={formErrors.driverMobile}
-                  />
-                  <TextInput
-                    label="Transport Name"
-                    name="transportName"
-                    value={formData.transportName}
-                    onChange={handleInputChange}
-                    placeholder="e.g. VRL Logistics"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <TimePickerInput
-                    label="Loading Time"
-                    name="loadingTime"
-                    value={formData.loadingTime}
-                    onChange={(val) => setFormData((prev) => ({ ...prev, loadingTime: val }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink-muted mb-1">Remarks</label>
-                  <textarea
-                    name="remarks"
-                    value={formData.remarks}
-                    onChange={handleInputChange}
-                    placeholder="Enter dispatch remarks..."
-                    className="w-full px-3 py-2 border border-line-soft rounded-lg text-sm bg-card-2 text-ink placeholder:text-ink-subtle focus:ring-primary focus:border-primary outline-none"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
+            <h2 className="text-base font-bold text-ink">Create Goods Dispatch</h2>
+            <p className="text-xs text-ink-subtle mt-0.5">Select completed production orders to dispatch to the warehouse</p>
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex justify-end items-center gap-3 p-6 border-t border-line-soft bg-card rounded-b-2xl">
-          <CustomButton
-            text="Cancel"
-            icon={FaArrowLeft}
-            onClick={() => navigate("/production/goods-dispatch")}
-            disabled={loading}
-            variant="secondary"
+        {/* Step 1 & 2 Combined */}
+        <div className="px-5 py-3 border-b border-line">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Select Production Orders</p>
+            {selectedPOs.length > 0 && (
+              <div className="flex items-center gap-3 text-xs font-semibold text-ink-muted">
+                <span>{selectedPOs.length} Selected</span>
+                <span>Total: {totalDispatchQty} Units</span>
+              </div>
+            )}
+          </div>
+          <DataTable
+            columns={combinedColumns}
+            data={filteredEligibleOrders}
+            loading={loading}
+            rowKey={(item) => item.productionOrderId}
+            emptyMessage="No eligible production orders available for dispatch."
+            minHeightClassName=""
+            rowClassName={(item: any) =>
+              selectedPOs.some((p) => p.productionOrderId === item.productionOrderId)
+                ? "bg-emerald-500/5 border-l-2 border-emerald-500"
+                : ""
+            }
           />
+        </div>
+
+        {/* Vehicle & Transport Details */}
+        <div className="px-5 py-5 border-b border-line">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            <DatePickerCalendar label="Dispatch Date" name="dispatchDate" value={formData.dispatchDate} onChange={(e) => handleInputChange(e as any)} required horizontal />
+            <SelectInput label="Destination Store" name="destinationStoreId" value={formData.destinationStoreId} onChange={handleInputChange} required error={formErrors.destinationStoreId}
+              options={[{ value: "", label: "Select Store" }, ...stores.map((s) => ({ value: s.storeId, label: s.storeName }))]} horizontal />
+            <TextInput label="Vehicle Number" name="vehicleNumber" value={formData.vehicleNumber} onChange={handleInputChange} placeholder="e.g. TN-XX-XXXX" required error={formErrors.vehicleNumber} horizontal />
+            <TextInput label="Driver Name" name="driverName" value={formData.driverName} onChange={handleInputChange} placeholder="Driver Name" required error={formErrors.driverName} horizontal />
+            <IndiaPhoneInput label="Driver Mobile" name="driverMobile" value={formData.driverMobile} onChange={(e: any) => handleInputChange(e)} required={false} error={formErrors.driverMobile} horizontal />
+            <TextInput label="Transport Name" name="transportName" value={formData.transportName} onChange={handleInputChange} placeholder="e.g. VRL Logistics" horizontal />
+            <TimePickerInput label="Loading Time" name="loadingTime" value={formData.loadingTime} onChange={(val) => setFormData((prev) => ({ ...prev, loadingTime: val }))} horizontal />
+            <div className="md:col-span-2">
+              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleInputChange} placeholder="Enter dispatch remarks..." horizontal as="textarea" rows={2} />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end items-center gap-3 px-5 py-3">
+          <CustomButton text="Cancel" icon={FaArrowLeft} onClick={() => navigate("/production/goods-dispatch")} disabled={loading} variant="secondary" />
           {can("goods-dispatch.create") && (
-            <CustomButton
-              text={loading ? "Creating..." : "Create Dispatch"}
-              icon={FaSave}
-              onClick={handleSubmit}
-              disabled={loading}
-            />
+            <CustomButton text={loading ? "Creating..." : "Create Dispatch"} icon={FaSave} onClick={handleSubmit} disabled={loading} />
           )}
         </div>
       </div>

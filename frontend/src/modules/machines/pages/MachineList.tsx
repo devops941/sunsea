@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -14,7 +14,7 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import MachineViewModal from "../components/MachineViewModal";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import { Search } from "lucide-react";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { usePermission } from "../../../hooks/usePermission";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -26,7 +26,7 @@ const MachineList: React.FC = () => {
     const dispatch = useAppDispatch();
     const { employees, loadEmployees } = useEmployees();
 
-    const { data, loading, error } = useAppSelector((state) => state.machines);
+    const { data, loading, error, totalPages } = useAppSelector((state) => state.machines);
     const { can } = usePermission();
     const canCreateMachine = can("machines.create");
     const canEditMachine = can("machines.edit");
@@ -42,45 +42,44 @@ const MachineList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
 
-    const reloadMachines = useCallback(() => {
+    const loadMachines = useCallback(() => {
         if (can("machines.view")) {
-            dispatch(fetchMachines());
+            dispatch(fetchMachines({
+                search: searchTerm || undefined,
+                page: currentPage,
+                limit: ITEMS_PER_PAGE,
+            }));
         }
-    }, [dispatch, can]);
+    }, [dispatch, can, searchTerm, currentPage]);
 
-    useSocketSync("machine", undefined, reloadMachines);
+    // Debounced fetch on search/page change
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            loadMachines();
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [loadMachines]);
+
+    // Socket reload (reset to page 1 on external change)
+    useSocketSync("machine", undefined, useCallback(() => {
+        if (can("machines.view")) {
+            dispatch(fetchMachines({ page: currentPage, limit: ITEMS_PER_PAGE }));
+        }
+    }, [dispatch, can, currentPage]));
 
     useEffect(() => {
-        reloadMachines();
         if (can("employees.view")) {
-            loadEmployees();
+            loadEmployees({ limit: 500 });
         }
-    }, [reloadMachines, loadEmployees, can]);
+    }, [loadEmployees, can]);
 
     useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
+        if (error) toast.error(error);
     }, [error]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
-    };
-
-    const filteredData = useMemo(() => {
-        return data.filter(item =>
-            item.machineId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.machineName?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [data, searchTerm]);
-
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-    const handleOpenAdd = () => {
-        navigate("/machines/create");
     };
 
     const handleOpenEdit = useCallback((item: any) => {
@@ -98,6 +97,8 @@ const MachineList: React.FC = () => {
             try {
                 await dispatch(deleteMachine(itemToDelete)).unwrap();
                 toast.success("Machine deleted successfully!");
+                // Reload current page after delete
+                dispatch(fetchMachines({ search: searchTerm || undefined, page: currentPage, limit: ITEMS_PER_PAGE }));
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || err.message || err || "Failed to delete machine");
             } finally {
@@ -108,77 +109,89 @@ const MachineList: React.FC = () => {
         }
     };
 
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
     return (
         <div>
-            <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Machine Management</h2>
+                        <h2 className="text-base font-bold text-ink">Machine Management</h2>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-                        <SearchInput
-                            value={searchTerm}
-                            onChange={handleSearch}
-                            placeholder="Search machines..."
-                        />
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="relative w-full md:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
+                            <input
+                                type="text"
+                                className="w-full pl-10 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+                                placeholder="Search machines..."
+                                value={searchTerm}
+                                onChange={handleSearch}
+                            />
+                        </div>
                         {canCreateMachine && (
                             <CustomButton
                                 text="Add Machine"
                                 icon={FaPlus}
-                                onClick={handleOpenAdd}
+                                onClick={() => navigate("/machines/create")}
                             />
                         )}
                     </div>
                 </div>
 
-                <DataTable
-                    data={paginatedData}
-                    rowKey={(item) => item.machineId}
-                    loading={loading}
-                    emptyMessage="No machines found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page),
-                    }}
-                    columns={[
-                        {
-                            header: "#",
-                            width: "60px",
-                            render: (_item, index) => startIndex + index + 1,
-                        },
-                        { header: "MACHINE ID", accessor: "machineId" },
-                        { header: "MACHINE NAME", accessor: "machineName" },
-                        { header: "TECH TYPE", render: (item) => item.technologyType || "-" },
-                        { header: "MACHINE TYPE", render: (item) => item.machineType || "-" },
-                        { 
-                            header: "MACHINE INCHARGE", 
-                            render: (item) => {
-                                if (!item.operatorId) return "-";
-                                const emp = employees.find(e => e.id === item.operatorId);
-                                return emp ? emp.fullName : item.operatorId;
-                            } 
-                        },
-                        {
-                            header: "ACTIVE STATUS",
-                            render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
-                        },
-                        {
-                            header: "ACTIONS",
-                            render: (item) => (
-                                <div className="flex items-center gap-2">
-                                    <ViewButton onClick={() => {
-                                        setSelectedMachine(item);
-                                        setShowViewModal(true);
-                                    }} />
-                                    {canEditMachine && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                    {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}
-                                </div>
-                            ),
-                            align: "left"
-                        },
-                    ]}
-                />
+                <div className="p-0 overflow-hidden rounded-b-2xl">
+                    <DataTable
+                        data={data}
+                        rowKey={(item) => item.machineId}
+                        loading={loading}
+                        emptyMessage="No machines found."
+                        pagination={
+                            totalPages > 1
+                                ? { currentPage, totalPages, onPageChange: setCurrentPage }
+                                : undefined
+                        }
+                        columns={[
+                            {
+                                header: "#",
+                                width: "60px",
+                                align: "center",
+                                render: (_item, index) => (
+                                    <span className="text-ink-subtle font-mono text-xs">{String(startIndex + index + 1).padStart(2, '0')}</span>
+                                ),
+                            },
+                            { header: "MACHINE ID", accessor: "machineId", width: "130px" },
+                            { header: "MACHINE NAME", accessor: "machineName", width: "180px" },
+                            { header: "TECH TYPE", width: "140px", render: (item) => item.technologyType || "—" },
+                            { header: "MACHINE TYPE", width: "140px", render: (item) => item.machineType || "—" },
+                            {
+                                header: "MACHINE INCHARGE",
+                                render: (item) => {
+                                    if (!item.operatorId) return "—";
+                                    const emp = employees.find(e => e.id === item.operatorId);
+                                    return emp ? emp.fullName : item.operatorId;
+                                }
+                            },
+                            {
+                                header: "STATUS",
+                                width: "110px",
+                                align: "center",
+                                render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
+                            },
+                            {
+                                header: "ACTIONS",
+                                width: "120px",
+                                align: "center",
+                                render: (item) => (
+                                    <div className="flex items-center gap-2">
+                                        <ViewButton onClick={() => { setSelectedMachine(item); setShowViewModal(true); }} />
+                                        {canEditMachine && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                        {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}
+                                    </div>
+                                ),
+                            },
+                        ]}
+                    />
+                </div>
 
                 <CommonConfirmModal
                     show={showDeleteModal}
@@ -191,7 +204,7 @@ const MachineList: React.FC = () => {
                     isDangerous={true}
                 />
 
-                <MachineViewModal 
+                <MachineViewModal
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
                     machine={selectedMachine}

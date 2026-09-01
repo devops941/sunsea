@@ -531,10 +531,14 @@ const AppRoutes = () => {
             {/* ---------- Machines & Shifts ---------- */}
             <Route element={<ProtectedRoute permission="machines.create" />}>
               <Route path="/machines/create" element={<MachineForm />} />
-              <Route path="/machines/assignments/create" element={<MachineAssignmentForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="machines.edit" />}>
               <Route path="/machines/edit/:id" element={<MachineForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permissionAny={["machine-assignments.create", "machines.create"]} />}>
+              <Route path="/machines/assignments/create" element={<MachineAssignmentForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permissionAny={["machine-assignments.edit", "machines.edit"]} />}>
               <Route path="/machines/assignments/edit/:id" element={<MachineAssignmentForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="shifts.create" />}>

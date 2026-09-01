@@ -3,9 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FaPrint, FaIndustry, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
-import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CustomButton from "../../../components/ui/Button/Button";
 
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { machineService } from "../../../services/machineService";
@@ -194,21 +194,43 @@ const DailyReportPage: React.FC = () => {
   }, [selectedDate, dailyPlans, hourlyProductions, machines, shifts]);
 
   const columns: DataTableColumn<any>[] = [
-    { header: "MACHINE", render: (item) => <span className="font-semibold text-slate-800">{item.machineName}</span> },
-    { header: "PROD. ORDER", render: (item) => item.productionOrder },
-    { header: "PRODUCT", render: (item) => item.productName },
-    { header: "SHIFT", render: (item) => item.shiftName },
-    { header: "PLANNED CAP.", render: (item) => item.plannedCapacity },
-    { header: "ACTUAL PROD.", render: (item) => <span className="text-emerald-600 font-semibold">{item.actualProduction}</span> },
-    { header: "PENDING QTY", render: (item) => <span className="text-amber-500 font-medium">{item.pendingQty}</span> },
-    { header: "EFFICIENCY %", render: (item) => <StatusBadge status={item.status === 'Highest' ? 'COMPLETED' : item.status === 'Medium' ? 'IN_PROGRESS' : 'DRAFT'} customText={`${item.efficiency}%`} /> },
-    { header: "STATUS", render: (item) => {
-      let customColor = { bg: "", text: "" };
-      if (item.status === 'Highest') customColor = { bg: '#d1fae5', text: '#065f46' };
-      else if (item.status === 'Medium') customColor = { bg: '#dbeafe', text: '#1d4ed8' };
-      else customColor = { bg: '#fee2e2', text: '#b91c1c' };
-      return <StatusBadge status="CUSTOM" customText={item.status} customColor={customColor} />;
-    }}
+    { header: "MACHINE", render: (item) => <span className="font-semibold text-ink">{item.machineName}</span> },
+    { header: "PROD. ORDER", render: (item) => <span className="text-ink-muted">{item.productionOrder}</span> },
+    { header: "PRODUCT", render: (item) => <span className="text-ink font-medium">{item.productName}</span> },
+    { header: "SHIFT", render: (item) => <span className="text-ink-subtle">{item.shiftName}</span> },
+    { header: "PLANNED CAP.", render: (item) => <span className="text-ink-muted">{item.plannedCapacity}</span> },
+    { header: "ACTUAL PROD.", render: (item) => <span className="text-emerald-400 font-semibold">{item.actualProduction}</span> },
+    { header: "PENDING QTY", render: (item) => <span className="text-amber-400 font-medium">{item.pendingQty}</span> },
+    { 
+      header: "EFFICIENCY %", 
+      render: (item) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+          Number(item.efficiency) >= 90
+            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+            : Number(item.efficiency) >= 50
+            ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+            : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+        }`}>
+          {item.efficiency}%
+        </span>
+      )
+    },
+    { 
+      header: "STATUS", 
+      render: (item) => {
+        let badgeClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+        if (item.status === 'Highest') {
+          badgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        } else if (item.status === 'Medium') {
+          badgeClass = "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+        }
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>
+            {item.status}
+          </span>
+        );
+      }
+    }
   ];
 
   const csvColumns = [
@@ -228,141 +250,154 @@ const DailyReportPage: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-white">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Daily Production Report</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Overview of production progress across all machines</p>
-        </div>
-        <BackButton />
-      </div>
+    <div>
+      <div className="max-w-[1200px] xl:mr-auto flex flex-col gap-6 report-print-container" id="daily-production-report">
+        
+        {/* Header & Controls Card */}
+        <div className="bg-card rounded-2xl shadow-sm border border-line p-5 md:p-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-ink">Daily Production Report</h2>
+              <p className="text-sm text-ink-subtle mt-0.5">Overview of production progress across all machines</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto no-print">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-ink-muted whitespace-nowrap">Select Date:</label>
+                <input 
+                  type="date" 
+                  className="bg-card-2 border border-line-soft rounded-xl px-3 py-2 text-sm text-ink outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all cursor-pointer [color-scheme:dark]"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                />
+              </div>
 
-      <div className="report-print-container flex flex-col gap-6" id="daily-production-report">
-        {/* Header Controls */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-semibold text-slate-700">Select Date:</label>
-            <input 
-              type="date" 
-              className="border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-blue-500"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex items-center gap-3 no-print">
-            <ExportCSVButton 
-              data={reportData.machineWise} 
-              columns={csvColumns} 
-              filename={`Daily_Production_Report_${selectedDate}.csv`} 
-              text="Export Excel" 
-            />
-            <button 
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-md text-sm hover:bg-slate-700 transition-colors shadow-sm"
-            >
-              <FaPrint /> Print / PDF
-            </button>
+              <ExportCSVButton 
+                data={reportData.machineWise} 
+                columns={csvColumns} 
+                filename={`Daily_Production_Report_${selectedDate}.csv`} 
+                text="Export Excel" 
+              />
+              
+              <CustomButton
+                variant="secondary"
+                text="Print / PDF"
+                icon={FaPrint}
+                onClick={handlePrint}
+              />
+
+              <BackButton />
+            </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center p-12 bg-white rounded-xl shadow-sm border border-slate-200">
-             <div className="flex items-center gap-2 text-slate-500">
-               <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center p-12 bg-card rounded-2xl shadow-sm border border-line">
+             <div className="flex items-center gap-2 text-ink-subtle text-sm">
+               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                Loading report data...
              </div>
           </div>
         ) : (
           <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Machines</span>
+            {/* Summary Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Machines */}
+              <div className="bg-card p-5 rounded-2xl border border-line shadow-sm flex flex-col justify-between hover:border-line-soft transition-all">
+                <span className="text-ink-subtle text-xs font-semibold uppercase tracking-wider mb-2">Machines</span>
                 <div className="flex justify-between items-end">
                   <div>
-                    <div className="text-3xl font-bold text-slate-800">{reportData.totals.machinesExecuted}</div>
-                    <div className="text-xs text-slate-500 mt-1">of {reportData.totals.machinesPlanned} Planned</div>
+                    <div className="text-3xl font-bold text-ink">{reportData.totals.machinesExecuted}</div>
+                    <div className="text-xs text-ink-subtle mt-1">of {reportData.totals.machinesPlanned} Planned</div>
                   </div>
-                  <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-                    <FaIndustry className="text-blue-400 text-xl" />
+                  <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center">
+                    <FaIndustry className="text-xl" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Production</span>
+              {/* Production */}
+              <div className="bg-card p-5 rounded-2xl border border-line shadow-sm flex flex-col justify-between hover:border-line-soft transition-all">
+                <span className="text-ink-subtle text-xs font-semibold uppercase tracking-wider mb-2">Production</span>
                 <div className="flex justify-between items-end">
                   <div>
-                    <div className="text-3xl font-bold text-emerald-600">{reportData.totals.actualProduction}</div>
-                    <div className="text-xs text-slate-500 mt-1">of {reportData.totals.plannedCapacity} Target</div>
+                    <div className="text-3xl font-bold text-emerald-400">{reportData.totals.actualProduction}</div>
+                    <div className="text-xs text-ink-subtle mt-1">of {reportData.totals.plannedCapacity} Target</div>
                   </div>
-                  <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center">
-                    <FaCheckCircle className="text-emerald-400 text-xl" />
+                  <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center">
+                    <FaCheckCircle className="text-xl" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Pending</span>
+              {/* Pending */}
+              <div className="bg-card p-5 rounded-2xl border border-line shadow-sm flex flex-col justify-between hover:border-line-soft transition-all">
+                <span className="text-ink-subtle text-xs font-semibold uppercase tracking-wider mb-2">Pending</span>
                 <div className="flex justify-between items-end">
                   <div>
-                    <div className="text-3xl font-bold text-amber-500">{reportData.totals.pendingQuantity}</div>
-                    <div className="text-xs text-slate-500 mt-1">Units Remaining</div>
+                    <div className="text-3xl font-bold text-amber-400">{reportData.totals.pendingQuantity}</div>
+                    <div className="text-xs text-ink-subtle mt-1">Units Remaining</div>
                   </div>
-                  <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center">
-                    <FaExclamationCircle className="text-amber-400 text-xl" />
+                  <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center">
+                    <FaExclamationCircle className="text-xl" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Efficiency</span>
+              {/* Efficiency */}
+              <div className="bg-card p-5 rounded-2xl border border-line shadow-sm flex flex-col justify-between hover:border-line-soft transition-all">
+                <span className="text-ink-subtle text-xs font-semibold uppercase tracking-wider mb-2">Efficiency</span>
                 <div className="flex justify-between items-end">
                   <div>
-                    <div className="text-3xl font-bold text-blue-600">{reportData.totals.efficiency}%</div>
-                    <div className="text-xs text-slate-500 mt-1">Overall OEE</div>
+                    <div className="text-3xl font-bold text-cyan-400">{reportData.totals.efficiency}%</div>
+                    <div className="text-xs text-ink-subtle mt-1">Overall OEE</div>
                   </div>
-                  <div className="w-12 h-12 rounded-full border-[5px] border-blue-100 flex items-center justify-center border-t-blue-600 shadow-sm">
-                    <span className="text-[11px] font-bold text-blue-600">{reportData.totals.efficiency}%</span>
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                    <span className="text-xs font-bold text-cyan-400">{reportData.totals.efficiency}%</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Overall Progress Bar */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-card p-5 md:p-6 rounded-2xl border border-line shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <span className="font-semibold text-slate-700">Overall Daily Progress</span>
-                <span className="font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-full text-sm">{reportData.totals.actualProduction} / {reportData.totals.plannedCapacity}</span>
+                <span className="font-semibold text-sm text-ink">Overall Daily Progress</span>
+                <span className="font-semibold text-ink bg-card-2 border border-line-soft px-3 py-1 rounded-full text-xs">
+                  {reportData.totals.actualProduction} / {reportData.totals.plannedCapacity}
+                </span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden border border-slate-200 shadow-inner">
+              <div className="w-full bg-card-2 rounded-full h-3 overflow-hidden border border-line-soft">
                 <div 
-                  className="bg-emerald-500 h-4 rounded-full transition-all duration-500 shadow-sm"
+                  className="bg-gradient-to-r from-accent to-emerald-500 h-full rounded-full transition-all duration-500 shadow-sm"
                   style={{ width: `${Math.min(100, Number(reportData.totals.efficiency) || 0)}%` }}
                 ></div>
               </div>
-              <div className="flex justify-between items-center mt-3 text-sm font-medium text-slate-500">
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-400"></span>{reportData.totals.runningHours} Running Hours</span>
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-indigo-400"></span>{reportData.totals.hourlyEntries} Hourly Records</span>
+              <div className="flex justify-between items-center mt-3 text-xs font-medium text-ink-subtle">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-accent"></span>
+                  {reportData.totals.runningHours} Running Hours
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  {reportData.totals.hourlyEntries} Hourly Records
+                </span>
               </div>
             </div>
 
             {/* Machine-wise Production Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-200 bg-slate-50">
-                <h3 className="font-bold text-slate-800">Machine-wise Production Summary</h3>
+            <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-line">
+                <h3 className="font-bold text-base text-ink">Machine-wise Production Summary</h3>
               </div>
-              <DataTable
-                columns={columns}
-                data={reportData.machineWise}
-                rowKey={(row) => row.id || row.machineId || Math.random().toString()}
-                pagination={{
-                  currentPage: 1,
-                  totalPages: 1,
-                  onPageChange: () => {}
-                }}
-              />
+              <div className="p-0">
+                <DataTable
+                  columns={columns}
+                  data={reportData.machineWise}
+                  rowKey={(row) => row.id || row.machineId || Math.random().toString()}
+                  emptyMessage="No production records found for the selected date."
+                />
+              </div>
             </div>
           </>
         )}
@@ -380,13 +415,10 @@ const DailyReportPage: React.FC = () => {
               left: 0;
               top: 0;
               width: 100%;
+              background: transparent !important;
             }
             .no-print {
               display: none !important;
-            }
-            .min-h-screen {
-              min-height: auto !important;
-              background-color: white !important;
             }
           }
         `}} />

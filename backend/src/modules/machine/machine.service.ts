@@ -13,31 +13,63 @@ class MachineService {
       throw new ApiError(409, `Machine with ID ${data.machineId} already exists`);
     }
 
-    return prisma.machine.create({
-      data: {
-        machineId: data.machineId,
-        machineName: data.machineName,
-        technologyType: data.technologyType as any,
-        machineType: data.machineType as any,
-        manufacturer: data.manufacturer,
-        modelNumber: data.modelNumber,
-        cycleTime: data.cycleTime,
-        operatorId: data.operatorId,
-        machineStatus: data.machineStatus as any || "IDLE",
-        isActive: data.isActive ?? true,
-        description: data.description,
-        targetTemperature: data.targetTemperature,
-        targetLoadPercent: data.targetLoadPercent,  
-      },
-    });
+    try {
+      return await prisma.machine.create({
+        data: {
+          machineId: data.machineId,
+          machineName: data.machineName,
+          technologyType: data.technologyType as any,
+          machineType: data.machineType as any,
+          manufacturer: data.manufacturer,
+          modelNumber: data.modelNumber,
+          cycleTime: data.cycleTime,
+          operatorId: data.operatorId,
+          machineStatus: data.machineStatus as any || "IDLE",
+          isActive: data.isActive ?? true,
+          description: data.description,
+          targetTemperature: data.targetTemperature,
+          targetLoadPercent: data.targetLoadPercent,
+        },
+      });
+    } catch (error: any) {
+      if (
+        (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2020') ||
+        error?.message?.includes('numeric field overflow') ||
+        error?.code === '22003'
+      ) {
+        throw new ApiError(400, "Target temperature value is too large. Maximum allowed is 999.99°C");
+      }
+      throw error;
+    }
   }
 
-  async findAll() {
-    return prisma.machine.findMany({
-      orderBy: {
-        machineId: "asc",
-      },
-    });
+  async findAll(params?: { search?: string; page?: number; limit?: number }) {
+    const { search, page = 1, limit = 15 } = params || {};
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { machineId: { contains: search, mode: "insensitive" } },
+        { machineName: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const [machines, total] = await Promise.all([
+      prisma.machine.findMany({
+        where,
+        orderBy: { machineId: "asc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.machine.count({ where }),
+    ]);
+
+    return {
+      machines,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findById(machineId: string) {

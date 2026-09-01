@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
+import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -143,18 +144,18 @@ const ShiftList: React.FC = () => {
         <div>
             <div>
 
-                <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                     {/* Page Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                         <div>
-                            <h2 className="text-2xl font-bold text-ink">Shift Management</h2>
+                            <h2 className="text-base font-bold text-ink">Shift Management</h2>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
                                 <input
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
                                     placeholder="Search shifts..."
                                     value={searchTerm}
                                     onChange={handleSearch}
@@ -174,7 +175,7 @@ const ShiftList: React.FC = () => {
                     {error ? (
                         <div className="text-center text-red-500 p-4">{error}</div>
                     ) : (
-                        <div className="p-0">
+                        <div className="p-0 overflow-hidden rounded-b-2xl">
                             <DataTable
                                 data={paginatedData}
                                 rowKey={(item) => item.id}

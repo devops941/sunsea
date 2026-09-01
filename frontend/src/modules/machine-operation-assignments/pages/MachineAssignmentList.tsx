@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   FaPlus,
-  FaFileCsv,
   FaToggleOn,
   FaToggleOff,
 } from "react-icons/fa";
@@ -15,11 +14,10 @@ import DataTable from "../../../components/ui/table/DataTable";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import TextInput from "../../../components/form/TextInput/TextInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { formatDate } from "../../../utils/dateUtils";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { Search } from "lucide-react";
 
 import {
   machineOperationAssignmentService,
@@ -50,6 +48,10 @@ const MachineAssignmentList: React.FC = () => {
   const [filterMachineId, setFilterMachineId] = useState("");
   const [filterWeekDate, setFilterWeekDate] = useState("");
 
+  // Filter Popover Draft States
+  const [draftMachineId, setDraftMachineId] = useState("");
+  const [draftWeekDate, setDraftWeekDate] = useState("");
+
   // Reference lists for filters
   const [machines, setMachines] = useState<any[]>([]);
 
@@ -59,7 +61,7 @@ const MachineAssignmentList: React.FC = () => {
   const loadFiltersData = useCallback(async () => {
     try {
       const mRes = await machineService.getAll();
-      setMachines(Array.isArray(mRes) ? mRes : mRes.data || []);
+      setMachines(Array.isArray(mRes) ? mRes : (mRes.machines || mRes.data || []));
     } catch (_err) {
       console.error("Failed to load filter references:", _err);
     }
@@ -107,6 +109,26 @@ const MachineAssignmentList: React.FC = () => {
 
   useSocketSync("machineOperationAssignment", undefined, loadAssignments);
 
+  // Apply filters from popover
+  const handleApplyFilters = () => {
+    setFilterMachineId(draftMachineId);
+    setFilterWeekDate(draftWeekDate);
+    setCurrentPage(1);
+  };
+
+  // Clear filters
+  const handleClearFilters = () => {
+    setDraftMachineId("");
+    setDraftWeekDate("");
+    setFilterMachineId("");
+    setFilterWeekDate("");
+    setCurrentPage(1);
+  };
+
+  // Active filter count
+  const activeFilterCount = (filterMachineId ? 1 : 0) + (filterWeekDate ? 1 : 0);
+  const hasActiveFilters = activeFilterCount > 0;
+
   // Pagination
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -131,123 +153,69 @@ const MachineAssignmentList: React.FC = () => {
     }
   };
 
-  const handleExportCSV = async () => {
-    try {
-      // Fetch all matching data for export
-      const params: Record<string, any> = {
-        limit: 10000,
-      };
-      if (filterMachineId) params.machineId = filterMachineId;
-      if (filterWeekDate) params.weekStartDate = filterWeekDate;
-      if (searchTerm) params.search = searchTerm;
-
-      const res = await machineOperationAssignmentService.getAssignments(params);
-      const dataToExport = res.assignments || res.data || [];
-
-      if (dataToExport.length === 0) {
-        toast.info("No data available to export");
-        return;
-      }
-
-      const headers = [
-        "Assignment ID",
-        "Machine ID",
-        "Machine Name",
-        "Shift",
-        "Week Start Date",
-        "Week End Date",
-        "Operators",
-        "Status",
-        "Created Date",
-        "Remarks",
-      ];
-
-      const rows = dataToExport.map((item: any) => {
-        const opString = item.operators && item.operators.length > 0
-          ? item.operators.map((op: any) => `${op.employee?.fullName || "N/A"} (${op.role?.name || "N/A"})`).join(" | ")
-          : "No operators";
-
-        return [
-          item.id,
-          item.machineId,
-          item.machine?.machineName || "",
-          item.shift?.shiftName || "N/A",
-          item.weekStartDate ? item.weekStartDate.split("T")[0] : "",
-          item.weekEndDate ? item.weekEndDate.split("T")[0] : "",
-          `"${opString}"`,
-          item.isActive ? "Active" : "Closed",
-          item.createdAt ? formatDate(item.createdAt) : "",
-          `"${item.remarks || ""}"`,
-        ];
-      });
-
-      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r: string[]) => r.join(","))].join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `machine_operation_assignments_${new Date().toISOString().split("T")[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("Assignment records exported to CSV successfully!");
-    } catch (_err: any) {
-      toast.error("Failed to generate CSV export");
-    }
-  };
-
   return (
     <div>
-      <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
         {/* Top Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-line overflow-x-auto">
-          <h2 className="text-base font-bold text-ink whitespace-nowrap shrink-0">Machine Operation Assignments</h2>
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <div className="w-[160px]">
-              <SelectInput
-                name="filterMachineId"
-                hideLabel={true}
-                value={filterMachineId}
-                onChange={(e) => {
-                  setFilterMachineId(e.target.value);
-                  setCurrentPage(1);
-                }}
-                noMargin={true}
-                options={[
-                  { label: "-- All Machines --", value: "" },
-                  ...machines.map((m) => ({
-                    label: `${m.machineName} (${m.machineId})`,
-                    value: m.machineId,
-                  })),
-                ]}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
+          <div>
+            <h2 className="text-base font-bold text-ink">Machine Assignments</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {/* Search */}
+            <div className="relative w-full md:w-52">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
+              <input
+                type="text"
+                className="w-full pl-9 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={handleSearch}
               />
             </div>
-            <div className="w-[150px]">
-              <DatePickerCalendar
-                name="filterWeekDate"
-                value={filterWeekDate}
-                onChange={(e: any) => {
-                  setFilterWeekDate(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Filter by Week"
-              />
-            </div>
-            <SearchInput
-              value={searchTerm}
-              onChange={handleSearch}
-              placeholder="Search..."
-            />
-            <CustomButton
-              text="Export CSV"
-              icon={FaFileCsv}
-              variant="secondary"
-              onClick={handleExportCSV}
-            />
+
+            {/* Filter Popover */}
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+            >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Machine
+                  </label>
+                  <SelectInput
+                    name="draftMachineId"
+                    value={draftMachineId}
+                    onChange={(e) => setDraftMachineId(e.target.value)}
+                    options={machines.map((m) => ({
+                      label: `${m.machineName} (${m.machineId})`,
+                      value: m.machineId,
+                    }))}
+                    defaultOptionLabel="All Machines"
+                    noMargin
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Week Date
+                  </label>
+                  <DatePickerCalendar
+                    name="draftWeekDate"
+                    value={draftWeekDate}
+                    onChange={(e: any) => setDraftWeekDate(e.target.value)}
+                    placeholder="Select Week"
+                  />
+                </div>
+              </div>
+            </FilterPopover>
+
             {canCreateAssignment && (
               <CustomButton
                 text="Assign Operator"
                 icon={FaPlus}
-                variant="primary"
                 onClick={handleOpenCreate}
               />
             )}
@@ -255,7 +223,7 @@ const MachineAssignmentList: React.FC = () => {
         </div>
 
         {/* Table Content */}
-        <div className="p-6">
+        <div className="p-0 overflow-hidden rounded-b-2xl">
           <DataTable
             data={paginatedData}
             rowKey={(item: any) => item.id}

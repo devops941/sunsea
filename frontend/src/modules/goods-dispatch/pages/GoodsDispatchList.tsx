@@ -109,26 +109,31 @@ const GoodsDispatchList: React.FC = () => {
   const columns: DataTableColumn<any>[] = [
     {
       header: "Dispatch No",
+      width: "130px",
       accessor: "dispatchNumber",
       render: (item: any) => <span className="font-bold text-ink tracking-tight">{item.dispatchNumber}</span>,
     },
     {
       header: "Date",
+      width: "110px",
       accessor: "dispatchDate",
       render: (item: any) => <span className="text-ink font-semibold">{formatDate(item.dispatchDate)}</span>,
     },
     {
       header: "Vehicle",
+      width: "minmax(100px, 1fr)",
       accessor: "vehicleNumber",
       render: (item: any) => <span className="text-ink font-semibold">{item.vehicleNumber}</span>,
     },
     {
       header: "Driver",
+      width: "minmax(100px, 1fr)",
       accessor: "driverName",
       render: (item: any) => <span className="text-ink font-semibold">{item.driverName}</span>,
     },
     {
       header: "Items",
+      width: "80px",
       accessor: "items",
       render: (item: any) => (
         <span className="text-ink-subtle font-bold">{item.items?.length || 0} PO(s)</span>
@@ -136,6 +141,7 @@ const GoodsDispatchList: React.FC = () => {
     },
     {
       header: "Status",
+      width: "185px",
       accessor: "status",
       render: (item: any) => {
         return <StatusBadge status={item.status} />;
@@ -143,6 +149,7 @@ const GoodsDispatchList: React.FC = () => {
     },
     {
       header: "Action",
+      width: "90px",
       accessor: "id",
       render: (item: any) => (
         <div className="flex items-center gap-2">
@@ -161,23 +168,21 @@ const GoodsDispatchList: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 md:p-6 bg-card rounded-2xl border border-line-soft shadow-xs">
-      <div className="w-full">
+    <div>
+      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-extrabold text-ink tracking-tight">Goods Dispatch</h2>
-            <div className="text-sm font-semibold text-ink-subtle mt-1">Manage finished goods dispatches to warehouse</div>
+            <h2 className="text-2xl font-bold text-ink">Goods Dispatch</h2>
+            <p className="text-sm text-ink-subtle mt-0.5">Manage finished goods dispatches to warehouse</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-            <div className="w-full lg:w-auto">
-              <SearchInput
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by Dispatch No, Vehicle, Driver..."
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <SearchInput
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by Dispatch No, Vehicle, Driver..."
+            />
             <FilterPopover
               activeFilterCount={activeFilterCount}
               hasActiveFilters={hasActiveFilters}
@@ -186,9 +191,7 @@ const GoodsDispatchList: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">
-                  Status
-                </label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Status</label>
                 <select
                   className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card-2 text-ink font-semibold"
                   value={draftFilterStatus}
@@ -202,11 +205,8 @@ const GoodsDispatchList: React.FC = () => {
                   <option value="STORE_REJECTED">Store Rejected</option>
                 </select>
               </div>
-
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">
-                  Date From
-                </label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date From</label>
                 <DatePickerCalendar
                   name="dateFrom"
                   value={draftFilterDateFrom}
@@ -214,11 +214,8 @@ const GoodsDispatchList: React.FC = () => {
                   placeholder="Select date"
                 />
               </div>
-
               <div className="mb-4">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">
-                  Date To
-                </label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date To</label>
                 <DatePickerCalendar
                   name="dateTo"
                   value={draftFilterDateTo}
@@ -240,26 +237,24 @@ const GoodsDispatchList: React.FC = () => {
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-500/15 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
+          <div className="bg-red-500/15 border-l-4 border-red-500 p-4 m-4 rounded-r-xl">
             <p className="text-red-400 font-semibold">{error}</p>
           </div>
         )}
 
         {/* Data Table */}
-        <div className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
-          <DataTable
-            columns={columns}
-            data={dispatches || []}
-            loading={loading}
-            rowKey={(item) => item.id.toString()}
-            emptyMessage="No dispatches found"
-            pagination={meta && meta.totalPages > 1 ? {
-              currentPage,
-              totalPages: meta.totalPages,
-              onPageChange: handlePageChange
-            } : undefined}
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={dispatches || []}
+          loading={loading}
+          rowKey={(item) => item.id.toString()}
+          emptyMessage="No dispatches found"
+          pagination={meta && meta.totalPages > 1 ? {
+            currentPage,
+            totalPages: meta.totalPages,
+            onPageChange: handlePageChange
+          } : undefined}
+        />
       </div>
     </div>
   );

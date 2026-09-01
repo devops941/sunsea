@@ -341,8 +341,11 @@ class HourlyProductionService {
       ? Number(latestCapacityRecord.newCapacity)
       : Number(order.productItem?.capacityLitres || 0);
 
-    if (currentCapacity > 0 && shiftTotalProduced > currentCapacity) {
-      // It's a new high!
+    // Trigger when:
+    //  a) No previous record (currentCapacity = 0) AND something was produced → set as first-ever high
+    //  b) Production this shift beats the existing high
+    if (shiftTotalProduced > 0 && (currentCapacity === 0 || shiftTotalProduced > currentCapacity)) {
+      // It's a new high (or first recorded capacity for this product+machine)!
       // Keep max 2 records per product AND machine
       const existing = await tx.productCapacityHistory.findMany({
         where: { productId, machineId: data.machineId },

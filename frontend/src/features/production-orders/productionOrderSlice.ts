@@ -54,6 +54,9 @@ export const deleteProductionOrder = createAsyncThunk(
 
 const initialState: ProductionOrderState = {
   data: [],
+  total: 0,
+  page: 1,
+  totalPages: 1,
   loading: false,
   error: null,
 };

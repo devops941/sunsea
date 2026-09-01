@@ -100,7 +100,14 @@ export const sidebarItems: SidebarItem[] = [
           { title: "Add Machine", path: "/machines/create", permission: "machines.create" }
         ]
       },
-      { title: "Machine Assignments", path: "/machines/assignments", permission: "machine-assignments.view" },
+      {
+        title: "Machine Assignments",
+        permission: "machine-assignments.view",
+        children: [
+          { title: "Assignment List", path: "/machines/assignments", permission: "machine-assignments.view" },
+          { title: "Add Assignment", path: "/machines/assignments/create", permission: "machine-assignments.create" }
+        ]
+      },
       {
         title: "Employees",
         permission: "employees.view",

@@ -8,9 +8,9 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
-import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import { Search } from "lucide-react";
 
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -137,20 +137,25 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     ];
 
     return (
-        <div className="p-4 md:p-6 bg-card">
-            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div>
+            <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Finished Goods Stock</h2>
+                        <h2 className="text-base font-bold text-ink">Finished Goods Stock</h2>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-                        <SearchInput
-                            value={searchTerm}
-                            onChange={handleSearch}
-                            placeholder="Search stock..."
-                        />
+                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        <div className="relative w-full md:w-56">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
+                            <input
+                                type="text"
+                                className="w-full pl-9 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+                                placeholder="Search stock..."
+                                value={searchTerm}
+                                onChange={handleSearch}
+                            />
+                        </div>
                         <FilterPopover
                             activeFilterCount={activeFilterCount}
                             hasActiveFilters={hasActiveFilters}
@@ -182,16 +187,17 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                 </div>
 
                 {/* Table */}
+                <div className="p-0 overflow-hidden rounded-b-2xl">
                 <DataTable
                     data={paginatedData || []}
                     rowKey={(item) => `${item.storeId}-${item.productItemId}`}
                     loading={loading}
                     emptyMessage="No finished goods stock found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page)
-                    }}
+                    pagination={
+                        totalPages > 1
+                            ? { currentPage, totalPages, onPageChange: (page) => setCurrentPage(page) }
+                            : undefined
+                    }
                     columns={[
                         {
                             header: "#",
@@ -238,6 +244,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                         }
                     ]}
                 />
+                </div>
 
                 {/* View Modal */}
                 <CommonViewModal

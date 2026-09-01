@@ -20,8 +20,13 @@ class MachineController {
     );
   });
 
-  findAll = asyncHandler(async (_req: Request, res: Response) => {
-    const machines = await machineService.findAll();
+  findAll = asyncHandler(async (req: Request, res: Response) => {
+    const { search, page, limit } = req.query;
+    const machines = await machineService.findAll({
+      search: search as string | undefined,
+      page: page ? parseInt(page as string, 10) : 1,
+      limit: limit ? parseInt(limit as string, 10) : 15,
+    });
 
     return res.status(200).json(
       new ApiResponse("Machines fetched successfully", machines)

@@ -107,8 +107,8 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                 setStores(data);
             })
             .catch((err) => console.error("Failed to fetch stores", err));
-        rawMaterialService.fetchAll({}).then((res: any) => {
-            const list = Array.isArray(res) ? res : [];
+        rawMaterialService.fetchAll({ limit: 1000 }).then((res: any) => {
+            const list = Array.isArray(res) ? res : Array.isArray(res?.rawMaterials) ? res.rawMaterials : [];
             const rmOnly = list.filter((rm: any) =>
                 rm.itemType !== "WASTAGE" &&
                 rm.store?.storeCategory !== "WASTAGE" &&
@@ -440,10 +440,16 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                 if (item.storeId && rm.storeId && String(rm.storeId) !== String(item.storeId)) return false;
                                 return true;
                             })
-                            .map((rm: any) => ({
-                                value: rm.rawMaterialId,
-                                label: `${rm.materialName} (${rm.rawMaterialId})`,
-                            }))}
+                            .map((rm: any) => {
+                                const alreadyAdded = issueItems.some(
+                                    (it, i) => i !== idx && String(it.rawMaterialId) === String(rm.rawMaterialId)
+                                );
+                                return {
+                                    value: rm.rawMaterialId,
+                                    label: rm.materialName,
+                                    disabled: alreadyAdded,
+                                };
+                            })}
                     />
                 ) : (
                     <div className="flex flex-col gap-0.5">
