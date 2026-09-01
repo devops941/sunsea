@@ -68,6 +68,15 @@ export interface MultiLedgerStatementResult {
   openingBalance: number;
   closingBalance: number;
   entries: LedgerStatementEntry[];
+  // Per-account opening / closing balances keyed by account name — used to
+  // render Busy-style "Closing Balance" rows per account section.
+  accountBalances?: Record<string, {
+    name: string;
+    opening: number;
+    openingSide: "Dr" | "Cr";
+    closing: number;
+    closingSide: "Dr" | "Cr";
+  }>;
 }
 
 export const accountService = {
