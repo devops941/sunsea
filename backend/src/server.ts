@@ -23,17 +23,19 @@ const startServer = async (): Promise<void> => {
 
     console.log("✅ Database connected successfully");
 
-    // Automatically create admin user from .env variables
-    await bootstrapAdmin(prisma);
+    // Automatically create admin user from .env variables.
+    // Returns true only on a fresh install (DB was empty).
+    const isFirstRun = await bootstrapAdmin(prisma);
 
-    // Seed system ledgers (Cash in Hand, Main Bank Account, Petty Cash, etc.)
-    // so the bank selector on customer/supplier forms is never empty on a fresh DB.
-    // ensureSystemLedgersExist is a no-op when all 17 codes already exist.
-    try {
-      await accountsService.ensureSystemLedgersExist();
-      console.log("✅ System ledgers verified");
-    } catch (err) {
-      console.error("⚠️  System ledger seed failed:", err);
+    // Seed system ledgers only on fresh install — on subsequent restarts the
+    // accounts service memoises existence itself so this avoids an extra query.
+    if (isFirstRun) {
+      try {
+        await accountsService.ensureSystemLedgersExist();
+        console.log("✅ System ledgers verified");
+      } catch (err) {
+        console.error("⚠️  System ledger seed failed:", err);
+      }
     }
 
     const server = http.createServer(app);

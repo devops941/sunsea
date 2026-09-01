@@ -2,7 +2,29 @@ import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { generatePermissions } from "../config/permissionRegistry";
 
-export const bootstrapAdmin = async (prisma: PrismaClient) => {
+/**
+ * Returns `true` if this was a fresh install (DB was empty),
+ * `false` if admin already existed (subsequent server restarts).
+ */
+export const bootstrapAdmin = async (prisma: PrismaClient): Promise<boolean> => {
+  // ── 0. Fast path: already bootstrapped ───────────────────────────────────
+  //    On every restart after the first, skip all seeding. Only sync truly
+  //    new permissions that were added since the last migration.
+  const existingAdmin = await prisma.admin.findFirst({ select: { id: true } });
+
+  if (existingAdmin) {
+    const permissionData = generatePermissions();
+    const { count } = await prisma.permission.createMany({
+      data: permissionData,
+      skipDuplicates: true,
+    });
+    if (count > 0) {
+      console.log(`✅ ${count} new permissions seeded from registry`);
+    }
+    return false;
+  }
+
+  // ── Fresh install: run full bootstrap ────────────────────────────────────
   const adminEmail    = process.env.ADMIN_EMAIL    || "admin@sunsea.in";
   const adminUsername = process.env.ADMIN_USERNAME || "superadmin";
   const adminPassword = process.env.ADMIN_PASSWORD || "admin@123";
@@ -32,8 +54,10 @@ export const bootstrapAdmin = async (prisma: PrismaClient) => {
 
   await prisma.permission.createMany({
     data: permissionData,
-    skipDuplicates: true,   // idempotent: safe to run on every server boot
+    skipDuplicates: true,
   });
 
   console.log(`✅ ${permissionData.length} permissions seeded from registry`);
+
+  return true;
 };

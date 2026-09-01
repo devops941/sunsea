@@ -2,26 +2,26 @@
 @config "../../../tailwind.config.js";
 
 @theme {
-    --color-primary: var(--color-red-600);
+    --color-primary: var(--color-primary);
 
-    /* ── Nav / sidebar chrome (dark) ──────────────────────────────────── */
-    --color-nav: #0F172A;
-    --color-nav-fg: #94A3B8;
-    --color-nav-active: #0D9488;
-    --color-nav-active-fg: #FFFFFF;
-    --color-nav-hover: #1E293B;
-    --color-accent: #2DD4BF;
+    /* ── Nav / sidebar chrome ──────────────────────────────────── */
+    --color-nav: var(--color-nav);
+    --color-nav-fg: var(--color-nav-fg);
+    --color-nav-active: var(--color-nav-active);
+    --color-nav-active-fg: var(--color-nav-active-fg);
+    --color-nav-hover: var(--color-nav-hover);
+    --color-accent: var(--color-accent);
 
-    /* ── Semantic theme tokens (dark only) ────────────────────────────── */
-    --color-page: #0B1120;
-    --color-card: #131B2E;
-    --color-card-2: #1C273C;
-    --color-ink: #F8FAFC;
-    --color-ink-muted: #CBD5E1;
-    --color-ink-subtle: #94A3B8;
-    --color-line: #28354A;
-    --color-line-soft: #1E2A3E;
-    --color-head: #1A2438;
+    /* ── Semantic theme tokens (Dynamic Light / Dark) ─────────── */
+    --color-page: var(--color-page);
+    --color-card: var(--color-card);
+    --color-card-2: var(--color-card-2);
+    --color-ink: var(--color-ink);
+    --color-ink-muted: var(--color-ink-muted);
+    --color-ink-subtle: var(--color-ink-subtle);
+    --color-line: var(--color-line);
+    --color-line-soft: var(--color-line-soft);
+    --color-head: var(--color-head);
 
     --radius-sm: 6px;
     --radius-md: 10px;
@@ -126,15 +126,20 @@
    Light theme tokens
 ================================ */
 :root[data-theme="light"] {
-    --color-page: #F1F5F9;
+    --color-page: #F8FAFC;
     --color-card: #FFFFFF;
-    --color-card-2: #F8FAFC;
+    --color-card-2: #F1F5F9;
     --color-ink: #0F172A;
     --color-ink-muted: #334155;
     --color-ink-subtle: #64748B;
     --color-line: #E2E8F0;
-    --color-line-soft: #F1F5F9;
-    --color-head: #F1F5F9;
+    --color-line-soft: #E2E8F0;
+    --color-head: #F8FAFC;
+    --color-surface: #FFFFFF;
+    --color-border: #E2E8F0;
+    --color-text-primary: #0F172A;
+    --color-text-secondary: #334155;
+    --color-text-muted: #64748B;
     --color-nav: #1E293B;
     --color-nav-fg: #94A3B8;
     --color-nav-hover: #334155;

@@ -68,7 +68,7 @@ const ProductList: React.FC = () => {
     const [capHistoryRecords, setCapHistoryRecords] = useState<any[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
     const [roles, setRoles] = useState<any[]>([]);
-    const [departments, setDepartments] = useState<any[]>([]);
+    const [, setDepartments] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
 
@@ -265,7 +265,8 @@ const ProductList: React.FC = () => {
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        { header: "Product Name", accessor: "productName" },
+        { header: "Product Name", render: (product) => <span className="whitespace-nowrap">{product.productName}</span>, width: "200px" },
+        { header: "Category", render: (product) => product.category?.name || "-" },
         {
             header: "Product Type",
             render: (product) => (
@@ -316,7 +317,7 @@ const ProductList: React.FC = () => {
     return (
         <div>
             <div>
-                <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBars, FaUser, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa';
 import ThemeToggle from './ThemeToggle';
+import LiveBadge from '../ui/LiveBadge/LiveBadge';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logoutUser } from '../../features/auth/authSlice';
@@ -93,6 +94,9 @@ const TopNavbar: React.FC<NavbarProps> = ({
 
       {/* Right Section */}
       <div className="flex items-center gap-3 relative" ref={dropdownRef}>
+        {/* Live Status Indicator */}
+        <LiveBadge />
+
         {/* Profile */}
         <div
           className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all hover:bg-card-2"

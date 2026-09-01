@@ -123,7 +123,7 @@ const ProductForm: React.FC = () => {
     }, []);
     const fetchMachinesData = useCallback(() => {
         machineService.getAll().then((res: any) => {
-            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            const data = Array.isArray(res) ? res : Array.isArray(res?.machines) ? res.machines : Array.isArray(res?.data) ? res.data : [];
             setMachines(data);
         }).catch(() => {});
     }, []);
@@ -770,7 +770,7 @@ const ProductForm: React.FC = () => {
                                             <div className="grid grid-cols-6 gap-x-2 gap-y-1">
                                                 <DatePickerCalendar label="Date" name={`capDate-${idx}`} value={cap.capDate} onChange={(e) => handleInitialCapacityChange(idx, "capDate", e.target.value)} required error={errors[`cap_${idx}_date`]} />
                                                 <SelectInput label="Shift" name={`capShiftId-${idx}`} value={cap.capShiftId} options={[{ value: "", label: "-- Shift --" }, ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))]} onChange={(e) => handleInitialCapacityChange(idx, "capShiftId", e.target.value)} required error={errors[`cap_${idx}_shift`]} />
-                                                <SelectInput label="Machine" name={`capMachine-${idx}`} value={cap.capMachine} options={[{ value: "", label: "-- Machine --" }, ...machines.filter(m => String(m.machineId) === String(cap.capMachine) || !initialCapacities.some((c, i) => i !== idx && String(c.capMachine) === String(m.machineId))).map(m => ({ value: String(m.machineId), label: `${m.machineId} - ${m.machineName}` }))]} onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)} required error={errors[`cap_${idx}_machine`]} />
+                                                <SelectInput label="Machine" name={`capMachine-${idx}`} value={cap.capMachine} options={[{ value: "", label: "-- Machine --" }, ...machines.filter(m => String(m.machineId) === String(cap.capMachine) || !initialCapacities.some((c, i) => i !== idx && String(c.capMachine) === String(m.machineId))).map(m => ({ value: String(m.machineId), label: m.machineName }))]} onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)} required error={errors[`cap_${idx}_machine`]} />
                                                 <SelectInput label="Role" name={`capRoleId-${idx}`} value={cap.capRoleId} options={[{ value: "", label: "-- Role --" }, ...roles.map(role => ({ value: String(role.id), label: role.name }))]} onChange={(e) => handleInitialCapacityChange(idx, "capRoleId", e.target.value)} required error={errors[`cap_${idx}_role`]} />
                                                 <TextInput label="Qty / Shift" name={`capQty-${idx}`} type="number" step="any" value={cap.capQty} onChange={(e) => handleInitialCapacityChange(idx, "capQty", e.target.value)} placeholder="0" required error={errors[`cap_${idx}_qty`]} />
                                                 <div className="col-span-full">

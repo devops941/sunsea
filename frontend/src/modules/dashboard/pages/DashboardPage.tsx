@@ -1,3 +1,5 @@
+
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -17,8 +19,10 @@ import {
   FaLayerGroup, FaBoxOpen, FaUsers, FaUserTie,
   FaShoppingCart, FaTruck, FaChartLine, FaClock,
   FaMoneyBillWave, FaCalendarAlt, FaHourglassHalf, FaUserFriends,
-  FaArrowUp, FaHandHoldingUsd, FaFileInvoiceDollar,
-  FaUniversity, FaWarehouse, FaCheckCircle, FaSync, FaMapMarkerAlt, FaTimes,
+  FaArrowUp, FaArrowDown, FaHandHoldingUsd, FaFileInvoiceDollar,
+  FaUniversity, FaWarehouse, FaCheckCircle, FaTimesCircle, FaSync, FaMapMarkerAlt, FaTimes,
+  FaChartBar, FaChartPie, FaListUl, FaArrowLeft, FaArrowRight, FaPlus, FaSearch, FaBox,
+  FaBell, FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaChevronRight,
 } from "react-icons/fa";
 import { FiTrendingUp, FiTrendingDown, FiMoreVertical } from "react-icons/fi";
 
@@ -26,6 +30,7 @@ import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import DashboardFooter from "../components/DashboardFooter";
 import { SparklineCard } from "../components/SparklineCard";
 import SalesPurchaseTrendChart from "../components/SalesPurchaseTrendChart";
+import { SalesPersonLiveMap } from "../components/SalesPersonLiveMap";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../../components/ui/chart";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -68,7 +73,27 @@ const inventoryChartConfig = {
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { can, isSuperAdmin } = usePermission();
-  const [productModal, setProductModal] = useState<{ customer: string; type: "purchased" | "notPurchased"; products: string[] } | null>(null);
+  const [selectedCustomerReport, setSelectedCustomerReport] = useState<{
+    customer: string;
+    type: "purchased" | "notPurchased";
+  } | null>(null);
+  const [customerProductSearch, setCustomerProductSearch] = useState("");
+  const [topProductsChartType, setTopProductsChartType] = useState<"list" | "bar" | "pie">(() => {
+    try {
+      const saved = localStorage.getItem("dashboard_top_products_chart_type");
+      if (saved && ["list", "bar", "pie"].includes(saved)) {
+        return saved as "list" | "bar" | "pie";
+      }
+    } catch (e) {}
+    return "list";
+  });
+
+  const handleTopProductsChartTypeChange = (newType: "list" | "bar" | "pie") => {
+    setTopProductsChartType(newType);
+    try {
+      localStorage.setItem("dashboard_top_products_chart_type", newType);
+    } catch (e) {}
+  };
 
   // Dashboard widget visibility — super admin always sees everything
   const showOverview     = isSuperAdmin || can("dash-overview.view");
@@ -150,6 +175,33 @@ const DashboardPage: React.FC = () => {
   useSocketSync("salesInvoice", undefined, refreshAccountsSummary);
   useSocketSync("grnInvoice", undefined, refreshAccountsSummary);
   useSocketSync("pettyCashEntry", undefined, refreshAccountsSummary);
+
+  /* ─── ACCOUNTS CARD TRENDS ──────────────────────────────────── */
+  const cardTrends = useMemo(() => {
+    if (!accountsSummary) return { sales: "neutral", purchase: "neutral", receivable: "neutral", payable: "neutral", cash: "neutral", bank: "neutral" } as const;
+
+    const txns = accountsSummary.recentTransactions || [];
+
+    const getTrend = (type: string): "up" | "down" | "neutral" => {
+      const filtered = txns.filter((t: any) => t.type === type);
+      if (filtered.length < 2) return "neutral";
+      return filtered[0].amount >= filtered[1].amount ? "up" : "down";
+    };
+
+    const cashTrend: "up" | "down" | "neutral" =
+      accountsSummary.todayReceipts > accountsSummary.todayPayments ? "up"
+      : accountsSummary.todayReceipts < accountsSummary.todayPayments ? "down"
+      : "neutral";
+
+    return {
+      sales: getTrend("SALES"),
+      purchase: getTrend("PURCHASE"),
+      receivable: getTrend("RECEIPT"),
+      payable: getTrend("PAYMENT"),
+      cash: cashTrend,
+      bank: cashTrend,
+    };
+  }, [accountsSummary]);
 
   /* ─── DERIVED DATA ────────────────────────────────────────── */
   const safe = (d: any) => (Array.isArray(d) ? d : []);
@@ -345,6 +397,18 @@ const DashboardPage: React.FC = () => {
       .slice(0, 7);
   }, [finishedGoodsStocks]);
 
+  const topProductsTotal = useMemo(() => {
+    return topProducts.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  }, [topProducts]);
+
+  const topProductsWithColors = useMemo(() => {
+    return topProducts.map((item, idx) => ({
+      ...item,
+      color: PIE_COLORS[idx % PIE_COLORS.length],
+      percent: topProductsTotal > 0 ? item.value / topProductsTotal : 0,
+    }));
+  }, [topProducts, topProductsTotal]);
+
   // Recent orders
   const recentSales = useMemo(() => {
     return safe(salesOrders)
@@ -430,311 +494,976 @@ const DashboardPage: React.FC = () => {
           <>
             {/* 6 Top Stat Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
+
+              {/* TOTAL SALES */}
               <button
                 onClick={() => navigate("/accounts/vouchers")}
-                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)", border: "1px solid rgba(52,211,153,0.25)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Sales</span>
-                  <FaArrowUp className="text-emerald-500 text-xs" />
+                {/* Bottom-right corner white shade on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
+                {/* BG Icon — visible, scales on hover */}
+                <FaArrowUp
+                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
+                  style={{ fontSize: "5.5rem" }}
+                />
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-emerald-200">Total Sales</span>
+                    {cardTrends.sales !== "neutral" && (
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        cardTrends.sales === "up"
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
+                      }`}>
+                        {cardTrends.sales === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+                    ₹{Number(accountsSummary.totalSales).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm" />
+                    <span className="text-[11px] font-bold text-emerald-100/80">{accountsSummary.salesVoucherCount} vouchers</span>
+                  </div>
                 </div>
-                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
-                  ₹{Number(accountsSummary.totalSales).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.salesVoucherCount} vouchers</div>
               </button>
 
+              {/* TOTAL PURCHASE */}
               <button
                 onClick={() => navigate("/invoice")}
-                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #1d4ed8 100%)", border: "1px solid rgba(96,165,250,0.25)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Purchase</span>
-                  <FaCheckCircle className="text-blue-500 text-xs" />
+                {/* Bottom-right corner white shade on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
+                <FaCheckCircle
+                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
+                  style={{ fontSize: "5.5rem" }}
+                />
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-blue-200">Total Purchase</span>
+                    {cardTrends.purchase !== "neutral" && (
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        cardTrends.purchase === "up"
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
+                      }`}>
+                        {cardTrends.purchase === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+                    ₹{Number(accountsSummary.totalPurchase).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-sm" />
+                    <span className="text-[11px] font-bold text-blue-100/80">{accountsSummary.purchaseVoucherCount} vouchers</span>
+                  </div>
                 </div>
-                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
-                  ₹{Number(accountsSummary.totalPurchase).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.purchaseVoucherCount} vouchers</div>
               </button>
 
+              {/* RECEIVABLE */}
               <button
                 onClick={() => navigate("/accounts/receivable")}
-                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "linear-gradient(135deg, #451a03 0%, #78350f 50%, #92400e 100%)", border: "1px solid rgba(251,191,36,0.25)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Receivable</span>
-                  <FaHandHoldingUsd className="text-amber-500 text-xs" />
+                {/* Bottom-right corner white shade on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
+                <FaHandHoldingUsd
+                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
+                  style={{ fontSize: "5.5rem" }}
+                />
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-amber-200">Receivable</span>
+                    {cardTrends.receivable !== "neutral" && (
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        cardTrends.receivable === "up"
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
+                      }`}>
+                        {cardTrends.receivable === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] flex items-baseline gap-1">
+                    <span>₹{Math.abs(accountsSummary.totalReceivable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                    {accountsSummary.totalReceivable < 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-black/40 text-emerald-300 border border-emerald-400/30">Cr</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-sm" />
+                    <span className="text-[11px] font-bold text-amber-100/80">{accountsSummary.receivableCustomerCount} customers</span>
+                  </div>
                 </div>
-                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalReceivable < 0 ? "text-emerald-500" : "text-ink"}`}>
-                  ₹{Math.abs(accountsSummary.totalReceivable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  {accountsSummary.totalReceivable < 0 && <span className="text-[10px] ml-1">Cr</span>}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.receivableCustomerCount} customers</div>
               </button>
 
+              {/* PAYABLE */}
               <button
                 onClick={() => navigate("/accounts/payable")}
-                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "linear-gradient(135deg, #4c0519 0%, #9f1239 50%, #be123c 100%)", border: "1px solid rgba(251,113,133,0.25)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Payable</span>
-                  <FaFileInvoiceDollar className="text-rose-500 text-xs" />
+                {/* Bottom-right corner white shade on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
+                <FaFileInvoiceDollar
+                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
+                  style={{ fontSize: "5.5rem" }}
+                />
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-rose-200">Payable</span>
+                    {cardTrends.payable !== "neutral" && (
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        cardTrends.payable === "up"
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
+                      }`}>
+                        {cardTrends.payable === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] flex items-baseline gap-1">
+                    <span>₹{Math.abs(accountsSummary.totalPayable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                    {accountsSummary.totalPayable < 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-black/40 text-rose-300 border border-rose-400/30">Dr</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-sm" />
+                    <span className="text-[11px] font-bold text-rose-100/80">{accountsSummary.payableSupplierCount} suppliers</span>
+                  </div>
                 </div>
-                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalPayable < 0 ? "text-emerald-500" : "text-ink"}`}>
-                  ₹{Math.abs(accountsSummary.totalPayable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  {accountsSummary.totalPayable < 0 && <span className="text-[10px] ml-1">Dr</span>}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.payableSupplierCount} suppliers</div>
               </button>
 
+              {/* CASH */}
               <button
                 onClick={() => navigate("/accounts/bank-accounts?filter=cash")}
-                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "linear-gradient(135deg, #042f2e 0%, #115e59 50%, #0d9488 100%)", border: "1px solid rgba(45,212,191,0.25)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Cash</span>
-                  <FaMoneyBillWave className="text-emerald-500 text-xs" />
+                {/* Bottom-right corner white shade on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
+                <FaMoneyBillWave
+                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
+                  style={{ fontSize: "5.5rem" }}
+                />
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-200">Cash</span>
+                    {cardTrends.cash !== "neutral" && (
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        cardTrends.cash === "up"
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
+                      }`}>
+                        {cardTrends.cash === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+                    ₹{Math.abs(accountsSummary.totalCashInHand).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shadow-sm" />
+                    <span className="text-[11px] font-bold text-teal-100/80">{accountsSummary.cashAccountCount || 0} accounts</span>
+                  </div>
                 </div>
-                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalCashInHand < 0 ? "text-rose-500" : "text-ink"}`}>
-                  ₹{Math.abs(accountsSummary.totalCashInHand).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.cashAccountCount || 0} accounts</div>
               </button>
 
+              {/* BANK */}
               <button
                 onClick={() => navigate("/accounts/bank-accounts?filter=bank")}
-                className="text-left bg-card border border-line-soft rounded-lg shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
+                style={{ background: "linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #6d28d9 100%)", border: "1px solid rgba(167,139,250,0.25)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Bank</span>
-                  <FaUniversity className="text-indigo-500 text-xs" />
+                {/* Bottom-right corner white shade on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
+                <FaUniversity
+                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
+                  style={{ fontSize: "5.5rem" }}
+                />
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-violet-200">Bank</span>
+                    {cardTrends.bank !== "neutral" && (
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        cardTrends.bank === "up"
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
+                      }`}>
+                        {cardTrends.bank === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+                    ₹{Math.abs(accountsSummary.totalBankBalance).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shadow-sm" />
+                    <span className="text-[11px] font-bold text-violet-100/80">{accountsSummary.bankAccountCount || 0} accounts</span>
+                  </div>
                 </div>
-                <div className={`text-base sm:text-lg font-mono font-bold mt-1 ${accountsSummary.totalBankBalance < 0 ? "text-rose-500" : "text-ink"}`}>
-                  ₹{Math.abs(accountsSummary.totalBankBalance).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.bankAccountCount || 0} accounts</div>
               </button>
 
-              {/* <div className="bg-card border border-line-soft rounded-lg shadow-sm p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Stock Value</span>
-                  <FaWarehouse className="text-cyan-500 text-xs" />
-                </div>
-                <div className="text-base sm:text-lg font-mono font-bold text-ink mt-1">
-                  ₹{Number(accountsSummary.stockValue).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-[10px] text-ink-subtle mt-0.5">{accountsSummary.stockItemCount} items</div>
-              </div> */}
             </div>
+          </>
+        )}        {/* ══════════════════════════════════════════════════════
+           ROW 2  –  Sales/Purchase Trend Chart (Left) + Today's Tasks & Recent Sales (Right)
+           ══════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "530px" }}>
+          {/* Left: Sales & Purchase Trend Chart */}
+          {showTrend && (
+            <div className="h-full min-h-[530px]">
+              <SalesPurchaseTrendChart
+                salesOrders={salesOrders}
+                purchaseOrders={purchaseOrders}
+                productionOrders={productionOrders}
+              />
+            </div>
+          )}
 
-            {/* Alerts + Recent Transactions — single 2-col row.
-                Each card has fixed header (+ footer for txns) with scrollable body. */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4 mb-3 sm:mb-4" style={{ height: "340px" }}>
-              {/* Alerts (1 col of 5) */}
-              <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
-                <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Alerts</div>
-                  {accountsSummary.alerts.length > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/30">
-                      {accountsSummary.alerts.length}
-                    </span>
+          {/* Right: Today's Tasks & Production (Top) + Recent Sales Orders (Bottom) */}
+          <div className="flex flex-col gap-3 sm:gap-4 h-full min-h-[530px]">
+            {/* 1. Today's Tasks / Daily Production Planning */}
+            {showTasks && (
+              <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden flex-1 min-h-[255px]">
+                {/* Card Header */}
+                <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                      <FaCalendarCheck className="text-xs" />
+                    </div>
+                    <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
+                      Today's Tasks & Production
+                    </div>
+                  </div>
+                  
+                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live
+                  </span>
+                </div>
+
+                {/* Card Content */}
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                  {todayStats.tasksList.length > 0 ? (
+                    todayStats.tasksList.map((task: any, i: number) => {
+                      const linkedPo = safe(productionOrders).find((po: any) => po.productionOrderId === task.productionOrderId || po.id === task.productionOrderId);
+                      const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
+                      const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
+                      const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "General Shift";
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => navigate("/planning/daily-production-planning")}
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-card-2 border border-line-soft hover:border-emerald-500/40 hover:bg-card transition-all group cursor-pointer shadow-sm"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-emerald-500/20 to-teal-600/30 text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform">
+                              <FaCalendarCheck className="text-xs" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[12px] font-bold text-ink truncate">{machineName}</span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-card text-ink-muted border border-line-soft">
+                                  {shiftName}
+                                </span>
+                              </div>
+                              <span className="text-[10.5px] font-medium text-ink-muted truncate block mt-0.5">{productName}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                              {task.status || "SCHEDULED"}
+                            </span>
+                            <FaChevronRight className="text-ink-subtle text-[10px] group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full py-8 text-center text-ink-subtle">
+                      <FaCalendarCheck size={32} className="mb-2 opacity-25 text-emerald-400" />
+                      <p className="text-[12px] font-bold text-ink-muted">No tasks scheduled for today</p>
+                      <p className="text-[10px] text-ink-subtle mt-0.5">Daily production plans for today will appear here</p>
+                    </div>
                   )}
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1.5">
-                  {accountsSummary.alerts.length === 0 ? (
-                    <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
-                      <FaCheckCircle className="text-emerald-500 text-[10px]" /> All good, no alerts
+              </div>
+            )}
+
+            {/* 2. Recent Sales Orders */}
+            {showRecentSales && (
+              <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden flex-1 min-h-[255px]">
+                {/* Header */}
+                <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft bg-card-2/50 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                      <FaShoppingCart className="text-xs" />
+                    </div>
+                    <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
+                      Recent Sales Orders
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 uppercase">
+                      Latest {recentSales.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/sales/orders")}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold text-ink-muted hover:text-ink bg-card hover:bg-card-2 border border-line-soft transition-colors flex items-center gap-1 cursor-pointer"
+                      title="View all sales orders"
+                    >
+                      <span>View All</span>
+                      <FaArrowRight className="text-[8px]" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                  {recentSales.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full py-8 text-center text-ink-subtle">
+                      <FaShoppingCart size={32} className="mb-2 opacity-25 text-blue-400" />
+                      <p className="text-[12px] font-bold text-ink-muted">No Sales Orders Yet</p>
+                      <p className="text-[10px] text-ink-subtle mt-0.5">New sales orders placed in the system will display here</p>
                     </div>
                   ) : (
-                    accountsSummary.alerts.map((a, i) => {
-                      const styles = a.level === "danger"
-                        ? "bg-rose-500/10 border-rose-500/20 text-amber-500 hover:bg-rose-500/15"
-                        : a.level === "warn"
-                        ? "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/15"
-                        : "bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/15";
-                      const dot = a.level === "danger" ? "bg-rose-500"
-                        : a.level === "warn" ? "bg-amber-500"
-                        : "bg-blue-500";
-                      const content = (
-                        <>
-                          <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${dot}`}></span>
-                          <span className="flex-1 text-left">{a.message}</span>
-                          {a.link && <span className="shrink-0 text-[10px] opacity-70">→</span>}
-                        </>
-                      );
-                      return a.link ? (
-                        <button
+                    recentSales.map((so: any, i: number) => {
+                      const custName = so.customer?.firmName || so.customer?.displayName || so.customerName || "Customer";
+                      const initial = (custName || "C").trim().charAt(0).toUpperCase();
+                      const status = (so.status || "DRAFT").toUpperCase();
+                      const isCompleted = status === "COMPLETED" || status === "INVOICED" || status === "DELIVERED";
+                      const isCancelled = status === "CANCELLED";
+
+                      return (
+                        <div
                           key={i}
-                          onClick={() => navigate(a.link!)}
-                          className={`w-full flex items-start gap-2 px-2 py-1.5 rounded text-[11px] border transition-colors cursor-pointer ${styles}`}
+                          onClick={() => navigate(`/sales/orders/${so.id || so.salesOrderId || ""}`)}
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/40 hover:bg-card transition-all group cursor-pointer shadow-sm"
                         >
-                          {content}
-                        </button>
-                      ) : (
-                        <div key={i}
-                          className={`flex items-start gap-2 px-2 py-1.5 rounded text-[11px] border ${styles}`}>
-                          {content}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 font-extrabold flex items-center justify-center text-xs group-hover:scale-105 transition-transform">
+                              {initial}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="block text-[11.5px] font-mono font-bold text-ink truncate group-hover:text-blue-400 transition-colors">
+                                {so.orderNo || `SO-${so.id}`}
+                              </span>
+                              <span className="text-[10px] font-medium text-ink-muted truncate block">{custName}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-0.5 shrink-0">
+                            <span className="text-[12px] font-mono font-black text-ink whitespace-nowrap">
+                              ₹{Number(so.netAmount || 0).toLocaleString("en-IN")}
+                            </span>
+                            <span
+                              className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                                isCompleted
+                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                  : isCancelled
+                                  ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                                  : "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                              }`}
+                            >
+                              {status.replace(/_/g, " ")}
+                            </span>
+                          </div>
                         </div>
                       );
                     })
                   )}
                 </div>
               </div>
-
-              {/* Recent Transactions (2 cols of 5) */}
-              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
-                <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Transactions</div>
-                  <button onClick={() => navigate("/accounts/ledger-statement")} className="text-[11px] font-semibold text-blue-500 hover:underline">
-                    View Ledger Statement →
-                  </button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-auto">
-                  {accountsSummary.recentTransactions.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
-                  ) : (
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
-                        <tr>
-                          <th className="px-2 py-1.5 bg-card-2">Voucher No</th>
-                          <th className="px-2 py-1.5 bg-card-2">Type</th>
-                          <th className="px-2 py-1.5 bg-card-2">Party / Account</th>
-                          <th className="px-2 py-1.5 bg-card-2">Date</th>
-                          <th className="px-2 py-1.5 bg-card-2 text-right">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-line-soft">
-                        {accountsSummary.recentTransactions.map((t) => {
-                          const typeColor: Record<string, string> = {
-                            SALES: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-                            PURCHASE: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                            RECEIPT: "bg-green-500/10 text-green-500 border-green-500/20",
-                            PAYMENT: "bg-rose-500/10 text-rose-500 border-rose-500/20",
-                            JOURNAL: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-                            CONTRA: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-                          };
-                          const party = t.debitLedger || t.creditLedger || t.narration || "-";
-                          return (
-                            <tr key={t.id} className="hover:bg-card-2 transition-colors">
-                              <td className="px-2 py-1.5 font-mono font-semibold text-blue-500 whitespace-nowrap text-[11px]">{t.voucherNo}</td>
-                              <td className="px-2 py-1.5">
-                                <span className={`px-1 py-0.5 rounded text-[9px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
-                                  {t.type}
-                                </span>
-                              </td>
-                              <td className="px-2 py-1.5 text-ink truncate max-w-[140px] text-[11px]">{party}</td>
-                              <td className="px-2 py-1.5 font-mono text-[10px] text-ink-muted whitespace-nowrap">
-                                {new Date(t.date).toLocaleDateString("en-IN")}
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap text-[11px]">
-                                ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-
-              {/* Sales Person Location Map (2 cols of 5) */}
-              <div className="lg:col-span-2 bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
-                <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle flex items-center gap-1.5">
-                    <FaMapMarkerAlt className="text-emerald-500 text-[10px]" /> Sales Person Location
-                  </div>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 uppercase">Live</span>
-                </div>
-                <div className="flex-1 min-h-0 overflow-hidden relative">
-                  {/* Satellite map — Google Maps embed (satellite view, Coimbatore–Tirupur region) */}
-                  <iframe
-                    title="Sales Person Locations"
-                    src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d250000!2d77.3!3d11.1!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4t3!5e1!3m2!1sen!2sin"
-                    className="w-full h-full border-0"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    allowFullScreen
-                  />
-                  {/* Location pin overlays */}
-                  {[
-                    { name: "Ravi K", area: "RS Puram", initials: "RK", top: "30%", left: "30%", status: "active", color: "from-emerald-400 to-emerald-600" },
-                    { name: "Suresh M", area: "SIDCO", initials: "SM", top: "62%", left: "62%", status: "active", color: "from-blue-400 to-blue-600" },
-                    { name: "Karthik S", area: "Perundurai", initials: "KS", top: "45%", left: "78%", status: "idle", color: "from-amber-400 to-amber-600" },
-                  ].map((pin, i) => (
-                    <div key={i} className="absolute group" style={{ top: pin.top, left: pin.left, transform: "translate(-50%, -100%)" }}>
-                      <div className="relative flex flex-col items-center cursor-pointer">
-                        {/* Pin body */}
-                        <div className="relative">
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${pin.color} border-[2.5px] border-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] flex items-center justify-center`}>
-                            <span className="text-white text-[9px] font-black leading-none">{pin.initials}</span>
-                          </div>
-                          {pin.status === "active" && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-[1.5px] border-white animate-pulse" />}
-                        </div>
-                        {/* Pin tail */}
-                        <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-[6px] border-l-transparent border-r-transparent border-t-white -mt-[1px]" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))" }} />
-                        {/* Name label (always visible) */}
-                        <div className="mt-0.5 bg-black/70 backdrop-blur-sm rounded px-1.5 py-0.5 shadow-lg">
-                          <p className="text-[8px] font-bold text-white whitespace-nowrap leading-tight">{pin.name}</p>
-                        </div>
-                        {/* Expanded tooltip on hover */}
-                        <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col items-center z-20">
-                          <div className="bg-card border border-line-soft rounded-lg shadow-sm px-3 py-2 shadow-xl whitespace-nowrap">
-                            <p className="text-[11px] font-bold text-ink">{pin.name}</p>
-                            <p className="text-[10px] text-ink-subtle">{pin.area}</p>
-                            <div className="flex items-center gap-1 mt-1">
-                              <span className={`w-1.5 h-1.5 rounded-full ${pin.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                              <span className="text-[9px] font-semibold text-ink-muted">{pin.status === "active" ? "Active now" : "Idle"}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {/* Bottom legend */}
-                  <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5 flex items-center gap-3 z-10">
-                    <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="text-[9px] font-semibold text-white/80">Active</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" />
-                      <span className="text-[9px] font-semibold text-white/80">Idle</span>
-                    </div>
-                    <span className="text-[9px] text-white/50">3 persons</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Old sparkline stats row removed — replaced by the 6 accounts cards above. */}
+            )}
+          </div>
+        </div>
 
         {/* ══════════════════════════════════════════════════════
-           ROW 2.5  –  Sales/Purchase Trend + Customer Product Report
+           ROW 3  –  Alerts & Recent Transactions (3/4 Left) + Top Products (1/4 Right)
            ══════════════════════════════════════════════════════ */}
-        {showTrend && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ height: "460px" }}>
-            {/* Sales & Purchase Trend Chart */}
-            <SalesPurchaseTrendChart
-              salesOrders={salesOrders}
-              purchaseOrders={purchaseOrders}
-              productionOrders={productionOrders}
-            />
-
-            {/* Customer Product Purchase Report — fixed height so header &
-               footer stay pinned while only the tbody scrolls. */}
-            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden h-full min-h-0">
-              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle flex items-center gap-1.5">
-                  <FaShoppingCart className="text-indigo-500 text-[10px]" /> Product Purchase Report
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "360px" }}>
+          {/* Left 3/4: Alerts (1/3) + Recent Transactions (2/3) */}
+          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 h-full">
+            {/* Alerts (1 of 3 inside 3/4) */}
+            <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-[360px]">
+              <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
+                  <FaBell className="text-amber-400 text-xs" />
+                  <span>Alerts</span>
                 </div>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 border border-indigo-500/30">
-                  {customerPurchaseReport.totalProducts} Products · {customerPurchaseReport.customers.length} Customers
-                </span>
+                {accountsSummary.alerts.length > 0 ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                    {accountsSummary.alerts.length} Action{accountsSummary.alerts.length > 1 ? "s" : ""}
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    0 Active
+                  </span>
+                )}
               </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2">
+                {accountsSummary.alerts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+                    <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-2">
+                      <FaCheckCircle className="text-sm" />
+                    </div>
+                    <p className="text-xs font-bold text-ink">All Systems Clear</p>
+                    <p className="text-[10px] text-ink-subtle mt-0.5">No pending warnings or actions</p>
+                  </div>
+                ) : (
+                  accountsSummary.alerts.map((a, i) => {
+                    const isDanger = a.level === "danger";
+                    const isWarn = a.level === "warn";
+
+                    const borderAccent = isDanger
+                      ? "border-l-rose-500"
+                      : isWarn
+                      ? "border-l-amber-500"
+                      : "border-l-blue-500";
+
+                    const iconColor = isDanger
+                      ? "text-rose-400"
+                      : isWarn
+                      ? "text-amber-400"
+                      : "text-blue-400";
+
+                    const IconComponent = isDanger
+                      ? FaExclamationCircle
+                      : isWarn
+                      ? FaExclamationTriangle
+                      : FaInfoCircle;
+
+                    const content = (
+                      <div className="flex items-center justify-between gap-2.5 w-full">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <IconComponent className={`text-xs mt-0.5 shrink-0 ${iconColor}`} />
+                          <p className="text-[11px] font-semibold text-ink leading-snug break-words">
+                            {a.message}
+                          </p>
+                        </div>
+                        {a.link && (
+                          <FaChevronRight className="text-[9px] text-ink-subtle group-hover:text-ink group-hover:translate-x-0.5 transition-all shrink-0" />
+                        )}
+                      </div>
+                    );
+
+                    return a.link ? (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => navigate(a.link!)}
+                        className={`w-full text-left rounded-md p-2.5 bg-card-2 border border-line-soft hover:bg-card border-l-[3px] ${borderAccent} transition-all duration-150 cursor-pointer shadow-sm group`}
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      <div
+                        key={i}
+                        className={`w-full text-left rounded-md p-2.5 bg-card-2 border border-line-soft border-l-[3px] ${borderAccent} shadow-sm`}
+                      >
+                        {content}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {accountsSummary.alerts.length > 0 && (
+                <div className="shrink-0 px-3 py-1.5 bg-card-2/50 border-t border-line-soft flex items-center justify-between text-[10px] text-ink-subtle">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Active Alerts
+                  </span>
+                  <span className="text-[9px] text-ink-muted">Click to view</span>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Transactions (2 of 3 inside 3/4) */}
+            <div className="md:col-span-2 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-[360px]">
+              <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink">Recent Transactions</div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/accounts/ledger-statement")}
+                  className="text-[11px] font-semibold text-blue-400 hover:underline cursor-pointer"
+                >
+                  View Ledger Statement →
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto">
+                {accountsSummary.recentTransactions.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
+                      <tr>
+                        <th className="px-3 py-2 bg-card-2">Voucher No</th>
+                        <th className="px-2 py-2 bg-card-2">Type</th>
+                        <th className="px-3 py-2 bg-card-2">Party / Account</th>
+                        <th className="px-2 py-2 bg-card-2">Date</th>
+                        <th className="px-3 py-2 bg-card-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-soft">
+                      {accountsSummary.recentTransactions.map((t) => {
+                        const typeColor: Record<string, string> = {
+                          SALES: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                          PURCHASE: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                          RECEIPT: "bg-green-500/10 text-green-500 border-green-500/20",
+                          PAYMENT: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+                          JOURNAL: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                          CONTRA: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+                        };
+                        const party = t.debitLedger || t.creditLedger || t.narration || "-";
+                        return (
+                          <tr key={t.id} className="hover:bg-card-2 transition-colors">
+                            <td className="px-3 py-2 font-mono font-semibold text-blue-400 whitespace-nowrap text-[11px]">{t.voucherNo}</td>
+                            <td className="px-2 py-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
+                                {t.type}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-ink truncate max-w-[160px] text-[11px] font-medium">{party}</td>
+                            <td className="px-2 py-2 font-mono text-[10px] text-ink-muted whitespace-nowrap">
+                              {new Date(t.date).toLocaleDateString("en-IN")}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
+                              ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right 1/4: Top Products */}
+          {showTopProducts && (
+            <div className="lg:col-span-1 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-[360px]">
+              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">Top Products</div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-500 border border-teal-500/30 uppercase shrink-0">By stock</span>
+                </div>
+                {/* 3 Chart Type Switch Icons */}
+                <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-1 shrink-0 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => handleTopProductsChartTypeChange("list")}
+                    title="Horizontal Ranking Bars"
+                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${
+                      topProductsChartType === "list"
+                        ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
+                        : "text-ink-muted hover:text-ink hover:bg-card"
+                    }`}
+                  >
+                    <FaListUl className="text-xs" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTopProductsChartTypeChange("bar")}
+                    title="Vertical Column Chart"
+                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${
+                      topProductsChartType === "bar"
+                        ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
+                        : "text-ink-muted hover:text-ink hover:bg-card"
+                    }`}
+                  >
+                    <FaChartBar className="text-xs" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTopProductsChartTypeChange("pie")}
+                    title="Donut Distribution Chart"
+                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${
+                      topProductsChartType === "pie"
+                        ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
+                        : "text-ink-muted hover:text-ink hover:bg-card"
+                    }`}
+                  >
+                    <FaChartPie className="text-xs" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 1. Horizontal Progress Ranking */}
+              {topProductsChartType === "list" && (
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
+                  {topProducts.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
+                  ) : (
+                    topProductsWithColors.map((prod: any, i: number) => {
+                      const maxVal = topProducts[0]?.value || 1;
+                      const pct = Math.min((prod.value / maxVal) * 100, 100);
+                      return (
+                        <div key={i} className="flex flex-col gap-1 group">
+                          <div className="flex justify-between items-end">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[9px] font-bold w-4 h-4 rounded bg-card-2 border border-line-soft text-ink-muted flex items-center justify-center shrink-0 group-hover:border-teal-500/40 group-hover:text-teal-500 transition-colors">
+                                {i + 1}
+                              </span>
+                              <span className="text-[11px] font-semibold text-ink-muted truncate max-w-[130px] group-hover:text-ink transition-colors" title={prod.name}>
+                                {prod.name}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-bold text-ink whitespace-nowrap">{prod.value.toLocaleString()}</span>
+                          </div>
+                          <div className="w-full bg-line-soft rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="h-1.5 rounded-full transition-all duration-700"
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: prod.color,
+                                boxShadow: `0 0 6px ${prod.color}40`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {/* 2. Vertical Column Bar Chart */}
+              {topProductsChartType === "bar" && (
+                <div className="flex-1 min-h-0 p-2.5 flex flex-col">
+                  {topProducts.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
+                  ) : (
+                    <div className="w-full h-full min-h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topProductsWithColors} margin={{ top: 12, right: 8, left: -24, bottom: 26 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-line-soft)" />
+                          <XAxis
+                            dataKey="name"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 9, fill: "var(--color-ink-subtle)" }}
+                            interval={0}
+                            tickFormatter={(val) => (val && val.length > 7 ? `${val.slice(0, 6)}…` : val)}
+                            angle={-25}
+                            textAnchor="end"
+                            height={30}
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 9, fill: "var(--color-ink-subtle)" }}
+                            tickFormatter={(val) => (val >= 1000 ? `${(val / 1000).toFixed(0)}k` : `${val}`)}
+                          />
+                          <Tooltip
+                            content={({ active, payload }: any) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload || {};
+                                return (
+                                  <div className="bg-card/95 backdrop-blur-md border border-line-soft rounded-lg px-2.5 py-1.5 shadow-xl text-ink text-[11px] z-50">
+                                    <p className="font-bold text-ink max-w-[170px] truncate mb-0.5">{data.name}</p>
+                                    <div className="flex items-center gap-1.5 text-ink-muted">
+                                      <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: data.color || "#14b8a6" }} />
+                                      <span>Stock: <strong className="text-ink font-mono">{Number(data.value || 0).toLocaleString()}</strong></span>
+                                    </div>
+                                    {data.percent !== undefined && (
+                                      <p className="text-[9px] text-ink-subtle mt-0.5">{(data.percent * 100).toFixed(1)}% of top items</p>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                            {topProductsWithColors.map((entry, index) => (
+                              <Cell key={`cell-bar-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Donut / Pie Chart */}
+              {topProductsChartType === "pie" && (
+                <div className="flex-1 min-h-0 p-2 flex flex-col justify-between overflow-hidden">
+                  {topProducts.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
+                  ) : (
+                    <>
+                      <div className="h-[145px] w-full relative shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Tooltip
+                              content={({ active, payload }: any) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload || {};
+                                  return (
+                                    <div className="bg-card/95 backdrop-blur-md border border-line-soft rounded-lg px-2.5 py-1.5 shadow-xl text-ink text-[11px] z-50">
+                                      <p className="font-bold text-ink max-w-[170px] truncate mb-0.5">{data.name}</p>
+                                      <div className="flex items-center gap-1.5 text-ink-muted">
+                                        <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: data.color || "#14b8a6" }} />
+                                        <span>Stock: <strong className="text-ink font-mono">{Number(data.value || 0).toLocaleString()}</strong></span>
+                                      </div>
+                                      {data.percent !== undefined && (
+                                        <p className="text-[9px] text-ink-subtle mt-0.5">{(data.percent * 100).toFixed(1)}% of top items</p>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Pie
+                              data={topProductsWithColors}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={36}
+                              outerRadius={60}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {topProductsWithColors.map((entry, index) => (
+                                <Cell key={`cell-pie-${index}`} fill={entry.color} stroke="transparent" />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className="text-[8px] text-ink-muted font-bold uppercase tracking-wider">Total</span>
+                          <span className="text-[11px] font-black text-ink">{topProductsTotal.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[85px] overflow-y-auto px-1 pt-1 border-t border-line-soft">
+                        {topProductsWithColors.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 min-w-0" title={`${item.name}: ${item.value.toLocaleString()}`}>
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-[10px] text-ink-muted truncate flex-1">{item.name}</span>
+                            <span className="text-[10px] font-bold text-ink shrink-0">{item.value.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════
+           ROW 4  –  Customer Product Purchase Report (Left) + Sales Person Location (Right)
+           ══════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ height: "360px" }}>
+          {/* Customer Product Purchase Report — in-card drill-down view */}
+          <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-0">
+            {/* Header */}
+            <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between gap-2">
+              {selectedCustomerReport ? (
+                <>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomerReport(null);
+                        setCustomerProductSearch("");
+                      }}
+                      className="px-2 py-1 rounded bg-card-2 text-ink-muted hover:text-ink hover:bg-card transition-colors flex items-center gap-1.5 text-[11px] font-bold cursor-pointer border border-line-soft shadow-sm"
+                      title="Back to Customer List"
+                    >
+                      <FaArrowLeft className="text-[10px]" />
+                      <span>Back</span>
+                    </button>
+                    <span className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
+                      {selectedCustomerReport.customer}
+                    </span>
+                  </div>
+
+                  {/* In-Card Toggle: Purchased vs Not Purchased */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(() => {
+                      const customerObj = customerPurchaseReport.customers.find(
+                        (c) => c.name === selectedCustomerReport.customer
+                      );
+                      const purchasedCount = customerObj?.purchasedProducts.length || 0;
+                      const notPurchasedCount = customerObj?.notPurchasedProducts.length || 0;
+                      return (
+                        <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-0.5 shadow-inner">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomerReport({ customer: selectedCustomerReport.customer, type: "purchased" })}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              selectedCustomerReport.type === "purchased"
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "text-ink-muted hover:text-ink hover:bg-card"
+                            }`}
+                          >
+                            <FaCheckCircle className="text-[9px]" />
+                            <span>Purchased ({purchasedCount})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomerReport({ customer: selectedCustomerReport.customer, type: "notPurchased" })}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              selectedCustomerReport.type === "notPurchased"
+                                ? "bg-rose-600 text-white shadow-sm"
+                                : "text-ink-muted hover:text-ink hover:bg-card"
+                            }`}
+                          >
+                            <FaTimesCircle className="text-[9px]" />
+                            <span>Not Purchased ({notPurchasedCount})</span>
+                          </button>
+                        </div>
+                      );
+                    })()}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomerReport(null);
+                        setCustomerProductSearch("");
+                      }}
+                      className="p-1 text-ink-subtle hover:text-ink hover:bg-card-2 rounded transition-colors cursor-pointer"
+                      title="Close details"
+                    >
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
+                    <FaShoppingCart className="text-indigo-400 text-xs" /> Product Purchase Report
+                  </div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 border border-indigo-500/30">
+                    {customerPurchaseReport.totalProducts} Products · {customerPurchaseReport.customers.length} Customers
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Body */}
+            {selectedCustomerReport ? (
+              /* In-Card Details View */
+              (() => {
+                const customerObj = customerPurchaseReport.customers.find(
+                  (c) => c.name === selectedCustomerReport.customer
+                );
+                const isPurchased = selectedCustomerReport.type === "purchased";
+                const rawList = isPurchased
+                  ? customerObj?.purchasedProducts || []
+                  : customerObj?.notPurchasedProducts || [];
+                const filtered = rawList.filter((p) =>
+                  p.toLowerCase().includes(customerProductSearch.toLowerCase())
+                );
+
+                return (
+                  <div className="flex-1 min-h-0 flex flex-col p-3 overflow-hidden">
+                    {/* Search bar */}
+                    <div className="flex items-center gap-2 mb-2.5 shrink-0">
+                      <div className="relative flex-1">
+                        <FaSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted text-[10px]" />
+                        <input
+                          type="text"
+                          value={customerProductSearch}
+                          onChange={(e) => setCustomerProductSearch(e.target.value)}
+                          placeholder={`Search ${isPurchased ? "purchased" : "not purchased"} products...`}
+                          className="w-full bg-card-2 border border-line-soft rounded-lg pl-7 pr-3 py-1 text-xs text-ink placeholder:text-ink-subtle focus:outline-none focus:border-teal-500/50"
+                        />
+                        {customerProductSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomerProductSearch("")}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[10px]"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <span
+                        className={`text-[9px] font-bold px-2 py-1 rounded-md border shrink-0 ${
+                          isPurchased
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                            : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                        }`}
+                      >
+                        {rawList.length} of {customerPurchaseReport.totalProducts} products
+                      </span>
+                    </div>
+
+                    {/* Product items list */}
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
+                      {filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full py-10 text-ink-subtle">
+                          <FaBox className="text-2xl mb-2 opacity-20" />
+                          <p className="text-xs font-semibold">No products found</p>
+                          <p className="text-[10px] mt-0.5">
+                            {rawList.length === 0
+                              ? `No ${isPurchased ? "purchased" : "unpurchased"} products for this customer`
+                              : "No matching search results"}
+                          </p>
+                        </div>
+                      ) : (
+                        filtered.map((productName, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-2 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span
+                                className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                                  isPurchased
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                }`}
+                              >
+                                {idx + 1}
+                              </span>
+                              <span
+                                className="text-xs font-semibold text-ink truncate group-hover:text-white transition-colors"
+                                title={productName}
+                              >
+                                {productName}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${
+                                isPurchased
+                                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                  : "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                              }`}
+                            >
+                              {isPurchased ? "Ordered" : "Not Ordered"}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              /* Customer Overview Table */
               <div className="flex-1 min-h-0 overflow-auto">
                 {customerPurchaseReport.customers.length === 0 ? (
                   <div className="p-6 text-center text-xs text-ink-subtle">No customers available</div>
@@ -742,22 +1471,37 @@ const DashboardPage: React.FC = () => {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
                       <tr>
-                        <th className="px-3 py-1.5 bg-card-2">Customer</th>
-                        <th className="px-3 py-1.5 bg-card-2 text-center">Purchased</th>
-                        <th className="px-3 py-1.5 bg-card-2 text-center">Not Purchased</th>
+                        <th className="px-3 py-2 bg-card-2">Customer</th>
+                        <th className="px-3 py-2 bg-card-2 text-center">Purchased</th>
+                        <th className="px-3 py-2 bg-card-2 text-center">Not Purchased</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line-soft">
                       {customerPurchaseReport.customers.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-card-2 transition-colors">
-                          <td className="px-3 py-1.5">
-                            <span className="text-[11px] font-semibold text-ink truncate block max-w-[180px]">{row.name}</span>
+                        <tr key={idx} className="hover:bg-card-2/80 transition-colors group">
+                          <td className="px-3 py-2.5">
+                            <span
+                              onClick={() =>
+                                setSelectedCustomerReport({
+                                  customer: row.name,
+                                  type: row.purchasedProducts.length > 0 ? "purchased" : "notPurchased",
+                                })
+                              }
+                              className="text-[12px] font-semibold text-ink group-hover:text-teal-400 cursor-pointer truncate block max-w-[200px] transition-colors"
+                              title="Click to view product breakdown"
+                            >
+                              {row.name}
+                            </span>
                           </td>
-                          <td className="px-3 py-1.5 text-center">
+                          <td className="px-3 py-2.5 text-center">
                             {row.purchasedProducts.length > 0 ? (
                               <button
-                                onClick={() => setProductModal({ customer: row.name, type: "purchased", products: row.purchasedProducts })}
-                                className="text-[11px] font-mono font-bold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                                type="button"
+                                onClick={() =>
+                                  setSelectedCustomerReport({ customer: row.name, type: "purchased" })
+                                }
+                                title={`View ${row.purchasedProducts.length} purchased products for ${row.name}`}
+                                className="px-2.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-mono font-bold text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer shadow-sm"
                               >
                                 {row.purchasedProducts.length}
                               </button>
@@ -765,16 +1509,20 @@ const DashboardPage: React.FC = () => {
                               <span className="text-[11px] font-mono text-ink-muted">0</span>
                             )}
                           </td>
-                          <td className="px-3 py-1.5 text-center">
+                          <td className="px-3 py-2.5 text-center">
                             {row.notPurchasedProducts.length > 0 ? (
                               <button
-                                onClick={() => setProductModal({ customer: row.name, type: "notPurchased", products: row.notPurchasedProducts })}
-                                className="text-[11px] font-mono font-bold text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
+                                type="button"
+                                onClick={() =>
+                                  setSelectedCustomerReport({ customer: row.name, type: "notPurchased" })
+                                }
+                                title={`View ${row.notPurchasedProducts.length} not purchased products for ${row.name}`}
+                                className="px-2.5 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-[11px] font-mono font-bold text-rose-400 hover:bg-rose-500 hover:text-white transition-all cursor-pointer shadow-sm"
                               >
                                 {row.notPurchasedProducts.length}
                               </button>
                             ) : (
-                              <span className="text-[11px] font-mono text-emerald-400">0</span>
+                              <span className="text-[11px] font-mono text-emerald-400 font-semibold">0</span>
                             )}
                           </td>
                         </tr>
@@ -783,133 +1531,12 @@ const DashboardPage: React.FC = () => {
                   </table>
                 )}
               </div>
-            </div>
+            )}
           </div>
-        )}
 
-        {/* ══════════════════════════════════════════════════════
-           BOTTOM ROW  –  Today's Tasks | Top Products | Recent Sales
-           Single 3-col row. Each widget has fixed header + scrollable body.
-           ══════════════════════════════════════════════════════ */}
-        {(showTasks || showTopProducts || showRecentSales) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ height: "340px" }}>
-
-          {/* Today's Tasks */}
-          {showTasks && (
-            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
-              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Today's Tasks</div>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 uppercase">Live</span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-                {todayStats.tasksList.length > 0 ? (
-                  todayStats.tasksList.map((task: any, i: number) => {
-                    const linkedPo = safe(productionOrders).find((po: any) => po.productionOrderId === task.productionOrderId || po.id === task.productionOrderId);
-                    const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
-                    const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
-                    const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "No Shift";
-                    return (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors group cursor-pointer">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
-                            <FaCalendarCheck className="text-xs" />
-                          </div>
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-bold text-ink truncate">{machineName}</span>
-                            <span className="text-[10px] font-medium text-ink-muted truncate block">{productName} · {shiftName}</span>
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          {task.status || "SCHEDULED"}
-                        </span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full py-8 text-ink-subtle">
-                    <FaCalendarCheck size={36} className="mb-2 opacity-20" />
-                    <p className="text-[12px] font-semibold">No tasks scheduled for today</p>
-                    <p className="text-[10px] mt-0.5">Schedules for today will appear here</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Top Products */}
-          {showTopProducts && (
-            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
-              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Top Products</div>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-500 border border-teal-500/30 uppercase">By stock</span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-                {topProducts.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
-                ) : (
-                  topProducts.map((prod: any, i: number) => {
-                    const maxVal = topProducts[0]?.value || 1;
-                    const pct = Math.min((prod.value / maxVal) * 100, 100);
-                    const barColors = [
-                      "from-violet-500 to-indigo-500",
-                      "from-sky-400 to-blue-500",
-                      "from-emerald-400 to-teal-500",
-                      "from-amber-400 to-orange-500",
-                      "from-rose-400 to-pink-500",
-                      "from-fuchsia-400 to-purple-500",
-                      "from-cyan-400 to-sky-500",
-                    ];
-                    return (
-                      <div key={i} className="flex flex-col gap-1">
-                        <div className="flex justify-between items-end">
-                          <span className="text-[11px] font-semibold text-ink-muted truncate max-w-[140px]">{prod.name}</span>
-                          <span className="text-[11px] font-bold text-ink whitespace-nowrap">{prod.value.toLocaleString()}</span>
-                        </div>
-                        <div className="w-full bg-line-soft rounded-full h-1.5">
-                          <div className={`h-1.5 rounded-full bg-gradient-to-r ${barColors[i % barColors.length]} transition-all duration-700`}
-                            style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Recent Sales Orders */}
-          {showRecentSales && (
-            <div className="bg-card border border-line-soft rounded-lg shadow-sm flex flex-col overflow-hidden">
-              <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
-                <div className="text-[11px] uppercase tracking-wide font-bold text-ink-subtle">Recent Sales Orders</div>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/30 uppercase">Latest 5</span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-                {recentSales.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Sales Orders</div>
-                ) : (
-                  recentSales.map((so: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between bg-card-2 hover:bg-card rounded-lg px-3 py-2 border border-line-soft transition-colors">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[11px] font-bold text-ink truncate">{so.orderNo || `SO-${so.id}`}</span>
-                        <span className="text-[10px] font-medium text-ink-muted truncate">{so.customer?.firmName || so.customer?.displayName || "Customer"}</span>
-                      </div>
-                      <div className="flex flex-col items-end gap-0.5 shrink-0">
-                        <span className="text-[11px] font-black text-ink whitespace-nowrap">₹{Number(so.netAmount || 0).toLocaleString("en-IN")}</span>
-                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${
-                          so.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
-                          so.status === "CANCELLED" ? "bg-rose-500/20 text-rose-300 border-rose-500/30" :
-                          "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                        }`}>{(so.status || "DRAFT").replace(/_/g, " ")}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+          {/* Sales Person Live GPS Interactive Map */}
+          <SalesPersonLiveMap />
         </div>
-        )}
       </div>
 
       {/* ── FIXED FOOTER ────────────────────────────────────── */}
@@ -917,53 +1544,7 @@ const DashboardPage: React.FC = () => {
         <DashboardFooter />
       </div>
 
-      {/* ── Product List Modal ────────────────────────────────── */}
-      {productModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setProductModal(null)}>
-          <div className="bg-card border border-line rounded-lg shadow-2xl w-[480px] max-w-[95vw] max-h-[70vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className={`px-4 py-2.5 flex items-center justify-between ${productModal.type === "purchased" ? "bg-emerald-600" : "bg-rose-600"} text-white`}>
-              <div>
-                <h3 className="text-sm font-bold">
-                  {productModal.type === "purchased" ? "Purchased Products" : "Not Purchased Products"}
-                </h3>
-                <p className="text-[11px] text-white/80 mt-0.5">{productModal.customer}</p>
-              </div>
-              <button onClick={() => setProductModal(null)} className="text-white/80 hover:text-white p-1">
-                <FaTimes className="text-sm" />
-              </button>
-            </div>
-            <div className="px-3 py-2 bg-card-2 border-b border-line-soft flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
-                {productModal.products.length} of {customerPurchaseReport.totalProducts} products
-              </span>
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${productModal.type === "purchased" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-rose-500/10 text-rose-500 border-rose-500/30"}`}>
-                {productModal.type === "purchased" ? "ORDERED" : "NOT ORDERED"}
-              </span>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              {productModal.products.length === 0 ? (
-                <div className="p-6 text-center text-xs text-ink-subtle">No products</div>
-              ) : (
-                <div className="divide-y divide-line-soft">
-                  {productModal.products.map((product, idx) => (
-                    <div key={idx} className="flex items-center gap-2.5 px-4 py-2 hover:bg-card-2 transition-colors">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${productModal.type === "purchased" ? "bg-emerald-500" : "bg-rose-500"}`}>
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs font-semibold text-ink truncate">{product}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="px-4 py-2 border-t border-line-soft flex justify-end">
-              <button onClick={() => setProductModal(null)} className="px-3 py-1 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
