@@ -22,7 +22,6 @@ export interface SalesReturn {
   customerId: string;
   salesInvoiceId?: string | null;
   reason?: string | null;
-  refundMode?: string;
   subTotal?: number;
   taxAmount?: number;
   grandTotal: number;
@@ -44,10 +43,8 @@ export interface CreateSalesReturnDto {
   customerId: string;
   salesInvoiceId?: string;
   reason?: string;
-  refundMode?: "CREDIT_NOTE" | "CASH" | "BANK";
   narration?: string;
   companyId: string;
-  status?: "DRAFT" | "APPROVED" | "COMPLETED";
   items: {
     productId: number;
     salesInvoiceItemId?: string;
@@ -121,11 +118,6 @@ export const returnService = {
 
   updateSalesReturn: async (id: string, data: CreateSalesReturnDto): Promise<SalesReturn> => {
     const response = await apiClient.put(`/returns/sales/${id}`, data);
-    return response.data?.data;
-  },
-
-  confirmSalesReturn: async (id: string): Promise<SalesReturn> => {
-    const response = await apiClient.patch(`/returns/sales/${id}/confirm`);
     return response.data?.data;
   },
 

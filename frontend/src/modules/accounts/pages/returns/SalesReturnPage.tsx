@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUndo, FaPlus, FaTimes, FaEdit, FaEye } from "react-icons/fa";
+import { FaUndo, FaPlus, FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import { returnService, type SalesReturn } from "../../../../services/returnService";
@@ -11,6 +11,7 @@ import { formatStockQty } from "../../../../utils/uomConversion";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { useListCache } from "../../../../hooks/useListCache";
 import CustomButton from "../../../../components/ui/Button/Button";
+import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
@@ -149,14 +150,6 @@ export const SalesReturnPage: React.FC = () => {
       },
     },
     {
-      header: "REFUND MODE",
-      render: (item) => (
-        <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-card-2 text-ink-muted border border-line">
-          {item.refundMode || "CREDIT_NOTE"}
-        </span>
-      ),
-    },
-    {
       header: "STATUS",
       render: (item) => <StatusBadge status={item.status} />,
       align: "center",
@@ -180,23 +173,8 @@ export const SalesReturnPage: React.FC = () => {
       header: "ACTIONS",
       align: "center",
       render: (item) => (
-        <div className="flex items-center justify-center gap-1.5">
-          <button
-            onClick={() => setSelectedViewReturn(item)}
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all duration-200 cursor-pointer"
-            title="View"
-          >
-            <FaEye size={12} />
-          </button>
-          {item.status === "DRAFT" && (
-            <button
-              onClick={() => navigate(`/sales-returns/edit/${item.id}`)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all duration-200 cursor-pointer"
-              title="Edit"
-            >
-              <FaEdit size={12} />
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          <ViewButton onClick={() => setSelectedViewReturn(item)} />
         </div>
       ),
     },
@@ -209,8 +187,8 @@ export const SalesReturnPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
           <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
-            <FaUndo className="text-indigo-500" />
-            Sales Returns (Credit Note)
+           
+            Sales Returns 
           </h2>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full md:w-auto">
@@ -253,8 +231,8 @@ export const SalesReturnPage: React.FC = () => {
                     name="filterStatus"
                     value={draftFilters.status}
                     options={[
-                      { value: "DRAFT", label: "Draft" },
-                      { value: "APPROVED", label: "Approved / Completed" },
+                      { value: "APPROVED", label: "Approved" },
+                      { value: "COMPLETED", label: "Completed" },
                     ]}
                     defaultOptionLabel="All Statuses"
                     searchable={false}
@@ -346,7 +324,6 @@ export const SalesReturnPage: React.FC = () => {
                   ? `INV #${selectedViewReturn.salesInvoiceId}`
                   : "Direct Return",
               },
-              { label: "Refund Mode", value: selectedViewReturn?.refundMode || "CREDIT_NOTE" },
               {
                 label: "Grand Total",
                 value: selectedViewReturn
