@@ -64,7 +64,7 @@ const MachineViewModal: React.FC<MachineViewModalProps> = ({ show, onHide, machi
             <div className="w-full mt-2">
                 <DataTable
                     data={currentAssignment.operators ?? []}
-                    rowKey={(_op, index) => index}
+                    rowKey={(op: any) => op?.employeeId ?? op?.id ?? Math.random()}
                     emptyMessage="No operators assigned"
                     minHeightClassName=""
                     density="compact"
