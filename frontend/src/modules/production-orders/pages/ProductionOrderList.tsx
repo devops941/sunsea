@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaEye, FaSyncAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -37,6 +37,7 @@ const ProductionOrderList: React.FC = () => {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
 
@@ -50,8 +51,8 @@ const ProductionOrderList: React.FC = () => {
             const map = new Map<string, any>();
             arr.forEach((rm: any) => map.set(rm.rawMaterialId?.toString(), rm));
             setRawMaterialsMap(map);
-        } catch (error) {
-            console.error("Failed to fetch raw materials", error);
+        } catch {
+            // silently ignore
         }
     }, []);
 
@@ -67,8 +68,7 @@ const ProductionOrderList: React.FC = () => {
                 }));
             }
             setFullOrder(data);
-        } catch (err) {
-            console.error("❌ Failed to fetch PO details:", err);
+        } catch {
             toast.error("Failed to load production order details");
         } finally {
             setLoadingDetails(false);
@@ -91,8 +91,8 @@ const ProductionOrderList: React.FC = () => {
                         status: "IN_PRODUCTION"
                     });
                     soList = (soRes as any).data || soRes || [];
-                } catch (err) {
-                    console.warn("Sales Orders fetch skipped or permission denied:", err);
+                } catch {
+                    // silently ignore
                 }
             }
 
@@ -101,11 +101,11 @@ const ProductionOrderList: React.FC = () => {
             if (can("production_orders.view") || can("weekly_programs.view")) {
                 try {
                     const poRes = await productionOrderService.fetchAll({
-                        limit: 10
-                    } as any);
+                        pageSize: 1000
+                    });
                     poList = poRes.data || [];
-                } catch (err) {
-                    console.warn("Production Orders fetch skipped or permission denied:", err);
+                } catch {
+                    // silently ignore
                 }
             }
 
@@ -115,8 +115,8 @@ const ProductionOrderList: React.FC = () => {
                 try {
                     const fgRes = await finishedGoodsStockService.fetchAll();
                     fgList = Array.isArray(fgRes) ? fgRes : (fgRes as any).data || [];
-                } catch (err) {
-                    console.warn("Failed to fetch Finished Goods Stock:", err);
+                } catch {
+                    // silently ignore
                 }
             }
 
@@ -240,8 +240,7 @@ const ProductionOrderList: React.FC = () => {
             // 7. Paginate
             const start = (currentPage - 1) * ITEMS_PER_PAGE;
             setCombinedData(combinedList.slice(start, start + ITEMS_PER_PAGE));
-        } catch (error) {
-            console.error("Failed to load combined dashboard data", error);
+        } catch {
             toast.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
@@ -292,7 +291,6 @@ const ProductionOrderList: React.FC = () => {
                 fetchCombinedData();
             }
         } catch (error: any) {
-            console.error("Failed to check materials:", error);
             toast.error(error?.response?.data?.message || error?.message || "Failed to verify material availability.");
         } finally {
             setLoading(false);
@@ -316,7 +314,6 @@ const ProductionOrderList: React.FC = () => {
             }
             fetchCombinedData();
         } catch (error: any) {
-            console.error("Failed to check materials:", error);
             toast.error(error?.response?.data?.message || error?.message || "Failed to verify material availability.");
         } finally {
             setLoading(false);
@@ -367,7 +364,6 @@ const ProductionOrderList: React.FC = () => {
             }
             fetchCombinedData();
         } catch (error: any) {
-            console.error("Failed to allocate raw materials:", error);
             toast.error(error?.response?.data?.message || error?.message || "Failed to allocate raw materials.");
         } finally {
             setLoading(false);
@@ -375,7 +371,8 @@ const ProductionOrderList: React.FC = () => {
     };
 
     const handleDeleteConfirm = async () => {
-        if (!itemToDelete || itemToDelete.length === 0) return;
+        if (!itemToDelete || itemToDelete.length === 0 || isDeleting) return;
+        setIsDeleting(true);
         try {
             for (const id of itemToDelete) {
                 await productionOrderService.delete(id);
@@ -385,8 +382,9 @@ const ProductionOrderList: React.FC = () => {
             setItemToDelete([]);
             fetchCombinedData();
         } catch (error: any) {
-            console.error("Delete error:", error);
             toast.error(error?.response?.data?.message || "Failed to delete order(s)");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -403,7 +401,7 @@ const ProductionOrderList: React.FC = () => {
 
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
-    const columns = [
+    const columns = useMemo(() => [
         {
             header: "#",
             width: "48px",
@@ -453,7 +451,7 @@ const ProductionOrderList: React.FC = () => {
                         />
                     )}
 
-                    {/* CREATED / PENDING_PLANNING / READY_FOR_PLANNING with PO → Assign to Weekly */}
+                    {/* CREATED / PENDING_PLANNING / READY_FOR_PLANNING with PO → Assign to Weekly (NOT for DRAFT) */}
                     {(item.status === "CREATED" || item.status === "PENDING_PLANNING" || item.status === "READY_FOR_PLANNING") && item.primaryPO && (can("weekly_programs.create") || can("production_orders.edit")) && (
                         <IconButton
                             variant="success"
@@ -472,20 +470,6 @@ const ProductionOrderList: React.FC = () => {
                                 icon={FaSyncAlt}
                                 onClick={() => handleRecheckMaterials(item)}
                             />
-                            {/* <IconButton
-                                variant="success"
-                                title="Reserve Raw Materials"
-                                icon={FaCheckCircle}
-                                onClick={() => handleAllocateRM(item)}
-                            /> */}
-                            {/* {can("purchase_orders.create") && (
-                                <IconButton
-                                    variant="warning"
-                                    title="Create Purchase Order for Missing Materials"
-                                    icon={FaShoppingCart}
-                                    onClick={() => navigate(`/purchase-orders/create?po=${item.primaryPO?.productionOrderId}`)}
-                                />
-                            )} */}
                         </>
                     )}
 
@@ -498,14 +482,6 @@ const ProductionOrderList: React.FC = () => {
                             onClick={() => handleAllocateRM(item)}
                         />
                     )}
-                    {/* {item.status === "RM_PENDING" && can("purchase_orders.create") && (
-                        <IconButton
-                            variant="warning"
-                            title="Create Raw Material Purchase Order"
-                            icon={FaShoppingCart}
-                            onClick={() => navigate(`/purchase-orders/create?po=${item.primaryPO?.productionOrderId}`)}
-                        />
-                    )} */}
 
                     {/* View Details */}
                     {item.primaryPO && can("production_orders.view") && (
@@ -522,19 +498,19 @@ const ProductionOrderList: React.FC = () => {
                         />
                     )}
 
-                    {/* Edit — only for CREATED (draft) orders */}
-                    {item.primaryPO && ["CREATED"].includes(item.primaryPO.status?.toUpperCase()) && can("production_orders.edit") && (
+                    {/* Edit — only for CREATED / DRAFT orders */}
+                    {item.primaryPO && ["CREATED", "DRAFT"].includes(item.primaryPO.status?.toUpperCase()) && can("production_orders.edit") && (
                         <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
                     )}
 
                     {/* Delete — only for direct draft orders */}
-                    {item.primaryPO && ["CREATED"].includes(item.primaryPO.status?.toUpperCase()) && item.isDirect && can("production_orders.delete") && (
+                    {item.primaryPO && ["CREATED", "DRAFT"].includes(item.primaryPO.status?.toUpperCase()) && item.isDirect && can("production_orders.delete") && (
                         <DeleteButton onClick={() => triggerDelete(item.productionOrders.map((po: any) => po.productionOrderId))} />
                     )}
                 </div>
             )
         }
-    ];
+    ], [currentPage, can, handleAssignWeekly, handleRecheckMaterials, handleAllocateRM, handleOpenEdit, triggerDelete, fetchOrderDetails]);
 
     const hasInsufficientStock = fullOrder?.products?.some((p: any) =>
         p.rawMaterials?.some((rm: any) => {
@@ -557,14 +533,6 @@ const ProductionOrderList: React.FC = () => {
                 title: "Order Information",
                 fields: [
                     { label: "Order No", value: fullOrder?.productionOrderId || selectedItem.productionOrderId },
-                    { 
-                        label: "Sales Order No", 
-                        value: fullOrder?.salesOrderDetails?.orderNo || selectedItem.salesOrderDetails?.orderNo || selectedItem.sourceSalesOrderId || "Direct Order"
-                    },
-                    { 
-                        label: "Customer", 
-                        value: fullOrder?.salesOrderDetails?.customerName || selectedItem.salesOrderDetails?.customerName || "N/A (Direct)"
-                    },
                     { label: "Priority", value: fullOrder?.priority || selectedItem.priority || "-" },
                 ],
             },
@@ -666,20 +634,6 @@ const ProductionOrderList: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                        {/* {["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED"].includes(prod.status || fullOrder?.status) && (
-                            <div className="flex justify-end mt-2">
-                                <button 
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedProdForIssue(prod);
-                                        setShowIssueModal(true);
-                                    }}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-1.5 rounded text-sm transition-colors"
-                                >
-                                    Issue Raw Materials
-                                </button>
-                            </div>
-                        )} */}
                     </div>
                 ))
             )}
@@ -745,32 +699,13 @@ const ProductionOrderList: React.FC = () => {
                 customContent={modalCustomContent}
             />
 
-            {/* {selectedProdForIssue && (
-                <MaterialIssueModal
-                    show={showIssueModal}
-                    onHide={() => {
-                        setShowIssueModal(false);
-                        setSelectedProdForIssue(null);
-                    }}
-                    productionOrderId={selectedProdForIssue.productionOrderId}
-                    rawMaterials={selectedProdForIssue.rawMaterials || []}
-                    rawMaterialsMap={rawMaterialsMap}
-                    defaultStoreId={fullOrder?.sourceStoreId}
-                    onSuccess={() => {
-                        if (selectedItem) {
-                            fetchOrderDetails(String(selectedItem.productionOrderId || selectedItem.id));
-                        }
-                        fetchCombinedData();
-                    }}
-                />
-            )} */}
-
             {/* DELETE PO MODAL */}
             <CommonConfirmModal
                 show={showDeleteModal}
                 onHide={() => setShowDeleteModal(false)}
                 onConfirm={handleDeleteConfirm}
                 title="Delete Draft Production Order"
+                isDangerous={true}
                 message={
                     <>
                         Are you sure you want to delete the production plan for this order?<br />

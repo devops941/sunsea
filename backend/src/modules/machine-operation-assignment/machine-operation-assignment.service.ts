@@ -100,7 +100,7 @@ export class MachineOperationAssignmentService {
       where.OR = [
         { machineId: { contains: search, mode: "insensitive" } },
         { machine: { machineName: { contains: search, mode: "insensitive" } } },
-        { operatorEmployee: { fullName: { contains: search, mode: "insensitive" } } },
+        { operators: { some: { employee: { fullName: { contains: search, mode: "insensitive" } } } } },
         { inchargeEmployee: { fullName: { contains: search, mode: "insensitive" } } },
         { remarks: { contains: search, mode: "insensitive" } },
       ];

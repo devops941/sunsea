@@ -1193,7 +1193,42 @@ class ProductionOrderService {
       where: { productionOrderId },
       orderBy: { changedAt: "asc" },
     });
-    return history;
+
+    // Separate admin IDs ("admin_<n>") from regular user UUIDs
+    const allIds = Array.from(new Set(history.map((h) => h.changedBy).filter(Boolean))) as string[];
+    const adminIds = allIds.filter((id) => id.startsWith("admin_"));
+    const userIds  = allIds.filter((id) => !id.startsWith("admin_"));
+
+    const nameMap = new Map<string, string>();
+
+    // Resolve regular users
+    if (userIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { userId: { in: userIds } },
+        select: { userId: true, fullName: true, username: true },
+      });
+      users.forEach((u) => nameMap.set(u.userId, u.fullName || u.username));
+    }
+
+    // Resolve admins (stored as "admin_<bigint id>")
+    if (adminIds.length > 0) {
+      const numericIds = adminIds
+        .map((id) => { try { return BigInt(id.replace("admin_", "")); } catch { return null; } })
+        .filter((n): n is bigint => n !== null);
+      if (numericIds.length > 0) {
+        const admins = await prisma.admin.findMany({
+          where: { id: { in: numericIds } },
+          select: { id: true, fullName: true, username: true },
+        });
+        admins.forEach((a) => nameMap.set(`admin_${a.id}`, a.fullName || a.username));
+      }
+    }
+
+    return history.map((h) => ({
+      ...h,
+      id: h.id.toString(),
+      changedByName: h.changedBy ? (nameMap.get(h.changedBy) ?? h.changedBy) : null,
+    }));
   }
 }
 

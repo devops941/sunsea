@@ -29,6 +29,7 @@ class ProductionOrderController {
       toDate: req.query.toDate as string,
       sortBy: this.parseSortBy(req.query.sortBy) ?? "createdAt",
       sortOrder: this.parseSortOrder(req.query.sortOrder) ?? "desc",
+      sourceSalesOrderId: req.query.sourceSalesOrderId as string,
     };
 
     const orders = await productionOrderService.findAll(query);

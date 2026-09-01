@@ -15,6 +15,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { getImageUrl } from "../../../utils/ImageUrls";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { employeeService } from "../../../services/employeeService";
 import { roleService } from "../../../services/roleService";
@@ -628,16 +629,17 @@ const ProductForm: React.FC = () => {
                         </div>
                     )}
 
-                    {/* ── Images & BOM side-by-side ── */}
-                    <div className="grid grid-cols-2 gap-x-4">
+                    {/* ── Images & BOM stacked full-width ── */}
+                    <div className="flex flex-col gap-4">
 
                         {/* Product Images */}
                         <div>
                             <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Product Images</h3>
                             </div>
-                            <div className="flex gap-2 items-stretch">
-                                <div className="flex-1 border border-line-soft rounded p-2 bg-card-2 flex flex-col justify-center min-w-0">
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Left: file input */}
+                                <div className="border border-line-soft rounded p-3 bg-card-2 flex flex-col justify-center">
                                     <input
                                         ref={fileInputRef}
                                         type="file"
@@ -648,35 +650,38 @@ const ProductForm: React.FC = () => {
                                         disabled={remainingSlots <= 0}
                                         style={{ height: 'auto', minHeight: 'auto' }}
                                     />
-                                    <p className="text-[10px] text-ink-subtle mt-0.5 leading-tight">
+                                    <p className="text-[10px] text-ink-subtle mt-1 leading-tight">
                                         Max {MAX_IMAGES} · First = primary · {remainingSlots > 0 ? `${remainingSlots} left` : "Limit reached"}
                                     </p>
-                                    {errors.images && <p className="text-[10px] text-red-500">{errors.images}</p>}
+                                    {errors.images && <p className="text-[10px] text-red-500 mt-0.5">{errors.images}</p>}
                                 </div>
 
-                                {existingImages.map((img, index) => (
-                                    <div key={`existing-${img.id}`} className="w-14 h-14 border border-line-soft rounded relative flex items-center justify-center bg-card-2 flex-shrink-0">
-                                        <img src={getImageUrl(img.imageUrl)} alt={`img-${index + 1}`} className="max-h-full max-w-full object-contain rounded" />
-                                        {index === 0 && <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[7px] font-bold px-0.5 rounded leading-none">Pri</span>}
-                                        <button type="button" className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full hover:bg-red-600" onClick={() => handleRemoveExistingImage(img.id)}><FaTimes size={6} /></button>
-                                    </div>
-                                ))}
+                                {/* Right: image previews */}
+                                <div className="border border-line-soft rounded p-3 bg-card-2 flex flex-wrap gap-2 items-center min-h-[60px]">
+                                    {existingImages.map((img, index) => (
+                                        <div key={`existing-${img.id}`} className="w-14 h-14 border border-line-soft rounded relative flex items-center justify-center bg-card flex-shrink-0">
+                                            <img src={getImageUrl(img.imageUrl)} alt={`img-${index + 1}`} className="max-h-full max-w-full object-contain rounded" />
+                                            {index === 0 && <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[7px] font-bold px-0.5 rounded leading-none">Pri</span>}
+                                            <button type="button" className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full hover:bg-red-600" onClick={() => handleRemoveExistingImage(img.id)}><FaTimes size={6} /></button>
+                                        </div>
+                                    ))}
 
-                                {newImagePreviews.map((preview, index) => (
-                                    <div key={`new-${index}`} className="w-14 h-14 border border-line-soft rounded relative flex items-center justify-center bg-card-2 flex-shrink-0">
-                                        <img src={preview} alt={`new-${index + 1}`} className="max-h-full max-w-full object-contain rounded" />
-                                        {existingImages.length === 0 && index === 0 && <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[7px] font-bold px-0.5 rounded leading-none">Pri</span>}
-                                        <span className="absolute bottom-0.5 left-0.5 bg-primary text-white text-[7px] font-bold px-0.5 rounded leading-none">New</span>
-                                        <button type="button" className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full hover:bg-red-600" onClick={() => handleRemoveNewImage(index)}><FaTimes size={6} /></button>
-                                    </div>
-                                ))}
+                                    {newImagePreviews.map((preview, index) => (
+                                        <div key={`new-${index}`} className="w-14 h-14 border border-line-soft rounded relative flex items-center justify-center bg-card flex-shrink-0">
+                                            <img src={preview} alt={`new-${index + 1}`} className="max-h-full max-w-full object-contain rounded" />
+                                            {existingImages.length === 0 && index === 0 && <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[7px] font-bold px-0.5 rounded leading-none">Pri</span>}
+                                            <span className="absolute bottom-0.5 left-0.5 bg-primary text-white text-[7px] font-bold px-0.5 rounded leading-none">New</span>
+                                            <button type="button" className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full hover:bg-red-600" onClick={() => handleRemoveNewImage(index)}><FaTimes size={6} /></button>
+                                        </div>
+                                    ))}
 
-                                {!hasAnyImage && (
-                                    <div className="w-14 h-14 border border-dashed border-line-soft rounded flex flex-col items-center justify-center bg-card-2 text-ink-subtle flex-shrink-0">
-                                        <FaImage size={12} className="opacity-40" />
-                                        <span className="text-[8px] mt-0.5">No img</span>
-                                    </div>
-                                )}
+                                    {!hasAnyImage && (
+                                        <div className="flex flex-col items-center justify-center w-full h-full text-ink-subtle opacity-50">
+                                            <FaImage size={20} />
+                                            <span className="text-[10px] mt-1">No images</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -686,41 +691,63 @@ const ProductForm: React.FC = () => {
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Raw Materials (BOM) <span className="text-rose-500">*</span></h3>
                                 <CustomButton text="Add Raw Material" icon={FaPlus} onClick={handleAddRawMaterial} type="button" size="sm" variant="secondary" />
                             </div>
-                            {rawMaterials.length > 0 ? (
-                                <div className="border border-line-soft rounded-lg overflow-visible bg-card">
-                                    <table className="w-full text-left text-[11px]">
-                                        <thead className="bg-card-2 text-ink-muted border-b border-line-soft">
-                                            <tr>
-                                                <th className="px-2 py-1 font-semibold text-[10px] w-[60%]">Raw Material</th>
-                                                <th className="px-2 py-1 font-semibold text-[10px] w-[28%]">Percentage (%)</th>
-                                                <th className="px-2 py-1 font-semibold text-[10px] w-[12%] text-center">Del</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-line-soft">
-                                            {rawMaterials.map((rm, idx) => (
-                                                <tr key={`rm-${idx}`} className="hover:bg-card-2/60 transition-colors">
-                                                    <td className="px-2 py-0.5 align-top">
-                                                        <SelectInput hideLabel={true} name={`rm-${idx}`} value={rm.rawMaterialId} options={[{ value: "", label: "-- Select --" }, ...bomOptions]} onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)} error={errors[`rawMaterials.${idx}.rawMaterialId`]} />
-                                                    </td>
-                                                    <td className="px-2 py-0.5 align-top">
-                                                        <TextInput label="" bottom={true} name={`percent-${idx}`} type="number" step="0.01" value={rm.percentage} placeholder="0.00" onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)} error={errors[`rawMaterials.${idx}.percentage`]} />
-                                                    </td>
-                                                    <td className="px-2 py-0.5 align-top text-center">
-                                                        <DeleteButton onClick={() => handleRemoveRawMaterial(idx)} />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {errors.rawMaterials && <div className="px-2 py-1 bg-red-500/10 text-red-400 text-[10px] font-medium border-t border-line-soft">{errors.rawMaterials}</div>}
-                                </div>
-                            ) : (
-                                <div>
-                                    <div className={`text-[11px] italic p-2 rounded-lg border border-dashed text-center ${errors.rawMaterials ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-medium' : 'bg-card-2 border-line-soft text-ink-subtle'}`}>
+                            <DataTable
+                                columns={[
+                                    {
+                                        header: "RAW MATERIAL",
+                                        render: (_, idx) => (
+                                            <SelectInput
+                                                hideLabel
+                                                noMargin
+                                                name={`rm-${idx}`}
+                                                value={rawMaterials[idx]?.rawMaterialId ?? ""}
+                                                options={[{ value: "", label: "-- Select --" }, ...bomOptions]}
+                                                onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)}
+                                                error={errors[`rawMaterials.${idx}.rawMaterialId`]}
+                                            />
+                                        ),
+                                    },
+                                    {
+                                        header: "PERCENTAGE (%)",
+                                        width: "200px",
+                                        render: (_, idx) => (
+                                            <TextInput
+                                                label=""
+                                                bottom
+                                                name={`percent-${idx}`}
+                                                type="number"
+                                                step="0.01"
+                                                value={rawMaterials[idx]?.percentage ?? ""}
+                                                placeholder="0.00"
+                                                onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)}
+                                                error={errors[`rawMaterials.${idx}.percentage`]}
+                                            />
+                                        ),
+                                    },
+                                    {
+                                        header: "",
+                                        width: "52px",
+                                        align: "center",
+                                        render: (_, idx) => (
+                                            <DeleteButton onClick={() => handleRemoveRawMaterial(idx)} />
+                                        ),
+                                    },
+                                ] as DataTableColumn<any>[]}
+                                data={rawMaterials}
+                                rowKey={(rm) => rm.rawMaterialId || rawMaterials.indexOf(rm)}
+                                minHeightClassName="min-h-0"
+                                density="compact"
+                                emptyMessage={
+                                    <span className={errors.rawMaterials ? "text-rose-400 font-medium" : "text-ink-subtle"}>
                                         No raw materials added. Click "Add Raw Material" to specify the composition.
-                                    </div>
-                                    {errors.rawMaterials && <p className="mt-0.5 text-[10px] text-rose-400 font-medium">{errors.rawMaterials}</p>}
-                                </div>
+                                    </span>
+                                }
+                            />
+                            {errors.rawMaterials && rawMaterials.length === 0 && (
+                                <p className="mt-1 text-[10px] text-rose-400 font-medium">{errors.rawMaterials}</p>
+                            )}
+                            {errors.rawMaterials && rawMaterials.length > 0 && (
+                                <p className="mt-1 text-[10px] text-rose-400 font-medium">{errors.rawMaterials}</p>
                             )}
                         </div>
                     </div>

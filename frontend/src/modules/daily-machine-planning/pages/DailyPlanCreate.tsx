@@ -108,6 +108,7 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Machine-specific product capacity ────────────────────────────────────
   const [machineProductCapacity, setMachineProductCapacity] = useState<number | null>(null);
+  const [noCapacityWarning, setNoCapacityWarning] = useState(false);
 
   // States to keep track of existing plans for this Date & Machine to disable fully utilized shifts
   const [plansForDateAndMachine, setPlansForDateAndMachine] = useState<any[]>([]);
@@ -421,6 +422,7 @@ const DailyPlanCreate: React.FC = () => {
     if (!weeklyProgramId) {
       setSelectedWeeklyProg(null);
       setRemainingQty(null);
+      setNoCapacityWarning(false);
       return;
     }
     const wp = weeklyPrograms.find((p: any) => p.weeklyProgramId === weeklyProgramId);
@@ -455,15 +457,19 @@ const DailyPlanCreate: React.FC = () => {
     const poRemaining = Math.max(0, poTarget - poProduced);
 
     if (!isCarryForward) {
-      // First plan — use remaining PO qty but capped at capacity if capacity > 0
+      // First plan — auto-fill from machine capacity; if none set, warn and leave blank
       getCapacity().then((cap) => {
         setRemainingQty(poRemaining);
         if (!isEdit && machineId) {
           if (location.state && (location.state as any).plannedQty) {
+            setNoCapacityWarning(false);
             setPlannedQty(String(Number((location.state as any).plannedQty)));
+          } else if (cap > 0) {
+            setNoCapacityWarning(false);
+            setPlannedQty(String(cap));
           } else {
-            const qty = (cap > 0 && poRemaining > cap) ? cap : poRemaining;
-            setPlannedQty(String(qty));
+            setNoCapacityWarning(true);
+            setPlannedQty("");
           }
         }
       });
@@ -497,13 +503,15 @@ const DailyPlanCreate: React.FC = () => {
       setRemainingQty(remaining);
       if (!isEdit) {
         if (location.state && (location.state as any).plannedQty) {
+          setNoCapacityWarning(false);
           const stateQty = Number((location.state as any).plannedQty);
           setPlannedQty(String(Math.round(stateQty * 1000) / 1000));
         } else if (effectiveCapacity > 0) {
-          const qty = (remaining > effectiveCapacity) ? effectiveCapacity : remaining;
-          setPlannedQty(String(qty));
+          setNoCapacityWarning(false);
+          setPlannedQty(String(effectiveCapacity));
         } else {
-          setPlannedQty(String(remaining > 0 ? remaining : ""));
+          setNoCapacityWarning(true);
+          setPlannedQty("");
         }
       }
     }).catch(() => setRemainingQty(null))
@@ -584,8 +592,7 @@ const DailyPlanCreate: React.FC = () => {
   const overCapacity = remainingQty !== null && Number(plannedQty) > remainingQty;
 
   // ── Submit ───────────────────────────────────────────────────────────────
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (targetStatus: string) => {
 
     const schema = z.object({
       weeklyProgramId: z.string().min(1, "Weekly Program is required"),
@@ -648,7 +655,7 @@ const DailyPlanCreate: React.FC = () => {
         plannedQty: Number(plannedQty),
         plannedHours: Number(plannedHours) || null,
         priority,
-        status,
+        status: targetStatus,
         remarks: remarks.trim() || null,
         productionOrderId: selectedWeeklyProg?.productionOrderId,
         carryForwardFromPlanId: carryForwardFromPlanId || null,
@@ -695,7 +702,7 @@ const DailyPlanCreate: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-[1024px] xl:mr-auto">
-    <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
+    <form onSubmit={(e) => e.preventDefault()} className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-5 py-4 border-b border-line">
         <div>
@@ -926,7 +933,7 @@ const DailyPlanCreate: React.FC = () => {
               )}
             </div>
 
-            {isEdit && (
+            {isEdit && status !== "DRAFT" && (
               <SelectInput
                 label="Status"
                 horizontal
@@ -967,6 +974,12 @@ const DailyPlanCreate: React.FC = () => {
                 <div className="text-[11px] text-primary font-semibold mt-1 ml-[148px]">
                   Capacity: {machineProductCapacity.toLocaleString()} / Shift
                   {Number(plannedQty) < machineProductCapacity && ` · ${machineProductCapacity - Number(plannedQty)} pcs remaining`}
+                </div>
+              )}
+              {noCapacityWarning && machineId && weeklyProgramId && (
+                <div className="mt-1.5 ml-[148px] flex items-center gap-1.5 text-amber-400 text-[11px] font-medium">
+                  <FaExclamationTriangle size={11} />
+                  <span>Machine capacity not set for this product. Please enter planned quantity manually.</span>
                 </div>
               )}
               {overCapacity && (
@@ -1034,14 +1047,29 @@ const DailyPlanCreate: React.FC = () => {
           text="Cancel"
           variant="secondary"
           onClick={() => navigate("/daily-machine-planning")}
+          disabled={isSubmitting}
         />
         {(isEdit ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) && (
-          <CustomButton
-            text={isSubmitting ? "Saving..." : (isEdit ? "Update Plan" : "Create Plan")}
-            icon={isSubmitting ? undefined : FaSave}
-            type="submit"
-            disabled={isSubmitting}
-          />
+          <>
+            {/* Show Save as Draft + Create Plan when creating, or when editing a DRAFT plan */}
+            {(!isEdit || (isEdit && status === "DRAFT")) && (
+              <CustomButton
+                text={isSubmitting ? "Saving..." : "Save as Draft"}
+                icon={isSubmitting ? undefined : FaSave}
+                variant="secondary"
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleSubmit("DRAFT")}
+              />
+            )}
+            <CustomButton
+              text={isSubmitting ? "Saving..." : (isEdit && status !== "DRAFT" ? "Update Plan" : "Create Plan")}
+              icon={isSubmitting ? undefined : FaSave}
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED")}
+            />
+          </>
         )}
       </div>
 

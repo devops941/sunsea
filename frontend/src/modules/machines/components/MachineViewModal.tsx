@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
+import DataTable from "../../../components/ui/table/DataTable";
 
 interface MachineViewModalProps {
     show: boolean;
@@ -61,32 +62,31 @@ const MachineViewModal: React.FC<MachineViewModalProps> = ({ show, onHide, machi
     } else if (currentAssignment) {
         const operatorsTable = (
             <div className="w-full mt-2">
-                <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                        <tr className="bg-slate-50 border-y border-slate-200">
-                            <th className="px-4 py-2 font-semibold text-slate-600">S.No</th>
-                            <th className="px-4 py-2 font-semibold text-slate-600">Operator Name</th>
-                            <th className="px-4 py-2 font-semibold text-slate-600">Role</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {currentAssignment.operators && currentAssignment.operators.length > 0 ? (
-                            currentAssignment.operators.map((op: any, index: number) => (
-                                <tr key={index} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-4 py-2 border-b border-slate-100 text-slate-500">{index + 1}</td>
-                                    <td className="px-4 py-2 border-b border-slate-100 font-medium text-slate-800">
-                                        {op.employee?.fullName} {op.employee?.empCode ? `(${op.employee.empCode})` : ""}
-                                    </td>
-                                    <td className="px-4 py-2 border-b border-slate-100 text-slate-600">{op.role?.name || "N/A"}</td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan={3} className="px-4 py-3 text-center text-slate-400">No operators assigned</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                <DataTable
+                    data={currentAssignment.operators ?? []}
+                    rowKey={(_op, index) => index}
+                    emptyMessage="No operators assigned"
+                    minHeightClassName=""
+                    density="compact"
+                    columns={[
+                        {
+                            header: "S.No",
+                            width: "60px",
+                            align: "center",
+                            render: (_op, index) => index + 1,
+                        },
+                        {
+                            header: "Operator Name",
+                            render: (op) =>
+                                `${op.employee?.fullName ?? ""}${op.employee?.empCode ? ` (${op.employee.empCode})` : ""}`,
+                        },
+                        {
+                            header: "Role",
+                            width: "120px",
+                            render: (op) => op.role?.name || "N/A",
+                        },
+                    ]}
+                />
             </div>
         );
 

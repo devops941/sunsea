@@ -35,16 +35,20 @@ const WastageViewModal: React.FC<WastageViewModalProps> = ({
       fields: [
         { label: "Wastage Type", value: <StatusBadge status={wastage.wastageType} /> },
         { label: "Logged Quantity", value: `${wastage.quantity} ${wastage.uom}` },
-        { label: "Estimated Value", value: `â‚¹${wastage.estimatedValue ? Number(wastage.estimatedValue).toFixed(2) : "0.00"}` },
-        { label: "Raw Material Component", value: wastage.rawMaterial?.materialName || "N/A" },
       ]
     },
     {
       title: "Audit & Options",
       fields: [
-        { label: "Recyclable Wastage", value: wastage.isRecyclable ? "Yes" : "No" },
-        { label: "Sent for Rework", value: wastage.sentForRework ? "Yes" : "No" },
-        { label: "Approved By", value: wastage.approvedBy || "Not Audited" },
+        {
+          label: "Approved By",
+          value: wastage.approvedByUser?.name
+            || wastage.approvedByUser?.fullName
+            || wastage.approvedByUser?.username
+            || wastage.approvedByEmployee?.employeeName
+            || wastage.approvedBy
+            || "Not Audited"
+        },
       ]
     },
     {

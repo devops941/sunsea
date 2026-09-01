@@ -540,14 +540,12 @@ const DailyProductionPlanningPage: React.FC = () => {
         const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
         let activeStepName = null;
 
-        if (plan.status === "POST_PRODUCTION") {
+        if (plan.status === "POST_PRODUCTION" && customSteps.length > 0) {
           const currentStepKey = plan.currentProductionStep || customSteps[0]?.stepKey;
-          if (currentStepKey && customSteps.length > 0) {
+          if (currentStepKey) {
             const stepIndex = customSteps.findIndex((s: any) => s.stepKey === currentStepKey) + 1;
             const displayIndex = stepIndex > 0 ? stepIndex : 1;
             activeStepName = `Step: ${currentStepKey} (${displayIndex}/${customSteps.length})`;
-          } else {
-            activeStepName = currentStepKey ? `Step: ${currentStepKey}` : "Post Production";
           }
         }
 
@@ -683,7 +681,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         const plannedHoursCount = Number(plan.plannedHours || 0);
         const allHoursLogged = plannedHoursCount > 0 && loggedHoursCount >= plannedHoursCount;
         const nextStatus = STATUS_FLOW[plan.status]?.next;
-        let canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
+        let canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED" && plan.status !== "DRAFT";
         if (plan.status === "IN_PROGRESS") canAdvance = canAdvance && (producedQty >= plannedQty);
         const canLog = plan.status === "IN_PROGRESS";
         let targetNextStatus = STATUS_FLOW[plan.status]?.next;
@@ -828,10 +826,8 @@ const DailyProductionPlanningPage: React.FC = () => {
               />
             )}
             {(() => {
-              // Don't show stop button before the plan has started
-              if (["DRAFT", "PLANNED", "CANCELLED", "POST_PRODUCTION"].includes(plan.status)) return null;
-              // Don't show for completed plans that fully met their target (no shortage)
-              if (plan.status === "COMPLETED" && producedQty >= plannedQty && !plan.remarks?.includes("Short Closed:")) return null;
+              // Don't show stop button before the plan has started, or once it's fully completed
+              if (["DRAFT", "PLANNED", "CANCELLED", "POST_PRODUCTION", "COMPLETED"].includes(plan.status)) return null;
               if (!can("daily-machine-planning.edit")) return null;
               // Show disabled when PO is permanently closed
               const isPOPermanentlyClosed =

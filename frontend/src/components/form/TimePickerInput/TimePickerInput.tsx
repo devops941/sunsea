@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Form } from "react-bootstrap";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import ReactDOM from "react-dom";
 import { FaRegClock } from "react-icons/fa";
 import "./TimePickerInput.css";
 
@@ -26,7 +26,10 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
   onChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Parse 24h (HH:mm) into 12h components
   const parseTime = (timeStr: string) => {
@@ -75,18 +78,56 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
     return `${hStr}:${mStr}`;
   };
 
-  // Close dropdown on click outside
+  // Calculate fixed position for portal dropdown
+  const checkPosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const dropdownHeight = 290;
+    const dropdownWidth = 320;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    const left = Math.min(rect.left, window.innerWidth - dropdownWidth - 8);
+
+    if (spaceBelow < dropdownHeight) {
+      // Open upward
+      setDropdownStyle({
+        position: "fixed",
+        bottom: window.innerHeight - rect.top + 4,
+        left,
+        width: dropdownWidth,
+        zIndex: 99999,
+      });
+    } else {
+      // Open downward
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left,
+        width: dropdownWidth,
+        zIndex: 99999,
+      });
+    }
+  }, []);
+
+  // Close dropdown on click outside; reposition on scroll/resize
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideContainer = containerRef.current?.contains(target);
+      const insideDropdown = dropdownRef.current?.contains(target);
+      if (!insideContainer && !insideDropdown) {
         setIsOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", checkPosition, true);
+    window.addEventListener("resize", checkPosition);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", checkPosition, true);
+      window.removeEventListener("resize", checkPosition);
     };
-  }, []);
+  }, [checkPosition]);
 
   const handleSelectHour = (h: string) => {
     const newTime = formatTime(h, minute || "00", period);
@@ -129,6 +170,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
 
       <div className={`relative ${horizontal ? "flex-1" : ""}`}>
         <div
+          ref={triggerRef}
           className={`
             w-full h-10 px-4 flex items-center justify-between
             border rounded-[10px] outline-none cursor-pointer
@@ -140,7 +182,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
             }
             ${disabled ? "bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70" : "text-ink"}
           `}
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => { if (!disabled) { checkPosition(); setIsOpen(!isOpen); } }}
         >
           <span className={`truncate ${!displayValue ? "text-ink-subtle" : ""}`}>
             {displayValue || "hh:mm AM/PM"}
@@ -148,8 +190,12 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
           <FaRegClock className="text-ink-subtle flex-shrink-0" />
         </div>
 
-        {isOpen && !disabled && (
-          <div className="absolute top-[40px] left-0 z-50 bg-card border border-line-soft rounded-xl shadow-xl w-[320px] overflow-hidden text-ink">
+        {isOpen && !disabled && ReactDOM.createPortal(
+          <div
+            ref={dropdownRef}
+            className="bg-card border border-line-soft rounded-xl shadow-2xl overflow-hidden text-ink"
+            style={dropdownStyle}
+          >
             <div className="flex bg-card border-b border-line-soft">
               {/* Hour Column */}
               <div className="flex-1 border-r border-line-soft">
@@ -212,7 +258,8 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
                 Done
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 

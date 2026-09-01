@@ -273,7 +273,12 @@ const GoodsDispatchCreate: React.FC = () => {
     },
   ];
 
+  const DISPATCH_ELIGIBLE_STATUSES = ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"];
+
   const filteredEligibleOrders = eligibleOrders.filter((o) => {
+    // Only allow fully completed orders — block POST_PRODUCTION and earlier statuses
+    if (!DISPATCH_ELIGIBLE_STATUSES.includes(o.status)) return false;
+    if (!searchPo) return true;
     return (
       o.productionOrderId?.toLowerCase().includes(searchPo.toLowerCase()) ||
       o.productItem?.productName?.toLowerCase().includes(searchPo.toLowerCase())

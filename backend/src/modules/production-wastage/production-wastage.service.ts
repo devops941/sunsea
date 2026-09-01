@@ -3,6 +3,29 @@ import { ApiError } from "../../utils/ApiError";
 import { CreateProductionWastageInput, UpdateProductionWastageInput } from "./production-wastage.validation";
 
 class ProductionWastageService {
+  private async enrichWithApprovedByUser(wastage: any) {
+    if (!wastage || !wastage.approvedBy) return wastage;
+    const user = await prisma.user.findUnique({
+      where: { userId: wastage.approvedBy },
+      select: { userId: true, fullName: true, username: true }
+    });
+    return { ...wastage, approvedByUser: user ?? null };
+  }
+
+  private async enrichManyWithApprovedByUser(wastages: any[]) {
+    const userIds = [...new Set(wastages.map((w: any) => w.approvedBy).filter(Boolean))];
+    if (userIds.length === 0) return wastages;
+    const users = await prisma.user.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, fullName: true, username: true }
+    });
+    const userMap = new Map(users.map((u) => [u.userId, u]));
+    return wastages.map((w: any) => ({
+      ...w,
+      approvedByUser: w.approvedBy ? (userMap.get(w.approvedBy) ?? null) : null
+    }));
+  }
+
   private async generateWastageNo(): Promise<string> {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -192,7 +215,8 @@ class ProductionWastageService {
       findOptions.take = limit;
     }
 
-    const data = await prisma.productionWastage.findMany(findOptions);
+    const rawData = await prisma.productionWastage.findMany(findOptions);
+    const data = await this.enrichManyWithApprovedByUser(rawData);
 
     if (page !== undefined && limit !== undefined) {
       return {
@@ -225,7 +249,7 @@ class ProductionWastageService {
       throw new ApiError(404, `Production Wastage record with ID ${id} not found`);
     }
 
-    return record;
+    return this.enrichWithApprovedByUser(record);
   }
 
   async update(id: bigint, data: UpdateProductionWastageInput, userId: string) {
@@ -346,7 +370,7 @@ class ProductionWastageService {
         }
       }
 
-      return updatedWastage;
+      return this.enrichWithApprovedByUser(updatedWastage);
     });
   }
 
@@ -357,7 +381,7 @@ class ProductionWastageService {
       throw new ApiError(400, "Only records in DRAFT status can be rejected");
     }
 
-    return prisma.productionWastage.update({
+    const updated = await prisma.productionWastage.update({
       where: { id },
       data: {
         status: "REJECTED",
@@ -373,6 +397,7 @@ class ProductionWastageService {
         category: true,
       }
     });
+    return this.enrichWithApprovedByUser(updated);
   }
 }
 
