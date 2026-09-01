@@ -125,6 +125,26 @@ export const accountService = {
     return response.data?.data || response.data;
   },
 
+  /**
+   * Set (or reset) the opening balance of a bank / cash ledger.
+   * The backend posts an idempotent JV against Opening Balance Equity —
+   * customer / supplier ledgers are never touched.
+   */
+  setBankOpeningBalance: async (id: number, openingBalance: number): Promise<{ ledgerId: number; openingBalance: number }> => {
+    const response = await apiClient.post(`/accounts/ledgers/${id}/opening-balance`, { openingBalance });
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Repair legacy customer/supplier opening balance vouchers whose contra
+   * side was wrongly routed to a bank/cash ledger. Safe to call any number
+   * of times — a no-op after the first successful run.
+   */
+  repairPartyOpeningVouchers: async (): Promise<{ removed: number; ok: boolean }> => {
+    const response = await apiClient.post(`/accounts/repair-opening-vouchers`);
+    return response.data?.data || response.data;
+  },
+
   fetchStatement: async (
     id: number,
     params?: { startDate?: string; endDate?: string; search?: string }

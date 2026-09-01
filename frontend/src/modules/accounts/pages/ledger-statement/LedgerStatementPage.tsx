@@ -1676,7 +1676,8 @@ export const LedgerStatementPage: React.FC = () => {
                     Opening
                   </span>
                   <span className="text-sm font-mono font-bold text-ink">
-                    ₹ {statement.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹ {Math.abs(statement.openingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="ml-1 text-[10px]">{statement.openingBalance >= 0 ? "Dr" : "Cr"}</span>
                   </span>
                 </div>
                 <div className="border-l border-line pl-4">
@@ -1684,7 +1685,8 @@ export const LedgerStatementPage: React.FC = () => {
                     Closing
                   </span>
                   <span className="text-sm font-mono font-black text-blue-500">
-                    ₹ {statement.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹ {Math.abs(statement.closingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="ml-1 text-[10px]">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                   </span>
                 </div>
               </div>
@@ -1936,21 +1938,45 @@ export const LedgerStatementPage: React.FC = () => {
 
                     // GROUPED mode (multi ledger, non-merged) — segment rows by
                     // accountName and emit Busy-style "*** ACCOUNT ***" header
-                    // + net-movement footer per account.
-                    const groups: Array<{ name: string; rows: any[] }> = [];
+                    // + closing balance row per account.
+                    //
+                    // IMPORTANT: group by accountName ACROSS the whole entry
+                    // list (not contiguously). If an account has movements on
+                    // Mar-31, Aug-15 and Sep-01 interleaved with other accounts'
+                    // entries, we still want ONE "*** ACCOUNT ***" section
+                    // holding all three rows in date order — not three separate
+                    // sections that split the same account. Preserving each
+                    // account's FIRST-SEEN order keeps the overall list roughly
+                    // chronological while keeping each account contiguous.
+                    const groupMap = new Map<string, any[]>();
                     for (const row of filteredEntries as any[]) {
                       const name = row.accountName || "—";
-                      const last = groups[groups.length - 1];
-                      if (last && last.name === name) last.rows.push(row);
-                      else groups.push({ name, rows: [row] });
+                      const bucket = groupMap.get(name);
+                      if (bucket) bucket.push(row);
+                      else groupMap.set(name, [row]);
+                    }
+                    // Pull the synthetic OPENING BALANCE row out — it's a
+                    // combined roll-up, not a real per-account section, so it
+                    // renders as a stand-alone row at the very top with no
+                    // header and no per-account closing footer.
+                    const openingRows = groupMap.get("OPENING BALANCE") || [];
+                    groupMap.delete("OPENING BALANCE");
+                    const groups: Array<{ name: string; rows: any[] }> = [];
+                    for (const [name, rows] of groupMap) {
+                      groups.push({ name, rows });
                     }
                     let rowCursor = 0;
-                    let usedRowsCount = 0;
+                    let usedRowsCount = openingRows.length;
                     // Per-account opening/closing balances from backend, keyed
                     // by account name. Used to render Busy-style "Closing
                     // Balance" per section with the actual account balance
-                    // (opening + all movements), not just net movement.
+                    // (opening + all movements).
                     const acctBalances = (statement as any).accountBalances || {};
+                    const openingOutput = openingRows.map((r) => {
+                      const el = renderRow(r, rowCursor);
+                      rowCursor++;
+                      return el;
+                    });
                     const groupOutput = groups.map((g, gi) => {
                       // 1 header + N rows + 1 footer
                       usedRowsCount += 2 + g.rows.length;
@@ -1990,6 +2016,7 @@ export const LedgerStatementPage: React.FC = () => {
                     });
                     return (
                       <>
+                        {openingOutput}
                         {groupOutput}
                         {renderFillers(usedRowsCount, "grp-")}
                       </>

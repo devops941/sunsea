@@ -17,7 +17,6 @@ import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useSocket } from "../../../providers/SocketProvider";
-import apiClient from "../../../api/apiClient";
 
 const supplierFormSchema = z.object({
     companyId: z.string().optional(),
@@ -95,24 +94,8 @@ const SupplierForm: React.FC = () => {
         stateCode: "TN",
         openingBalance: 0,
         openingBalanceType: "CREDIT",
-        openingBalancePaidThroughLedgerId: "",
         status: "Active",
     });
-
-    // Load bank/cash ledgers so the "Deposit / Withdrawal" selector can offer real accounts
-    const [bankAccounts, setBankAccounts] = useState<Array<{ id: number; code: string; name: string; group: string }>>([]);
-    useEffect(() => {
-        let cancelled = false;
-        apiClient
-            .get("/accounts/bank-accounts")
-            .then((res) => {
-                if (cancelled) return;
-                const accounts = res.data?.data?.accounts || res.data?.accounts || [];
-                setBankAccounts(accounts);
-            })
-            .catch(() => { /* silent — dropdown just stays empty, contra falls back to Opening Equity */ });
-        return () => { cancelled = true; };
-    }, []);
 
     const [addresses, setAddresses] = useState<SupplierAddress[]>([
         {
@@ -153,7 +136,6 @@ const SupplierForm: React.FC = () => {
             stateCode: supplier.stateCode || "TN",
             openingBalance: Number(supplier.openingBalance) || 0,
             openingBalanceType: supplier.openingBalanceType || "CREDIT",
-            openingBalancePaidThroughLedgerId: supplier.openingBalancePaidThroughLedgerId || "",
             status: supplier.status || "Active",
         });
 
@@ -260,7 +242,6 @@ const SupplierForm: React.FC = () => {
                 stateCode: "TN",
                 openingBalance: 0,
                 openingBalanceType: "CREDIT",
-                openingBalancePaidThroughLedgerId: "",
                 status: "Active",
             });
             setAddresses([{
@@ -435,9 +416,6 @@ const SupplierForm: React.FC = () => {
         if (!isEdit) {
             payload.openingBalance = Number(formData.openingBalance || 0);
             payload.openingBalanceType = formData.openingBalanceType || "CREDIT";
-            if (formData.openingBalancePaidThroughLedgerId) {
-                payload.openingBalancePaidThroughLedgerId = Number(formData.openingBalancePaidThroughLedgerId);
-            }
         }
 
         try {
@@ -636,18 +614,6 @@ const SupplierForm: React.FC = () => {
                                         <p className="mt-0.5 text-[10px] text-amber-600">Set once. Cannot be edited later.</p>
                                     </div>
                                     <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} />
-                                    {Number(formData.openingBalance || 0) > 0 && (
-                                        <div className="col-span-2">
-                                            <SelectInput
-                                                searchable
-                                                label={formData.openingBalanceType === "DEBIT" ? "Advance Paid From (Bank / Cash)" : "Related Bank / Cash Account (optional)"}
-                                                name="openingBalancePaidThroughLedgerId"
-                                                value={String(formData.openingBalancePaidThroughLedgerId || "")}
-                                                options={[{ value: "", label: "— Opening Balance Equity —" }, ...bankAccounts.map((b) => ({ value: String(b.id), label: `[${b.code}] ${b.name}` }))]}
-                                                onChange={handleChange as any}
-                                            />
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}

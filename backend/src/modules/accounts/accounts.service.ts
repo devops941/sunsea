@@ -772,15 +772,34 @@ class AccountsService {
           ? (naturalSideIsCredit ? "Net advance paid to suppliers" : "Net advance received from customers")
           : "Combined Opening Balance",
         particulars: `Opening Balance (${ids.length} accounts)`,
+        // Marked so the frontend can render it as a top-level row (or a
+        // dedicated "OPENING BALANCE" section) instead of an ugly
+        // "*** — ***" placeholder header.
+        accountName: "OPENING BALANCE",
         debit: openingDebit,
         credit: openingCredit,
         runningBalance: openingBalance,
       });
     }
 
+    // Diagnostic: log selection membership + amounts for a few items so we
+    // can spot cases where an entry appears in the list but its debit/credit
+    // both end up 0 (WHERE matched a side that later doesn't pass the has()
+    // check — e.g. type mismatch between Set entries and item ledger IDs).
+    let __diagLogged = 0;
     for (const item of journalItems) {
       const isSelectedDebit = item.debitLedgerId && selectedIds.has(item.debitLedgerId);
       const isSelectedCredit = item.creditLedgerId && selectedIds.has(item.creditLedgerId);
+      if (__diagLogged < 5 && !isSelectedDebit && !isSelectedCredit) {
+        console.warn("[getMultiLedger] item matched WHERE but neither side is in selectedIds", {
+          itemId: item.id,
+          debitLedgerId: item.debitLedgerId,
+          creditLedgerId: item.creditLedgerId,
+          selectedIdsSize: selectedIds.size,
+          selectedIdsSample: Array.from(selectedIds).slice(0, 10),
+        });
+        __diagLogged++;
+      }
       // If both sides are within the selected set, the entry is internal — skip
       if (isSelectedDebit && isSelectedCredit) continue;
 
@@ -1382,6 +1401,104 @@ class AccountsService {
 
   async ensureSupplierLedger(supplier: { id: number; supplierCode: string; legalName: string }, txClient?: Prisma.TransactionClient) {
     return this.ensurePartyLedger({ type: "SUPPLIER", id: supplier.id, code: supplier.supplierCode, name: supplier.legalName }, txClient);
+  }
+
+  /**
+   * One-time repair for legacy customer/supplier opening balance vouchers
+   * whose contra side was wrongly routed to a bank/cash ledger. Deletes any
+   * offending voucher, then triggers the sync so a clean one is re-posted
+   * against Opening Balance Equity (EQ-001).
+   *
+   * Safe to run any number of times — after the first successful run, no
+   * more mismatched vouchers exist and subsequent calls are a no-op.
+   */
+  async repairPartyOpeningBalanceVouchers() {
+    const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand"];
+    const bankLedgers = await prisma.accountLedger.findMany({
+      where: {
+        type: LedgerType.ASSET,
+        group: { in: bankGroups, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    const bankLedgerIds = new Set(bankLedgers.map((l) => l.id));
+
+    const vouchers = await prisma.voucher.findMany({
+      where: { refDocType: { in: ["CUSTOMER_OPENING_BALANCE", "SUPPLIER_OPENING_BALANCE"] } },
+      include: { items: { select: { debitLedgerId: true, creditLedgerId: true } } },
+    });
+
+    const badVoucherIds = vouchers
+      .filter((v) =>
+        v.items.some(
+          (it) =>
+            (it.debitLedgerId != null && bankLedgerIds.has(it.debitLedgerId)) ||
+            (it.creditLedgerId != null && bankLedgerIds.has(it.creditLedgerId))
+        )
+      )
+      .map((v) => v.id);
+
+    if (badVoucherIds.length > 0) {
+      await prisma.$transaction([
+        prisma.journalItem.deleteMany({ where: { voucherId: { in: badVoucherIds } } }),
+        prisma.voucher.deleteMany({ where: { id: { in: badVoucherIds } } }),
+      ]);
+    }
+
+    const { voucherPostingService } = require("./voucherPosting.service");
+    await voucherPostingService.syncMissingOpeningBalanceVouchers();
+
+    return { removed: badVoucherIds.length, ok: true };
+  }
+
+  /**
+   * Set (or reset) the opening balance for a bank/cash ledger.
+   *
+   * Idempotent — any prior `JV-LEDG-OP-<code>` for the same ledger is deleted
+   * first so the user can adjust the number without stacking duplicate JVs.
+   * Passing `amount = 0` clears the opening balance entirely (no new voucher).
+   *
+   * The voucher hits the target ledger and `EQ-001 Opening Balance Equity` —
+   * never a customer/supplier ledger.
+   */
+  async setBankOpeningBalance(ledgerId: number, amount: number) {
+    const ledger = await prisma.accountLedger.findUnique({ where: { id: ledgerId } });
+    if (!ledger) throw new ApiError(404, "Ledger not found");
+
+    const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand"];
+    const isBankLike =
+      ledger.type === LedgerType.ASSET &&
+      bankGroups.some((g) => g.toLowerCase() === (ledger.group || "").toLowerCase().trim());
+    if (!isBankLike) {
+      throw new ApiError(400, "Opening balance edit is only allowed on bank / cash ledgers");
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new ApiError(400, "Opening balance must be a non-negative number");
+    }
+
+    const refDocId = String(ledger.id);
+    const existing = await prisma.voucher.findMany({
+      where: { refDocType: "LEDGER_OPENING_BALANCE", refDocId },
+      select: { id: true },
+    });
+    if (existing.length > 0) {
+      await prisma.$transaction([
+        prisma.journalItem.deleteMany({ where: { voucherId: { in: existing.map((v) => v.id) } } }),
+        prisma.voucher.deleteMany({ where: { id: { in: existing.map((v) => v.id) } } }),
+      ]);
+    }
+
+    if (amount > 0) {
+      const { voucherPostingService } = require("./voucherPosting.service");
+      await voucherPostingService.postGenericLedgerOpeningBalanceVoucher(
+        { id: ledger.id, code: ledger.code, name: ledger.name },
+        amount,
+        "DEBIT"
+      );
+    }
+
+    return { ledgerId: ledger.id, openingBalance: amount };
   }
 }
 

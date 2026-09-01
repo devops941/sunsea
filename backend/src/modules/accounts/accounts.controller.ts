@@ -212,6 +212,30 @@ export class AccountsController {
     }
   }
 
+  async setBankOpeningBalance(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      const amount = Number(req.body?.openingBalance);
+      const data = await accountsService.setBankOpeningBalance(id, amount);
+      res.json({ success: true, data, message: "Opening balance updated" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async repairPartyOpeningBalanceVouchers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await accountsService.repairPartyOpeningBalanceVouchers();
+      res.json({
+        success: true,
+        data,
+        message: `Repaired ${data.removed} legacy opening-balance voucher(s)`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getBalanceSheet(req: Request, res: Response, next: NextFunction) {
     try {
       const { asOnDate, showZeroBalance, groupByCategory } = req.query;

@@ -17,7 +17,6 @@ import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
 import CreatableSelectInput from "../../../components/form/CreatableSelectInput/CreatableSelectInput";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import apiClient from "../../../api/apiClient";
 
 const addressSchema = z.object({
   addressLine1: z.string().min(1, "Address Line 1 is required"),
@@ -48,7 +47,6 @@ const customerFormSchema = z.object({
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/, "Invalid GSTIN format").optional().or(z.literal("")),
   openingBalance: z.string().min(1, "Opening Balance is required"),
   openingBalanceType: z.string().min(1, "Opening Balance Type is required"),
-  openingBalancePaidThroughLedgerId: z.string().optional(),
   creditLimit: z.string().min(1, "Credit Limit is required").refine(val => !isNaN(Number(val)) && Number(val) >= 25000, { message: "Credit Limit must be at least ₹25000" }),
 
 
@@ -70,7 +68,6 @@ const initialFormData: CustomerFormValues = {
   creditLimit: "",
   openingBalance: "",
   openingBalanceType: "DEBIT",
-  openingBalancePaidThroughLedgerId: "",
   addresses: [{ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }]
 };
 
@@ -129,7 +126,6 @@ const CustomerFormPage: React.FC = () => {
   const { addCustomer, editCustomer } = useCustomers();
 
   const [loading, setLoading] = useState(isEditMode);
-  const [bankAccounts, setBankAccounts] = useState<Array<{ id: number; code: string; name: string; group: string }>>([]);
 
   const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
   const [deleteGradeModalState, setDeleteGradeModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
@@ -157,20 +153,6 @@ const CustomerFormPage: React.FC = () => {
   const handleRemoveAddress = (index: number) => {
     remove(index);
   };
-
-  // Load bank/cash accounts so the "Deposit To" dropdown can offer real ledgers.
-  useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .get("/accounts/bank-accounts")
-      .then((res) => {
-        if (cancelled) return;
-        const accounts = res.data?.data?.accounts || res.data?.accounts || [];
-        setBankAccounts(accounts);
-      })
-      .catch(() => { /* silent — dropdown just stays empty and defaults to Opening Equity */ });
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     if (isEditMode) {
@@ -241,15 +223,12 @@ const CustomerFormPage: React.FC = () => {
         creditLimit: Number(data.creditLimit) || 0,
         openingBalance: Number(data.openingBalance || 0),
         openingBalanceType: data.openingBalanceType || "DEBIT",
-        openingBalancePaidThroughLedgerId: data.openingBalancePaidThroughLedgerId
-          ? Number(data.openingBalancePaidThroughLedgerId)
-          : undefined,
         status: data.isActive === "true" ? "Active" : "Inactive",
       };
 
       if (isEditMode && id) {
         // Exclude openingBalance and openingBalanceType — both are immutable after creation
-        const { openingBalance: _ob, openingBalanceType: _obt, openingBalancePaidThroughLedgerId: _ol, ...updatePayload } = payload;
+        const { openingBalance: _ob, openingBalanceType: _obt, ...updatePayload } = payload;
         await editCustomer(id, updatePayload as any);
         toast.success("Customer updated successfully");
       } else {
@@ -392,32 +371,6 @@ const CustomerFormPage: React.FC = () => {
                 error={errors.openingBalanceType?.message}
               />
             )} />
-            {/*
-              Deposit / Withdrawal account for the opening advance.
-              Visible only when a real cash movement is being recorded so the
-              user isn't asked to pick a bank for a purely historical opening.
-                • CREDIT opening → advance RECEIVED from customer → pick where the money LANDED
-                • DEBIT  opening → we PAID the customer an advance → pick where the money CAME FROM
-              If the user leaves it blank, the contra falls back to EQ-001 (Opening Balance Equity).
-            */}
-            {!isEditMode && Number(watch("openingBalance") || 0) > 0 && (
-              <Controller name="openingBalancePaidThroughLedgerId" control={control} render={({ field }) => (
-                <SelectInput
-                  searchable
-                  label={watch("openingBalanceType") === "CREDIT" ? "Advance Deposited To (Bank / Cash)" : "Advance Paid From (Bank / Cash)"}
-                  name={field.name}
-                  value={field.value || ""}
-                  options={[
-                    { value: "", label: "— Opening Balance Equity (historical, no bank movement) —" },
-                    ...bankAccounts.map((b) => ({
-                      value: String(b.id),
-                      label: `[${b.code}] ${b.name}`,
-                    })),
-                  ]}
-                  onChange={(e: any) => field.onChange(e.target.value)}
-                />
-              )} />
-            )}
             <Controller name="creditLimit" control={control} render={({ field }) => (
               <CtrlText field={field} label="Credit Limit ₹" type="number" placeholder="30000" preventNegative error={errors.creditLimit?.message} />
             )} />
