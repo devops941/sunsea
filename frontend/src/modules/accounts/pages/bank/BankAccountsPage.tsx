@@ -15,6 +15,7 @@ interface BankAccount {
   currentBalance: number;
   totalDebit: number;
   totalCredit: number;
+  hasOpeningBalance: boolean;
 }
 
 interface BankAccountsData {
@@ -44,6 +45,7 @@ const BankAccountsPage: React.FC = () => {
   const [newCode, setNewCode] = useState("");
   const [newGroup, setNewGroup] = useState("Bank Accounts");
   const [newOpeningBalance, setNewOpeningBalance] = useState<string>("");
+  const [newOpeningDC, setNewOpeningDC] = useState<"D" | "C">("C");
 
   // Edit-opening-balance modal state
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
@@ -116,9 +118,10 @@ const BankAccountsPage: React.FC = () => {
     setNewCode("");
     setNewGroup("Bank Accounts");
     setNewOpeningBalance("");
+    setNewOpeningDC("C");
   };
 
-  const handleAddBank = async (e: React.FormEvent) => {
+  const handleAddBank = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newName || !newCode) {
       toast.error("Account name and code are required");
@@ -137,7 +140,7 @@ const BankAccountsPage: React.FC = () => {
         type: "ASSET",
         group: newGroup,
         openingBalance,
-        openingBalanceType: "DEBIT" as const,
+        openingBalanceType: newOpeningDC === "C" ? "DEBIT" : "CREDIT",
       });
       toast.success(
         openingBalance > 0
@@ -267,18 +270,20 @@ const BankAccountsPage: React.FC = () => {
                   <p className="text-[10px] uppercase tracking-wide font-mono text-ink-subtle mt-0.5">{acc.code}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingBank(acc);
-                      setEditOpeningBalance("");
-                    }}
-                    title="Set / edit opening balance"
-                    className="p-1 rounded border border-line text-ink-subtle hover:text-blue-600 hover:border-blue-500/40 transition-colors"
-                  >
-                    <FaPen className="text-[9px]" />
-                  </button>
+                  {!acc.hasOpeningBalance && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingBank(acc);
+                        setEditOpeningBalance("");
+                      }}
+                      title="Set opening balance (one-time only)"
+                      className="p-1 rounded border border-line text-ink-subtle hover:text-blue-600 hover:border-blue-500/40 transition-colors"
+                    >
+                      <FaPen className="text-[9px]" />
+                    </button>
+                  )}
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                     isCashAccount(acc.group, acc.name)
                       ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
@@ -294,12 +299,8 @@ const BankAccountsPage: React.FC = () => {
                   acc.currentBalance >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}>
                   ₹{Math.abs(acc.currentBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  {/* Bank/Cash is an ASSET — natural side is Dr. A negative
-                      balance means the ledger sits on Cr (overdraft / cash
-                      shortage). Label must reflect the ACTUAL side; the old
-                      code wrote "(Dr)" on negatives which was the reverse. */}
                   <span className="text-[10px] ml-1">
-                    {acc.currentBalance < 0 ? "(Cr)" : "(Dr)"}
+                    {acc.currentBalance >= 0 ? "(Cr)" : "(Dr)"}
                   </span>
                 </p>
               </div>
@@ -378,15 +379,29 @@ const BankAccountsPage: React.FC = () => {
                   <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
                     Opening Balance (₹)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={newOpeningBalance}
-                    onChange={(e) => setNewOpeningBalance(e.target.value)}
-                    className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
-                  />
+                  <div className="flex gap-1">
+                    <select
+                      value={newOpeningDC}
+                      onChange={(e) => setNewOpeningDC(e.target.value as "D" | "C")}
+                      className={`px-2 py-2 border border-line bg-card-2 rounded text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 ${newOpeningDC === "D" ? "text-red-400" : "text-emerald-500"}`}
+                    >
+                      <option value="D">Dr</option>
+                      <option value="C">Cr</option>
+                    </select>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={newOpeningBalance}
+                      onChange={(e) => setNewOpeningBalance(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
+                    />
+                  </div>
+                  <p className="mt-1 text-[9px] text-ink-subtle">
+                    <span className="text-red-400 font-bold">Dr</span> = Minus (↓) &nbsp;·&nbsp;
+                    <span className="text-emerald-500 font-bold">Cr</span> = Add (↑)
+                  </p>
                 </div>
 
               </div>

@@ -105,6 +105,10 @@ export const voucherService = {
     const response = await apiClient.get("/vouchers/next-no", { params: { type } });
     return response.data?.data?.voucherNo || "";
   },
+
+  deleteVoucher: async (id: number): Promise<void> => {
+    await apiClient.delete(`/vouchers/${id}`);
+  },
 };
 
 /**

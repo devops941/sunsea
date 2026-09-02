@@ -277,8 +277,8 @@ class AccountsService {
     // saturating the Neon pool). Now: 2 groupBy queries total, regardless of
     // ledger count. Runs in an interactive $transaction so both share one
     // connection.
-    const { debitRows, creditRows } = await prisma.$transaction(async (tx) => {
-      const [debitRows, creditRows] = await Promise.all([
+    const { debitRows, creditRows, openingVouchers } = await prisma.$transaction(async (tx) => {
+      const [debitRows, creditRows, openingVouchers] = await Promise.all([
         tx.journalItem.groupBy({
           by: ["debitLedgerId"],
           where: { debitLedgerId: { in: ledgerIds } },
@@ -289,8 +289,15 @@ class AccountsService {
           where: { creditLedgerId: { in: ledgerIds } },
           _sum: { creditAmount: true },
         }),
+        tx.voucher.findMany({
+          where: {
+            refDocType: "LEDGER_OPENING_BALANCE",
+            refDocId: { in: ledgerIds.map(String) },
+          },
+          select: { refDocId: true },
+        }),
       ]);
-      return { debitRows, creditRows };
+      return { debitRows, creditRows, openingVouchers };
     });
 
     const debitMap = new Map<number, number>(
@@ -298,6 +305,9 @@ class AccountsService {
     );
     const creditMap = new Map<number, number>(
       creditRows.map((r) => [r.creditLedgerId as number, Number(r._sum?.creditAmount || 0)])
+    );
+    const openingBalanceSet = new Set<number>(
+      openingVouchers.map((v) => Number(v.refDocId))
     );
 
     const results = ledgers.map((ledger) => {
@@ -311,6 +321,7 @@ class AccountsService {
         currentBalance: totalDebit - totalCredit,
         totalDebit,
         totalCredit,
+        hasOpeningBalance: openingBalanceSet.has(ledger.id),
       };
     });
 
@@ -482,7 +493,42 @@ class AccountsService {
     const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
     const signedOpeningBalance = openingType === naturalSide ? openingBalance : -openingBalance;
 
-    let runningBalance = 0;
+    // For bank/cash ledgers (no customer or supplier link), pull the opening
+    // balance from the dedicated LEDGER_OPENING_BALANCE JV and exclude it from
+    // the transaction list. This makes the Opening Balance stat card show the
+    // actual amount while keeping the statement table clean.
+    const isBankLedger = !ledger.customerId && !ledger.supplierId;
+    let openingBalanceForDisplay = signedOpeningBalance;
+    let itemsForStatement = journalItems;
+
+    if (isBankLedger) {
+      const openingJvItems = journalItems.filter(
+        (item) => item.voucher.refDocType === "LEDGER_OPENING_BALANCE"
+      );
+      itemsForStatement = journalItems.filter(
+        (item) => item.voucher.refDocType !== "LEDGER_OPENING_BALANCE"
+      );
+      let computedOpening = 0;
+      for (const item of openingJvItems) {
+        const isDebit = item.debitLedgerId === id;
+        const rawDebit = Number(item.debitAmount);
+        const rawCredit = Number(item.creditAmount);
+        const amt = rawDebit > 0 ? rawDebit : rawCredit > 0 ? rawCredit : 0;
+        if (isAssetOrExpense) {
+          computedOpening += isDebit ? amt : -amt;
+        } else {
+          computedOpening += isDebit ? -amt : amt;
+        }
+      }
+      openingBalanceForDisplay = computedOpening;
+    }
+
+    // For bank ledgers the opening JV is excluded from itemsForStatement so we
+    // start from the computed opening. For customer/supplier ledgers the opening
+    // JV IS included as a regular row — starting from openingBalanceForDisplay
+    // would double-count it (e.g. opening 5,000 + JV credit 5,000 = 10,000).
+    // Mirror the same logic used in getMultiLedgerStatement.
+    let runningBalance = isBankLedger ? openingBalanceForDisplay : 0;
     const entries: any[] = [];
 
     const getParticularsLabel = (item: any, isDebit: boolean): string => {
@@ -518,7 +564,7 @@ class AccountsService {
       }
     };
 
-    for (const item of journalItems) {
+    for (const item of itemsForStatement) {
       let isDebit = item.debitLedgerId === id;
       const rawDebit = Number(item.debitAmount);
       const rawCredit = Number(item.creditAmount);
@@ -578,7 +624,7 @@ class AccountsService {
       // side, e.g. customer with a CREDIT-type opening = advance received).
       // The running balance is already signed, so keeping both signed makes
       // the header banner consistent with the row math.
-      openingBalance: signedOpeningBalance,
+      openingBalance: openingBalanceForDisplay,
       closingBalance: runningBalance,
       entries: filteredEntries,
     };
@@ -1425,10 +1471,7 @@ class AccountsService {
       select: { id: true },
     });
     if (existing.length > 0) {
-      await prisma.$transaction([
-        prisma.journalItem.deleteMany({ where: { voucherId: { in: existing.map((v) => v.id) } } }),
-        prisma.voucher.deleteMany({ where: { id: { in: existing.map((v) => v.id) } } }),
-      ]);
+      throw new ApiError(400, "Opening balance has already been set for this account and cannot be changed");
     }
 
     if (amount > 0) {

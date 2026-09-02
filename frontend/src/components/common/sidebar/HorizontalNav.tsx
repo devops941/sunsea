@@ -21,6 +21,8 @@ const HorizontalNav = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const navContainerRef = useRef<HTMLDivElement>(null);
+  const dropdownPortalRef = useRef<HTMLDivElement>(null);
 
   // Dropdown portal state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -35,20 +37,64 @@ const HorizontalNav = () => {
   // Close menus on route change
   useEffect(() => {
     setActiveMenuId(null);
+    setActiveSubMenuId(null);
     setShowProfileMenu(false);
   }, [location.pathname]);
 
+  // Click outside listener for navigation dropdown menus
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      const isInsideNav = navContainerRef.current?.contains(target);
+      const isInsideDropdown = dropdownPortalRef.current?.contains(target);
+
+      if (!isInsideNav && !isInsideDropdown) {
+        setActiveMenuId(null);
+        setActiveSubMenuId(null);
+      }
+    };
+
+    if (activeMenuId) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      document.addEventListener("touchstart", handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [activeMenuId]);
+
+  // Close dropdown on window resize or scroll
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      if (activeMenuId) {
+        setActiveMenuId(null);
+        setActiveSubMenuId(null);
+      }
+    };
+    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    return () => {
+      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+    };
+  }, [activeMenuId]);
+
   // Click outside listener for profile menu
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
         setShowProfileMenu(false);
       }
     };
     if (showProfileMenu) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [showProfileMenu]);
 
   const handleMenuClick = (e: React.MouseEvent, title: string) => {
@@ -153,16 +199,8 @@ const HorizontalNav = () => {
   return (
     <div className="w-full bg-slate-900/95 backdrop-blur-md text-white shadow-sm border-b border-slate-800/80 relative z-40 hidden lg:flex items-center justify-between px-3.5 py-1.5">
       
-      {/* ── BACKGROUND OVERLAY TO CLOSE MENUS ── */}
-      {activeMenuId && (
-        <div 
-          className="fixed inset-0 z-40"
-          onClick={() => setActiveMenuId(null)}
-        />
-      )}
-
       {/* ── MIDDLE: Navigation Items ── */}
-      <div className="flex-1 overflow-x-auto no-scrollbar">
+      <div className="flex-1 overflow-x-auto no-scrollbar" ref={navContainerRef}>
         <ul className="flex items-center gap-1.5 min-w-max list-none m-0 p-0 flex-nowrap">
           {filteredSidebarItems.map((menu) => {
             const menuActive = isMenuActive(menu);
@@ -318,6 +356,7 @@ const HorizontalNav = () => {
       {/* ── FIXED PORTAL FOR DROPDOWNS (Prevents scroll clipping) ── */}
       {activeMenuData && activeMenuData.children && activeMenuData.children.length > 0 && (
         <div 
+          ref={dropdownPortalRef}
           className="fixed z-50 pt-2 animate-in fade-in slide-in-from-top-2"
           style={{ top: `${menuRect.bottom}px`, left: `${menuRect.left}px` }}
         >

@@ -69,6 +69,23 @@ class VouchersController {
       next(error);
     }
   }
+  async deleteVoucher(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      const result = await vouchersService.deleteVoucher(id);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("voucher:deleted", { id });
+        io.emit("accountLedger:updated", { source: "voucher" });
+      } catch (e) {}
+
+      return res.status(200).json({ success: true, message: "Voucher deleted", data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const vouchersController = new VouchersController();

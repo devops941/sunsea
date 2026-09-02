@@ -12,9 +12,11 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
    TYPES
    ════════════════════════════════════════════════════════════════ */
 interface SalesPurchaseTrendChartProps {
-  salesOrders: any[];
-  purchaseOrders: any[];
-  productionOrders: any[];
+  salesOrders?: any[];
+  purchaseOrders?: any[];
+  productionOrders?: any[];
+  salesInvoices?: any[];
+  purchaseInvoices?: any[];
 }
 
 const trendChartConfig = {
@@ -50,7 +52,10 @@ const useIsMobile = () => {
 };
 
 const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
-  salesOrders, purchaseOrders,
+  salesOrders = [],
+  purchaseOrders = [],
+  salesInvoices = [],
+  purchaseInvoices = [],
 }) => {
   const [period, setPeriod] = useState<PeriodKey>(() => {
     try {
@@ -135,10 +140,23 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
       }
     }
 
-    const processOrder = (order: any, isSales: boolean) => {
-      const d = new Date(order.createdAt || order.orderDate);
+    const effectiveSales = Array.isArray(salesInvoices) && salesInvoices.length > 0 ? salesInvoices : salesOrders;
+    const effectivePurchases = Array.isArray(purchaseInvoices) && purchaseInvoices.length > 0 ? purchaseInvoices : purchaseOrders;
+
+    const processItem = (item: any, isSales: boolean) => {
+      if (item.status && String(item.status).toUpperCase() === "CANCELLED") return;
+
+      const dateVal = item.invoiceDate || item.orderDate || item.grnDate || item.createdAt;
+      const d = new Date(dateVal);
       if (isNaN(d.getTime())) return;
-      const amount = Number(order.netAmount) || Number(order.totalAmount) || 0;
+
+      const amount =
+        Number(item.grandTotal) ||
+        Number(item.netAmount) ||
+        Number(item.totalAmount) ||
+        Number(item.subtotal) ||
+        0;
+
       for (const b of buckets) {
         if (d >= b.start && d < b.end) {
           if (isSales) b.sales += amount;
@@ -148,15 +166,15 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
       }
     };
 
-    if (Array.isArray(salesOrders)) salesOrders.forEach(o => processOrder(o, true));
-    if (Array.isArray(purchaseOrders)) purchaseOrders.forEach(o => processOrder(o, false));
+    if (Array.isArray(effectiveSales)) effectiveSales.forEach((o) => processItem(o, true));
+    if (Array.isArray(effectivePurchases)) effectivePurchases.forEach((o) => processItem(o, false));
 
-    return buckets.map(b => ({
+    return buckets.map((b) => ({
       name: b.label,
       sales: Math.round(b.sales),
-      purchase: Math.round(b.purchase)
+      purchase: Math.round(b.purchase),
     }));
-  }, [salesOrders, purchaseOrders, period]);
+  }, [salesOrders, purchaseOrders, salesInvoices, purchaseInvoices, period]);
 
   const totalSales = useMemo(() => chartData.reduce((sum, d) => sum + d.sales, 0), [chartData]);
   const totalPurchase = useMemo(() => chartData.reduce((sum, d) => sum + d.purchase, 0), [chartData]);

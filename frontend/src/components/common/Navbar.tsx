@@ -37,14 +37,20 @@ const TopNavbar: React.FC<NavbarProps> = ({
 
   // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    if (showDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showDropdown]);
 
   const handleConfirmLogout = () => {
     setShowLogoutModal(false);
@@ -93,35 +99,73 @@ const TopNavbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-3 relative" ref={dropdownRef}>
+      <div className="flex items-center gap-3">
         {/* Live Status Indicator */}
         <LiveBadge />
 
         {/* Profile */}
-        <div
-          className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all hover:bg-card-2"
-          role="button"
-          tabIndex={0}
-          onClick={() => setShowDropdown(!showDropdown)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") setShowDropdown(!showDropdown);
-          }}
-        >
-          <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-            {avatarImage ? (
-              <img src={avatarImage} alt="avatar" className="w-full h-full object-cover" />
-            ) : (
-              getInitials(user?.fullName)
-            )}
+        <div className="relative" ref={dropdownRef}>
+          <div
+            className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all hover:bg-card-2"
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowDropdown(!showDropdown)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setShowDropdown(!showDropdown);
+            }}
+          >
+            <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+              {avatarImage ? (
+                <img src={avatarImage} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                getInitials(user?.fullName)
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-ink leading-tight">
+                {user ? user.fullName : "Guest"}
+              </span>
+              <span className="text-xs text-ink-muted leading-tight">
+                {formatRole(user)}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-ink leading-tight">
-              {user ? user.fullName : "Guest"}
-            </span>
-            <span className="text-xs text-ink-muted leading-tight">
-              {formatRole(user)}
-            </span>
-          </div>
+
+          {/* Dropdown Menu */}
+          {showDropdown && (
+            <div className="absolute right-0 top-16 w-40 bg-card border border-line rounded-xl shadow-[0px_8px_30px_rgba(0,0,0,0.3)] py-2.5 z-50">
+              {/* Menu Items */}
+              <div className="px-1.5 space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDropdown(false);
+                    onProfileClick?.();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-card-2 hover:text-ink rounded-lg transition-colors text-left border-none outline-none cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                    <FaUser size={13} />
+                  </div>
+                  <span className="font-semibold">My Profile</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDropdown(false);
+                    setShowLogoutModal(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 rounded-lg transition-colors text-left border-none outline-none cursor-pointer pt-2"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                    <FaSignOutAlt size={13} />
+                  </div>
+                  <span className="font-bold">Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* MD Approval Shortcut */}
@@ -148,43 +192,6 @@ const TopNavbar: React.FC<NavbarProps> = ({
           <FaSignOutAlt className="text-sm" />
           <span className="hidden sm:inline">Logout</span>
         </button>
-
-        {/* Dropdown Menu */}
-        {showDropdown && (
-          <div className="absolute right-0 top-16 w-40 bg-card border border-line rounded-xl shadow-[0px_8px_30px_rgba(0,0,0,0.3)] py-2.5 z-50">
-            {/* User Header Block */}
-
-
-            {/* Menu Items */}
-            <div className="px-1.5 space-y-0.5">
-              <button
-                onClick={() => {
-                  setShowDropdown(false);
-                  onProfileClick?.();
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-card-2 hover:text-ink rounded-lg transition-colors text-left border-none outline-none cursor-pointer"
-              >
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                  <FaUser size={13} />
-                </div>
-                <span className="font-semibold">My Profile</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowDropdown(false);
-                  setShowLogoutModal(true);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 rounded-lg transition-colors text-left border-none outline-none cursor-pointer pt-2"
-              >
-                <div className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
-                  <FaSignOutAlt size={13} />
-                </div>
-                <span className="font-bold">Logout</span>
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Logout Confirmation Modal */}

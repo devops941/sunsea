@@ -7,10 +7,7 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 
-// Contra is Journal's twin: free-form D/C rows with balanced totals. The
-// only real business rule is that every ledger picked must be a cash or
-// bank account (Contra = money transfer between cash and bank, or between
-// two bank accounts — never touches customers, suppliers, income, expense).
+// Each row: D = money LEAVES (Out → credited in journal), C = money ARRIVES (In → debited in journal)
 interface ContraRow {
   id: number;
   dc: "D" | "C";
@@ -52,7 +49,6 @@ const ContraVoucherAddPage: React.FC = () => {
     fetcher: ledgersFetcher,
   });
 
-  // Keyboard nav — DC → account → amount → narration → next row DC
   const tableRef = useRef<HTMLDivElement>(null);
 
   const focusCell = (rowIdx: number, field: "dc" | "account" | "amount" | "narration") => {
@@ -117,16 +113,13 @@ const ContraVoucherAddPage: React.FC = () => {
     return true;
   };
 
-  // Busy-style: after save, clear the form so the operator can enter the
-  // next Contra voucher without navigating away. Date is preserved because
-  // most operators do a batch of same-day entries.
   const resetForm = () => {
     setMainNarration("");
     setRows(buildEmptyRows());
     setTimeout(() => focusCell(0, "dc"), 0);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
 
     const validRows = rows.filter((r) => r.ledgerId && parseFloat(r.amount) > 0);
@@ -139,14 +132,16 @@ const ContraVoucherAddPage: React.FC = () => {
       return;
     }
 
+    // D = money LEAVES this account (balance decreases) → CREDIT in journal
+    // C = money ARRIVES at this account (balance increases) → DEBIT in journal
     const items = validRows.map((r) => {
       const amt = parseFloat(r.amount);
-      const isDebit = r.dc === "D";
+      const isDOut = r.dc === "D"; // D = Out = source = Credit posting
       return {
-        debitLedgerId: isDebit ? parseInt(r.ledgerId, 10) : null,
-        creditLedgerId: !isDebit ? parseInt(r.ledgerId, 10) : null,
-        debitAmount: isDebit ? amt : 0,
-        creditAmount: !isDebit ? amt : 0,
+        debitLedgerId: !isDOut ? parseInt(r.ledgerId, 10) : null,  // C = In = Debit
+        creditLedgerId: isDOut ? parseInt(r.ledgerId, 10) : null,  // D = Out = Credit
+        debitAmount: !isDOut ? amt : 0,
+        creditAmount: isDOut ? amt : 0,
         narration: r.narration || mainNarration || "Contra Entry",
       };
     });
@@ -159,7 +154,6 @@ const ContraVoucherAddPage: React.FC = () => {
         narration: mainNarration || "Contra Entry",
         items,
       });
-      // Optimistic list update — Contra Register cache gets the new voucher.
       if (created?.id) {
         prependToListCacheByPrefix<Voucher>("accounts:contra-vouchers:", created);
       }
@@ -176,12 +170,12 @@ const ContraVoucherAddPage: React.FC = () => {
     <div className="p-3">
       <div className="w-full lg:w-7xl max-w-full">
         <form onSubmit={handleSubmit} className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
-          {/* Title bar — Contra uses rose/pink accent */}
+          {/* Title bar */}
           <div className="bg-rose-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
             Add Contra Voucher
           </div>
 
-          {/* Top meta grid — Contra has NO Mode field (same as Journal) */}
+          {/* Top meta */}
           <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[11px] items-center">
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Date</label>
             <div className="col-span-4">
@@ -211,17 +205,21 @@ const ContraVoucherAddPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Spreadsheet items grid — Journal-style D/C + Dr/Cr split.
-             Ledger dropdown restricted to cash/bank accounts only. */}
+          {/* Spreadsheet table */}
           <div className="border-b border-line" ref={tableRef}>
             <table className="w-full text-[11px] border-collapse">
               <thead>
                 <tr className="bg-card-2 text-ink font-bold border-b border-line">
                   <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
-                  <th className="w-12 px-2 py-1 text-center border-r border-line">D/C</th>
+                  <th className="w-20 px-2 py-1 text-center border-r border-line">
+                    D / C
+                    <div className="text-[9px] font-normal text-ink-subtle normal-case tracking-normal">
+                      D=Out(↓) · C=In(↑)
+                    </div>
+                  </th>
                   <th className="px-2 py-1 text-left border-r border-line">Account (Cash / Bank)</th>
-                  <th className="w-28 px-2 py-1 text-right border-r border-line">Debit (Rs.)</th>
-                  <th className="w-28 px-2 py-1 text-right border-r border-line">Credit (Rs.)</th>
+                  <th className="w-28 px-2 py-1 text-right border-r border-line text-red-400">Debit (Rs.)</th>
+                  <th className="w-28 px-2 py-1 text-right border-r border-line text-emerald-500">Credit (Rs.)</th>
                   <th className="px-2 py-1 text-left">Short Narration</th>
                 </tr>
               </thead>
@@ -237,13 +235,15 @@ const ContraVoucherAddPage: React.FC = () => {
                       <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[11px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
                         {idx + 1}
                       </td>
-                      <td className="w-12 px-0 py-0 border-r border-line text-center">
+                      <td className="w-20 px-0 py-0 border-r border-line text-center">
                         <select
                           data-cell={`${idx}-dc`}
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
                           disabled={!unlocked}
-                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center focus:outline-none focus:bg-card-2/60 ${
+                            row.dc === "D" ? "text-red-400" : "text-emerald-500"
+                          } ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         >
                           <option value="D">D</option>
                           <option value="C">C</option>
@@ -276,7 +276,7 @@ const ContraVoucherAddPage: React.FC = () => {
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-red-400 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -294,7 +294,7 @@ const ContraVoucherAddPage: React.FC = () => {
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-emerald-500 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -327,10 +327,10 @@ const ContraVoucherAddPage: React.FC = () => {
                       <FaPlus className="w-2 h-2" /> Add Row
                     </button>
                   </td>
-                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
+                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-red-400 border-l border-line">
                     {totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
+                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-emerald-500 border-l border-line">
                     {totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-2 py-1 text-[10px] italic">
@@ -356,9 +356,9 @@ const ContraVoucherAddPage: React.FC = () => {
             <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
               <FaExchangeAlt className="text-rose-500" />
               <span>
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">D</kbd> /
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">C</kbd> in D/C column •
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> to move forward
+                <b className="text-red-400">D</b> = Debit (Amount ↓) &nbsp;·&nbsp;
+                <b className="text-emerald-500">C</b> = Credit (Amount ↑) &nbsp;·&nbsp;
+                <kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> to next
               </span>
             </div>
             <div className="flex gap-2">
