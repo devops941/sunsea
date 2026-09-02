@@ -296,29 +296,43 @@ const dashboardController = {
         }
       }
 
-      // ─── Receivable (customers owe us) — signed opening ──────
+      // ─── Receivable (customers owe us) — POSITIVE netDr only ─
+      // Only customers with a Dr balance actually owe us money. A customer
+      // sitting on a Cr balance (they paid advance, or credit note pending)
+      // is NOT a receivable — it's a liability on our books. Excluded here
+      // so the Dashboard tile / Amount Receivable page reflect real dues.
       let totalReceivable = 0;
+      let totalCustomerAdvances = 0;
+      let receivableCustomerCount = 0;
+      let customerAdvanceCount = 0;
       for (const cl of customerLedgers) {
-        const raw = Number((cl.customer as any)?.openingBalance || 0);
-        const opType = String((cl.customer as any)?.openingBalanceType || "DEBIT").toUpperCase();
-        const opening = opType === "CREDIT" ? -Math.abs(raw) : Math.abs(raw);
-        // Journal items include the opening voucher; but we want opening + net(dr - cr excluding opening).
-        // Simpler: closing = signed opening + total dr - total cr - (opening voucher amount which is included in dr/cr).
-        // Since the opening voucher already contributes to dr or cr sums, and we're ADDING signed opening back,
-        // we'd double-count. So just use dr - cr (which naturally includes opening).
         const netDr = (debitMap.get(cl.id) || 0) - (creditMap.get(cl.id) || 0);
-        // For customer (ASSET side), receivable = netDr. Opening voucher is inside netDr already.
-        // Use netDr if opening voucher exists; otherwise fall back to signed opening.
-        void opening;
-        totalReceivable += netDr;
+        if (netDr > 0.005) {
+          totalReceivable += netDr;
+          receivableCustomerCount++;
+        } else if (netDr < -0.005) {
+          totalCustomerAdvances += -netDr;
+          customerAdvanceCount++;
+        }
       }
 
-      // ─── Payable (we owe suppliers) ───────────────────────────
+      // ─── Payable (we owe suppliers) — POSITIVE netCr only ─────
+      // Mirror of receivable rule: a supplier with a Dr balance (we paid
+      // advance, or debit note pending from them) is NOT a payable — it's
+      // an asset on our books.
       let totalPayable = 0;
+      let totalSupplierAdvances = 0;
+      let payableSupplierCount = 0;
+      let supplierAdvanceCount = 0;
       for (const sl of supplierLedgers) {
-        // For supplier (LIABILITY side), payable = netCr = cr - dr
         const netCr = (creditMap.get(sl.id) || 0) - (debitMap.get(sl.id) || 0);
-        totalPayable += netCr;
+        if (netCr > 0.005) {
+          totalPayable += netCr;
+          payableSupplierCount++;
+        } else if (netCr < -0.005) {
+          totalSupplierAdvances += -netCr;
+          supplierAdvanceCount++;
+        }
       }
 
       // ─── Sales / Purchase invoice totals ─────────────────────
@@ -415,8 +429,10 @@ const dashboardController = {
           // 6 top cards
           totalSales, salesVoucherCount,
           totalPurchase, purchaseVoucherCount,
-          totalReceivable, receivableCustomerCount: customerLedgers.length,
-          totalPayable, payableSupplierCount: supplierLedgers.length,
+          totalReceivable, receivableCustomerCount,
+          totalCustomerAdvances, customerAdvanceCount,
+          totalPayable, payableSupplierCount,
+          totalSupplierAdvances, supplierAdvanceCount,
           totalCashInHand, totalBankBalance,
           cashBankAccountCount: bankLedgers.length,
           cashAccountCount, bankAccountCount,
