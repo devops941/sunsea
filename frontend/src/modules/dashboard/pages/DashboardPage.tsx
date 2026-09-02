@@ -897,7 +897,7 @@ const DashboardPage: React.FC = () => {
         {/* ══════════════════════════════════════════════════════
            ROW 3  –  Alerts & Recent Transactions (3/4 Left) + Top Products (1/4 Right)
            ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "360px" }}>
+        {accountsSummary && <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "360px" }}>
           {/* Left 3/4: Alerts (1/3) + Recent Transactions (2/3) */}
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 h-full">
             {/* Alerts (1 of 3 inside 3/4) */}
@@ -1270,7 +1270,7 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* ══════════════════════════════════════════════════════
            ROW 4  –  Customer Product Purchase Report (Left) + Sales Person Location (Right)
