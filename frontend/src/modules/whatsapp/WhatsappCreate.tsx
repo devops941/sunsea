@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FaWhatsapp, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../api/apiClient";
@@ -7,6 +7,7 @@ import CustomButton from "../../components/ui/Button/Button";
 import IndiaPhoneInput from "../../components/ui/PhoneInput/PhoneInput";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
 import { usePermission } from "../../hooks/usePermission";
+import { useDetailCache, invalidateDetailCache } from "../../hooks/useDetailCache";
 
 interface WhatsappConfigForm {
     phoneNumberId: string;
@@ -28,7 +29,6 @@ const WhatsappCreatePage: React.FC = () => {
     const [formData, setFormData] = useState<WhatsappConfigForm>(initialFormData);
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const { can } = usePermission();
     const canEditWhatsapp = can("whatsapp.edit");
@@ -38,30 +38,36 @@ const WhatsappCreatePage: React.FC = () => {
     const [testMessage, setTestMessage] = useState("Hello from SUNSEA ERP! This is a test message.");
     const [sending, setSending] = useState(false);
 
-    // Fetch the existing configuration on mount
-    useEffect(() => {
-        const fetchConfig = async () => {
-            try {
-                const response = await apiClient.get("/whatsapp/config");
-                if (response.data && response.data.success && response.data.data) {
-                    const { phoneNumberId, wabaId, businessPhone, hasAccessToken, webhookVerifyToken } = response.data.data;
-                    setFormData({
-                        phoneNumberId: phoneNumberId || "",
-                        wabaId: wabaId || "",
-                        businessPhone: businessPhone || "",
-                        accessToken: hasAccessToken ? "••••••••••••••••••••" : "",
-                        webhookVerifyToken: webhookVerifyToken || "",
-                    });
-                    setIsEditing(true);
-                }
-            } catch (error) {
-                console.error("[WhatsApp Config] Error fetching:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchConfig();
+    // Fetch config with cache (survives navigation, instant on return)
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const response = await apiClient.get("/whatsapp/config");
+        if (response.data?.success && response.data.data) {
+            return response.data.data;
+        }
+        return null;
     }, []);
+
+    const { data: configData, loading } = useDetailCache<any>({
+        cacheKey: "whatsapp:config",
+        socketModule: "whatsapp",
+        fetcher,
+    });
+
+    // Populate form when cached/fetched data arrives
+    const populated = useRef(false);
+    useEffect(() => {
+        if (!configData || populated.current) return;
+        populated.current = true;
+        const { phoneNumberId, wabaId, businessPhone, hasAccessToken, webhookVerifyToken } = configData;
+        setFormData({
+            phoneNumberId: phoneNumberId || "",
+            wabaId: wabaId || "",
+            businessPhone: businessPhone || "",
+            accessToken: hasAccessToken ? "••••••••••••••••••••" : "",
+            webhookVerifyToken: webhookVerifyToken || "",
+        });
+        setIsEditing(true);
+    }, [configData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -138,6 +144,7 @@ const WhatsappCreatePage: React.FC = () => {
                 });
                 setIsEditing(true);
                 setErrors({});
+                invalidateDetailCache("whatsapp:config");
             } else {
                 toast.error(response.data?.message || "Failed to save configuration");
             }

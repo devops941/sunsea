@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FaSave, FaPaperPlane } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { emailConfigService } from "../../../services/emailConfigService";
@@ -7,6 +7,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { usePermission } from "../../../hooks/usePermission";
+import { useDetailCache, invalidateDetailCache } from "../../../hooks/useDetailCache";
 
 interface EmailConfigForm {
   smtpHost: string;
@@ -50,7 +51,6 @@ const EmailConfigPage: React.FC = () => {
   const [configData, setConfigData] = useState<EmailConfigForm>(initialConfigData);
   const [emailData, setEmailData] = useState<EmailForm>(initialEmailData);
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -59,29 +59,30 @@ const EmailConfigPage: React.FC = () => {
   const { can } = usePermission();
   const canEditEmail = can("email-config.edit");
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const data = await emailConfigService.getConfig();
-        if (data) {
-          setConfigData({
-            smtpHost: data.smtpHost || "",
-            smtpPort: data.smtpPort ? String(data.smtpPort) : "",
-            smtpUsername: data.smtpUsername || "",
-            smtpPassword: data.smtpPassword ? "••••••••••••••••••••" : "",
-            fromEmail: data.fromEmail || "",
-            fromName: data.fromName || "",
-            encryption: data.encryption || "TLS",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching email config:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchConfig();
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    return await emailConfigService.getConfig();
   }, []);
+
+  const { data: fetchedConfig, loading } = useDetailCache<any>({
+    cacheKey: "emailConfig:smtp",
+    socketModule: "emailConfig",
+    fetcher,
+  });
+
+  const populated = useRef(false);
+  useEffect(() => {
+    if (!fetchedConfig || populated.current) return;
+    populated.current = true;
+    setConfigData({
+      smtpHost: fetchedConfig.smtpHost || "",
+      smtpPort: fetchedConfig.smtpPort ? String(fetchedConfig.smtpPort) : "",
+      smtpUsername: fetchedConfig.smtpUsername || "",
+      smtpPassword: fetchedConfig.smtpPassword ? "••••••••••••••••••••" : "",
+      fromEmail: fetchedConfig.fromEmail || "",
+      fromName: fetchedConfig.fromName || "",
+      encryption: fetchedConfig.encryption || "TLS",
+    });
+  }, [fetchedConfig]);
 
   const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -144,6 +145,7 @@ const EmailConfigPage: React.FC = () => {
       await emailConfigService.saveConfig(configData);
       toast.success("Email configuration saved successfully!");
       setConfigData((prev) => ({ ...prev, smtpPassword: "••••••••••••••••••••" }));
+      invalidateDetailCache("emailConfig:smtp");
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to save configuration");
     } finally {
