@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaPlus, FaCog } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -17,6 +17,8 @@ import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { productService } from "../../../services/productService";
 import { useProducts } from "../../../hooks/useProducts";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { employeeService } from "../../../services/employeeService";
@@ -255,6 +257,32 @@ const ProductList: React.FC = () => {
 
     const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
     const safeCurrentPage = Math.min(currentPage, totalPages);
+    
+    const fetchProductsForExport = useCallback(async () => {
+        const res = await productService.fetchAll();
+        return Array.isArray(res) ? res : [];
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Product Code", accessor: (item: any) => item.productCode },
+            { header: "Product Name", accessor: (item: any) => item.productName },
+            { header: "Category", accessor: (item: any) => item.category?.name || "—" },
+            {
+                header: "Weight / Piece",
+                accessor: (item: any) =>
+                    item.weightPerPiece != null ? `${item.weightPerPiece} ${item.weightUom || "kg"}` : "—",
+            },
+            { header: "HSN Code", accessor: (item: any) => item.hsnCode || "—" },
+            { header: "Rate (₹)", accessor: (item: any) => item.rate != null ? item.rate : "—" },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Production_Product_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
     const paginatedProducts = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
@@ -341,6 +369,12 @@ const ProductList: React.FC = () => {
                                     placeholder="Search product..."
                                 />
                             </div>
+                            <ExportCSVButton
+                                fetchData={fetchProductsForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
                             {can("products.create") && <CustomButton text="Add Product" icon={FaPlus} onClick={() => navigate("/products/create")} />}
                         </div>
                     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAppSelector } from "../../../hooks/reduxHooks";
 import { toast } from "react-toastify";
@@ -13,6 +13,7 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import EmailButton from "../../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../../components/ui/WhatsappButton/WhatsappButton";
@@ -259,6 +260,30 @@ const QuotationList: React.FC = () => {
     const handleOpenEdit = useCallback((item: SalesOrder) => {
         navigate(`/quatation-order/edit/${item.id}`, { state: item });
     }, [navigate]);
+
+    const fetchQuotationsForExport = useCallback(async () => {
+        const res = await salesOrderService.fetchAll({
+            page: 1,
+            pageSize: 100000,
+            quotationOnly: true,
+            status: ["QUOTED"] as SalesOrderStatus[],
+        });
+        return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Order / Quotation No", accessor: (item: any) => item.orderNo || "" },
+            { header: "Order Date", accessor: (item: any) => item.orderDate ? new Date(item.orderDate).toLocaleDateString("en-IN") : "" },
+            { header: "Customer", accessor: (item: any) => item.customer?.displayName || item.customer?.firmName || "N/A" },
+            { header: "Net Amount", accessor: (item: any) => item.netAmount != null ? Number(item.netAmount).toFixed(2) : "0.00" },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Quotation_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     // ─── Estimate preview ─────────────────────────────────────────────────────
 
@@ -573,6 +598,13 @@ const QuotationList: React.FC = () => {
                                 />
                             </div>
                         </FilterPopover>
+
+                        <ExportCSVButton
+                            fetchData={fetchQuotationsForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
+                        />
 
                         {can("quotations.create") && (
                             <CustomButton

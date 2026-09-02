@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -18,6 +18,8 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { storeService } from "../../../services/storeService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -137,6 +139,32 @@ const StorageStoreList: React.FC = () => {
         }
     };
 
+    const fetchStoresForExport = useCallback(async () => {
+        const res = await storeService.fetchAll({ limit: 100000 });
+        return Array.isArray(res) ? res : (res?.stores || res?.data || []);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Store ID", accessor: (item: any) => item.storeId },
+            { header: "Store Name", accessor: (item: any) => item.storeName },
+            {
+                header: "Category",
+                accessor: (item: any) =>
+                    item.storeCategory
+                        ? STORE_CATEGORY_LABELS[item.storeCategory] ?? item.storeCategory
+                        : "N/A",
+            },
+            { header: "Incharge", accessor: (item: any) => item.incharge?.fullName || "N/A" },
+            { header: "Location", accessor: (item: any) => item.location || "N/A" },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Storage_Store_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     return (
         <div>
             <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
@@ -171,6 +199,12 @@ const StorageStoreList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search stores..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchStoresForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                         {can("stores.create") && (
                             <CustomButton

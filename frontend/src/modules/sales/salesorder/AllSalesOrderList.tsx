@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 
 import { FaPlus, FaTimes, FaPrint, FaDownload } from "react-icons/fa";
 import { useAppSelector } from "../../../hooks/reduxHooks";
@@ -16,6 +16,7 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import { DISPATCH_TYPE_OPTIONS, ORDER_SOURCE_OPTIONS } from "../../../constants/selectOption";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { FiClipboard } from "react-icons/fi";
 import { SalesOrderDeliveryEstimate } from "../../../components/salesOrder/SalesOrderDeliveryEstimate";
@@ -363,6 +364,26 @@ const AllSalesOrderList: React.FC = () => {
         navigate("/sales-order/create");
     }, [navigate]);
 
+    const fetchSalesOrdersForExport = useCallback(async () => {
+        const res = await salesOrderService.fetchAll({ page: 1, pageSize: 100000 });
+        return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Order No", accessor: (item: any) => item.orderNo || "" },
+            { header: "Order Date", accessor: (item: any) => item.orderDate ? new Date(item.orderDate).toLocaleDateString("en-IN") : "" },
+            { header: "Customer", accessor: (item: any) => item.customer?.displayName || item.customer?.firmName || item.customerName || "" },
+            { header: "Net Amount", accessor: (item: any) => item.netAmount != null ? Number(item.netAmount).toFixed(2) : "0.00" },
+            { header: "Order Source", accessor: (item: any) => item.orderSource || "" },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Sales_Orders_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     return (
         <div>
             <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
@@ -437,6 +458,13 @@ const AllSalesOrderList: React.FC = () => {
                                 />
                             </div>
                         </FilterPopover>
+
+                        <ExportCSVButton
+                            fetchData={fetchSalesOrdersForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
+                        />
 
                         {can("sales-orders.create") && (
                             <CustomButton

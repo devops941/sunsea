@@ -26,6 +26,8 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { rawMaterialService } from "../../../services/rawMaterialService";
 import { formatStockQty, parseBaseUom } from "../../../utils/uomConversion";
 
 const ITEMS_PER_PAGE = 15;
@@ -165,6 +167,42 @@ const RawMaterialList: React.FC = () => {
         }
     };
 
+    const fetchRawMaterialsForExport = useCallback(async () => {
+        const res = await rawMaterialService.fetchAll({ limit: 100000 });
+        return Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Material ID", accessor: (item: any) => item.rawMaterialId },
+            { header: "Material Name", accessor: (item: any) => item.materialName },
+            { header: "Category", accessor: (item: any) => item.category?.name || "—" },
+            { header: "Store", accessor: (item: any) => item.store?.storeName || item.storeId || "—" },
+            {
+                header: "Physical Stock",
+                accessor: (item: any) =>
+                    item.onHandQty != null ? `${item.onHandQty} ${item.baseUom || ""}`.trim() : "0",
+            },
+            {
+                header: "Reserved",
+                accessor: (item: any) =>
+                    item.reservedQty != null ? `${item.reservedQty} ${item.baseUom || ""}`.trim() : "0",
+            },
+            {
+                header: "Available",
+                accessor: (item: any) => {
+                    const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
+                    return `${available} ${item.baseUom || ""}`.trim();
+                },
+            },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Raw_Materials_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     const columns: DataTableColumn<RawMaterial>[] = [
         {
             header: "#",
@@ -274,6 +312,12 @@ const RawMaterialList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search materials..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchRawMaterialsForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                         {can("raw_materials.create") && (
                             <CustomButton

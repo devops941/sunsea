@@ -17,6 +17,8 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
 import IconButton from "../../../components/ui/IconButton/IconButton";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { dailyPlanService } from "../../../services/dailyPlanService";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -106,6 +108,34 @@ const DailyProductionPlanningPage: React.FC = () => {
     setFilterMachine("");
     setFilterShift("");
   };
+
+  const fetchDailyPlansForExport = useCallback(async () => {
+    try {
+      const res = await dailyPlanService.getAll();
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch {
+      // fallback
+    }
+    return Array.isArray(dailyPlans) ? dailyPlans : [];
+  }, [dailyPlans]);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Plan ID", accessor: (item: any) => item.dailyPlanId || item.id || "" },
+      { header: "Date", accessor: (item: any) => item.productionDate ? item.productionDate.split("T")[0] : "" },
+      { header: "PO Reference", accessor: (item: any) => item.productionOrderId || "" },
+      { header: "Product", accessor: (item: any) => item.productionOrder?.productItem?.productName || item.productName || "" },
+      { header: "Machine", accessor: (item: any) => item.machine?.machineName || item.machineId || "" },
+      { header: "Shift", accessor: (item: any) => item.shift?.shiftName || item.shiftId || "" },
+      { header: "Planned Qty", accessor: (item: any) => item.plannedQty || 0 },
+      { header: "Status", accessor: (item: any) => STATUS_FLOW[item.status]?.label || item.status || "" },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Daily_Production_Plans_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
 
   const handleOpenFilter = () => {
     setDraftFilterDate(filterDate);
@@ -925,12 +955,13 @@ const DailyProductionPlanningPage: React.FC = () => {
                 </select>
               </div>
             </FilterPopover>
-{/* 
-            {can("production_orders.create") && (
-              <CustomButton text="New Production Order" icon={FaPlus} onClick={() => navigate("/production-orders/create")} />
-            )} */}
-            
 
+            <ExportCSVButton
+              fetchData={fetchDailyPlansForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             {can("daily-machine-planning.view") && (
               <CustomButton text="Daily Report" icon={FaChartBar} onClick={() => {

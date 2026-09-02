@@ -6,6 +6,7 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { useNavigate } from "react-router-dom";
 
 import { productionOrderService } from "../../../services/productionOrderService";
@@ -108,8 +109,48 @@ const AllProductionOrderList: React.FC = () => {
     }, [data]);
 
     const handleOpenView = useCallback((item: any) => {
-        navigate(`/production-orders/history/view/${item.productionOrderId}`, { state: { order: item } });
+        navigate(`/production-orders/history/${item.productionOrderId}`, { state: { order: item } });
     }, [navigate]);
+
+    const fetchOrdersForExport = useCallback(async () => {
+        const response = await productionOrderService.fetchAll({
+            page: 1,
+            pageSize: 100000,
+        });
+        const list = response?.data || (Array.isArray(response) ? response : []);
+        const groupedPOs = list.reduce((acc: any, po: any) => {
+            const parts = po.productionOrderId.split('-');
+            const baseId = parts.length > 2 ? `${parts[0]}-${parts[1]}` : po.productionOrderId;
+
+            if (!acc[baseId]) {
+                acc[baseId] = {
+                    ...po,
+                    productionOrderId: baseId,
+                    totalProducts: 0,
+                    totalProductionQuantity: 0,
+                };
+            }
+            acc[baseId].totalProducts += 1;
+            acc[baseId].totalProductionQuantity += Number(po.targetQty) || 0;
+            return acc;
+        }, {});
+
+        return Object.values(groupedPOs);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "PO No", accessor: (item: any) => item.productionOrderId || "" },
+            { header: "Total Products", accessor: (item: any) => item.totalProducts ?? 1 },
+            { header: "Total Qty", accessor: (item: any) => item.totalProductionQuantity ?? item.targetQty ?? 0 },
+            { header: "Status", accessor: (item: any) => item.status === "DISPATCHED" ? "COMPLETED" : (item.status || "CREATED") },
+            { header: "Created Date", accessor: (item: any) => item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Production_Order_History_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
@@ -221,6 +262,12 @@ const AllProductionOrderList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search orders..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchOrdersForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                     </div>
                 </div>

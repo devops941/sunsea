@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -14,6 +14,8 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import WastageViewModal from "../components/WastageViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { productionWastageService } from "../../../services/productionWastageService";
 const ITEMS_PER_PAGE = 15;
 
 const WastageList: React.FC = () => {
@@ -112,6 +114,34 @@ const WastageList: React.FC = () => {
     setShowViewModal(true);
   }, []);
 
+  const fetchWastagesForExport = useCallback(async () => {
+    try {
+      const res = await productionWastageService.getAll({ page: 1, limit: 100000 });
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch {
+      // fallback
+    }
+    return Array.isArray(wastages) ? wastages : [];
+  }, [wastages]);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Date", accessor: (item: any) => item.wastageDate ? new Date(item.wastageDate).toLocaleDateString("en-IN") : "" },
+      { header: "PO Reference", accessor: (item: any) => item.productionOrderId || "" },
+      { header: "Product", accessor: (item: any) => item.product?.productName || item.productId || "" },
+      { header: "Machine", accessor: (item: any) => item.machine?.machineName || item.machineId || "" },
+      { header: "Shift", accessor: (item: any) => item.shift?.shiftName || item.shiftId || "" },
+      { header: "Quantity", accessor: (item: any) => `${item.quantity || 0} ${item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").split(',')[0].toLowerCase()}` },
+      { header: "Reason", accessor: (item: any) => item.reason || "" },
+      { header: "Status", accessor: (item: any) => item.status || "" },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Production_Wastage_List_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
+
   const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
   const displayWastages = wastages || [];
 
@@ -123,7 +153,15 @@ const WastageList: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-ink">Production Wastage Auditing</h2>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <ExportCSVButton
+              fetchData={fetchWastagesForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
           </div>
+        </div>
 
         {/* Table */}
         <DataTable

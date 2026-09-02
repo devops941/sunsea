@@ -8,6 +8,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import IconButton from "../../../components/ui/IconButton/IconButton";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -73,6 +74,31 @@ const ProductionOrderList: React.FC = () => {
         } finally {
             setLoadingDetails(false);
         }
+    }, []);
+
+    const fetchProductionOrdersForExport = useCallback(async () => {
+        const response = await productionOrderService.fetchAll({
+            page: 1,
+            pageSize: 100000,
+        });
+        const list = response?.data || (Array.isArray(response) ? response : []);
+        return Array.isArray(list) ? list : [];
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "PO No", accessor: (item: any) => item.productionOrderId || item.orderNo || "" },
+            { header: "Product", accessor: (item: any) => item.productItem?.productName || item.productName || item.salesProductName || "" },
+            { header: "Target Qty", accessor: (item: any) => item.targetQty || item.quantity || 0 },
+            { header: "Produced Qty", accessor: (item: any) => item.producedQty || 0 },
+            { header: "UOM", accessor: (item: any) => item.uom || "Pcs." },
+            { header: "Due Date", accessor: (item: any) => item.dueDate ? new Date(item.dueDate).toLocaleDateString("en-IN") : "" },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Production_Orders_${new Date().toISOString().split("T")[0]}.csv`,
+        };
     }, []);
 
     useEffect(() => {
@@ -649,6 +675,12 @@ const ProductionOrderList: React.FC = () => {
                         <h2 className="text-base font-bold text-ink">Production Order Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
+                        <ExportCSVButton
+                            fetchData={fetchProductionOrdersForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
+                        />
                         {(can("weekly_programs.create") || can("weekly_programs.view")) && (
                             <CustomButton
                                 text="Weekly Scheduling"

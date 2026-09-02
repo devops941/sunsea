@@ -55,7 +55,8 @@ const InvoiceList: React.FC = () => {
     // Function to fetch all invoices only when user clicks Export
     const fetchInvoicesForExport = useCallback(async () => {
         const response = await grnInvoiceService.fetchAll({ page: 1, pageSize: 100000 });
-        return Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+        const list = response?.data || (Array.isArray(response) ? response : []);
+        return Array.isArray(list) ? list : [];
     }, []);
 
     const fetchInvoices = useCallback(async () => {
@@ -119,6 +120,7 @@ const InvoiceList: React.FC = () => {
             { header: "GRN Date", accessor: (item: any) => formatDate(item.grnDate) },
             { header: "Supplier", accessor: (item: any) => item.supplier?.displayName || item.supplier?.legalName || "" },
             { header: "Net Amount", accessor: (item: any) => Number(item.netAmount || 0).toFixed(2) },
+            { header: "Payment Status", accessor: (item: any) => item.paymentStatus || "—" },
         ];
         return {
             csvColumns: columns,

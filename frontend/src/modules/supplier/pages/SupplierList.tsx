@@ -43,8 +43,9 @@ const SupplierList: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchSuppliersForExport = useCallback(async () => {
-        const data = await supplierService.fetchAll({ page: 1, limit: 100000 });
-        return data?.suppliers || (Array.isArray(data) ? data : []);
+        const res = await supplierService.fetchAll({ page: 1, limit: 100000 });
+        const list = res?.suppliers || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+        return Array.isArray(list) ? list : [];
     }, []);
 
     const fetchSuppliersData = useCallback(() => {
@@ -114,7 +115,8 @@ const SupplierList: React.FC = () => {
     // CSV Export Configuration
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
-            { header: "Name", accessor: (item: any) => item.legalName },
+            { header: "Supplier Code", accessor: (item: any) => item.supplierCode || "" },
+            { header: "Name", accessor: (item: any) => item.legalName || item.displayName || "" },
             { header: "Mobile", accessor: (item: any) => Array.isArray(item.mobile) && item.mobile.length > 0 ? item.mobile[0].number : (typeof item.mobile === "string" ? item.mobile : "") },
             { header: "Email", accessor: (item: any) => item.email || "" },
             { header: "GSTIN", accessor: (item: any) => item.gstin || "" },

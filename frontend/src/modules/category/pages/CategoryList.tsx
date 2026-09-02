@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -14,6 +14,8 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { categoryService } from "../../../services/categoryService";
 
 import { fetchCategories, deleteCategory } from "../../../features/categories/categorySlice";
 import type { RootState, AppDispatch } from "../../../app/store";
@@ -147,12 +149,33 @@ const CategoryList: React.FC = () => {
 
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
+  const fetchCategoriesForExport = useCallback(async () => {
+    const res = await categoryService.fetchAll({ limit: 100000 });
+    return Array.isArray(res) ? res : (res?.categories || res?.data || []);
+  }, []);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Category Code", accessor: (item: any) => item.code },
+      { header: "Category Name", accessor: (item: any) => item.name },
+      { header: "Type", accessor: (item: any) => TYPE_LABELS[item.type as CategoryType] || item.type },
+      { header: "Description", accessor: (item: any) => item.description || "—" },
+      { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Category_List_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
+
   return (
     <div>
       <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
-          <div />
+          <div>
+            <h2 className="text-base font-bold text-ink">Categories</h2>
+          </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {/* Type Filter */}
             <div className="w-36">
@@ -198,6 +221,13 @@ const CategoryList: React.FC = () => {
                 onChange={handleSearch}
               />
             </div>
+
+            <ExportCSVButton
+              fetchData={fetchCategoriesForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             {canCreate && (
               <CustomButton

@@ -70,21 +70,10 @@ const PurchaseOrderListPage: React.FC = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
-  // All POs for CSV export
-  const [allPOs, setAllPOs] = useState<any[]>([]);
-
-  const loadAllPOs = useCallback(async () => {
-    try {
-      const response = await purchaseOrderService.fetchAll({ page: 1, pageSize: 100000 });
-      setAllPOs(Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []));
-    } catch {
-      // export will just be empty
-    }
+  const fetchPOsForExport = useCallback(async () => {
+    const response = await purchaseOrderService.fetchAll({ page: 1, pageSize: 100000 });
+    return Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
   }, []);
-
-  useEffect(() => {
-    loadAllPOs();
-  }, [loadAllPOs]);
 
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
@@ -263,7 +252,6 @@ const PurchaseOrderListPage: React.FC = () => {
       await removePurchaseOrder(poToDelete);
       toast.success("Purchase Order deleted successfully!");
       fetchPOs();
-      loadAllPOs();
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete purchase order");
     } finally {
@@ -273,7 +261,7 @@ const PurchaseOrderListPage: React.FC = () => {
   };
 
   // CSV Export Configuration
-  const { csvData, csvColumns, csvFilename } = useMemo(() => {
+  const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
       { header: "PO Number", accessor: (item: any) => item.poNumber || "" },
       { header: "PO Date", accessor: (item: any) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "" },
@@ -282,11 +270,10 @@ const PurchaseOrderListPage: React.FC = () => {
       { header: "Status", accessor: (item: any) => item.status || "" },
     ];
     return {
-      csvData: allPOs,
       csvColumns: columns,
       csvFilename: `Purchase_Orders_${new Date().toISOString().split("T")[0]}.csv`,
     };
-  }, [allPOs]);
+  }, []);
 
   return (
     <div className="w-full">
@@ -346,7 +333,7 @@ const PurchaseOrderListPage: React.FC = () => {
             </FilterPopover>
 
             <ExportCSVButton
-              data={csvData}
+              fetchData={fetchPOsForExport}
               columns={csvColumns}
               filename={csvFilename}
               text="Export"
