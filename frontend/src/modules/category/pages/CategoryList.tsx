@@ -1,8 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useDispatch, useSelector } from "react-redux";
 import { Search } from "lucide-react";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -17,11 +16,9 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { categoryService } from "../../../services/categoryService";
 
-import { fetchCategories, deleteCategory } from "../../../features/categories/categorySlice";
-import type { RootState, AppDispatch } from "../../../app/store";
 import type { Category, CategoryType } from "../../../features/categories/types";
 import { usePermission } from "../../../hooks/usePermission";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache } from "../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -45,10 +42,6 @@ const TypeBadge: React.FC<{ type: CategoryType }> = ({ type }) => (
 
 const CategoryList: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>();
-  const { data: categories, loading, error, totalPages } = useSelector(
-    (state: RootState) => state.categories
-  );
   const { can } = usePermission();
 
   const canCreate = can("categories.create");
@@ -56,7 +49,6 @@ const CategoryList: React.FC = () => {
   const canDelete = can("categories.delete");
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,37 +60,35 @@ const CategoryList: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [searchTerm]);
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await categoryService.fetchAll({ limit: 10000 });
+    const list = Array.isArray(res) ? res : (res?.categories || res?.data || []);
+    return { data: list, total: list.length };
+  }, []);
 
-  const loadData = useCallback(() => {
-    if (can("categories.view")) {
-      dispatch(
-        fetchCategories({
-          page: currentPage,
-          limit: ITEMS_PER_PAGE,
-          search: debouncedSearch || undefined,
-          type: typeFilter !== "ALL" ? (typeFilter as CategoryType) : undefined,
-          isActive: activeFilter !== "ALL" ? activeFilter === "true" : undefined,
-        })
-      );
-    }
-  }, [dispatch, can, currentPage, debouncedSearch, typeFilter, activeFilter]);
+  const { data: allCategories, loading, refresh } = useListCache<Category>({
+    cacheKey: "categories:list",
+    socketModule: "category",
+    fetcher,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const categories = useMemo(() => {
+    return allCategories.filter((item) => {
+      const matchesSearch = !searchTerm ||
+        item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === "ALL" || item.type === typeFilter;
+      const matchesActive = activeFilter === "ALL" ||
+        (activeFilter === "true" ? item.isActive : !item.isActive);
+      return matchesSearch && matchesType && matchesActive;
+    });
+  }, [allCategories, searchTerm, typeFilter, activeFilter]);
 
-  useSocketSync("category", undefined, loadData);
+  const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE);
+  const paginatedCategories = categories.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -135,8 +125,9 @@ const CategoryList: React.FC = () => {
     if (itemToDelete !== null && !isDeleting) {
       setIsDeleting(true);
       try {
-        await dispatch(deleteCategory(itemToDelete)).unwrap();
+        await categoryService.delete(itemToDelete);
         toast.success("Category deleted successfully!");
+        refresh();
       } catch (err: any) {
         toast.error(err || "Failed to delete category");
       } finally {
@@ -240,12 +231,9 @@ const CategoryList: React.FC = () => {
         </div>
 
         {/* Table */}
-        {error ? (
-          <div className="text-center text-red-500 p-4">{error}</div>
-        ) : (
           <div className="p-0 overflow-hidden rounded-b-2xl">
             <DataTable
-              data={categories}
+              data={paginatedCategories}
               rowKey={(item) => item.id}
               loading={loading}
               emptyMessage="No categories found."
@@ -324,7 +312,6 @@ const CategoryList: React.FC = () => {
               ]}
             />
           </div>
-        )}
       </div>
 
       {/* View Modal */}

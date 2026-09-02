@@ -1,14 +1,12 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchRawMaterials, deleteRawMaterial, rawMaterialCreated, rawMaterialUpdated, rawMaterialDeleted } from "../../../features/raw-materials/rawMaterialSlice";
-import { fetchStores } from "../../../features/stores/storeSlice";
-import { useSocketSync } from "../../../hooks/useSocketSync";
 import type { RawMaterial } from "../../../features/raw-materials/types";
 import { usePermission } from "../../../hooks/usePermission";
+import { useListCache } from "../../../hooks/useListCache";
+import { storeService } from "../../../services/storeService";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -28,14 +26,9 @@ const ITEMS_PER_PAGE = 15;
 
 const WastageStoreList: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useAppDispatch();
-
-    const { data, loading, error, totalPages, total } = useAppSelector((state) => state.rawMaterials);
-    const { data: stores } = useAppSelector((state) => state.stores);
     const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
-    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
     const [activeFilter, setActiveFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -47,63 +40,46 @@ const WastageStoreList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<RawMaterial | null>(null);
 
-    useEffect(() => {
-        if (error) toast.error(error);
-    }, [error]);
-
-    // Debounce search — 300 ms
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-            setDebouncedSearch(searchTerm);
-            setCurrentPage(1);
-        }, 300);
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
-    }, [searchTerm]);
+    const [stores, setStores] = useState<any[]>([]);
 
     // Fetch WASTAGE stores for filter dropdown
-    const fetchWastageStoresData = useCallback(() => {
-        if (can("wastage-store.view")) {
-            dispatch(fetchStores({ storeCategory: "WASTAGE" }));
-        }
-    }, [dispatch, can]);
-
     useEffect(() => {
-        fetchWastageStoresData();
-    }, [fetchWastageStoresData]);
+        storeService.fetchAll({ storeCategory: "WASTAGE" }).then((res: any) => {
+            const list = Array.isArray(res) ? res : (res?.stores || res?.data || []);
+            setStores(list);
+        }).catch(() => {});
+    }, []);
 
-    // Server-side data load with all active filters
-    const loadData = useCallback(() => {
-        if (can("wastage-store.view")) {
-            dispatch(
-                fetchRawMaterials({
-                    search: debouncedSearch || undefined,
-                    storeId: storeFilter || undefined,
-                    isActive: activeFilter !== "" ? activeFilter === "true" : undefined,
-                    itemType: "WASTAGE",
-                    page: currentPage,
-                    limit: ITEMS_PER_PAGE,
-                })
-            );
-        }
-    }, [dispatch, can, debouncedSearch, storeFilter, activeFilter, currentPage]);
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await rawMaterialService.fetchAll({ itemType: "WASTAGE", limit: 10000 });
+        const list = Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
+        return { data: list, total: list.length };
+    }, []);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
-
-    // Real-time socket sync — in-place Redux state updates
-    useSocketSync<RawMaterial>("rawMaterial", {
-        created: rawMaterialCreated,
-        updated: rawMaterialUpdated,
-        deleted: rawMaterialDeleted,
+    const { data: allWastageItems, loading, refresh } = useListCache<any>({
+        cacheKey: "wastageStore:list",
+        socketModule: "rawMaterial",
+        fetcher,
     });
 
-    // Keep store dropdown fresh when stores change in another tab
-    useSocketSync("store", undefined, fetchWastageStoresData);
+    const filteredData = useMemo(() => {
+        return allWastageItems.filter((item: any) => {
+            const matchesSearch = !searchTerm ||
+                item.rawMaterialId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.materialName?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStore = !storeFilter || item.storeId === storeFilter;
+            const matchesActive = activeFilter === "" ||
+                (activeFilter === "true" ? item.isActive : !item.isActive);
+            return matchesSearch && matchesStore && matchesActive;
+        });
+    }, [allWastageItems, searchTerm, storeFilter, activeFilter]);
+
+    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const total = filteredData.length;
+    const paginatedData = filteredData.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const storeOptions = useMemo(
         () => [
@@ -149,8 +125,9 @@ const WastageStoreList: React.FC = () => {
         if (itemToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
-                await dispatch(deleteRawMaterial(itemToDelete)).unwrap();
+                await rawMaterialService.delete(itemToDelete);
                 toast.success("Wastage product deleted successfully!");
+                refresh();
             } catch (err: any) {
                 toast.error(err || "Failed to delete item");
             } finally {
@@ -287,7 +264,7 @@ const WastageStoreList: React.FC = () => {
                 {/* Data Table */}
                 <DataTable
                     columns={columns}
-                    data={data}
+                    data={paginatedData}
                     rowKey={(row) => row.rawMaterialId}
                     loading={loading}
                     emptyMessage="No wastage products found."
