@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -10,6 +10,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import PricingButton from "../../../components/ui/PricingButton/PricingButton";
 import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { useSuppliers } from "../../../hooks/useSuppliers";
 import { supplierService } from "../../../services/supplierService";
 import { usePermission } from "../../../hooks/usePermission";
@@ -41,6 +42,11 @@ const SupplierList: React.FC = () => {
     const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const fetchSuppliersForExport = useCallback(async () => {
+        const data = await supplierService.fetchAll({ page: 1, limit: 100000 });
+        return data?.suppliers || (Array.isArray(data) ? data : []);
+    }, []);
+
     const fetchSuppliersData = useCallback(() => {
         if (can("suppliers.view")) {
             loadSuppliers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
@@ -55,6 +61,7 @@ const SupplierList: React.FC = () => {
         }, 500);
         return () => clearTimeout(timer);
     }, [fetchSuppliersData]);
+
 
     useEffect(() => {
         if (error) {
@@ -104,6 +111,23 @@ const SupplierList: React.FC = () => {
         }
     };
 
+    // CSV Export Configuration
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Name", accessor: (item: any) => item.legalName },
+            { header: "Mobile", accessor: (item: any) => Array.isArray(item.mobile) && item.mobile.length > 0 ? item.mobile[0].number : (typeof item.mobile === "string" ? item.mobile : "") },
+            { header: "Email", accessor: (item: any) => item.email || "" },
+            { header: "GSTIN", accessor: (item: any) => item.gstin || "" },
+            { header: "Opening Balance", accessor: (item: any) => Number(item.openingBalance || 0).toFixed(2) },
+            { header: "Balance Type", accessor: (item: any) => item.openingBalanceType || "CREDIT" },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Supplier_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return (
@@ -126,6 +150,12 @@ const SupplierList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
+                            <ExportCSVButton
+                                fetchData={fetchSuppliersForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
                             {/* BUG-SUP-009 fix: only show Add Supplier button to users with create permission */}
                             {canCreateSupplier && (
                                 <CustomButton

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import CustomButton from "../../../../components/ui/Button/Button";
+import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
@@ -50,6 +51,12 @@ const InvoiceList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+    // Function to fetch all invoices only when user clicks Export
+    const fetchInvoicesForExport = useCallback(async () => {
+        const response = await grnInvoiceService.fetchAll({ page: 1, pageSize: 100000 });
+        return Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+    }, []);
 
     const fetchInvoices = useCallback(async () => {
         setLoading(true);
@@ -104,6 +111,21 @@ const InvoiceList: React.FC = () => {
 
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
+    // CSV Export Configuration
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "GRN No", accessor: (item: any) => item.grnNumber || "" },
+            { header: "Invoice No", accessor: (item: any) => item.invoiceNo || "" },
+            { header: "GRN Date", accessor: (item: any) => formatDate(item.grnDate) },
+            { header: "Supplier", accessor: (item: any) => item.supplier?.displayName || item.supplier?.legalName || "" },
+            { header: "Net Amount", accessor: (item: any) => Number(item.netAmount || 0).toFixed(2) },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Bill_Invoice_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     return (
         <div>
             <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
@@ -117,6 +139,12 @@ const InvoiceList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search invoices..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchInvoicesForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                         <CustomButton
                             text="Create Invoice"

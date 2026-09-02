@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FaPlus,
   FaToggleOn,
@@ -25,6 +25,7 @@ import {
 } from "../../../services/machineOperationAssignmentService";
 import { machineService } from "../../../services/machineService";
 import MachineAssignmentViewModal from "../components/MachineAssignmentViewModal";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -43,6 +44,11 @@ const MachineAssignmentList: React.FC = () => {
 
   // View modal state
   const [viewModalData, setViewModalData] = useState<any>(null);
+
+  const fetchAssignmentsForExport = useCallback(async () => {
+    const res = await machineOperationAssignmentService.getAssignments({ limit: 100000 });
+    return res.data || res.assignments || [];
+  }, []);
 
   // Filters
   const [filterMachineId, setFilterMachineId] = useState("");
@@ -153,6 +159,46 @@ const MachineAssignmentList: React.FC = () => {
     }
   };
 
+  // CSV Export Configuration
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      {
+        header: "Week Period",
+        accessor: (item: any) =>
+          `${item.weekStartDate ? item.weekStartDate.split("T")[0] : "—"} to ${item.weekEndDate ? item.weekEndDate.split("T")[0] : "—"}`,
+      },
+      { header: "Machine ID", accessor: (item: any) => item.machineId },
+      {
+        header: "Machine Name",
+        accessor: (item: any) => item.machine?.machineName || item.machineId || "—",
+      },
+      {
+        header: "Shift",
+        accessor: (item: any) => item.shift?.shiftName || item.shiftId || "—",
+      },
+      {
+        header: "Operators",
+        accessor: (item: any) => {
+          if (item.operators && item.operators.length > 0) {
+            return item.operators
+              .map((op: any) => op.employee?.fullName)
+              .filter(Boolean)
+              .join("; ");
+          }
+          return item.operatorEmployee?.fullName || "—";
+        },
+      },
+      {
+        header: "Status",
+        accessor: (item: any) => (item.isActive ? "Active" : "Closed"),
+      },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Machine_Assignments_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
+
   return (
     <div>
       <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-visible">
@@ -211,6 +257,13 @@ const MachineAssignmentList: React.FC = () => {
                 </div>
               </div>
             </FilterPopover>
+
+            <ExportCSVButton
+              fetchData={fetchAssignmentsForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             {canCreateAssignment && (
               <CustomButton

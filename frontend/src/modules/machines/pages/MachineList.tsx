@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -18,6 +18,8 @@ import { Search } from "lucide-react";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { usePermission } from "../../../hooks/usePermission";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { machineService } from "../../../services/machineService";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -41,6 +43,11 @@ const MachineList: React.FC = () => {
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
+
+    const fetchMachinesForExport = useCallback(async () => {
+        const res = await machineService.getAll({ limit: 100000 });
+        return Array.isArray(res) ? res : (res?.machines || res?.data || []);
+    }, []);
 
     const loadMachines = useCallback(() => {
         if (can("machines.view")) {
@@ -109,6 +116,29 @@ const MachineList: React.FC = () => {
         }
     };
 
+    // CSV Export Configuration
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Machine ID", accessor: (item: any) => item.machineId },
+            { header: "Machine Name", accessor: (item: any) => item.machineName },
+            { header: "Tech Type", accessor: (item: any) => item.technologyType || "—" },
+            { header: "Machine Type", accessor: (item: any) => item.machineType || "—" },
+            {
+                header: "Machine Incharge",
+                accessor: (item: any) => {
+                    if (!item.operatorId) return "—";
+                    const emp = employees.find((e: any) => e.id === item.operatorId);
+                    return emp ? emp.fullName : item.operatorId;
+                },
+            },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Machine_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, [employees]);
+
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return (
@@ -117,8 +147,7 @@ const MachineList: React.FC = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
                         <h2 className="text-base font-bold text-ink">
-                            
-                            
+                            Machine Management
                         </h2>
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
@@ -132,6 +161,12 @@ const MachineList: React.FC = () => {
                                 onChange={handleSearch}
                             />
                         </div>
+                        <ExportCSVButton
+                            fetchData={fetchMachinesForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
+                        />
                         {canCreateMachine && (
                             <CustomButton
                                 text="Add Machine"

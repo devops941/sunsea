@@ -13,6 +13,7 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 import { fetchShifts, deleteShift, shiftCreated, shiftUpdated, shiftDeleted } from "../../../features/shifts/shiftSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
@@ -106,6 +107,24 @@ const ShiftList: React.FC = () => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
+    // CSV Export Configuration
+    const { csvData, csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Shift Code", accessor: (item: any) => item.shiftCode },
+            { header: "Shift Name", accessor: (item: any) => item.shiftName },
+            { header: "Start Time", accessor: (item: any) => formatTime12h(item.startTime) },
+            { header: "End Time", accessor: (item: any) => formatTime12h(item.endTime) },
+            { header: "Break Duration", accessor: (item: any) => (item.breakDuration ? `${item.breakDuration} mins` : "—") },
+            { header: "Working Hours", accessor: (item: any) => calculateWorkingHours(item.startTime, item.endTime, item.breakDuration) },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvData: data,
+            csvColumns: columns,
+            csvFilename: `Shift_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, [data]);
+
     const handleOpenView = useCallback((item: Shift) => {
         setSelectedItem(item);
         setShowViewModal(true);
@@ -161,6 +180,12 @@ const ShiftList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
+                            <ExportCSVButton
+                                data={csvData}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
                             {canCreateShift && (
                                 <CustomButton
                                     text="Add Shift"

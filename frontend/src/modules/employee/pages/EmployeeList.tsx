@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +16,8 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { departmentService } from "../../../services/departmentService";
 import { roleService } from "../../../services/roleService";
+import { employeeService } from "../../../services/employeeService";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -55,6 +57,11 @@ const Employeelist: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchEmployeesForExport = useCallback(async () => {
+    const res = await employeeService.fetchAll({ limit: 100000 });
+    return Array.isArray(res) ? res : (res?.employees || res?.data || []);
+  }, []);
 
   // Load roles and departments for filter dropdowns
   useEffect(() => {
@@ -141,6 +148,27 @@ const Employeelist: React.FC = () => {
       }
     }
   };
+
+  // CSV Export Configuration
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Employee Code", accessor: (emp: any) => emp.empCode },
+      { header: "Employee Name", accessor: (emp: any) => emp.fullName },
+      { header: "Mobile", accessor: (emp: any) => emp.mobile || "—" },
+      { header: "Role", accessor: (emp: any) => emp.role?.name || emp.user?.role?.name || "—" },
+      { header: "Department", accessor: (emp: any) => emp.department?.name || "—" },
+      {
+        header: "Login Account",
+        accessor: (emp: any) =>
+          emp.user ? (emp.user.status === "active" ? "Enabled" : emp.user.status?.toUpperCase() || "Disabled") : "No Login",
+      },
+      { header: "Status", accessor: (emp: any) => (emp.status ? emp.status.toUpperCase() : "—") },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Employee_List_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
 
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
@@ -279,6 +307,13 @@ const Employeelist: React.FC = () => {
                 </div>
               </div>
             </FilterPopover>
+
+            <ExportCSVButton
+              fetchData={fetchEmployeesForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             {canCreate && (
               <CustomButton
