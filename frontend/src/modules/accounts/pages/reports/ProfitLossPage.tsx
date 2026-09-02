@@ -556,6 +556,48 @@ export const ProfitLossPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Right sidebar — Summary. Amounts render on their own row so
+         crores-scale values never squeeze the label or overflow the card. */}
+      {filteredData && (
+        <aside className="w-[220px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden self-start">
+          <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
+            <FaChartLine className="text-emerald-500 text-xs" /> Summary
+          </div>
+          <div className="divide-y divide-line-soft">
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Income</div>
+              <div className="text-sm font-mono font-bold text-emerald-500 break-all leading-tight">
+                ₹{fmt(filteredData.totalIncome)}
+              </div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Expenses</div>
+              <div className="text-sm font-mono font-bold text-red-500 break-all leading-tight">
+                ₹{fmt(filteredData.totalExpense)}
+              </div>
+            </div>
+            <div className={`px-3 py-2 ${filteredData.isProfit ? "bg-emerald-500/5" : "bg-red-500/5"}`}>
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">
+                Net {filteredData.isProfit ? "Profit" : "Loss"}
+              </div>
+              <div className={`text-sm font-mono font-bold break-all leading-tight ${filteredData.isProfit ? "text-emerald-500" : "text-red-500"}`}>
+                {filteredData.isProfit ? "+" : "-"}₹{fmt(Math.abs(filteredData.netProfit))}
+              </div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Period</div>
+              <div className="text-[11px] font-mono text-ink break-all leading-tight">
+                {startDate}
+              </div>
+              <div className="text-[10px] text-ink-subtle">to</div>
+              <div className="text-[11px] font-mono text-ink break-all leading-tight">
+                {endDate}
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   );
 };

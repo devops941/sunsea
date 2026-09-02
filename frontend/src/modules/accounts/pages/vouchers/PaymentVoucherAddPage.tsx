@@ -2,11 +2,11 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMoneyBillWave, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { voucherService, displayVoucherNo } from "../../../../services/voucherService";
+import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 
 interface PaymentRow {
   id: number;
@@ -225,7 +225,7 @@ const PaymentVoucherAddPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await voucherService.createVoucher({
+      const created = await voucherService.createVoucher({
         type: "PAYMENT",
         date,
         narration: mainNarration || "Payment Voucher",
@@ -237,6 +237,11 @@ const PaymentVoucherAddPage: React.FC = () => {
           narration: r.narration || mainNarration || "Payment",
         })),
       });
+      // Optimistic list update — the Payment Register cache gets the new
+      // voucher immediately, so navigating back shows it with no reload.
+      if (created?.id) {
+        prependToListCacheByPrefix<Voucher>("accounts:payment-vouchers:", created);
+      }
       toast.success("Payment voucher saved successfully");
       resetFormForNext();
     } catch (err: any) {

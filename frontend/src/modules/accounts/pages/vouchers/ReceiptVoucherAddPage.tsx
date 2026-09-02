@@ -2,11 +2,11 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaReceipt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { voucherService, displayVoucherNo } from "../../../../services/voucherService";
+import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 
 // Receipt = money coming IN. Direction reversed from Payment:
 //   debitLedgerId  = Bank/Cash where the money lands ("Received In")
@@ -199,7 +199,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await voucherService.createVoucher({
+      const created = await voucherService.createVoucher({
         type: "RECEIPT",
         date,
         narration: mainNarration || "Receipt Voucher",
@@ -211,6 +211,11 @@ const ReceiptVoucherAddPage: React.FC = () => {
           narration: r.narration || mainNarration || "Receipt",
         })),
       });
+      // Optimistic list update — Receipt Register cache gets the new voucher
+      // immediately, so navigating back shows it with no reload.
+      if (created?.id) {
+        prependToListCacheByPrefix<Voucher>("accounts:receipt-vouchers:", created);
+      }
       toast.success("Receipt voucher saved successfully");
       resetFormForNext();
     } catch (err: any) {

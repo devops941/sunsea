@@ -477,6 +477,59 @@ const BalanceSheetPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Right sidebar — Summary. Amounts render on their own row so
+         crores-scale values never squeeze the label or overflow the card. */}
+      {view && (
+        <aside className="w-[220px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden self-start">
+          <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
+            <FaBalanceScale className="text-teal-500 text-xs" /> Summary
+          </div>
+          <div className="divide-y divide-line-soft">
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Assets</div>
+              <div className="text-sm font-mono font-bold text-blue-500 break-all leading-tight">
+                ₹{fmt(view.totalAssets)}
+              </div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Liabilities</div>
+              <div className="text-sm font-mono font-bold text-red-500 break-all leading-tight">
+                ₹{fmt(view.totalLiabilities)}
+              </div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Equity</div>
+              <div className="text-sm font-mono font-bold text-purple-500 break-all leading-tight">
+                ₹{fmt(view.totalEquity)}
+              </div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Liabilities + Equity</div>
+              <div className="text-sm font-mono font-bold text-ink break-all leading-tight">
+                ₹{fmt(view.totalLiabilitiesAndEquity)}
+              </div>
+            </div>
+            <div className={`px-3 py-2 ${view.isBalanced ? "bg-teal-500/5" : "bg-red-500/5"}`}>
+              <div className="text-[11px] font-semibold text-ink-muted mb-1">Balance Check</div>
+              {view.isBalanced ? (
+                <div className="text-[12px] font-semibold text-teal-500 flex items-center gap-1">
+                  <FaCheckCircle className="text-[10px]" /> Balanced
+                </div>
+              ) : (
+                <>
+                  <div className="text-[12px] font-semibold text-red-500 flex items-center gap-1 mb-1">
+                    <FaExclamationTriangle className="text-[10px]" /> Not balanced
+                  </div>
+                  <div className="text-[11px] font-mono font-bold text-red-500 break-all leading-tight">
+                    ₹{fmt(Math.abs(view.totalAssets - view.totalLiabilitiesAndEquity))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   );
 };
