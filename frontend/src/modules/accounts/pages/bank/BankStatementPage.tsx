@@ -189,7 +189,11 @@ const BankStatementPage: React.FC = () => {
                     </td>
                     <td className="px-3 py-1.5 text-xs text-right font-mono font-bold text-ink">
                       ₹{Math.abs(entry.runningBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      {entry.runningBalance < 0 && <span className="text-[10px] text-red-500 ml-1">Dr</span>}
+                      {/* Bank/Cash is an ASSET — natural side is Dr. Negative
+                          running balance means the ledger sits on Cr (overdraft /
+                          cash shortage). Show "Cr" so the sign matches accounting
+                          convention — old code wrote "Dr" here which was inverted. */}
+                      {entry.runningBalance < 0 && <span className="text-[10px] text-red-500 ml-1">Cr</span>}
                     </td>
                   </tr>
                 ))}

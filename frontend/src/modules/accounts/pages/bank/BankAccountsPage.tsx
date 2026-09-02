@@ -294,7 +294,13 @@ const BankAccountsPage: React.FC = () => {
                   acc.currentBalance >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}>
                   ₹{Math.abs(acc.currentBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  {acc.currentBalance < 0 && <span className="text-[10px] ml-1">(Dr)</span>}
+                  {/* Bank/Cash is an ASSET — natural side is Dr. A negative
+                      balance means the ledger sits on Cr (overdraft / cash
+                      shortage). Label must reflect the ACTUAL side; the old
+                      code wrote "(Dr)" on negatives which was the reverse. */}
+                  <span className="text-[10px] ml-1">
+                    {acc.currentBalance < 0 ? "(Cr)" : "(Dr)"}
+                  </span>
                 </p>
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-line-soft">
