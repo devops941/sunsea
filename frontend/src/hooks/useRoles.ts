@@ -1,44 +1,32 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Role, CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
 import { roleService } from "../services/roleService";
-import { useListCache, invalidateCache, markStaleByPrefix } from "./useListCache";
-import { useSocketSync } from "./useSocketSync";
+import { useListCache, markStaleByPrefix } from "./useListCache";
 
 const CACHE_PREFIX = "roles:";
 
 export const useRoles = () => {
-  // Track current fetch params so the cache key stays in sync
-  const paramsRef = useRef<{ page: number; limit: number; search: string }>({
-    page: 1, limit: 15, search: "",
-  });
+  // Params as state so cacheKey updates reactively → useListCache checks cache first
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const [search, setSearch] = useState("");
 
-  const cacheKey = `${CACHE_PREFIX}${paramsRef.current.page}:${paramsRef.current.limit}:${paramsRef.current.search}`;
+  const cacheKey = `${CACHE_PREFIX}${page}:${limit}:${search}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
-    const { page, limit, search } = paramsRef.current;
     const res = await roleService.fetchAll({
       page,
       limit,
       search: search || undefined,
     });
     return { data: res.data || [], total: res.total || 0 };
-  }, []);
+  }, [page, limit, search]);
 
   const { data: rawRoles, total, loading, refreshing, refresh } = useListCache<Role>({
     cacheKey,
     socketModule: "role",
     fetcher,
   });
-
-  // After any mutation (create/edit/delete), mark all role caches stale
-  // so the next render shows cached data instantly + refetches silently.
-  const invalidateAndRefresh = useCallback(() => {
-    markStaleByPrefix(CACHE_PREFIX);
-    refresh();
-  }, [refresh]);
-
-  // Socket live-sync — refetch on any role event from other clients
-  useSocketSync("role", undefined, invalidateAndRefresh);
 
   // Filter out super admin roles from display
   const roles = useMemo(() => {
@@ -56,41 +44,41 @@ export const useRoles = () => {
     });
   }, [rawRoles]);
 
-  const loadRoles = useCallback((page?: number, limit?: number, search?: string) => {
-    paramsRef.current = {
-      page: page || 1,
-      limit: limit || 15,
-      search: search || "",
-    };
-    // Invalidate current cache key so useListCache refetches with new params
-    invalidateCache(cacheKey);
-    refresh();
-  }, [cacheKey, refresh]);
+  // Page calls loadRoles(page, limit, search) — just update state.
+  // cacheKey changes → useListCache checks cache → instant if cached, fetch if not.
+  const loadRoles = useCallback((p?: number, l?: number, s?: string) => {
+    setPage(p || 1);
+    setLimit(l || 15);
+    setSearch(s || "");
+  }, []);
 
   const addRole = useCallback(
     async (data: CreateRoleDto) => {
       const result = await roleService.create(data);
-      invalidateAndRefresh();
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
       return result;
     },
-    [invalidateAndRefresh]
+    [refresh]
   );
 
   const editRole = useCallback(
     async (id: number, data: UpdateRoleDto) => {
       const result = await roleService.update(id, data);
-      invalidateAndRefresh();
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
       return result;
     },
-    [invalidateAndRefresh]
+    [refresh]
   );
 
   const removeRole = useCallback(
     async (id: number) => {
       await roleService.delete(id);
-      invalidateAndRefresh();
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
     },
-    [invalidateAndRefresh]
+    [refresh]
   );
 
   return {
