@@ -10,8 +10,8 @@ import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import { useEmployees } from "../../../hooks/useEmployees";
 import { usePermission } from "../../../hooks/usePermission";
+import { useListCache } from "../../../hooks/useListCache";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { departmentService } from "../../../services/departmentService";
@@ -22,19 +22,18 @@ import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVBut
 const ITEMS_PER_PAGE = 15;
 
 const STATUS_OPTIONS = [
-  { value: "active",     label: "Active" },
-  { value: "inactive",   label: "Inactive" },
-  { value: "resigned",   label: "Resigned" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "resigned", label: "Resigned" },
   { value: "terminated", label: "Terminated" },
 ];
 
 const Employeelist: React.FC = () => {
   const navigate = useNavigate();
-  const { employees, loading, error, loadEmployees, removeEmployee, totalPages } = useEmployees();
   const { can } = usePermission();
-  const canView   = can("employees.view");
+  const canView = can("employees.view");
   const canCreate = can("employees.create");
-  const canEdit   = can("employees.edit");
+  const canEdit = can("employees.edit");
   const canDelete = can("employees.delete");
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,34 +69,43 @@ const Employeelist: React.FC = () => {
       setRoles(list
         .filter((r: any) => !r.code?.toLowerCase().includes("super_admin") && !r.code?.toLowerCase().includes("superadmin"))
         .map((r: any) => ({ value: String(r.id), label: r.name })));
-    }).catch(() => {});
+    }).catch(() => { });
 
     departmentService.fetchAll({ limit: 200 }).then(res => {
       const list = Array.isArray(res.data) ? res.data : [];
       setDepartments(list.map((d: any) => ({ value: String(d.id), label: d.name })));
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
-  // Fetch employees whenever search, pagination, or applied filters change
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (canView) {
-        loadEmployees({
-          search: searchTerm || undefined,
-          roleId: appliedRoleId || undefined,
-          departmentId: appliedDeptId || undefined,
-          status: appliedStatus || undefined,
-          page: currentPage,
-          limit: ITEMS_PER_PAGE,
-        });
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [loadEmployees, searchTerm, currentPage, appliedRoleId, appliedDeptId, appliedStatus]);
+  // Fetch employees (cached)
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await employeeService.fetchAll({ limit: 10000 });
+    const list = Array.isArray(res) ? res : (res.employees || res.data || []);
+    return { data: list, total: res.total || list.length };
+  }, []);
 
-  useEffect(() => {
-    if (error) toast.error(error);
-  }, [error]);
+  const { data: employees, loading, refresh } = useListCache<any>({
+    cacheKey: "employees:list",
+    socketModule: "employee",
+    fetcher,
+  });
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((emp: any) => {
+      const matchesSearch = !searchTerm ||
+        emp.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.empCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.mobile?.includes(searchTerm);
+      const matchesRole = !appliedRoleId || String(emp.roleId || emp.role?.id || emp.user?.roleId) === appliedRoleId;
+      const matchesDept = !appliedDeptId || String(emp.departmentId) === appliedDeptId;
+      const matchesStatus = !appliedStatus || emp.status === appliedStatus;
+      return matchesSearch && matchesRole && matchesDept && matchesStatus;
+    });
+  }, [employees, searchTerm, appliedRoleId, appliedDeptId, appliedStatus]);
+
+  const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -137,8 +145,9 @@ const Employeelist: React.FC = () => {
     if (employeeToDelete && !isDeleting) {
       setIsDeleting(true);
       try {
-        await removeEmployee(employeeToDelete);
+        await employeeService.delete(employeeToDelete);
         toast.success("Employee deleted successfully!");
+        refresh();
       } catch (err: any) {
         toast.error(err?.response?.data?.message || err.message || err || "Failed to delete employee");
       } finally {
@@ -170,7 +179,7 @@ const Employeelist: React.FC = () => {
     };
   }, []);
 
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
 
   const columns: DataTableColumn<any>[] = [
     {
@@ -202,11 +211,10 @@ const Employeelist: React.FC = () => {
         return (
           <div className="flex flex-col items-center gap-0.5">
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                isActive
-                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-              }`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${isActive
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>
               {isActive ? "Enabled" : emp.user.status?.toUpperCase() || "Disabled"}
@@ -328,7 +336,7 @@ const Employeelist: React.FC = () => {
         {/* Table */}
         <div className="p-0 overflow-hidden rounded-b-2xl">
           <DataTable
-            data={employees}
+            data={paginatedEmployees}
             rowKey={(emp) => emp.id}
             loading={loading}
             emptyMessage="No employees found."

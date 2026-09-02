@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useDispatch, useSelector } from "react-redux";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -15,11 +14,10 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
-import { fetchShifts, deleteShift, shiftCreated, shiftUpdated, shiftDeleted } from "../../../features/shifts/shiftSlice";
-import type { RootState, AppDispatch } from "../../../app/store";
 import type { Shift } from "../../../features/shifts/types";
+import { shiftService } from "../../../services/shiftService";
 import { usePermission } from "../../../hooks/usePermission";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache } from "../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -61,9 +59,6 @@ const calculateWorkingHours = (startTime: string, endTime: string, breakDuration
 
 const ShiftList: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useDispatch<AppDispatch>();
-
-    const { data, loading, error } = useSelector((state: RootState) => state.shifts);
     const { can } = usePermission();
     const canCreateShift = can("shifts.create");
     const canEditShift = can("shifts.edit");
@@ -79,17 +74,16 @@ const ShiftList: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useSocketSync<Shift>("shift", {
-        created: shiftCreated,
-        updated: shiftUpdated,
-        deleted: shiftDeleted,
-    });
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const list = await shiftService.fetchAll();
+        return { data: list, total: list.length };
+    }, []);
 
-    useEffect(() => {
-        if (can("shifts.view")) {
-            dispatch(fetchShifts());
-        }
-    }, [dispatch, can]);
+    const { data, loading, refresh } = useListCache<Shift>({
+        cacheKey: "shifts:list",
+        socketModule: "shift",
+        fetcher,
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -147,8 +141,9 @@ const ShiftList: React.FC = () => {
         if (itemToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
-                await dispatch(deleteShift(itemToDelete)).unwrap();
+                await shiftService.delete(itemToDelete);
                 toast.success("Shift deleted successfully!");
+                refresh();
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || err.message || err || "Failed to delete shift");
             } finally {
@@ -197,17 +192,14 @@ const ShiftList: React.FC = () => {
                     </div>
 
                     {/* Table */}
-                    {error ? (
-                        <div className="text-center text-red-500 p-4">{error}</div>
-                    ) : (
-                        <div className="p-0 overflow-hidden rounded-b-2xl">
-                            <DataTable
-                                data={paginatedData}
-                                rowKey={(item) => item.id}
-                                loading={loading}
-                                emptyMessage="No shifts found."
-                                pagination={
-                                    totalPages > 1
+                    <div className="p-0 overflow-hidden rounded-b-2xl">
+                        <DataTable
+                            data={paginatedData}
+                            rowKey={(item) => item.id}
+                            loading={loading}
+                            emptyMessage="No shifts found."
+                            pagination={
+                                totalPages > 1
                                         ? {
                                             currentPage,
                                             totalPages,
@@ -237,8 +229,7 @@ const ShiftList: React.FC = () => {
                                     },
                                 ]}
                             />
-                        </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* View Modal */}

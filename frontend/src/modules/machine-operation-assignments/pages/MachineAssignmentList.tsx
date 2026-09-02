@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
+import { useListCache } from "../../../hooks/useListCache";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -30,10 +31,7 @@ import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVBut
 const ITEMS_PER_PAGE = 15;
 
 const MachineAssignmentList: React.FC = () => {
-  const [assignments, setAssignments] = useState<MachineOperationAssignment[]>([]);
-  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const { can } = usePermission();
   const canCreateAssignment = can("machine-assignments.create");
   const canEditAssignment = can("machine-assignments.edit");
@@ -84,36 +82,29 @@ const MachineAssignmentList: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // Load assignments
-  const loadAssignments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, any> = {
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-      };
-      if (filterMachineId) params.machineId = filterMachineId;
-      if (filterWeekDate) params.weekStartDate = filterWeekDate;
-      if (searchTerm) params.search = searchTerm;
+  // Load assignments (cached)
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await machineOperationAssignmentService.getAssignments({ limit: 10000 });
+    const list = res.data || res.assignments || [];
+    return { data: list, total: res.pagination?.total || list.length };
+  }, []);
 
-      const res = await machineOperationAssignmentService.getAssignments(params);
-      setAssignments(res.data || res.assignments || []);
-      setTotalItems(res.pagination?.total || 0);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Failed to load assignments");
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, filterMachineId, filterWeekDate, searchTerm]);
+  const { data: allAssignments, loading, refresh } = useListCache<MachineOperationAssignment>({
+    cacheKey: "machineAssignments:list",
+    socketModule: "machineOperationAssignment",
+    fetcher,
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadAssignments();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [loadAssignments]);
-
-  useSocketSync("machineOperationAssignment", undefined, loadAssignments);
+  const filteredAssignments = useMemo(() => {
+    return allAssignments.filter((item: any) => {
+      const matchesMachine = !filterMachineId || item.machineId === filterMachineId;
+      const matchesWeek = !filterWeekDate || item.weekStartDate?.split("T")[0] === filterWeekDate;
+      const matchesSearch = !searchTerm ||
+        item.machineId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.machine?.machineName?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesMachine && matchesWeek && matchesSearch;
+    });
+  }, [allAssignments, filterMachineId, filterWeekDate, searchTerm]);
 
   // Apply filters from popover
   const handleApplyFilters = () => {
@@ -135,10 +126,10 @@ const MachineAssignmentList: React.FC = () => {
   const activeFilterCount = (filterMachineId ? 1 : 0) + (filterWeekDate ? 1 : 0);
   const hasActiveFilters = activeFilterCount > 0;
 
-  // Pagination
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+  // Pagination (client-side)
+  const totalPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedData = assignments; // Data is already paginated by the backend
+  const paginatedData = filteredAssignments.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handleOpenCreate = () => {
     navigate("/machines/assignments/create");
@@ -153,7 +144,7 @@ const MachineAssignmentList: React.FC = () => {
     try {
       await machineOperationAssignmentService.toggleStatus(item.id, newStatus);
       toast.success(`Assignment ${newStatus ? "activated" : "closed"} successfully!`);
-      loadAssignments();
+      refresh();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to change assignment status");
     }

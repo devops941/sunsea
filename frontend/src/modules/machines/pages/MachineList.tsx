@@ -3,8 +3,8 @@ import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchMachines, deleteMachine } from "../../../features/machines/machineSlice";
+import { useListCache } from "../../../hooks/useListCache";
+import { machineService } from "../../../services/machineService";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -17,18 +17,13 @@ import MachineViewModal from "../components/MachineViewModal";
 import { Search } from "lucide-react";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { usePermission } from "../../../hooks/usePermission";
-import { useSocketSync } from "../../../hooks/useSocketSync";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import { machineService } from "../../../services/machineService";
 
 const ITEMS_PER_PAGE = 15;
 
 const MachineList: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useAppDispatch();
     const { employees, loadEmployees } = useEmployees();
-
-    const { data, loading, error, totalPages } = useAppSelector((state) => state.machines);
     const { can } = usePermission();
     const canCreateMachine = can("machines.create");
     const canEditMachine = can("machines.edit");
@@ -49,40 +44,38 @@ const MachineList: React.FC = () => {
         return Array.isArray(res) ? res : (res?.machines || res?.data || []);
     }, []);
 
-    const loadMachines = useCallback(() => {
-        if (can("machines.view")) {
-            dispatch(fetchMachines({
-                search: searchTerm || undefined,
-                page: currentPage,
-                limit: ITEMS_PER_PAGE,
-            }));
-        }
-    }, [dispatch, can, searchTerm, currentPage]);
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await machineService.getAll({ limit: 10000 });
+        const list = Array.isArray(res) ? res : (res.machines || res.data || []);
+        return { data: list, total: list.length };
+    }, []);
 
-    // Debounced fetch on search/page change
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            loadMachines();
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [loadMachines]);
+    const { data: machines, loading, refresh } = useListCache<any>({
+        cacheKey: "machines:list",
+        socketModule: "machine",
+        fetcher,
+    });
 
-    // Socket reload (reset to page 1 on external change)
-    useSocketSync("machine", undefined, useCallback(() => {
-        if (can("machines.view")) {
-            dispatch(fetchMachines({ page: currentPage, limit: ITEMS_PER_PAGE }));
-        }
-    }, [dispatch, can, currentPage]));
+    const filteredData = useMemo(() => {
+        if (!searchTerm) return machines;
+        const term = searchTerm.toLowerCase();
+        return machines.filter((m: any) =>
+            m.machineId?.toLowerCase().includes(term) ||
+            m.machineName?.toLowerCase().includes(term) ||
+            m.technologyType?.toLowerCase().includes(term) ||
+            m.machineType?.toLowerCase().includes(term)
+        );
+    }, [machines, searchTerm]);
+
+    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     useEffect(() => {
         if (can("employees.view")) {
             loadEmployees({ limit: 500 });
         }
     }, [loadEmployees, can]);
-
-    useEffect(() => {
-        if (error) toast.error(error);
-    }, [error]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -102,10 +95,9 @@ const MachineList: React.FC = () => {
         if (itemToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
-                await dispatch(deleteMachine(itemToDelete)).unwrap();
+                await machineService.delete(itemToDelete);
                 toast.success("Machine deleted successfully!");
-                // Reload current page after delete
-                dispatch(fetchMachines({ search: searchTerm || undefined, page: currentPage, limit: ITEMS_PER_PAGE }));
+                refresh();
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || err.message || err || "Failed to delete machine");
             } finally {
@@ -139,7 +131,6 @@ const MachineList: React.FC = () => {
         };
     }, [employees]);
 
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return (
         <div>
@@ -179,7 +170,7 @@ const MachineList: React.FC = () => {
 
                 <div className="p-0 overflow-hidden rounded-b-2xl">
                     <DataTable
-                        data={data}
+                        data={paginatedData}
                         rowKey={(item) => item.machineId}
                         loading={loading}
                         emptyMessage="No machines found."
