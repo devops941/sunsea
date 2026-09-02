@@ -1,52 +1,77 @@
-import { useCallback } from "react";
-import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment, departmentCreated, departmentUpdated, departmentDeleted } from "../features/departments/departmentSlice";
+import { useCallback, useState } from "react";
 import type { Department, CreateDepartmentDto, UpdateDepartmentDto } from "../features/departments/types";
-import { useSocketSync } from "./useSocketSync";
+import { departmentService } from "../services/departmentService";
+import { useListCache, markStaleByPrefix } from "./useListCache";
+
+const CACHE_PREFIX = "departments:";
 
 export const useDepartments = () => {
-  const dispatch = useAppDispatch();
-  const { data: departments, total, loading, error } = useAppSelector((state) => state.departments);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const [search, setSearch] = useState("");
 
-  useSocketSync<Department>("department", {
-    created: departmentCreated,
-    updated: departmentUpdated,
-    deleted: departmentDeleted,
+  const cacheKey = `${CACHE_PREFIX}${page}:${limit}:${search}`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await departmentService.fetchAll({
+      page,
+      limit,
+      search: search || undefined,
+    });
+    return { data: res.data || [], total: res.total || 0 };
+  }, [page, limit, search]);
+
+  const { data: departments, total, loading, refreshing, refresh } = useListCache<Department>({
+    cacheKey,
+    socketModule: "department",
+    fetcher,
   });
 
-  const loadDepartments = useCallback((page?: number, limit?: number, search?: string) => {
-    dispatch(fetchDepartments({ page, limit, search }));
-  }, [dispatch]);
+  const loadDepartments = useCallback((p?: number, l?: number, s?: string) => {
+    setPage(p || 1);
+    setLimit(l || 15);
+    setSearch(s || "");
+  }, []);
 
   const addDepartment = useCallback(
     async (data: CreateDepartmentDto) => {
-      return await dispatch(createDepartment(data)).unwrap();
+      const result = await departmentService.create(data);
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
+      return result;
     },
-    [dispatch]
+    [refresh]
   );
 
   const editDepartment = useCallback(
     async (id: number, data: UpdateDepartmentDto) => {
-      return await dispatch(updateDepartment({ id, data })).unwrap();
+      const result = await departmentService.update(id, data);
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
+      return result;
     },
-    [dispatch]
+    [refresh]
   );
 
   const removeDepartment = useCallback(
     async (id: number) => {
-      return await dispatch(deleteDepartment(id)).unwrap();
+      await departmentService.delete(id);
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
     },
-    [dispatch]
+    [refresh]
   );
 
   return {
     departments,
     total,
     loading,
-    error,
+    refreshing,
+    error: null as string | null,
     loadDepartments,
     addDepartment,
     editDepartment,
     removeDepartment,
+    refresh,
   };
 };

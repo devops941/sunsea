@@ -1,10 +1,7 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Briefcase, Mail, Phone, CalendarDays, BadgeCheck, ShieldCheck, Shield } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
 
-import type { RootState, AppDispatch } from "../../app/store";
-import { fetchProfile } from "../../features/profiles/profileSlice";
-
+import { useProfile } from "../../hooks/useProfile";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
 
 const formatDate = (date?: string | null) =>
@@ -16,12 +13,7 @@ const getInitials = (name?: string | null) => {
 };
 
 const ProfilePage: React.FC = () => {
-    const dispatch = useDispatch<AppDispatch>();
-    const { employee, loading } = useSelector((state: RootState) => state.profile);
-
-    useEffect(() => {
-        dispatch(fetchProfile());
-    }, [dispatch]);
+    const { employee, loading } = useProfile();
 
     if (loading || !employee) {
         return <CommonLoader text="Loading Profile..." />;
