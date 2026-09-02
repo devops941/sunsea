@@ -31,13 +31,43 @@ const cache = new Map<string, CacheEntry<any>>();
 // share one Promise instead of firing parallel fetches.
 const inflight = new Map<string, Promise<{ data: any[]; total: number }>>();
 
+// ─── Pub/Sub for delta updates ────────────────────────────────────────────────
+// Subscribers are notified after any cache mutation (writeCache / delta helpers)
+// so hooks currently mounted with matching cacheKey re-read from cache and
+// re-render — no network fetch, no loading flash. Fully opt-in from callers.
+const subscribers = new Map<string, Set<() => void>>();
+
+function subscribe(key: string, cb: () => void): () => void {
+  let set = subscribers.get(key);
+  if (!set) {
+    set = new Set();
+    subscribers.set(key, set);
+  }
+  set.add(cb);
+  return () => {
+    const s = subscribers.get(key);
+    if (!s) return;
+    s.delete(cb);
+    if (s.size === 0) subscribers.delete(key);
+  };
+}
+
+function notify(key: string) {
+  const set = subscribers.get(key);
+  if (!set) return;
+  // Copy to array so callbacks that unsubscribe don't mutate iteration
+  Array.from(set).forEach((cb) => {
+    try { cb(); } catch (err) { console.error("[useListCache] subscriber error:", err); }
+  });
+}
+
 function evict() {
   if (cache.size < MAX_ENTRIES) return;
   const oldest = cache.keys().next().value;
   if (oldest) cache.delete(oldest);
 }
 
-/** Write to both memory and sessionStorage */
+/** Write to both memory and sessionStorage. Notifies subscribers. */
 function writeCache<T>(key: string, entry: CacheEntry<T>) {
   evict();
   cache.set(key, entry);
@@ -49,6 +79,7 @@ function writeCache<T>(key: string, entry: CacheEntry<T>) {
   } catch {
     // sessionStorage quota exceeded — memory cache is still good
   }
+  notify(key);
 }
 
 /** Read from memory first, fall back to sessionStorage */
@@ -257,6 +288,24 @@ export function useListCache<T = any>({
     doFetch(false);
   }, [doFetch]);
 
+  // ─── Subscribe to external cache mutations (delta helpers) ────
+  // When appendToListCache / updateInListCache / removeFromListCache /
+  // upsertInListCache is called from a save/edit/delete handler, we re-read
+  // from cache and re-render — no network fetch, no loading flash.
+  useEffect(() => {
+    const onCacheMutated = () => {
+      const entry = readCache<T>(cacheKeyRef.current, Infinity);
+      if (entry) {
+        setData([...entry.data]);
+        setTotal(entry.total);
+      } else {
+        setData([]);
+        setTotal(0);
+      }
+    };
+    return subscribe(cacheKey, onCacheMutated);
+  }, [cacheKey]);
+
   return { data, total, loading, refreshing, refresh };
 }
 
@@ -327,6 +376,159 @@ export function invalidateCacheByPrefix(prefix: string): void {
     );
     ssKeys.forEach((k) => sessionStorage.removeItem(k));
   } catch {}
+}
+
+// ─── Delta helpers — opt-in, safe to call from save/edit/delete handlers ─────
+//
+// These mutate the cache IN PLACE and notify any currently mounted hook
+// (matching cacheKey) to re-render from the new cache — no network fetch,
+// no loading spinner. Use them for optimistic UI: run the delta locally
+// before the POST/PATCH/DELETE round-trip completes, so the user sees the
+// change instantly. If the network call later fails, roll back with the
+// inverse operation.
+
+/** Append one item to the tail of a cached list. Creates the entry if missing. */
+export function appendToListCache<T = any>(key: string, item: T): void {
+  const entry = readCache<T>(key, Infinity);
+  if (!entry) {
+    writeCache(key, { data: [item], total: 1, timestamp: Date.now() });
+    return;
+  }
+  writeCache(key, {
+    data: [...entry.data, item],
+    total: entry.total + 1,
+    timestamp: Date.now(),
+  });
+}
+
+/** Prepend one item to the head of a cached list. Creates the entry if missing. */
+export function prependToListCache<T = any>(key: string, item: T): void {
+  const entry = readCache<T>(key, Infinity);
+  if (!entry) {
+    writeCache(key, { data: [item], total: 1, timestamp: Date.now() });
+    return;
+  }
+  writeCache(key, {
+    data: [item, ...entry.data],
+    total: entry.total + 1,
+    timestamp: Date.now(),
+  });
+}
+
+/**
+ * Replace the first item matching `matcher` with the value returned by `updater`.
+ * No-op if the cache is empty or no item matches.
+ */
+export function updateInListCache<T = any>(
+  key: string,
+  matcher: (item: T) => boolean,
+  updater: (item: T) => T
+): void {
+  const entry = readCache<T>(key, Infinity);
+  if (!entry) return;
+  let changed = false;
+  const data = entry.data.map((it) => {
+    if (!changed && matcher(it)) {
+      changed = true;
+      return updater(it);
+    }
+    return it;
+  });
+  if (!changed) return;
+  writeCache(key, { ...entry, data, timestamp: Date.now() });
+}
+
+/** Remove every item matching `matcher`. No-op if the cache is empty. */
+export function removeFromListCache<T = any>(
+  key: string,
+  matcher: (item: T) => boolean
+): void {
+  const entry = readCache<T>(key, Infinity);
+  if (!entry) return;
+  const data = entry.data.filter((it) => !matcher(it));
+  const removed = entry.data.length - data.length;
+  if (removed === 0) return;
+  writeCache(key, {
+    data,
+    total: Math.max(0, entry.total - removed),
+    timestamp: Date.now(),
+  });
+}
+
+/**
+ * Insert-or-replace: if an item matches, replace it; otherwise append.
+ * Perfect fit for socket `<module>:created`|`:updated` events that carry
+ * a payload with the full record — apply once, no full-list refetch needed.
+ */
+export function upsertInListCache<T = any>(
+  key: string,
+  matcher: (item: T) => boolean,
+  item: T
+): void {
+  const entry = readCache<T>(key, Infinity);
+  if (!entry) {
+    writeCache(key, { data: [item], total: 1, timestamp: Date.now() });
+    return;
+  }
+  const idx = entry.data.findIndex(matcher);
+  if (idx >= 0) {
+    const data = [...entry.data];
+    data[idx] = item;
+    writeCache(key, { ...entry, data, timestamp: Date.now() });
+  } else {
+    writeCache(key, {
+      data: [...entry.data, item],
+      total: entry.total + 1,
+      timestamp: Date.now(),
+    });
+  }
+}
+
+/**
+ * Apply a delta helper to EVERY cached key that starts with `prefix`. Useful
+ * when the exact cacheKey isn't known (list pages typically bake filters +
+ * dates into their key). Only touches keys that already exist — never
+ * populates a brand-new entry.
+ */
+export function appendToListCacheByPrefix<T = any>(prefix: string, item: T): void {
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith(prefix)) appendToListCache(key, item);
+  }
+}
+
+export function prependToListCacheByPrefix<T = any>(prefix: string, item: T): void {
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith(prefix)) prependToListCache(key, item);
+  }
+}
+
+export function updateInListCacheByPrefix<T = any>(
+  prefix: string,
+  matcher: (item: T) => boolean,
+  updater: (item: T) => T
+): void {
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith(prefix)) updateInListCache(key, matcher, updater);
+  }
+}
+
+export function removeFromListCacheByPrefix<T = any>(
+  prefix: string,
+  matcher: (item: T) => boolean
+): void {
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith(prefix)) removeFromListCache(key, matcher);
+  }
+}
+
+export function upsertInListCacheByPrefix<T = any>(
+  prefix: string,
+  matcher: (item: T) => boolean,
+  item: T
+): void {
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith(prefix)) upsertInListCache(key, matcher, item);
+  }
 }
 
 export async function prefetchCache<T>(

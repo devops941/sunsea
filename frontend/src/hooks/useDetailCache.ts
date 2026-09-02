@@ -32,6 +32,32 @@ const detailCache = new Map<string, DetailCacheEntry<any>>();
 // they share a single network Promise instead of firing duplicate fetches.
 const inflight = new Map<string, Promise<any>>();
 
+// ─── Pub/Sub for delta updates (same pattern as useListCache) ─────────────────
+const subscribers = new Map<string, Set<() => void>>();
+
+function subscribeDetail(key: string, cb: () => void): () => void {
+  let set = subscribers.get(key);
+  if (!set) {
+    set = new Set();
+    subscribers.set(key, set);
+  }
+  set.add(cb);
+  return () => {
+    const s = subscribers.get(key);
+    if (!s) return;
+    s.delete(cb);
+    if (s.size === 0) subscribers.delete(key);
+  };
+}
+
+function notifyDetail(key: string) {
+  const set = subscribers.get(key);
+  if (!set) return;
+  Array.from(set).forEach((cb) => {
+    try { cb(); } catch (err) { console.error("[useDetailCache] subscriber error:", err); }
+  });
+}
+
 function evict() {
   if (detailCache.size < MAX_ENTRIES) return;
   const oldest = detailCache.keys().next().value;
@@ -45,6 +71,7 @@ function write<T>(key: string, data: T) {
   try {
     sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify(entry));
   } catch { /* quota exceeded — memory cache still works */ }
+  notifyDetail(key);
 }
 
 function read<T>(key: string): DetailCacheEntry<T> | undefined {
@@ -64,6 +91,7 @@ function read<T>(key: string): DetailCacheEntry<T> | undefined {
 function del(key: string) {
   detailCache.delete(key);
   try { sessionStorage.removeItem(SESSION_PREFIX + key); } catch {}
+  notifyDetail(key);
 }
 
 // ─── useDetailCache ───────────────────────────────────────────────────────────
@@ -213,6 +241,18 @@ export function useDetailCache<T = any>({
     doFetch(false);
   }, [doFetch]);
 
+  // ─── Subscribe to external cache mutations (delta helpers) ────
+  // When updateDetailCache / patchDetailCache / removeDetailCache is called
+  // from a save/edit/delete handler, we re-read from cache and re-render —
+  // no network fetch, no loading flash.
+  useEffect(() => {
+    const onCacheMutated = () => {
+      const entry = read<T>(cacheKeyRef.current);
+      setData(entry?.data ?? null);
+    };
+    return subscribeDetail(cacheKey, onCacheMutated);
+  }, [cacheKey]);
+
   return { data, loading, refreshing, refresh };
 }
 
@@ -347,6 +387,35 @@ export function invalidateDetailCacheByPrefix(prefix: string): void {
     );
     ssKeys.forEach((k) => sessionStorage.removeItem(k));
   } catch { /* ignore */ }
+}
+
+// ─── Delta helpers — opt-in, safe to call from save/edit/delete handlers ─────
+//
+// Use these for optimistic UI on a single-record page: apply the change
+// locally BEFORE the server round-trip completes so the user sees it instantly.
+// Any hook currently mounted with the matching cacheKey re-renders from cache.
+
+/** Replace the cached record wholesale. Creates the entry if missing. */
+export function updateDetailCache<T = any>(key: string, data: T): void {
+  write(key, data);
+}
+
+/**
+ * Merge a partial patch into the cached record: `{ ...cached, ...patch }`.
+ * No-op if nothing is cached — we don't guess the shape.
+ */
+export function patchDetailCache<T extends object = any>(
+  key: string,
+  patch: Partial<T>
+): void {
+  const entry = read<T>(key);
+  if (!entry) return;
+  write(key, { ...entry.data, ...patch });
+}
+
+/** Remove the cached record (call after a successful DELETE). */
+export function removeDetailCache(key: string): void {
+  del(key);
 }
 
 /**
