@@ -29,7 +29,7 @@ import { salesOrderService } from "../../services/salesOrderService";
 import { salesProductService } from "../../services/salesProductService";
 import { finishedGoodsStockService } from "../../services/finishedGoodsStockService";
 import { useSocketSync } from "../../hooks/useSocketSync";
-import { useSalesInvoiceRefData } from "../../hooks/useSalesInvoiceRefData";
+import { useDetailCache } from "../../hooks/useDetailCache";
 
 // ---- Types ----
 interface InvoiceLineItem {
@@ -148,9 +148,6 @@ const SalesInvoiceForm: React.FC = () => {
   const dispatch = useDispatch<any>();
   const { data: company } = useSelector((state: any) => state.company);
 
-  const { data: refData, loading: refLoading } = useSalesInvoiceRefData();
-
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -230,23 +227,71 @@ const SalesInvoiceForm: React.FC = () => {
       });
   }, [id, navigate]);
 
-  // ---- Populate state from cached reference data ----
+  // ---- Load dropdown data (cached — instant on revisit) ----
+  const refFetcher = useCallback(async (_signal: AbortSignal) => {
+    const [customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData] =
+      await Promise.all([
+        customerService.fetchAll({ limit: 1000 } as any).catch(() => ({ customers: [] })),
+        productService.fetchAll().catch(() => []),
+        invoiceSettingsService.getConfig().catch(() => null),
+        salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+        salesOrderService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+        finishedGoodsStockService.fetchAll().catch(() => []),
+        salesProductService.fetchAll().catch(() => []),
+      ]);
+    return { customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData };
+  }, []);
+
+  const { data: refData, loading } = useDetailCache<any>({
+    cacheKey: "salesInvoice:refData",
+    socketModule: "salesInvoice",
+    fetcher: refFetcher,
+  });
+
   useEffect(() => {
     if (!refData) return;
+    const { customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData } = refData;
 
-    setCustomers(refData.customers);
-    setCustomersRaw(refData.customersRaw);
-    setItems(refData.items);
-    setAllOrders(refData.allOrders);
-    setSalesOrders(refData.salesOrders);
-    setStockMap(refData.stockMap);
-    setSalesProducts(refData.salesProducts);
+    const customersArray = Array.isArray(customerList)
+      ? customerList
+      : (customerList as any)?.customers || (customerList as any)?.data || [];
+    setCustomers(customersArray.map((c: any) => ({
+      id: c.id,
+      name: c.firmName || c.displayName || c.customerCode || "Unknown Customer",
+    })));
+    setCustomersRaw(customersArray);
 
-    if (refData.invoiceSettings) {
-      setInvoiceSettings(refData.invoiceSettings);
+    setItems((productList || [])
+      .filter((p: any) => p.productType === 'SALES_PRODUCTION')
+      .map((p: any) => ({
+        id: String(p.id),
+        name: p.productName,
+        defaultRate: Number(p.mrp) || Number(p.b2b) || 0,
+        gstRate: Number(p.gstRate) || 0,
+      })));
+
+    const ordersList = ordersResponse?.data || (ordersResponse as any)?.orders || [];
+    setAllOrders(ordersList);
+
+    const rawSalesOrdersList: any[] = salesOrdersResponse?.data || (salesOrdersResponse as any)?.orders || [];
+    setSalesOrders(rawSalesOrdersList.filter((so: any) => so && ['CONFIRMED', 'QUOTED'].includes(so.status)));
+
+    const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
+    const fgStockMap = new Map<string, number>();
+    fgList.forEach((fg: any) => {
+      const prodId = (fg.productItemId || fg.productId)?.toString();
+      if (prodId) fgStockMap.set(prodId, (fgStockMap.get(prodId) || 0) + Number(fg.onHandQty || 0));
+    });
+    setStockMap(fgStockMap);
+
+    const spList = Array.isArray(salesProductsData) ? salesProductsData.filter((sp: any) => sp.isActive !== false) : [];
+    setSalesProducts(spList);
+
+    if (settings) {
+      setInvoiceSettings(settings);
       if (!id) {
         const todayStr = new Date().toISOString().split("T")[0];
-        setPreviewInvoiceNo(calculateInvoiceNumber(todayStr, refData.invoiceSettings, refData.allOrders));
+        setPreviewInvoiceNo(calculateInvoiceNumber(todayStr, settings, ordersList));
       }
     }
 
@@ -268,8 +313,6 @@ const SalesInvoiceForm: React.FC = () => {
         })
         .catch(() => {});
     }
-
-    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refData]);
 
