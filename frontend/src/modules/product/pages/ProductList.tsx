@@ -19,7 +19,7 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { productService } from "../../../services/productService";
-import { useProducts } from "../../../hooks/useProducts";
+import { useListCache } from "../../../hooks/useListCache";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
@@ -35,7 +35,16 @@ const ITEMS_PER_PAGE = 15;
 
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
-    const { products, loading, error, loadProducts, removeProduct } = useProducts();
+    const productFetcher = useCallback(async (_signal: AbortSignal) => {
+        const list = await productService.fetchAll();
+        return { data: Array.isArray(list) ? list : [], total: Array.isArray(list) ? list.length : 0 };
+    }, []);
+
+    const { data: products, loading, refresh } = useListCache<any>({
+        cacheKey: "products:list",
+        socketModule: "product",
+        fetcher: productFetcher,
+    });
     const { can } = usePermission();
 
     const [showViewModal, setShowViewModal] = useState(false);
@@ -107,20 +116,15 @@ const ProductList: React.FC = () => {
         }).catch(() => {});
     }, []);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (can("products.view")) {
-                loadProducts({ search: searchTerm, categoryId: categoryFilter || undefined });
-            }
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchTerm, categoryFilter, loadProducts, can]);
-
-    useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
-    }, [error]);
+    const filteredProducts = useMemo(() => {
+        return products.filter((p: any) => {
+            const matchesSearch = !searchTerm ||
+                p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                p.productCode?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = !categoryFilter || String(p.categoryId) === categoryFilter;
+            return matchesSearch && matchesCategory;
+        });
+    }, [products, searchTerm, categoryFilter]);
 
     useSocketSync("productCapacityHistory", undefined, () => {
         if (showViewModal && selectedProduct) {
@@ -223,7 +227,7 @@ const ProductList: React.FC = () => {
             });
             toast.success("Capacity updated successfully!");
             setShowCapModal(false);
-            loadProducts({ search: searchTerm, categoryId: categoryFilter || undefined });
+            refresh();
         } catch (err: any) {
             toast.error(err.message || "Failed to update capacity");
         } finally {
@@ -240,8 +244,9 @@ const ProductList: React.FC = () => {
         if (productToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
-                await removeProduct(productToDelete);
+                await productService.delete(productToDelete);
                 toast.success("Product deleted successfully!");
+                refresh();
             } catch (err: any) {
                 const errorMessage = typeof err === 'string' ? err : err?.response?.data?.message || err?.message || "Failed to delete product";
                 toast.error(errorMessage);
@@ -252,8 +257,6 @@ const ProductList: React.FC = () => {
             }
         }
     };
-
-    const filteredProducts = products || [];
 
     const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
     const safeCurrentPage = Math.min(currentPage, totalPages);

@@ -1,10 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStores, deleteStore } from "../../../features/stores/storeSlice";
 import type { Store } from "../../../features/stores/types";
 import { STORE_CATEGORY_OPTIONS, STORE_CATEGORY_LABELS } from "../../../features/stores/types";
 
@@ -20,8 +18,8 @@ import DataTable from "../../../components/ui/table/DataTable";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { storeService } from "../../../services/storeService";
-import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
+import { useListCache } from "../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -38,15 +36,11 @@ const activeFilterOptions = [
 
 const StorageStoreList: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useAppDispatch();
     const { can } = usePermission();
-
-    const { data, loading, error, totalPages, total } = useAppSelector(state => state.stores);
 
     const [storeCategoryFilter, setStoreCategoryFilter] = useState("");
     const [activeFilter, setActiveFilter] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
-    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const [showViewModal, setShowViewModal] = useState(false);
@@ -56,44 +50,35 @@ const StorageStoreList: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        if (error) toast.error(error);
-    }, [error]);
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await storeService.fetchAll({ limit: 10000 });
+        const list = Array.isArray(res) ? res : (res?.stores || res?.data || []);
+        return { data: list, total: list.length };
+    }, []);
 
-    // Debounce search — 300 ms
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-            setDebouncedSearch(searchTerm);
-            setCurrentPage(1);
-        }, 300);
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
-    }, [searchTerm]);
+    const { data: allStores, loading, refresh } = useListCache<any>({
+        cacheKey: "stores:list",
+        socketModule: "store",
+        fetcher,
+    });
 
-    const fetchStoreData = useCallback(() => {
-        if (can("stores.view")) {
-            dispatch(
-                fetchStores({
-                    search: debouncedSearch || undefined,
-                    storeCategory: storeCategoryFilter || undefined,
-                    isActive: activeFilter !== "" ? activeFilter === "true" : undefined,
-                    page: currentPage,
-                    limit: ITEMS_PER_PAGE,
-                    sortBy: "createdAt",
-                    sortOrder: "asc",
-                })
-            );
-        }
-    }, [dispatch, debouncedSearch, storeCategoryFilter, activeFilter, currentPage, can]);
+    const filteredStores = useMemo(() => {
+        return allStores.filter((item: any) => {
+            const matchesSearch = !searchTerm ||
+                item.storeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.storeName?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = !storeCategoryFilter || item.storeCategory === storeCategoryFilter;
+            const matchesActive = activeFilter === "" ||
+                (activeFilter === "true" ? item.isActive : !item.isActive);
+            return matchesSearch && matchesCategory && matchesActive;
+        });
+    }, [allStores, searchTerm, storeCategoryFilter, activeFilter]);
 
-    useEffect(() => {
-        fetchStoreData();
-    }, [fetchStoreData]);
-
-    useSocketSync("store", undefined, fetchStoreData);
+    const totalPages = Math.ceil(filteredStores.length / ITEMS_PER_PAGE);
+    const paginatedStores = filteredStores.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -127,8 +112,9 @@ const StorageStoreList: React.FC = () => {
         if (itemToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
-                await dispatch(deleteStore(itemToDelete)).unwrap();
+                await storeService.delete(itemToDelete);
                 toast.success("Store deleted successfully!");
+                refresh();
             } catch (err: any) {
                 toast.error(err || "Failed to delete store");
             } finally {
@@ -219,7 +205,7 @@ const StorageStoreList: React.FC = () => {
                 {/* Table */}
                 <div className="p-0">
                     <DataTable
-                        data={data}
+                        data={paginatedStores}
                         rowKey={(item) => item.storeId}
                         emptyMessage="No stores found."
                         loading={loading}

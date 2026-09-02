@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { salesProductService } from "../../../services/salesProductService";
 import { usePermission } from "../../../hooks/usePermission";
+import { useListCache } from "../../../hooks/useListCache";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -21,8 +22,6 @@ const SalesProductList: React.FC = () => {
     const navigate = useNavigate();
     const { can } = usePermission();
 
-    const [salesProducts, setSalesProducts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -30,20 +29,26 @@ const SalesProductList: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const loadData = useCallback((search: string = "") => {
-        setLoading(true);
-        salesProductService.fetchAll(search)
-            .then((data: any) => setSalesProducts(Array.isArray(data) ? data : []))
-            .catch(() => toast.error("Failed to load sales products"))
-            .finally(() => setLoading(false));
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const data = await salesProductService.fetchAll();
+        const list = Array.isArray(data) ? data : [];
+        return { data: list, total: list.length };
     }, []);
 
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (can("sales_products.view")) loadData(searchTerm);
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, loadData, can]);
+    const { data: allSalesProducts, loading, refresh } = useListCache<any>({
+        cacheKey: "salesProducts:list",
+        socketModule: "salesProduct",
+        fetcher,
+    });
+
+    const salesProducts = useMemo(() => {
+        if (!searchTerm) return allSalesProducts;
+        const term = searchTerm.toLowerCase();
+        return allSalesProducts.filter((p: any) =>
+            p.salesProductName?.toLowerCase().includes(term) ||
+            p.salesProductCode?.toLowerCase().includes(term)
+        );
+    }, [allSalesProducts, searchTerm]);
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -70,7 +75,7 @@ const SalesProductList: React.FC = () => {
         try {
             await salesProductService.delete(itemToDelete);
             toast.success("Sales Product deleted successfully!");
-            loadData(searchTerm);
+            refresh();
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to delete Sales Product");
         } finally {
