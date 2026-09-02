@@ -22,8 +22,8 @@ const DashboardQuickNav: React.FC<DashboardQuickNavProps> = ({ alerts }) => {
         { title: 'Weekly Schedule', icon: FaCalendarCheck, path: '/weekly-machine-schedules', colorClass: 'text-green-600', bgClass: 'bg-green-100' },
         { title: 'Daily Plan', icon: FaCogs, path: '/daily-machine-planning', colorClass: 'text-blue-600', bgClass: 'bg-blue-100' },
         { title: 'Raw Materials', icon: FaLayerGroup, path: '/raw-materials', colorClass: 'text-red-600', bgClass: 'bg-red-100' },
-        { title: 'Finished Goods', icon: FaBoxOpen, path: '/stock-adjustments', colorClass: 'text-yellow-600', bgClass: 'bg-yellow-100' },
-        { title: 'Inventory', icon: FaBoxes, path: '/store-types', colorClass: 'text-gray-600', bgClass: 'bg-gray-100' },
+        { title: 'Finished Goods', icon: FaBoxOpen, path: '/finished-stock', colorClass: 'text-yellow-600', bgClass: 'bg-yellow-100' },
+        { title: 'Inventory', icon: FaBoxes, path: '/stock', colorClass: 'text-gray-600', bgClass: 'bg-gray-100' },
         { title: 'Employees', icon: FaUserTie, path: '/employees', colorClass: 'text-gray-900', bgClass: 'bg-gray-200' },
         { title: 'Users', icon: FaUsers, path: '/users', colorClass: '!text-primary', bgClass: '!bg-primary' },
     ];

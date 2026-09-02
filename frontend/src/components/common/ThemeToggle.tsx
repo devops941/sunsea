@@ -1,5 +1,5 @@
 import React from "react";
-import { FaSun, FaMoon } from "react-icons/fa";
+import { LuSunMedium, LuMoonStar } from "react-icons/lu";
 import { useTheme } from "../../providers/ThemeProvider";
 
 const ThemeToggle: React.FC<{ className?: string }> = ({ className = "" }) => {
@@ -11,16 +11,17 @@ const ThemeToggle: React.FC<{ className?: string }> = ({ className = "" }) => {
       type="button"
       onClick={toggle}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border cursor-pointer transition-all
-        ${isDark
-          ? "bg-yellow-400/10 text-yellow-300 border-yellow-400/30 hover:bg-yellow-400 hover:text-gray-900"
-          : "bg-indigo-500/10 text-indigo-500 border-indigo-500/30 hover:bg-indigo-500 hover:text-white"
-        } ${className}`}
+      className={`w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-95 shadow-xs group ${className}`}
     >
-      {isDark ? <FaSun size={13} /> : <FaMoon size={13} />}
-     
+      {isDark ? (
+        <LuSunMedium className="text-[16px] text-amber-400 group-hover:text-amber-300 group-hover:scale-110 transition-all duration-200" />
+      ) : (
+        <LuMoonStar className="text-[15px] text-slate-300 group-hover:text-indigo-400 group-hover:scale-110 transition-all duration-200" />
+      )}
     </button>
   );
 };
 
 export default ThemeToggle;
+
+
