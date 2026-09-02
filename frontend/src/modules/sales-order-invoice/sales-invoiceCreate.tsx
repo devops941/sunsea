@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -7,6 +7,7 @@ import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
 import { usePermission } from "../../hooks/usePermission";
+import { useDetailCache, invalidateDetailCache } from "../../hooks/useDetailCache";
 
 import { invoiceSettingsService, type InvoiceSettingDto } from "../../services/invoiceSettingsService";
 
@@ -15,7 +16,6 @@ import { invoiceSettingsService, type InvoiceSettingDto } from "../../services/i
 const FY_START_MONTH = 3;
 
 const SalesInvoiceCreate: React.FC = () => {
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState<InvoiceSettingDto>({
         invoicePrefix: "INV",
@@ -51,56 +51,52 @@ const SalesInvoiceCreate: React.FC = () => {
         return end.toISOString().split("T")[0];
     };
 
-    // ---- Load existing settings ----
-    useEffect(() => {
-        const initDefaultDatesLocal = () => {
-            setFormData((prev) => {
-                const defaultStartStr = prev.autoFinancialYear
-                    ? getAutoFinancialYearStart()
-                    : `${new Date().getFullYear()}-04-01`;
-                const defaultEndStr = calculateEndDate(defaultStartStr);
-                return {
-                    ...prev,
-                    financialYearStart: defaultStartStr,
-                    financialYearEnd: defaultEndStr,
-                };
-            });
-        };
-
-        setLoading(true);
-        invoiceSettingsService
-            .getConfig()
-            .then((data) => {
-                if (data) {
-                    const isAuto = data.autoFinancialYear !== undefined ? data.autoFinancialYear : true;
-                    const start = isAuto
-                        ? getAutoFinancialYearStart()
-                        : data.financialYearStart
-                            ? new Date(data.financialYearStart).toISOString().split("T")[0]
-                            : "";
-                    const end = start ? calculateEndDate(start) : "";
-
-                    setFormData({
-                        id: data.id,
-                        companyId: data.companyId,
-                        invoicePrefix: data.invoicePrefix || "INV",
-                        sequenceLength: data.sequenceLength || 4,
-                        currentSequenceNumber: data.currentSequenceNumber || 1,
-                        financialYearStart: start,
-                        financialYearEnd: end,
-                        autoFinancialYear: isAuto,
-                        formatTemplate: data.formatTemplate || "{PREFIX}-{FY}-{SEQ}",
-                    });
-                } else {
-                    initDefaultDatesLocal();
-                }
-            })
-            .catch((err) => {
-                console.error("Failed to load invoice settings:", err);
-                initDefaultDatesLocal();
-            })
-            .finally(() => setLoading(false));
+    // ---- Load existing settings (cached) ----
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        return await invoiceSettingsService.getConfig();
     }, []);
+
+    const { data: fetchedConfig, loading } = useDetailCache<any>({
+        cacheKey: "invoiceSettings:config",
+        socketModule: "invoiceSettings",
+        fetcher,
+    });
+
+    const populated = useRef(false);
+    useEffect(() => {
+        if (loading || populated.current) return;
+        populated.current = true;
+
+        if (fetchedConfig) {
+            const isAuto = fetchedConfig.autoFinancialYear !== undefined ? fetchedConfig.autoFinancialYear : true;
+            const start = isAuto
+                ? getAutoFinancialYearStart()
+                : fetchedConfig.financialYearStart
+                    ? new Date(fetchedConfig.financialYearStart).toISOString().split("T")[0]
+                    : "";
+            const end = start ? calculateEndDate(start) : "";
+
+            setFormData({
+                id: fetchedConfig.id,
+                companyId: fetchedConfig.companyId,
+                invoicePrefix: fetchedConfig.invoicePrefix || "INV",
+                sequenceLength: fetchedConfig.sequenceLength || 4,
+                currentSequenceNumber: fetchedConfig.currentSequenceNumber || 1,
+                financialYearStart: start,
+                financialYearEnd: end,
+                autoFinancialYear: isAuto,
+                formatTemplate: fetchedConfig.formatTemplate || "{PREFIX}-{FY}-{SEQ}",
+            });
+        } else {
+            const defaultStartStr = getAutoFinancialYearStart();
+            const defaultEndStr = calculateEndDate(defaultStartStr);
+            setFormData((prev) => ({
+                ...prev,
+                financialYearStart: defaultStartStr,
+                financialYearEnd: defaultEndStr,
+            }));
+        }
+    }, [fetchedConfig, loading]);
 
     useEffect(() => {
         if (formData.financialYearStart) {
@@ -171,6 +167,7 @@ const SalesInvoiceCreate: React.FC = () => {
         try {
             await invoiceSettingsService.saveConfig(formData);
             toast.success("Invoice settings saved successfully!");
+            invalidateDetailCache("invoiceSettings:config");
         } catch (err: any) {
             toast.error(err.response?.data?.message || "Failed to save invoice settings");
         } finally {
