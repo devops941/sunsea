@@ -15,11 +15,10 @@ import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSV
 
 import IconButton from "../../../../components/ui/IconButton/IconButton";
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
-import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { usePermission } from "../../../../hooks/usePermission";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
@@ -39,14 +38,6 @@ const PurchaseOrderListPage: React.FC = () => {
   const canCreate = can("purchaseOrders.create");
   const canEdit = can("purchaseOrders.edit");
   const canDelete = can("purchaseOrders.delete");
-
-  const {
-    removePurchaseOrder,
-  } = usePurchaseOrders();
-
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -75,41 +66,38 @@ const PurchaseOrderListPage: React.FC = () => {
     return Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
   }, []);
 
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const response = await purchaseOrderService.fetchAll({ pageSize: 10000 });
+    const list = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+    return { data: list, total: response?.total || list.length };
+  }, []);
+
+  const { data: allPurchaseOrders, loading, refresh } = useListCache<any>({
+    cacheKey: "purchaseOrders:list",
+    socketModule: "purchaseOrder",
+    fetcher,
+  });
+
+  const purchaseOrders = useMemo(() => {
+    return allPurchaseOrders.filter((po: any) => {
+      const matchesSearch = !searchTerm ||
+        po.orderNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        po.supplier?.legalName?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = !statusFilter || po.status === statusFilter;
+      const matchesFrom = !fromDate || (po.orderDate && po.orderDate >= fromDate);
+      const matchesTo = !toDate || (po.orderDate && po.orderDate <= toDate);
+      return matchesSearch && matchesStatus && matchesFrom && matchesTo;
+    });
+  }, [allPurchaseOrders, searchTerm, statusFilter, fromDate, toDate]);
+
+  const totalPages = Math.ceil(purchaseOrders.length / ITEMS_PER_PAGE);
+  const paginatedPOs = purchaseOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
-
-  const fetchPOs = useCallback(async () => {
-    if (!can("purchaseOrders.view")) return;
-    setLoading(true);
-    try {
-      const response = await purchaseOrderService.fetchAll({
-        page: currentPage,
-        pageSize: ITEMS_PER_PAGE,
-        search: searchTerm || undefined,
-        status: statusFilter || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      });
-
-      setPurchaseOrders(response?.data || []);
-      setTotal(Math.ceil((response?.total ?? 0) / ITEMS_PER_PAGE));
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to fetch purchase orders");
-      setPurchaseOrders([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, searchTerm, statusFilter, fromDate, toDate]);
-
-  useSocketSync("purchaseOrder", undefined, fetchPOs);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchPOs();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [fetchPOs]);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -249,9 +237,9 @@ const PurchaseOrderListPage: React.FC = () => {
     if (!poToDelete) return;
 
     try {
-      await removePurchaseOrder(poToDelete);
+      await purchaseOrderService.delete(String(poToDelete));
       toast.success("Purchase Order deleted successfully!");
-      fetchPOs();
+      refresh();
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete purchase order");
     } finally {
@@ -352,13 +340,13 @@ const PurchaseOrderListPage: React.FC = () => {
 
         {/* Table */}
         < DataTable
-          data={purchaseOrders}
+          data={paginatedPOs}
           rowKey={(item) => item.id}
           loading={loading}
           emptyMessage="No purchase orders found."
           pagination={{
             currentPage,
-            totalPages: total,
+            totalPages,
             onPageChange: (page) => setCurrentPage(page),
           }}
           columns={

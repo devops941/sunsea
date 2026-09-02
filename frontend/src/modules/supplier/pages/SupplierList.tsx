@@ -11,17 +11,14 @@ import PricingButton from "../../../components/ui/PricingButton/PricingButton";
 import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import { useSuppliers } from "../../../hooks/useSuppliers";
 import { supplierService } from "../../../services/supplierService";
 import { usePermission } from "../../../hooks/usePermission";
 import DataTable from "../../../components/ui/table/DataTable";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache } from "../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
 const SupplierList: React.FC = () => {
     const navigate = useNavigate();
-    const { suppliers, loading, error, totalPages, loadSuppliers, removeSupplier } = useSuppliers();
-    
     const { can } = usePermission();
     const canEditSupplier = can("suppliers.edit");
     const canDeleteSupplier = can("suppliers.delete");
@@ -48,27 +45,31 @@ const SupplierList: React.FC = () => {
         return Array.isArray(list) ? list : [];
     }, []);
 
-    const fetchSuppliersData = useCallback(() => {
-        if (can("suppliers.view")) {
-            loadSuppliers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
-        }
-    }, [searchTerm, currentPage, loadSuppliers, can]);
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await supplierService.fetchAll({ limit: 10000 });
+        const list = res?.suppliers || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+        return { data: list, total: list.length };
+    }, []);
 
-    useSocketSync("supplier", undefined, fetchSuppliersData);
+    const { data: allSuppliers, loading, refresh } = useListCache<any>({
+        cacheKey: "suppliers:list",
+        socketModule: "supplier",
+        fetcher,
+    });
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchSuppliersData();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [fetchSuppliersData]);
+    const suppliers = useMemo(() => {
+        if (!searchTerm) return allSuppliers;
+        const term = searchTerm.toLowerCase();
+        return allSuppliers.filter((s: any) =>
+            s.supplierCode?.toLowerCase().includes(term) ||
+            s.legalName?.toLowerCase().includes(term) ||
+            s.displayName?.toLowerCase().includes(term)
+        );
+    }, [allSuppliers, searchTerm]);
 
-
-    useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
-    }, [error]);
+    const totalPages = Math.ceil(suppliers.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedSuppliers = suppliers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -99,9 +100,9 @@ const SupplierList: React.FC = () => {
         if (supplierToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
-                await removeSupplier(supplierToDelete);
+                await supplierService.delete(supplierToDelete);
                 toast.success("Supplier deleted successfully!");
-                fetchSuppliersData();
+                refresh();
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || err.message || err || "Failed to delete supplier");
             } finally {
@@ -129,8 +130,6 @@ const SupplierList: React.FC = () => {
             csvFilename: `Supplier_List_${new Date().toISOString().split("T")[0]}.csv`,
         };
     }, []);
-
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return (
         <div >
@@ -172,7 +171,7 @@ const SupplierList: React.FC = () => {
                     {/* View Table */}
                     <div className="p-0">
                         <DataTable
-                            data={suppliers}
+                            data={paginatedSuppliers}
                             rowKey={(supplier) => supplier.id}
                             loading={loading}
                             emptyMessage="No suppliers found."
