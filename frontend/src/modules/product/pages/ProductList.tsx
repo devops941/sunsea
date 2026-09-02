@@ -90,8 +90,9 @@ const ProductList: React.FC = () => {
                 const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
                 setShifts(data);
             }).catch(() => { });
-            machineService.getAll().then((res: any) => {
-                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            machineService.getAll({ limit: 1000 }).then((res: any) => {
+                // Backend returns { machines: [...], total, page, totalPages }
+                const data = Array.isArray(res) ? res : Array.isArray(res?.machines) ? res.machines : Array.isArray(res?.data) ? res.data : [];
                 setMachines(data);
             }).catch(() => {});
         }
