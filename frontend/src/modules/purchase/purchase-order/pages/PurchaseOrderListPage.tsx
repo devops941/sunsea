@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaPlus, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -11,6 +11,7 @@ import CustomButton from "../../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import EmailButton from "../../../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../../../components/ui/WhatsappButton/WhatsappButton";
+import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 import IconButton from "../../../../components/ui/IconButton/IconButton";
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
@@ -68,6 +69,22 @@ const PurchaseOrderListPage: React.FC = () => {
   const [whatsappPo, setWhatsappPo] = useState<any | null>(null);
   const [recipientPhone, setRecipientPhone] = useState("");
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
+
+  // All POs for CSV export
+  const [allPOs, setAllPOs] = useState<any[]>([]);
+
+  const loadAllPOs = useCallback(async () => {
+    try {
+      const response = await purchaseOrderService.fetchAll({ page: 1, pageSize: 100000 });
+      setAllPOs(Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []));
+    } catch {
+      // export will just be empty
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAllPOs();
+  }, [loadAllPOs]);
 
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
@@ -246,6 +263,7 @@ const PurchaseOrderListPage: React.FC = () => {
       await removePurchaseOrder(poToDelete);
       toast.success("Purchase Order deleted successfully!");
       fetchPOs();
+      loadAllPOs();
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete purchase order");
     } finally {
@@ -253,6 +271,22 @@ const PurchaseOrderListPage: React.FC = () => {
       setPoToDelete(null);
     }
   };
+
+  // CSV Export Configuration
+  const { csvData, csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "PO Number", accessor: (item: any) => item.poNumber || "" },
+      { header: "PO Date", accessor: (item: any) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "" },
+      { header: "Supplier", accessor: (item: any) => item.supplier?.supplierName || "" },
+      { header: "Net Amount", accessor: (item: any) => Number(item.netAmount ?? 0).toFixed(2) },
+      { header: "Status", accessor: (item: any) => item.status || "" },
+    ];
+    return {
+      csvData: allPOs,
+      csvColumns: columns,
+      csvFilename: `Purchase_Orders_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, [allPOs]);
 
   return (
     <div className="w-full">
@@ -279,6 +313,7 @@ const PurchaseOrderListPage: React.FC = () => {
               onClear={handleClearFilters}
               onOpen={handleOpenFilter}
             >
+
               <TextInput
                 label="From Date"
                 name="draftFromDate"
@@ -309,6 +344,13 @@ const PurchaseOrderListPage: React.FC = () => {
                 onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
               />
             </FilterPopover>
+
+            <ExportCSVButton
+              data={csvData}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
 
             {canCreate && (

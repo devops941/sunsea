@@ -137,6 +137,7 @@ const DashboardPage: React.FC = () => {
   const weeklyPrograms = dashData.weeklyPrograms || [];
   const rawMaterials = dashData.rawMaterials || [];
   const allProducts = dashData.products || [];
+  const allSalesProducts = dashData.salesProducts || [];
   const allCustomers = dashData.customers || [];
   const productsCount = dashData.productsCount || (Array.isArray(allProducts) ? allProducts.length : 0);
   const employeesCount = dashData.employeesCount || 0;
@@ -417,22 +418,28 @@ const DashboardPage: React.FC = () => {
       .slice(0, 5);
   }, [salesOrders]);
 
-  // Customer Purchase Report — per-customer: which products purchased vs not purchased
+  // Customer Purchase Report — per-customer: which sales products purchased vs not purchased
   const customerPurchaseReport = useMemo(() => {
     const so = safe(salesOrders);
-    const products = safe(allProducts);
+    const salesProducts = safe(allSalesProducts);
     const customers = safe(allCustomers);
-    const productNames = products.map((p: any) => p.productName || p.name || "").filter(Boolean);
+    const productNames = salesProducts
+      .map((p: any) => p.salesProductName || p.name || "")
+      .filter(Boolean);
     const totalProducts = productNames.length;
 
-    // Build: { customerName → Set of purchased product names }
+    // Build: { customerName → Set of purchased sales product names }
     const customerProducts: Record<string, Set<string>> = {};
     for (const order of so) {
       const cName = order.customer?.firmName || "Unknown";
       if (!customerProducts[cName]) customerProducts[cName] = new Set();
       const items = Array.isArray(order.items) ? order.items : [];
       for (const item of items) {
-        const pName = item.product?.productName || item.productName || "";
+        // Prefer salesProduct name; fall back to product name for legacy orders
+        const pName =
+          item.salesProduct?.salesProductName ||
+          item.salesProductName ||
+          "";
         if (pName) customerProducts[cName].add(pName);
       }
     }
@@ -460,7 +467,7 @@ const DashboardPage: React.FC = () => {
     }
 
     return { totalProducts, customers: result.sort((a, b) => b.purchasedProducts.length - a.purchasedProducts.length || a.name.localeCompare(b.name)) };
-  }, [salesOrders, allProducts, allCustomers]);
+  }, [salesOrders, allSalesProducts, allCustomers]);
 
   /* ═══════════════ RENDER ═══════════════ */
   // Cache-first render: no full-page CommonLoader anymore. On first cold visit

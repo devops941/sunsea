@@ -18,6 +18,7 @@ const dashboardController = {
         finishedGoodsStocks,
         dailyPlans,
         salesInvoices,
+        allSalesProducts,
       ] = await Promise.all([
         // Sales Orders
         prisma.salesOrder.findMany({
@@ -29,7 +30,15 @@ const dashboardController = {
             createdAt: true,
             orderDate: true,
             customer: { select: { id: true, firmName: true } },
-            items: { select: { productId: true, quantity: true, product: { select: { productName: true } } } },
+            items: {
+              select: {
+                productId: true,
+                quantity: true,
+                product: { select: { productName: true } },
+                salesProductId: true,
+                salesProduct: { select: { salesProductName: true } },
+              },
+            },
           },
           orderBy: { createdAt: "desc" },
         }).catch(() => []),
@@ -142,6 +151,13 @@ const dashboardController = {
             status: { not: "CANCELLED" },
           },
         }).catch(() => []),
+
+        // Sales Products — for Customer Purchase Report
+        prisma.salesProduct.findMany({
+          where: { isActive: true },
+          select: { id: true, salesProductName: true, salesProductCode: true },
+          orderBy: { salesProductName: "asc" },
+        }).catch(() => []),
       ]);
 
       return res.status(200).json({
@@ -153,6 +169,7 @@ const dashboardController = {
           products: productsCount,
           productsCount: Array.isArray(productsCount) ? productsCount.length : productsCount,
           customers: allCustomers,
+          salesProducts: allSalesProducts,
           employeesCount,
           machines,
           weeklyPrograms,

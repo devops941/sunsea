@@ -1,5 +1,7 @@
-import { FaFileCsv } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaFileCsv, FaSpinner } from 'react-icons/fa';
 import CustomButton from '../Button/Button';
+import { toast } from 'react-toastify';
 
 export interface CSVColumn<T> {
     header: string;
@@ -7,34 +9,42 @@ export interface CSVColumn<T> {
 }
 
 export interface ExportCSVButtonProps<T> {
-    data: T[];
+    data?: T[];
+    fetchData?: () => Promise<T[]>;
     columns: CSVColumn<T>[];
     filename?: string;
     text?: string;
+    loadingText?: string;
 }
 
 const ExportCSVButton = <T,>({
     data,
+    fetchData,
     columns,
     filename = 'export.csv',
-    text = 'Export CSV'
+    text = 'Export CSV',
+    loadingText = 'Exporting...',
 }: ExportCSVButtonProps<T>) => {
-    const handleExport = () => {
-        if (!data || data.length === 0) return;
+    const [isLoading, setIsLoading] = useState(false);
 
-        // Escape CSV values to handle commas, quotes, and newlines safely
-        const escapeCSVValue = (value: any) => {
-            if (value === null || value === undefined) return '""';
-            const stringValue = String(value);
-            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-                return `"${stringValue.replace(/"/g, '""')}"`;
-            }
-            return stringValue;
-        };
+    const escapeCSVValue = (value: any) => {
+        if (value === null || value === undefined) return '""';
+        const stringValue = String(value);
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+    };
+
+    const downloadCSV = (items: T[]) => {
+        if (!items || items.length === 0) {
+            toast.info("No data available to export.");
+            return;
+        }
 
         const headers = columns.map(col => escapeCSVValue(col.header)).join(',');
 
-        const rows = data.map(item => {
+        const rows = items.map(item => {
             return columns.map(col => escapeCSVValue(col.accessor(item))).join(',');
         });
 
@@ -49,14 +59,32 @@ const ExportCSVButton = <T,>({
         document.body.removeChild(link);
     };
 
+    const handleExport = async () => {
+        if (fetchData) {
+            setIsLoading(true);
+            try {
+                const items = await fetchData();
+                downloadCSV(items);
+            } catch (err: any) {
+                toast.error(err?.message || "Failed to fetch export data");
+            } finally {
+                setIsLoading(false);
+            }
+        } else if (data) {
+            downloadCSV(data);
+        }
+    };
+
     return (
         <CustomButton
-            text={text}
-            icon={FaFileCsv}
+            text={isLoading ? loadingText : text}
+            icon={isLoading ? FaSpinner : FaFileCsv}
             onClick={handleExport}
-            className="btn-outline-success"
+            disabled={isLoading}
+            className={`btn-outline-success ${isLoading ? 'animate-pulse' : ''}`}
         />
     );
 };
 
 export default ExportCSVButton;
+
