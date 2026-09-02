@@ -205,7 +205,13 @@ export const AmountPayablePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>("activity");
 
   const filteredSuppliers = useMemo(() => {
-    const list = Array.isArray(payables) ? [...payables] : [];
+    // Only suppliers with a POSITIVE Cr balance (we owe them) actually count
+    // as payable. A supplier with a Dr balance (we paid advance / debit note
+    // pending from them) is NOT a payable — it's an asset. Hide them so this
+    // page only shows real dues. Supplier `balanceAsOnDate` uses the same
+    // sign convention as customer: positive = we owe them (Cr from our side).
+    const list = (Array.isArray(payables) ? payables : [])
+      .filter((s: any) => Number(s.balanceAsOnDate || 0) > 0.005);
     if (sortBy === "activity") {
       list.sort((a: any, b: any) => {
         const aAct = (a.totalBilled || 0) + (a.totalPaid || 0);
@@ -628,7 +634,7 @@ export const AmountPayablePage: React.FC = () => {
               </span>
             </div>
             <div className="flex gap-3 uppercase tracking-wide">
-              <span>Suppliers: <b className="text-ink">{payables.length}</b></span>
+              <span>Suppliers: <b className="text-ink">{filteredSuppliers.length}</b></span>
               <span>Overdue: <b className="text-amber-600">{totals.overdueCount}</b></span>
             </div>
           </div>
@@ -666,7 +672,7 @@ export const AmountPayablePage: React.FC = () => {
               <FaBuilding className="text-indigo-600 text-[10px]" />
               <span className="text-[11px] font-semibold text-ink-muted">Suppliers</span>
             </div>
-            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{payables.length}</div>
+            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{filteredSuppliers.length}</div>
           </div>
 
           <div className="px-3 py-2">

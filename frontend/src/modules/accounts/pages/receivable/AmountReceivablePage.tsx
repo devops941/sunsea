@@ -195,7 +195,13 @@ export const AmountReceivablePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>("activity");
 
   const filteredCustomers = useMemo(() => {
-    const list = Array.isArray(receivables) ? [...receivables] : [];
+    // Only customers with a POSITIVE Dr balance actually owe us. A customer
+    // sitting on a Cr balance (they paid advance / credit note pending) is
+    // NOT a receivable — they've already paid. Hide them so this page only
+    // shows real dues. If the user needs to see credit-balance customers,
+    // that's a separate "Customer Advances" report.
+    const list = (Array.isArray(receivables) ? receivables : [])
+      .filter((c) => Number(c.balanceAsOnDate || 0) > 0.005);
     if (sortBy === "activity") {
       list.sort((a, b) => {
         const aAct = (a.totalBilled || 0) + (a.totalPaid || 0);
@@ -602,7 +608,7 @@ export const AmountReceivablePage: React.FC = () => {
               </span>
             </div>
             <div className="flex gap-3 uppercase tracking-wide">
-              <span>Customers: <b className="text-ink">{receivables.length}</b></span>
+              <span>Customers: <b className="text-ink">{filteredCustomers.length}</b></span>
               <span>Overdue: <b className="text-amber-600">{totals.overdueCount}</b></span>
             </div>
           </div>
@@ -640,7 +646,7 @@ export const AmountReceivablePage: React.FC = () => {
               <FaUserFriends className="text-indigo-600 text-[10px]" />
               <span className="text-[11px] font-semibold text-ink-muted">Customers</span>
             </div>
-            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{receivables.length}</div>
+            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{filteredCustomers.length}</div>
           </div>
 
           <div className="px-3 py-2">
