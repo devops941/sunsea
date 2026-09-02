@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePageSocketSync } from "../../../hooks/usePageSocketSync";
 import dashboardService, { type AccountsSummary } from "../../../services/dashboardService";
 import { useListCache } from "../../../hooks/useListCache";
 
@@ -24,13 +24,15 @@ import {
   FaChartBar, FaChartPie, FaListUl, FaArrowLeft, FaArrowRight, FaPlus, FaSearch, FaBox,
   FaBell, FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaChevronRight,
 } from "react-icons/fa";
+import { LuLayoutDashboard } from "react-icons/lu";
 import { FiTrendingUp, FiTrendingDown, FiMoreVertical } from "react-icons/fi";
 
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
-import DashboardFooter from "../components/DashboardFooter";
 import { SparklineCard } from "../components/SparklineCard";
 import SalesPurchaseTrendChart from "../components/SalesPurchaseTrendChart";
 import { SalesPersonLiveMap } from "../components/SalesPersonLiveMap";
+import { InventoryStockIntelligence } from "../components/InventoryStockIntelligence";
+import { WorkforceShiftAttendance } from "../components/WorkforceShiftAttendance";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../../components/ui/chart";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -142,11 +144,12 @@ const DashboardPage: React.FC = () => {
   void rawMaterialStocks; // reserved for future use
 
   // ── Real-time socket refresh on any relevant change ─────────
-  useSocketSync("purchaseOrder", undefined, refreshDashboard);
-  useSocketSync("productionOrder", undefined, refreshDashboard);
-  useSocketSync("dailyPlan", undefined, refreshDashboard);
-  useSocketSync("finishedGoodsStock", undefined, refreshDashboard);
-  useSocketSync("rawMaterialStock", undefined, refreshDashboard);
+  // Single 300ms debounce shared across all modules — prevents up to 5
+  // independent refetches when one save touches multiple collections.
+  usePageSocketSync(
+    ["purchaseOrder", "productionOrder", "dailyPlan", "finishedGoodsStock", "rawMaterialStock"],
+    refreshDashboard
+  );
 
   // ─────────────────────────────────────────────────────────────
   //  ACCOUNTS SUMMARY — 6 top cards + Alerts + Recent Transactions
@@ -169,12 +172,10 @@ const DashboardPage: React.FC = () => {
   const refreshAccountsSummary = accountsSummaryCache.refresh;
   const accountsSummary = accSummaryList[0] || null;
 
-  useSocketSync("payment", undefined, refreshAccountsSummary);
-  useSocketSync("journalItem", undefined, refreshAccountsSummary);
-  useSocketSync("accountLedger", undefined, refreshAccountsSummary);
-  useSocketSync("salesInvoice", undefined, refreshAccountsSummary);
-  useSocketSync("grnInvoice", undefined, refreshAccountsSummary);
-  useSocketSync("pettyCashEntry", undefined, refreshAccountsSummary);
+  usePageSocketSync(
+    ["payment", "journalItem", "accountLedger", "salesInvoice", "grnInvoice", "pettyCashEntry"],
+    refreshAccountsSummary
+  );
 
   /* ─── ACCOUNTS CARD TRENDS ──────────────────────────────────── */
   const cardTrends = useMemo(() => {
@@ -469,22 +470,25 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="bg-page flex flex-col min-h-0" style={{ height: "calc(100vh - 100px)" }}>
 
-      {/* ── FIXED HEADER ────────────────────────────────────── */}
-      <div className="shrink-0   px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-base sm:text-lg lg:text-xl font-black tracking-tight text-ink">Dashboard</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {isSyncingAccounts && (
-            <span className="flex items-center gap-1 text-[10px] text-blue-500">
-              <FaSync className="animate-spin" /> Syncing…
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* ── SCROLLABLE MAIN CONTENT ─────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0 px-2 py-3 sm:px-6 sm:py-4 lg:px-8">
+
+        {/* ── NON-STICKY HEADER ───── */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-black tracking-tight text-ink">
+              Dashboard
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isSyncingAccounts && (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-xs">
+                <FaSync className="animate-spin text-[10px]" /> Syncing…
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* ══════════════════════════════════════════════════════
            ROW 0  –  ACCOUNTS SUMMARY (Busy-style)
@@ -497,7 +501,7 @@ const DashboardPage: React.FC = () => {
 
               {/* TOTAL SALES */}
               <button
-                onClick={() => navigate("/accounts/vouchers")}
+                onClick={() => navigate("/sales-invoices")}
                 className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
                 style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)", border: "1px solid rgba(52,211,153,0.25)" }}
               >
@@ -768,7 +772,7 @@ const DashboardPage: React.FC = () => {
                       return (
                         <div
                           key={i}
-                          onClick={() => navigate("/planning/daily-production-planning")}
+                          onClick={() => navigate("/daily-machine-planning")}
                           className="flex items-center justify-between p-2.5 rounded-xl bg-card-2 border border-line-soft hover:border-emerald-500/40 hover:bg-card transition-all group cursor-pointer shadow-sm"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -825,7 +829,7 @@ const DashboardPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => navigate("/sales/orders")}
+                      onClick={() => navigate("/sales-order")}
                       className="px-2 py-0.5 rounded text-[10px] font-bold text-ink-muted hover:text-ink bg-card hover:bg-card-2 border border-line-soft transition-colors flex items-center gap-1 cursor-pointer"
                       title="View all sales orders"
                     >
@@ -854,7 +858,7 @@ const DashboardPage: React.FC = () => {
                       return (
                         <div
                           key={i}
-                          onClick={() => navigate(`/sales/orders/${so.id || so.salesOrderId || ""}`)}
+                          onClick={() => navigate(`/sales-order/details/${so.id || so.salesOrderId || ""}`)}
                           className="flex items-center justify-between p-2.5 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/40 hover:bg-card transition-all group cursor-pointer shadow-sm"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -1537,13 +1541,26 @@ const DashboardPage: React.FC = () => {
           {/* Sales Person Live GPS Interactive Map */}
           <SalesPersonLiveMap />
         </div>
-      </div>
 
-      {/* ── FIXED FOOTER ────────────────────────────────────── */}
-      <div className="shrink-0">
-        <DashboardFooter />
-      </div>
+        {/* ══════════════════════════════════════════════════════
+           ROW 4  –  INVENTORY & STOCK INTELLIGENCE (Multi-Chart & Reorder Alerts)
+           ══════════════════════════════════════════════════════ */}
+        <InventoryStockIntelligence
+          rawMaterials={rawMaterials}
+          rawMaterialStocks={rawMaterialStocks}
+          finishedGoodsStocks={finishedGoodsStocks}
+          allProducts={allProducts}
+        />
 
+        {/* ══════════════════════════════════════════════════════
+           ROW 5  –  WORKFORCE & SHIFT ATTENDANCE SNAPSHOT
+           ══════════════════════════════════════════════════════ */}
+        <WorkforceShiftAttendance
+          employeesCount={employeesCount}
+          dailyPlans={dailyPlans}
+          weeklyPrograms={weeklyPrograms}
+        />
+      </div>
 
     </div>
   );

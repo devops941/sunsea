@@ -128,12 +128,12 @@
 :root[data-theme="light"] {
     --color-page: #F8FAFC;
     --color-card: #FFFFFF;
-    --color-card-2: #F1F5F9;
+    --color-card-2: #F8FAFC;
     --color-ink: #0F172A;
     --color-ink-muted: #334155;
     --color-ink-subtle: #64748B;
     --color-line: #E2E8F0;
-    --color-line-soft: #E2E8F0;
+    --color-line-soft: #EEF2F6;
     --color-head: #F8FAFC;
     --color-surface: #FFFFFF;
     --color-border: #E2E8F0;
@@ -147,6 +147,21 @@
     --color-nav-active-fg: #FFFFFF;
     --color-accent: #0D9488;
     color-scheme: light;
+}
+
+/* Clean modern soft shadow for Light theme (Dashboard cards & tables) */
+:root[data-theme="light"] .shadow-md,
+:root[data-theme="light"] .shadow-lg,
+:root[data-theme="light"] .shadow-xl {
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04) !important;
+}
+
+:root[data-theme="light"] .shadow-sm {
+    box-shadow: 0 2px 8px -1px rgba(15, 23, 42, 0.06) !important;
+}
+
+:root[data-theme="light"] .bg-card {
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
 }
 
 /* ===============================

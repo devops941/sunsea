@@ -3,11 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   FaMapMarkerAlt,
-  FaPhoneAlt,
-  FaWhatsapp,
   FaCrosshairs,
-  FaRoute,
-  FaTimes,
   FaCompress,
   FaExpand,
   FaPlay,
@@ -34,7 +30,6 @@ export interface SalesPerson {
   lastUpdated: string;
   avatarColor: string;
   accentColor: string;
-  routeStops: { name: string; time: string; amount: number; completed: boolean; lat: number; lng: number }[];
 }
 
 const SALES_PERSONS_INITIAL: SalesPerson[] = [
@@ -57,12 +52,6 @@ const SALES_PERSONS_INITIAL: SalesPerson[] = [
     lastUpdated: "Just now",
     avatarColor: "from-emerald-400 to-emerald-600",
     accentColor: "#10b981",
-    routeStops: [
-      { name: "Lakshmi Plastics", time: "09:30 AM", amount: 18500, completed: true, lat: 11.002, lng: 76.948 },
-      { name: "Sri Amman Agencies", time: "11:15 AM", amount: 24000, completed: true, lat: 11.011, lng: 76.952 },
-      { name: "Kovai Polymer Hub", time: "01:45 PM", amount: 25900, completed: true, lat: 11.0168, lng: 76.9558 },
-      { name: "Supreme Traders", time: "04:30 PM", amount: 0, completed: false, lat: 11.025, lng: 76.968 },
-    ],
   },
   {
     id: "sp-2",
@@ -83,12 +72,6 @@ const SALES_PERSONS_INITIAL: SalesPerson[] = [
     lastUpdated: "1m ago",
     avatarColor: "from-blue-400 to-cyan-600",
     accentColor: "#0ea5e9",
-    routeStops: [
-      { name: "Kandhan Plastics", time: "09:00 AM", amount: 32000, completed: true, lat: 11.095, lng: 77.325 },
-      { name: "Tiruppur Packagings", time: "10:40 AM", amount: 41500, completed: true, lat: 11.102, lng: 77.335 },
-      { name: "Vijay Polymers SIDCO", time: "02:00 PM", amount: 39000, completed: true, lat: 11.1085, lng: 77.3411 },
-      { name: "Universal Containers", time: "05:15 PM", amount: 0, completed: false, lat: 11.118, lng: 77.355 },
-    ],
   },
   {
     id: "sp-3",
@@ -109,11 +92,6 @@ const SALES_PERSONS_INITIAL: SalesPerson[] = [
     lastUpdated: "3m ago",
     avatarColor: "from-amber-400 to-orange-600",
     accentColor: "#f59e0b",
-    routeStops: [
-      { name: "Sri Kannan Chemicals", time: "10:15 AM", amount: 21000, completed: true, lat: 11.265, lng: 77.57 },
-      { name: "Erode Petro Chem", time: "12:30 PM", amount: 21000, completed: true, lat: 11.2758, lng: 77.5828 },
-      { name: "Greenland Polytech", time: "04:00 PM", amount: 0, completed: false, lat: 11.285, lng: 77.595 },
-    ],
   },
   {
     id: "sp-4",
@@ -134,11 +112,6 @@ const SALES_PERSONS_INITIAL: SalesPerson[] = [
     lastUpdated: "Just now",
     avatarColor: "from-purple-400 to-indigo-600",
     accentColor: "#a855f7",
-    routeStops: [
-      { name: "Annamalai Agro Plastics", time: "09:45 AM", amount: 26000, completed: true, lat: 10.648, lng: 76.995 },
-      { name: "Pollachi Containers", time: "11:50 AM", amount: 28800, completed: true, lat: 10.6582, lng: 77.0089 },
-      { name: "South Pack Industries", time: "03:45 PM", amount: 0, completed: false, lat: 10.672, lng: 77.022 },
-    ],
   },
 ];
 
@@ -150,31 +123,19 @@ export const SalesPersonLiveMap: React.FC = () => {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersRef = useRef<{ [id: string]: L.Marker }>({});
-  const polylineRef = useRef<L.Polyline | null>(null);
-  const stopMarkersRef = useRef<L.Marker[]>([]);
 
   const [salesPersons, setSalesPersons] = useState<SalesPerson[]>(SALES_PERSONS_INITIAL);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "in_meeting">("all");
   const [tileLayerType, setTileLayerType] = useState<TileLayerType>("theme_default");
   const [isSimulating, setIsSimulating] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showDetailDrawer, setShowDetailDrawer] = useState(true);
 
-  const selectedPerson = salesPersons.find((sp) => sp.id === selectedPersonId) || null;
-
-  // Resolve Tile Layer URL
-  const getLayerUrl = (layerType: TileLayerType, currentTheme: "dark" | "light") => {
+  // Resolve Tile Layer URL — free OpenStreetMap & ESRI Satellite without API Key watermarks
+  const getLayerUrl = (layerType: TileLayerType) => {
     if (layerType === "satellite") {
       return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
     }
-    if (layerType === "streets") {
-      return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-    }
-    // Default dynamic theme
-    return currentTheme === "light"
-      ? "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
   };
 
   // 1. Initialize Leaflet Map
@@ -189,10 +150,10 @@ export const SalesPersonLiveMap: React.FC = () => {
         attributionControl: false,
       });
 
-      const url = getLayerUrl(tileLayerType, mode);
+      const url = getLayerUrl(tileLayerType);
       const tileLayer = L.tileLayer(url, {
         maxZoom: 19,
-        subdomains: "abcd",
+        subdomains: "abc",
       }).addTo(map);
 
       tileLayerRef.current = tileLayer;
@@ -207,38 +168,32 @@ export const SalesPersonLiveMap: React.FC = () => {
     };
   }, []);
 
-  // 2. Handle Layer / Theme Switching
+  // 2. Handle Layer Switching
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
     if (tileLayerRef.current) {
       map.removeLayer(tileLayerRef.current);
     }
-    const url = getLayerUrl(tileLayerType, mode);
+    const url = getLayerUrl(tileLayerType);
     const newLayer = L.tileLayer(url, {
       maxZoom: 19,
-      subdomains: "abcd",
+      subdomains: "abc",
     }).addTo(map);
     tileLayerRef.current = newLayer;
-  }, [tileLayerType, mode]);
+  }, [tileLayerType]);
 
-  // 3. Render Custom Markers on Map
+  // 3. Render Custom Location Markers on Map
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
-
-    const visiblePersons = salesPersons.filter((sp) => {
-      if (activeFilter === "active") return sp.status === "active";
-      if (activeFilter === "in_meeting") return sp.status === "in_meeting";
-      return true;
-    });
 
     Object.values(markersRef.current).forEach((marker) => marker.remove());
     markersRef.current = {};
 
     const isLight = mode === "light";
 
-    visiblePersons.forEach((person) => {
+    salesPersons.forEach((person) => {
       const isSelected = person.id === selectedPersonId;
       const isLive = person.status === "active";
 
@@ -247,15 +202,15 @@ export const SalesPersonLiveMap: React.FC = () => {
         iconSize: [44, 52],
         iconAnchor: [22, 50],
         html: `
-          <div class="relative flex flex-col items-center cursor-pointer group select-none">
+          <div class="relative flex flex-col items-center cursor-pointer select-none">
             ${
               isLive
-                ? `<div class="absolute -top-1.5 w-11 h-11 rounded-full animate-ping opacity-35" style="background-color: ${person.accentColor}"></div>`
+                ? `<div class="absolute -top-1 w-10 h-10 rounded-full animate-ping opacity-30" style="background-color: ${person.accentColor}"></div>`
                 : ""
             }
             
             <div class="relative z-10 w-9 h-9 rounded-full bg-gradient-to-br ${person.avatarColor} border-[2.5px] ${
-          isSelected ? "border-white scale-110 ring-4 ring-sky-400/70 shadow-xl" : isLight ? "border-white shadow-md" : "border-slate-900 shadow-md"
+          isSelected ? "border-white scale-110 ring-4 ring-emerald-400/80 shadow-xl" : isLight ? "border-white shadow-md" : "border-slate-900 shadow-md"
         } flex items-center justify-center transition-transform hover:scale-110">
               <span class="text-white text-[10px] font-black tracking-tight leading-none">${person.initials}</span>
               ${
@@ -270,16 +225,22 @@ export const SalesPersonLiveMap: React.FC = () => {
             } -mt-[1px] drop-shadow-md"></div>
 
             <div class="mt-0.5 px-2 py-0.5 rounded-md ${
-              isLight ? "bg-white/95 text-slate-900 border-slate-200" : "bg-slate-950/85 text-white border-slate-700/80"
+              isLight ? "bg-white/95 text-slate-900 border-slate-200" : "bg-slate-950/90 text-white border-slate-700/80"
             } backdrop-blur-md border shadow-lg text-center whitespace-nowrap">
               <p class="text-[9px] font-black leading-none">${person.name}</p>
-              <p class="text-[7.5px] font-bold" style="color: ${person.accentColor}">${person.speedKmH > 0 ? `${person.speedKmH} km/h` : "Stopped"}</p>
+              <p class="text-[8px] font-medium opacity-80">${person.city}</p>
             </div>
           </div>
         `,
       });
 
       const marker = L.marker([person.lat, person.lng], { icon: customIcon }).addTo(map);
+
+      // Tooltip showing exact live location / area
+      marker.bindTooltip(
+        `<div class="text-[11px] font-bold"><strong>${person.name}</strong><br/><span class="text-slate-600 dark:text-slate-300">📍 ${person.area}, ${person.city}</span></div>`,
+        { direction: "top", offset: [0, -46] }
+      );
 
       marker.on("click", (e) => {
         L.DomEvent.stopPropagation(e);
@@ -288,66 +249,9 @@ export const SalesPersonLiveMap: React.FC = () => {
 
       markersRef.current[person.id] = marker;
     });
-  }, [salesPersons, selectedPersonId, activeFilter, mode]);
+  }, [salesPersons, selectedPersonId, mode]);
 
-  // 4. Draw Route Polylines & Stop Checkpoints for Selected Person
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    const map = mapInstanceRef.current;
-
-    if (polylineRef.current) {
-      polylineRef.current.remove();
-      polylineRef.current = null;
-    }
-    stopMarkersRef.current.forEach((m) => m.remove());
-    stopMarkersRef.current = [];
-
-    if (selectedPerson && selectedPerson.routeStops && selectedPerson.routeStops.length > 0) {
-      const latLngs: [number, number][] = [
-        ...selectedPerson.routeStops.map((stop) => [stop.lat, stop.lng] as [number, number]),
-        [selectedPerson.lat, selectedPerson.lng],
-      ];
-
-      const polyline = L.polyline(latLngs, {
-        color: selectedPerson.accentColor,
-        weight: 4,
-        opacity: 0.9,
-        dashArray: "6, 8",
-        lineCap: "round",
-        lineJoin: "round",
-      }).addTo(map);
-
-      polylineRef.current = polyline;
-
-      selectedPerson.routeStops.forEach((stop, idx) => {
-        const isLight = mode === "light";
-        const stopIcon = L.divIcon({
-          className: "custom-stop-marker",
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-          html: `
-            <div class="w-5 h-5 rounded-full ${
-              stop.completed ? "bg-emerald-500 text-white" : isLight ? "bg-slate-200 text-slate-600 border border-slate-300" : "bg-slate-800 text-slate-400 border border-slate-600"
-            } flex items-center justify-center text-[8.5px] font-black shadow-md border-2 ${isLight ? "border-white" : "border-slate-900"}">
-              ${idx + 1}
-            </div>
-          `,
-        });
-
-        const stopMarker = L.marker([stop.lat, stop.lng], { icon: stopIcon }).addTo(map);
-        stopMarker.bindTooltip(
-          `<div class="text-[10px] font-bold text-slate-900">${stop.name} (${stop.time})<br/>${
-            stop.amount > 0 ? `₹${stop.amount.toLocaleString("en-IN")}` : "Pending Visit"
-          }</div>`,
-          { direction: "top", offset: [0, -8] }
-        );
-
-        stopMarkersRef.current.push(stopMarker);
-      });
-    }
-  }, [selectedPerson, mode]);
-
-  // 5. Live Simulation
+  // 4. Live Movement Simulation
   useEffect(() => {
     if (!isSimulating) return;
 
@@ -373,9 +277,9 @@ export const SalesPersonLiveMap: React.FC = () => {
     return () => clearInterval(interval);
   }, [isSimulating]);
 
+  // Click salesperson to focus map location
   const handleSelectPerson = (person: SalesPerson) => {
     setSelectedPersonId(person.id);
-    setShowDetailDrawer(true);
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([person.lat, person.lng], 13, {
         duration: 1.1,
@@ -384,6 +288,7 @@ export const SalesPersonLiveMap: React.FC = () => {
   };
 
   const handleFitAll = () => {
+    setSelectedPersonId(null);
     if (!mapInstanceRef.current || salesPersons.length === 0) return;
     const group = L.featureGroup(Object.values(markersRef.current));
     mapInstanceRef.current.fitBounds(group.getBounds().pad(0.2), { duration: 1 });
@@ -431,9 +336,8 @@ export const SalesPersonLiveMap: React.FC = () => {
           <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-0.5 shadow-inner">
             {(
               [
-                { key: "theme_default", label: "Auto Theme" },
+                { key: "theme_default", label: "Street Map" },
                 { key: "satellite", label: "Satellite" },
-                { key: "streets", label: "Street" },
               ] as { key: TileLayerType; label: string }[]
             ).map(({ key, label }) => (
               <button
@@ -479,9 +383,19 @@ export const SalesPersonLiveMap: React.FC = () => {
       {/* ── MAP CANVAS & OVERLAYS ────────────────────────────── */}
       <div className="flex-1 min-h-0 w-full relative overflow-hidden flex">
         {/* Leaflet Map Target */}
-        <div ref={mapContainerRef} className="w-full h-full z-0 bg-page" />
+        <div
+          ref={mapContainerRef}
+          className={`w-full h-full z-0 bg-page ${
+            mode === "dark" && tileLayerType === "theme_default" ? "map-tiles-dark" : ""
+          }`}
+          style={
+            mode === "dark" && tileLayerType === "theme_default"
+              ? { filter: "brightness(0.82) invert(92%) hue-rotate(180deg) contrast(1.15)" }
+              : {}
+          }
+        />
 
-        {/* ── TOP-LEFT FLOATING QUICK-SELECT CHIPS ─────────────── */}
+        {/* ── TOP-LEFT FLOATING QUICK LOCATION CHIPS ─────────────── */}
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-wrap items-center gap-1.5 max-w-[calc(100%-120px)]">
           {salesPersons.map((person) => {
             const isSelected = person.id === selectedPersonId;
@@ -490,9 +404,10 @@ export const SalesPersonLiveMap: React.FC = () => {
                 key={person.id}
                 type="button"
                 onClick={() => handleSelectPerson(person)}
-                className={`px-2 py-1 rounded-lg backdrop-blur-md text-[10px] font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-lg ${
+                title={`📍 ${person.area}, ${person.city}`}
+                className={`px-2.5 py-1 rounded-lg backdrop-blur-md text-[10px] font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-lg ${
                   isSelected
-                    ? "bg-sky-600 text-white border-sky-400 ring-2 ring-sky-400/40 scale-105"
+                    ? "bg-emerald-600 text-white border-emerald-400 ring-2 ring-emerald-400/40 scale-105"
                     : "bg-card/90 text-ink border-line-soft hover:bg-card hover:border-teal-500/40"
                 }`}
               >
@@ -508,7 +423,7 @@ export const SalesPersonLiveMap: React.FC = () => {
                   }}
                 />
                 <span>{person.name}</span>
-                <span className="text-[8.5px] opacity-75 font-mono">₹{(person.todaySalesValue / 1000).toFixed(0)}k</span>
+                <span className="text-[9px] opacity-75 font-normal">📍 {person.city}</span>
               </button>
             );
           })}
@@ -532,147 +447,24 @@ export const SalesPersonLiveMap: React.FC = () => {
           </button>
         </div>
 
-        {/* ── SELECTED SALESPERSON PROFILE CARD / POPUP DRAWER ── */}
-        {selectedPerson && showDetailDrawer && (
-          <div className="absolute bottom-2.5 left-2.5 right-2.5 sm:right-auto sm:w-96 z-20 bg-card/95 backdrop-blur-xl border border-line-soft rounded-2xl p-3.5 shadow-2xl text-ink animate-in fade-in slide-in-from-bottom-3 duration-200">
-            {/* Header: Name, Status, Close */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedPerson.avatarColor} border-2 border-white/80 shadow-md flex items-center justify-center text-white text-xs font-black shrink-0`}
-                >
-                  {selectedPerson.initials}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="text-[13px] font-black text-ink truncate">{selectedPerson.name}</h4>
-                    <span
-                      className={`text-[8px] font-black uppercase px-1.5 py-0.2 rounded-full border ${
-                        selectedPerson.status === "active"
-                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                          : "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                      }`}
-                    >
-                      {selectedPerson.status.replace("_", " ")}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-ink-muted flex items-center gap-1 mt-0.5 truncate">
-                    <FaMapMarkerAlt className="text-emerald-400 text-[9px] shrink-0" />
-                    <span className="truncate">
-                      {selectedPerson.area}, {selectedPerson.city}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedPersonId(null)}
-                className="text-ink-subtle hover:text-ink p-1 rounded hover:bg-card-2 transition-colors cursor-pointer"
-              >
-                <FaTimes className="text-xs" />
-              </button>
-            </div>
-
-            {/* Telemetry Micro-Cards */}
-            <div className="grid grid-cols-3 gap-1.5 mt-3 pt-2.5 border-t border-line-soft">
-              <div className="p-1.5 rounded-lg bg-card-2 border border-line-soft text-center">
-                <span className="text-[8px] font-bold text-ink-subtle uppercase tracking-wider block">Today's Sales</span>
-                <span className="text-[12px] font-mono font-black text-emerald-400">
-                  ₹{selectedPerson.todaySalesValue.toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div className="p-1.5 rounded-lg bg-card-2 border border-line-soft text-center">
-                <span className="text-[8px] font-bold text-ink-subtle uppercase tracking-wider block">Visits Done</span>
-                <span className="text-[12px] font-mono font-black text-sky-400">
-                  {selectedPerson.completedVisits} / {selectedPerson.targetVisits}
-                </span>
-              </div>
-              <div className="p-1.5 rounded-lg bg-card-2 border border-line-soft text-center">
-                <span className="text-[8px] font-bold text-ink-subtle uppercase tracking-wider block">Live Speed</span>
-                <span className="text-[12px] font-mono font-black text-amber-400">
-                  {selectedPerson.speedKmH} km/h
-                </span>
-              </div>
-            </div>
-
-            {/* Today's Route Stops List */}
-            <div className="mt-2.5 pt-2 border-t border-line-soft">
-              <div className="flex items-center justify-between text-[9.5px] font-bold text-ink-subtle mb-1.5">
-                <span className="flex items-center gap-1 text-ink-muted">
-                  <FaRoute className="text-sky-400" /> Today's Itinerary
-                </span>
-                <span className="text-[8.5px] text-ink-subtle">Battery: {selectedPerson.battery}%</span>
-              </div>
-              <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                {selectedPerson.routeStops.map((stop, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-1.5 rounded-md bg-card-2 border border-line-soft text-[10px]"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black shrink-0 ${
-                          stop.completed
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                            : "bg-card text-ink-subtle border border-line-soft"
-                        }`}
-                      >
-                        {i + 1}
-                      </span>
-                      <span className={`truncate font-medium ${stop.completed ? "text-ink" : "text-ink-subtle"}`}>
-                        {stop.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[9px] text-ink-subtle font-mono">{stop.time}</span>
-                      {stop.amount > 0 && (
-                        <span className="text-[9.5px] font-mono font-bold text-emerald-400">
-                          ₹{stop.amount.toLocaleString("en-IN")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Action Buttons: Call & WhatsApp */}
-            <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-line-soft">
-              <a
-                href={`tel:${selectedPerson.phone}`}
-                className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors shadow-md shadow-emerald-950/20"
-              >
-                <FaPhoneAlt className="text-[9px]" />
-                <span>Call Salesman</span>
-              </a>
-              <a
-                href={`https://wa.me/${selectedPerson.phone.replace("+", "")}?text=Hi%20${selectedPerson.name},%20checking%20today's%20sales%20status.`}
-                target="_blank"
-                rel="noreferrer"
-                className="py-1.5 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-emerald-500/40 shadow-md shadow-emerald-950/20"
-              >
-                <FaWhatsapp className="text-xs" />
-                <span>WhatsApp</span>
-              </a>
-            </div>
+        {/* ── BOTTOM ACTIVE LOCATION CHIP ──────────────────────── */}
+        <div className="absolute bottom-2.5 left-2.5 bg-card/90 backdrop-blur-md rounded-xl px-3 py-1.5 border border-line-soft flex items-center gap-3 text-[10px] text-ink shadow-xl z-10">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>{salesPersons.filter((p) => p.status === "active").length} In Field</span>
           </div>
-        )}
-
-        {/* ── BOTTOM-RIGHT STATUS SUMMARY BADGE ───────────────── */}
-        {!selectedPerson && (
-          <div className="absolute bottom-2.5 left-2.5 bg-card/90 backdrop-blur-md rounded-xl px-3 py-1.5 border border-line-soft flex items-center gap-3 text-[10px] text-ink shadow-xl z-10">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{salesPersons.filter((p) => p.status === "active").length} In Field</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span>{salesPersons.filter((p) => p.status === "in_meeting").length} In Meeting</span>
-            </div>
-            <span className="text-[9px] text-ink-subtle">Click any pin for profile</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span>{salesPersons.filter((p) => p.status === "in_meeting").length} In Meeting</span>
           </div>
-        )}
+          {selectedPersonId && (
+            <span className="text-[10px] text-emerald-400 font-semibold border-l border-line-soft pl-2.5">
+              📍 {salesPersons.find((p) => p.id === selectedPersonId)?.name}:{" "}
+              {salesPersons.find((p) => p.id === selectedPersonId)?.area},{" "}
+              {salesPersons.find((p) => p.id === selectedPersonId)?.city}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

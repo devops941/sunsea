@@ -1,11 +1,11 @@
-import React, { useMemo, useCallback, useState, useEffect } from "react";
+import React, { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { sidebarItems } from "./sidebar.data";
 import { usePermission } from "../../../hooks/usePermission";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { logoutUser } from "../../../features/auth/authSlice";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa";
-import { FiLogOut } from "react-icons/fi";
+import { FiLogOut, FiUser } from "react-icons/fi";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ThemeToggle from "../ThemeToggle";
 import LiveBadge from "../../../components/ui/LiveBadge/LiveBadge";
@@ -19,6 +19,8 @@ const HorizontalNav = () => {
   const { user } = useAppSelector((state) => state.auth);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Dropdown portal state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -33,7 +35,21 @@ const HorizontalNav = () => {
   // Close menus on route change
   useEffect(() => {
     setActiveMenuId(null);
+    setShowProfileMenu(false);
   }, [location.pathname]);
+
+  // Click outside listener for profile menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    if (showProfileMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showProfileMenu]);
 
   const handleMenuClick = (e: React.MouseEvent, title: string) => {
     if (activeMenuId === title) {
@@ -110,7 +126,7 @@ const HorizontalNav = () => {
 
   const getInitials = (name?: string) => {
     if (!name) return "U";
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2);
+    return name.trim().charAt(0).toUpperCase();
   };
 
   const formatRole = (userObj?: any) => {
@@ -122,7 +138,7 @@ const HorizontalNav = () => {
     return "User";
   };
 
-  const avatarImage = (user as any)?.employeeProfile?.profilePicture || user?.avatarUrl || user?.profilePicture || user?.photoUrl;
+  const avatarImage = (user as any)?.employeeProfile?.profilePicture || user?.avatarUrl || (user as any)?.profilePicture || (user as any)?.photoUrl || (user as any)?.profileImage;
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -135,7 +151,7 @@ const HorizontalNav = () => {
   };
 
   return (
-    <div className="w-full bg-nav text-nav-fg shadow-xs border-b border-line-soft relative z-40 hidden lg:flex items-center justify-between px-3 py-1.5">
+    <div className="w-full bg-slate-900/95 backdrop-blur-md text-white shadow-sm border-b border-slate-800/80 relative z-40 hidden lg:flex items-center justify-between px-3.5 py-1.5">
       
       {/* ── BACKGROUND OVERLAY TO CLOSE MENUS ── */}
       {activeMenuId && (
@@ -147,7 +163,7 @@ const HorizontalNav = () => {
 
       {/* ── MIDDLE: Navigation Items ── */}
       <div className="flex-1 overflow-x-auto no-scrollbar">
-        <ul className="flex items-center gap-1 min-w-max list-none m-0 p-0 flex-nowrap">
+        <ul className="flex items-center gap-1.5 min-w-max list-none m-0 p-0 flex-nowrap">
           {filteredSidebarItems.map((menu) => {
             const menuActive = isMenuActive(menu);
             const resolvedPath = resolveMenuPath(menu);
@@ -159,17 +175,27 @@ const HorizontalNav = () => {
                 {hasChildren ? (
                   <div 
                     onClick={(e) => handleMenuClick(e, menu.title)}
-                    className={`cursor-pointer px-2 py-1.5 xl:px-3 xl:py-2 rounded-md flex items-center gap-1.5 xl:gap-2 transition-all duration-300 ${menuActive ? "bg-nav-active font-bold shadow-sm" : (isOpen ? "bg-nav-hover" : "bg-transparent hover:bg-nav-hover")}`}
+                    className={`cursor-pointer px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all duration-200 ${
+                      menuActive 
+                        ? "bg-teal-600 text-white font-bold shadow-xs" 
+                        : (isOpen 
+                            ? "bg-white/15 text-white font-bold" 
+                            : "bg-transparent text-white hover:text-white hover:bg-white/10 font-bold")
+                    }`}
                   >
-                    <span className={`text-[12px] xl:text-[14px] font-bold whitespace-nowrap select-none ${menuActive ? "text-nav-active-fg" : "text-nav-fg"}`}>{menu.title}</span>
-                    <FaChevronDown className={`min-w-[10px] text-[10px] xl:min-w-[10px] xl:text-[10px] transition-transform ${isOpen ? "rotate-180" : ""} ${menuActive ? "text-nav-active-fg" : "text-nav-fg"}`} />
+                    <span className="text-[13.5px] whitespace-nowrap select-none tracking-tight">{menu.title}</span>
+                    <FaChevronDown className={`text-[9px] transition-transform duration-200 ${isOpen ? "rotate-180" : ""} text-white`} />
                   </div>
                 ) : (
                   <NavLink
                     to={resolvedPath}
-                    className={`px-2 py-1.5 xl:px-3 xl:py-2 rounded-md flex items-center gap-1.5 xl:gap-2 transition-all duration-300 no-underline ${menuActive ? "bg-nav-active font-bold shadow-sm" : "bg-transparent hover:bg-nav-hover"}`}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all duration-200 no-underline ${
+                      menuActive 
+                        ? "bg-teal-600 text-white font-bold shadow-xs" 
+                        : "bg-transparent text-white hover:text-white hover:bg-white/10 font-bold"
+                    }`}
                   >
-                    <span className={`text-[12px] xl:text-[14px] font-bold whitespace-nowrap select-none ${menuActive ? "text-nav-active-fg" : "text-nav-fg"}`}>{menu.title}</span>
+                    <span className="text-[13.5px] whitespace-nowrap select-none tracking-tight">{menu.title}</span>
                   </NavLink>
                 )}
               </li>
@@ -178,51 +204,115 @@ const HorizontalNav = () => {
         </ul>
       </div>
 
-      {/* ── RIGHT: Live status, Profile, Theme switch & Logout ── */}
+      {/* ── RIGHT: Live status, Theme switch & User Profile Card (matching screenshot) ── */}
       <div className="flex items-center gap-2.5 pl-3 shrink-0">
         {/* Live Status Indicator */}
-        <LiveBadge />
+        <LiveBadge size="xs" />
 
+        {/* Theme Toggle Button */}
+        <ThemeToggle className="!w-8 !h-8 !rounded-full bg-slate-800/80 border border-slate-700/60 hover:bg-slate-700 shadow-xs" />
+
+        {/* User Profile Card */}
         {user && (() => {
           const name = user.fullName || user.username || "User";
           const role = formatRole(user);
-          const isSame = name.toLowerCase().trim() === role.toLowerCase().trim() ||
-                         (user.isSuperAdmin && (name.toLowerCase().includes("admin") || name.toLowerCase().includes("super")));
           return (
-            <button
-              type="button"
-              onClick={() => navigate("/profile")}
-              title="View Profile"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700/80 shadow-xs cursor-pointer transition-all duration-200 group"
-            >
-              <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center text-[10px] font-extrabold border border-blue-400/40 shrink-0">
-                {getInitials(name)}
-              </div>
-              <span className="font-bold text-xs text-slate-100 tracking-tight whitespace-nowrap group-hover:text-white">
-                {name}
-              </span>
-              {!isSame && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30 font-mono uppercase tracking-wider">
-                  {role}
-                </span>
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                title="Account Menu"
+                className={`flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-200 cursor-pointer ${
+                  showProfileMenu 
+                    ? "bg-slate-800 border-teal-500/60 shadow-md shadow-teal-500/15" 
+                    : "bg-slate-800/80 hover:bg-slate-800 border-slate-700/60 hover:border-slate-600 shadow-xs"
+                }`}
+              >
+                {/* Round Avatar (Image or First Letter Initial) */}
+                <div className="shrink-0">
+                  {avatarImage ? (
+                    <img 
+                      src={avatarImage} 
+                      alt={name} 
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                      className="w-7 h-7 rounded-full object-cover border border-slate-700 shadow-xs" 
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-xs uppercase">
+                      {getInitials(name)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Two Stacked Lines: Name on top, Role below */}
+                <div className="flex flex-col text-left leading-tight pr-0.5">
+                  <span className="font-bold text-xs text-white tracking-tight whitespace-nowrap">
+                    {name}
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-400 capitalize whitespace-nowrap">
+                    {role}
+                  </span>
+                </div>
+
+                {/* Chevron Dropdown Arrow */}
+                <FaChevronDown className={`text-[9px] transition-transform duration-200 ${showProfileMenu ? "rotate-180 text-teal-400" : "text-slate-400"}`} />
+              </button>
+
+              {/* Interactive Profile Dropdown Menu */}
+              {showProfileMenu && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-card border border-line-soft rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="p-2.5 rounded-xl bg-card-2 border border-line-soft mb-1.5 flex items-center gap-2.5">
+                    {avatarImage ? (
+                      <img 
+                        src={avatarImage} 
+                        alt={name} 
+                        className="w-8 h-8 rounded-full object-cover border border-line-soft shadow-xs shrink-0" 
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0 uppercase">
+                        {getInitials(name)}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs text-ink truncate">{name}</div>
+                      <div className="text-[10px] font-semibold text-teal-500 uppercase tracking-wider">{role}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate("/profile");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-ink-muted hover:text-ink hover:bg-card-2 transition-colors cursor-pointer text-left"
+                    >
+                      <FiUser className="text-sm text-teal-500" />
+                      <span>My Profile</span>
+                    </button>
+
+                    <div className="h-px bg-line-soft my-1" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
+                    >
+                      <FiLogOut className="text-sm" />
+                      <span>Log Out</span>
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
           );
         })()}
-
-        {/* Theme Toggle */}
-        <ThemeToggle />
-
-        {/* Direct Logout Button */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-200 hover:bg-red-500 hover:text-white transition-all font-semibold text-xs border border-red-500/30 cursor-pointer shadow-xs"
-          title="Logout"
-        >
-          <FiLogOut className="text-sm" />
-          <span className="hidden sm:inline">Logout</span>
-        </button>
       </div>
 
       {/* ── FIXED PORTAL FOR DROPDOWNS (Prevents scroll clipping) ── */}
