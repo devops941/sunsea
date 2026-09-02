@@ -390,10 +390,13 @@ const SalesInvoiceForm: React.FC = () => {
       const amount = orderQty * unitPrice;
       const taxAmount = (amount * taxPercent) / 100;
 
-      // Calculate weight from component products
+      // Calculate weight from component products (always in kg)
       let weightPerUnit = 0;
       spComps.forEach((c: any) => {
-        weightPerUnit += Number(c.componentProduct?.weightPerPiece || 0) * Number(c.quantity || 1);
+        const rawWeight = Number(c.componentProduct?.weightPerPiece || 0);
+        const wUom = (c.componentProduct?.weightUom || "kg").toLowerCase().trim();
+        const weightInKg = wUom === "g" ? rawWeight / 1000 : rawWeight;
+        weightPerUnit += weightInKg * Number(c.quantity || 1);
       });
 
       result.push({
@@ -431,7 +434,9 @@ const SalesInvoiceForm: React.FC = () => {
         id: crypto.randomUUID(),
         itemId: String(item.productId || ""),
         itemName: item.product?.productName || item.productName || "Unknown Item",
-        qty, rate, weight: Number(item.product?.weightPerPiece || 0) * qty, discountAmount: 0, taxPercent, amount, taxAmount, total: amount + taxAmount,
+        qty, rate,
+        weight: (() => { const rw = Number(item.product?.weightPerPiece || 0); const wu = (item.product?.weightUom || "kg").toLowerCase().trim(); return (wu === "g" ? rw / 1000 : rw) * qty; })(),
+        discountAmount: 0, taxPercent, amount, taxAmount, total: amount + taxAmount,
       });
     });
 
