@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaSave, FaExclamationTriangle } from "react-icons/fa";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -181,6 +181,25 @@ const SalesInvoiceForm: React.FC = () => {
   const [chargeRows, setChargeRows] = useState<ChargeRow[]>([]);
   const [invoiceStatus, setInvoiceStatus] = useState<string>("DRAFT");
 
+  const formDataFetcher = useCallback(async (_signal: AbortSignal) => {
+    const [customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData] = await Promise.all([
+      customerService.fetchAll({ limit: 1000 } as any).catch(() => ({ customers: [] })),
+      productService.fetchAll().catch(() => []),
+      invoiceSettingsService.getConfig().catch(() => null),
+      salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+      salesOrderService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+      finishedGoodsStockService.fetchAll().catch(() => []),
+      salesProductService.fetchAll().catch(() => []),
+    ]);
+    return { customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData };
+  }, []);
+
+  const { data: formData, loading } = useDetailCache<any>({
+    cacheKey: "salesInvoice:formData",
+    socketModule: "salesInvoice",
+    fetcher: formDataFetcher,
+  });
+
   useEffect(() => {
     dispatch(fetchCompany());
   }, [dispatch]);
@@ -227,30 +246,13 @@ const SalesInvoiceForm: React.FC = () => {
       });
   }, [id, navigate]);
 
-  // ---- Load dropdown data (cached — instant on revisit) ----
-  const refFetcher = useCallback(async (_signal: AbortSignal) => {
-    const [customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData] =
-      await Promise.all([
-        customerService.fetchAll({ limit: 1000 } as any).catch(() => ({ customers: [] })),
-        productService.fetchAll().catch(() => []),
-        invoiceSettingsService.getConfig().catch(() => null),
-        salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
-        salesOrderService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
-        finishedGoodsStockService.fetchAll().catch(() => []),
-        salesProductService.fetchAll().catch(() => []),
-      ]);
-    return { customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData };
-  }, []);
-
-  const { data: refData, loading } = useDetailCache<any>({
-    cacheKey: "salesInvoice:refData",
-    socketModule: "salesInvoice",
-    fetcher: refFetcher,
-  });
-
+  // ---- Populate state from cached form data ----
+  const populated = useRef(false);
   useEffect(() => {
-    if (!refData) return;
-    const { customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData } = refData;
+    if (!formData || populated.current) return;
+    populated.current = true;
+
+    const { customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, salesProductsData } = formData;
 
     const customersArray = Array.isArray(customerList)
       ? customerList
@@ -313,8 +315,7 @@ const SalesInvoiceForm: React.FC = () => {
         })
         .catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refData]);
+  }, [formData]);
 
   // Recalculate invoice number when date changes
   useEffect(() => {
