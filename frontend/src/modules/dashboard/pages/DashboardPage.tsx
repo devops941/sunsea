@@ -142,13 +142,14 @@ const DashboardPage: React.FC = () => {
   const productsCount = dashData.productsCount || (Array.isArray(allProducts) ? allProducts.length : 0);
   const employeesCount = dashData.employeesCount || 0;
   const salesInvoices = dashData.salesInvoices || [];
+  const purchaseInvoices = dashData.purchaseInvoices || [];
   void rawMaterialStocks; // reserved for future use
 
   // ── Real-time socket refresh on any relevant change ─────────
   // Single 300ms debounce shared across all modules — prevents up to 5
   // independent refetches when one save touches multiple collections.
   usePageSocketSync(
-    ["purchaseOrder", "productionOrder", "dailyPlan", "finishedGoodsStock", "rawMaterialStock"],
+    ["purchaseOrder", "productionOrder", "dailyPlan", "finishedGoodsStock", "rawMaterialStock", "salesOrder", "salesInvoice", "grnInvoice"],
     refreshDashboard
   );
 
@@ -742,6 +743,8 @@ const DashboardPage: React.FC = () => {
                 salesOrders={salesOrders}
                 purchaseOrders={purchaseOrders}
                 productionOrders={productionOrders}
+                salesInvoices={salesInvoices}
+                purchaseInvoices={purchaseInvoices}
               />
             </div>
           )}

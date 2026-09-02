@@ -64,6 +64,24 @@ class VouchersService {
     return `${prefix}-${Date.now().toString().slice(-6)}`;
   }
 
+  async deleteVoucher(id: number) {
+    const voucher = await prisma.voucher.findUnique({ where: { id }, select: { id: true, type: true, refDocType: true } });
+    if (!voucher) throw new ApiError(404, "Voucher not found");
+
+    // Block deletion of system-generated vouchers (opening balance JVs, invoice-linked vouchers)
+    const blockedRefDocTypes = ["LEDGER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE", "SUPPLIER_OPENING_BALANCE"];
+    if (voucher.refDocType && blockedRefDocTypes.includes(voucher.refDocType)) {
+      throw new ApiError(400, "System-generated vouchers cannot be deleted");
+    }
+
+    await prisma.$transaction([
+      prisma.journalItem.deleteMany({ where: { voucherId: id } }),
+      prisma.voucher.delete({ where: { id } }),
+    ]);
+
+    return { deleted: true, id };
+  }
+
   private async enrichVouchers(vouchers: any[]) {
     try {
       const [allGrnInvoices, allSalesInvoices] = await Promise.all([

@@ -18,6 +18,7 @@ const dashboardController = {
         finishedGoodsStocks,
         dailyPlans,
         salesInvoices,
+        purchaseInvoices,
         allSalesProducts,
       ] = await Promise.all([
         // Sales Orders
@@ -139,17 +140,33 @@ const dashboardController = {
           take: 50,
         }).catch(() => []),
 
-        // Sales Invoices for pending amount
+        // Sales Invoices for pending amount and trend chart
         prisma.salesInvoice.findMany({
           select: {
             id: true,
             grandTotal: true,
             payments: true,
             status: true,
+            invoiceDate: true,
+            createdAt: true,
           },
           where: {
             status: { not: "CANCELLED" },
           },
+          orderBy: { createdAt: "desc" },
+        }).catch(() => []),
+
+        // Purchase / GRN Invoices for trend chart
+        (prisma as any).grnInvoice.findMany({
+          select: {
+            id: true,
+            netAmount: true,
+            subtotal: true,
+            payments: true,
+            paymentStatus: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
         }).catch(() => []),
 
         // Sales Products — for Customer Purchase Report
@@ -178,6 +195,7 @@ const dashboardController = {
           finishedGoodsStocks,
           dailyPlans,
           salesInvoices,
+          purchaseInvoices,
         },
       });
     } catch (error) {

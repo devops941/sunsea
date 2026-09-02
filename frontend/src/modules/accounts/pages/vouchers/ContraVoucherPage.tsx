@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaExchangeAlt, FaPlus, FaSync, FaFilter } from "react-icons/fa";
+import { FaExchangeAlt, FaPlus, FaSync, FaFilter, FaTrash, FaCheckSquare, FaSquare } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, invalidateCache } from "../../../../hooks/useListCache";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 // Contra filter — same defaults as Journal per Busy's convention:
@@ -33,6 +33,8 @@ const ContraVoucherPage: React.FC = () => {
   const [pending, setPending] = useState<FilterOptions>(() => defaultFilters());
   const [panelOpen, setPanelOpen] = useState(true);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!panelOpen) return;
@@ -75,6 +77,48 @@ const ContraVoucherPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+
+  const allVoucherIds = useMemo(() => vouchers.map((v) => v.id), [vouchers]);
+  const allSelected = allVoucherIds.length > 0 && allVoucherIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleVoucher = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(allVoucherIds));
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const confirmed = window.confirm(
+      `Delete ${selectedIds.size} selected contra voucher(s)? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    let failed = 0;
+    for (const id of Array.from(selectedIds)) {
+      try {
+        await voucherService.deleteVoucher(id);
+      } catch {
+        failed++;
+      }
+    }
+    setDeleting(false);
+    setSelectedIds(new Set());
+    invalidateCache(cacheKey);
+    refresh();
+    if (failed === 0) {
+      toast.success(`Deleted ${selectedIds.size} voucher(s) successfully`);
+    } else {
+      toast.warning(`Deleted with ${failed} error(s)`);
+    }
+  };
 
   // Contra list — one row per journal item (matches Busy's flat register).
   const flatRows = useMemo(() => {
@@ -215,6 +259,16 @@ const ContraVoucherPage: React.FC = () => {
           >
             <FaSync className={refreshing ? "animate-spin text-rose-500" : ""} /> Refresh
           </button>
+          {someSelected && (
+            <button
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold border border-red-700 disabled:opacity-50 cursor-pointer"
+            >
+              <FaTrash className="text-[10px]" />
+              {deleting ? "Deleting..." : `Delete (${selectedIds.size})`}
+            </button>
+          )}
           <button
             onClick={() => navigate("/accounts/contra-entry/add")}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold transition cursor-pointer"
@@ -245,6 +299,11 @@ const ContraVoucherPage: React.FC = () => {
             <table className="w-full text-left text-[11px] text-ink-muted border-collapse">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card-2 text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                  <th className="px-2 py-1.5 border-r border-line w-8 text-center">
+                    <button type="button" onClick={toggleAll} className="text-ink-subtle hover:text-rose-500">
+                      {allSelected ? <FaCheckSquare className="text-rose-500" /> : <FaSquare />}
+                    </button>
+                  </th>
                   <th className="px-2 py-1.5 border-r border-line w-28">Date</th>
                   <th className="px-2 py-1.5 border-r border-line w-24 text-center">Vch/Bill No</th>
                   <th className="px-2 py-1.5 border-r border-line">Account</th>
@@ -260,19 +319,26 @@ const ContraVoucherPage: React.FC = () => {
                     applied.accountShownBy === "Code" ? ledger?.code : ledger?.name;
                   const dr = Number(item.debitAmount || 0);
                   const cr = Number(item.creditAmount || 0);
-                  const isSelected = selectedRow === voucher.id;
+                  const isChecked = selectedIds.has(voucher.id);
                   return (
                     <tr
                       key={`${voucher.id}-${itemIdx}`}
-                      onClick={() => setSelectedRow(voucher.id)}
+                      onClick={() => toggleVoucher(voucher.id)}
                       className={`border-b border-line-soft cursor-pointer ${
-                        isSelected
+                        isChecked
                           ? "bg-rose-600/20 text-ink"
                           : rowIdx % 2 === 0
                             ? "hover:bg-card-2/70"
                             : "bg-card-2/20 hover:bg-card-2/70"
                       }`}
                     >
+                      <td className="px-2 py-1 border-r border-line-soft text-center" onClick={(e) => e.stopPropagation()}>
+                        {isFirst && (
+                          <button type="button" onClick={() => toggleVoucher(voucher.id)} className="text-ink-subtle hover:text-rose-500">
+                            {isChecked ? <FaCheckSquare className="text-rose-500" /> : <FaSquare />}
+                          </button>
+                        )}
+                      </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono text-[11px]">
                         {isFirst ? new Date(voucher.date).toLocaleDateString("en-GB") : ""}
                       </td>
@@ -303,6 +369,7 @@ const ContraVoucherPage: React.FC = () => {
                 {/* Busy-style empty filler rows — 25 per user preference */}
                 {Array.from({ length: Math.max(0, 25 - flatRows.length) }).map((_, i) => (
                   <tr key={`empty-${i}`} className="border-b border-line-soft">
+                    <td className="px-2 py-1 border-r border-line-soft"></td>
                     <td className="px-2 py-1 border-r border-line-soft">&nbsp;</td>
                     <td className="px-2 py-1 border-r border-line-soft"></td>
                     <td className="px-2 py-1 border-r border-line-soft"></td>
@@ -314,7 +381,7 @@ const ContraVoucherPage: React.FC = () => {
               </tbody>
               <tfoot className="sticky bottom-0 z-10 bg-card-2 border-t-2 border-line">
                 <tr>
-                  <td colSpan={3} className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide border-r border-line">
+                  <td colSpan={4} className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide border-r border-line">
                     Page Total ({vouchers.length} vouchers · {flatRows.length} entries)
                   </td>
                   <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">

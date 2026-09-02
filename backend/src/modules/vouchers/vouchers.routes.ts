@@ -7,5 +7,6 @@ router.get("/", (req, res, next) => vouchersController.getVouchers(req, res, nex
 router.get("/next-no", (req, res, next) => vouchersController.peekNextVoucherNo(req, res, next));
 router.post("/", (req, res, next) => vouchersController.createVoucher(req, res, next));
 router.get("/:id", (req, res, next) => vouchersController.getVoucherById(req, res, next));
+router.delete("/:id", (req, res, next) => vouchersController.deleteVoucher(req, res, next));
 
 export default router;
