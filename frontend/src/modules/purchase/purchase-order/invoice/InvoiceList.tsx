@@ -14,7 +14,7 @@ import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
 import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import EditButton from "../../../../components/ui/EditButton/EditButton";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useListCache } from "../../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -43,47 +43,44 @@ const calculatePendingAmount = (item: any) => {
 
 const InvoiceList: React.FC = () => {
     const navigate = useNavigate();
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [total, setTotal] = useState(0);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
-    // Function to fetch all invoices only when user clicks Export
     const fetchInvoicesForExport = useCallback(async () => {
         const response = await grnInvoiceService.fetchAll({ page: 1, pageSize: 100000 });
         const list = response?.data || (Array.isArray(response) ? response : []);
         return Array.isArray(list) ? list : [];
     }, []);
 
-    const fetchInvoices = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await grnInvoiceService.fetchAll({
-                page: currentPage,
-                pageSize: ITEMS_PER_PAGE,
-                search: searchTerm || undefined,
-            });
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const response = await grnInvoiceService.fetchAll({ pageSize: 10000 });
+        const list = response?.data || (Array.isArray(response) ? response : []);
+        return { data: list, total: response?.total || list.length };
+    }, []);
 
-            setData(response.data || []);
-            setTotal(response.total || 0);
-        } catch (error: any) {
-            console.error("❌ Fetch error:", error);
-            toast.error(error?.response?.data?.message || "Failed to fetch invoices");
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, searchTerm]);
+    const { data: allInvoices, loading, refresh } = useListCache<any>({
+        cacheKey: "grnInvoices:list",
+        socketModule: "grnInvoice",
+        fetcher,
+    });
 
-    useEffect(() => {
-        fetchInvoices();
-    }, [fetchInvoices]);
+    const filteredData = useMemo(() => {
+        if (!searchTerm) return allInvoices;
+        const term = searchTerm.toLowerCase();
+        return allInvoices.filter((item: any) =>
+            item.grnNumber?.toLowerCase().includes(term) ||
+            item.invoiceNo?.toLowerCase().includes(term) ||
+            item.supplier?.legalName?.toLowerCase().includes(term)
+        );
+    }, [allInvoices, searchTerm]);
 
-    useSocketSync("grnInvoice", undefined, fetchInvoices);
+    const data = filteredData.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -103,14 +100,14 @@ const InvoiceList: React.FC = () => {
             toast.success("Invoice deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
-            fetchInvoices();
+            refresh();
         } catch (error: any) {
             console.error("❌ Delete error:", error);
             toast.error(error?.response?.data?.message || "Failed to delete invoice");
         }
     };
 
-    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
 
     // CSV Export Configuration
     const { csvColumns, csvFilename } = useMemo(() => {
