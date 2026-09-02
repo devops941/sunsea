@@ -138,7 +138,7 @@ const StorageStoreList: React.FC = () => {
                 header: "Category",
                 accessor: (item: any) =>
                     item.storeCategory
-                        ? STORE_CATEGORY_LABELS[item.storeCategory] ?? item.storeCategory
+                        ? (STORE_CATEGORY_LABELS as any)[item.storeCategory] ?? item.storeCategory
                         : "N/A",
             },
             { header: "Incharge", accessor: (item: any) => item.incharge?.fullName || "N/A" },
@@ -232,7 +232,7 @@ const StorageStoreList: React.FC = () => {
                                 header: "CATEGORY",
                                 render: (item) =>
                                     item.storeCategory
-                                        ? STORE_CATEGORY_LABELS[item.storeCategory] ?? item.storeCategory
+                                        ? (STORE_CATEGORY_LABELS as any)[item.storeCategory] ?? item.storeCategory
                                         : "N/A",
                             },
                             {
