@@ -20,6 +20,8 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { rawMaterialService } from "../../../services/rawMaterialService";
 import { formatStockQty, parseBaseUom } from "../../../utils/uomConversion";
 
 const ITEMS_PER_PAGE = 15;
@@ -150,7 +152,7 @@ const WastageStoreList: React.FC = () => {
                 await dispatch(deleteRawMaterial(itemToDelete)).unwrap();
                 toast.success("Wastage product deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete wastage product");
+                toast.error(err || "Failed to delete item");
             } finally {
                 setIsDeleting(false);
                 setShowDeleteModal(false);
@@ -158,6 +160,30 @@ const WastageStoreList: React.FC = () => {
             }
         }
     };
+
+    const fetchWastageForExport = useCallback(async () => {
+        const res = await rawMaterialService.fetchAll({ itemType: "WASTAGE", limit: 100000 });
+        return Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Product ID", accessor: (item: any) => item.rawMaterialId },
+            { header: "Product Name", accessor: (item: any) => item.materialName },
+            { header: "Category", accessor: (item: any) => item.category?.name || "—" },
+            { header: "Store", accessor: (item: any) => item.store?.storeName || item.storeId || "—" },
+            {
+                header: "Physical Stock",
+                accessor: (item: any) =>
+                    item.onHandQty != null ? `${item.onHandQty} ${item.baseUom || ""}`.trim() : "0",
+            },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Wastage_Store_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     const columns: DataTableColumn<RawMaterial>[] = [
         {
@@ -209,8 +235,8 @@ const WastageStoreList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Wastage Products Management</h2>
-                      
+                        <h2 className="text-2xl font-bold text-ink">Wastage Products</h2>
+
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <div className="w-40">
@@ -241,6 +267,12 @@ const WastageStoreList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search products..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchWastageForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                         {can("wastage-store.create") && (
                             <CustomButton

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,6 +13,7 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -78,6 +79,35 @@ const SalesProductList: React.FC = () => {
             setItemToDelete(null);
         }
     };
+
+    const fetchSalesProductsForExport = useCallback(async () => {
+        const res = await salesProductService.fetchAll();
+        return Array.isArray(res) ? res : [];
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Sales Product Code", accessor: (item: any) => item.salesProductCode },
+            { header: "Sales Product Name", accessor: (item: any) => item.salesProductName },
+            {
+                header: "Components",
+                accessor: (item: any) =>
+                    (item.components || [])
+                        .map((c: any) => {
+                            const name = c.componentProduct?.productName;
+                            if (!name) return null;
+                            return `${name} (${c.quantity ?? 1})`;
+                        })
+                        .filter(Boolean)
+                        .join("; ") || "—",
+            },
+            { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Sales_Product_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     const columns: DataTableColumn<any>[] = [
         {
@@ -145,6 +175,12 @@ const SalesProductList: React.FC = () => {
                                 placeholder="Search by sales product..."
                             />
                         </div>
+                        <ExportCSVButton
+                            fetchData={fetchSalesProductsForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
+                        />
                         {can("sales_products.create") && (
                             <CustomButton text="Add Sales Product" icon={FaPlus} onClick={handleOpenAdd} />
                         )}

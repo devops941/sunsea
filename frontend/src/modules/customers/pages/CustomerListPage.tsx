@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { FaTimes } from "react-icons/fa";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { FaTimes, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -18,7 +18,8 @@ import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
 import CustomerViewModal from "../components/CustomerViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
-import { FaPlus } from "react-icons/fa";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { customerService } from "../../../services/customerService";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -111,6 +112,34 @@ const CustomerListPage: React.FC = () => {
     setDraftFilters(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
     setCurrentPage(1);
+  }, []);
+
+  const handleCloseViewModal = useCallback(() => {
+    setShowViewModal(false);
+    setSelectedCustomer(null);
+  }, []);
+
+  const fetchCustomersForExport = useCallback(async () => {
+    const res = await customerService.fetchAll({ page: 1, limit: 100000 });
+    return res?.customers || (Array.isArray(res) ? res : []);
+  }, []);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Customer Code", accessor: (item: any) => item.customerCode || "" },
+      { header: "Customer Name", accessor: (item: any) => item.customerName || item.companyName || "" },
+      { header: "Contact Person", accessor: (item: any) => item.contactPerson || "" },
+      { header: "Mobile", accessor: (item: any) => item.mobile || "" },
+      { header: "Email", accessor: (item: any) => item.email || "" },
+      { header: "Customer Type", accessor: (item: any) => item.customerType?.name || "" },
+      { header: "Grade", accessor: (item: any) => item.customerGrade?.name || "" },
+      { header: "GSTIN", accessor: (item: any) => item.gstNumber || item.gstin || "" },
+      { header: "Status", accessor: (item: any) => item.status || "" },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Customer_List_${new Date().toISOString().split("T")[0]}.csv`,
+    };
   }, []);
 
   const handleView = useCallback((customer: any) => {
@@ -241,6 +270,13 @@ const CustomerListPage: React.FC = () => {
                 </div>
               </div>
             </FilterPopover>
+
+            <ExportCSVButton
+              fetchData={fetchCustomersForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             {canCreate && (
               <CustomButton

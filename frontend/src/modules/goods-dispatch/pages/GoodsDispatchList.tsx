@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -8,6 +8,8 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { goodsDispatchService } from "../../../services/goodsDispatchService";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -97,6 +99,33 @@ const GoodsDispatchList: React.FC = () => {
     setDraftFilterDateFrom(filterDateFrom);
     setDraftFilterDateTo(filterDateTo);
   };
+
+  const fetchDispatchesForExport = useCallback(async () => {
+    try {
+      const res = await goodsDispatchService.fetchAll({ page: 1, limit: 100000 });
+      const list = res?.dispatches || (Array.isArray(res) ? res : (res?.data || []));
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch {
+      // fallback
+    }
+    return Array.isArray(dispatches) ? dispatches : [];
+  }, [dispatches]);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Dispatch No", accessor: (item: any) => item.dispatchNumber || "" },
+      { header: "Date", accessor: (item: any) => item.dispatchDate ? formatDate(item.dispatchDate) : "" },
+      { header: "Vehicle No", accessor: (item: any) => item.vehicleNumber || "" },
+      { header: "Driver Name", accessor: (item: any) => item.driverName || "" },
+      { header: "Destination Store", accessor: (item: any) => item.store?.storeName || item.destinationStoreId || "" },
+      { header: "Total Items", accessor: (item: any) => item.items?.length || 0 },
+      { header: "Status", accessor: (item: any) => item.status || "" },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Goods_Dispatch_List_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -224,6 +253,13 @@ const GoodsDispatchList: React.FC = () => {
                 />
               </div>
             </FilterPopover>
+
+            <ExportCSVButton
+              fetchData={fetchDispatchesForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             {can("goods-dispatch.create") && (
               <CustomButton

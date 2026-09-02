@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaBoxes, FaPlus, FaSync, FaTimes, FaTrash, FaSearch, FaEye } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
@@ -8,6 +8,7 @@ import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { storeService } from "../../../../services/storeService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 import { useListCache } from "../../../../hooks/useListCache";
+import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 interface FormReturnRow {
   rawMaterialId: string;
@@ -302,6 +303,48 @@ export const PurchaseReturnPage: React.FC = () => {
 
   const paginatedReturns = filteredReturns;
 
+  const fetchPurchaseReturnsForExport = useCallback(async () => {
+    try {
+      const list = await returnService.fetchPurchaseReturns();
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch (e) {
+      console.warn("fetchPurchaseReturns failed, using current returns:", e);
+    }
+    return Array.isArray(returns) ? returns : [];
+  }, [returns]);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Return No", accessor: (item: any) => item.returnNo || "" },
+      {
+        header: "Return Date",
+        accessor: (item: any) =>
+          item.returnDate
+            ? new Date(item.returnDate).toLocaleDateString("en-IN")
+            : "",
+      },
+      {
+        header: "Supplier",
+        accessor: (item: any) => item.supplier?.legalName || item.supplier?.displayName || "",
+      },
+      {
+        header: "GRN Invoice",
+        accessor: (item: any) =>
+          item.grnInvoice?.invoiceNo || (item.grnInvoiceId ? `GRN #${item.grnInvoiceId}` : ""),
+      },
+      {
+        header: "Grand Total (₹)",
+        accessor: (item: any) => Number(item.grandTotal ?? 0).toFixed(2),
+      },
+      { header: "Reason", accessor: (item: any) => item.reason || "" },
+      { header: "Status", accessor: (item: any) => item.status || "" },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Purchase_Returns_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
+
   return (
     <div className="w-full max-w-[1200px] mr-auto">
       <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
@@ -317,6 +360,12 @@ export const PurchaseReturnPage: React.FC = () => {
             <button onClick={refresh} className="flex items-center gap-1 px-2.5 py-1.5 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line-soft">
               <FaSync className={refreshing ? "animate-spin text-primary" : ""} /> Refresh
             </button>
+            <ExportCSVButton
+              fetchData={fetchPurchaseReturnsForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
             <button onClick={() => { resetForm(); setShowModal(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded text-xs font-semibold transition cursor-pointer">
               <FaPlus className="text-[10px]" /> Process Return
             </button>

@@ -18,6 +18,8 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { hourlyProductionService } from "../../../services/hourlyProductionService";
 
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -85,6 +87,35 @@ const HourlyWorkReportList: React.FC = () => {
             [key]: !prev[key]
         }));
     };
+
+    const fetchHourlyForExport = useCallback(async () => {
+        try {
+            const res = await hourlyProductionService.getAll();
+            const list = Array.isArray(res) ? res : (res?.data || []);
+            if (Array.isArray(list) && list.length > 0) return list;
+        } catch {
+            // fallback
+        }
+        return Array.isArray(data) ? data : [];
+    }, [data]);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Date", accessor: (item: any) => item.productionDate ? item.productionDate.split("T")[0] : "" },
+            { header: "Hour", accessor: (item: any) => item.hourSlot || item.hourIndex || "" },
+            { header: "PO Reference", accessor: (item: any) => item.productionOrderId || "" },
+            { header: "Product", accessor: (item: any) => item.product?.productName || item.productName || "" },
+            { header: "Machine", accessor: (item: any) => item.machine?.machineName || item.machineId || "" },
+            { header: "Shift", accessor: (item: any) => item.shift?.shiftName || item.shiftId || "" },
+            { header: "Produced Qty", accessor: (item: any) => item.qtyProduced || 0 },
+            { header: "Reject Qty", accessor: (item: any) => item.rejectQty || 0 },
+            { header: "Scrap Qty", accessor: (item: any) => item.scrapQty || 0 },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Hourly_Production_Logs_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     const groupedData = useMemo(() => {
         const safeData = Array.isArray(data) ? data : [];
@@ -492,6 +523,12 @@ const HourlyWorkReportList: React.FC = () => {
                                 onChange={(e) => setFilterDate(e.target.value)}
                             />
                         </div>
+                        <ExportCSVButton
+                            fetchData={fetchHourlyForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
+                        />
                     </div>
                 </div>
 

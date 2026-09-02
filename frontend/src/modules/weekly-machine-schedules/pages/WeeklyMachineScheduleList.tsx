@@ -7,6 +7,8 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchWeeklyPrograms, deleteWeeklyProgram, weeklyProgramCreated, weeklyProgramUpdated, weeklyProgramDeleted } from "../../../features/weekly-programs/weeklyProgramSlice";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import CustomButton from "../../../components/ui/Button/Button";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { weeklyProgramService } from "../../../services/weeklyProgramService";
 
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -96,6 +98,28 @@ const WeeklyMachineScheduleList: React.FC = () => {
             [weekKey]: !prev[weekKey]
         }));
     };
+
+    const fetchSchedulesForExport = useCallback(async () => {
+        const res = await weeklyProgramService.getAll({ page: 1, limit: 100000 });
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        return Array.isArray(list) ? list : [];
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Schedule No", accessor: (item: any) => item.programCode || item.weeklyProgramId || item.id || "" },
+            { header: "PO Reference", accessor: (item: any) => item.productionOrderId || "" },
+            { header: "Product", accessor: (item: any) => item.product?.productName || item.productName || item.salesProductName || "" },
+            { header: "Machine", accessor: (item: any) => item.machine?.machineName || item.machineName || item.machineId || "" },
+            { header: "Week Range", accessor: (item: any) => item.startDate && item.endDate ? `${item.startDate.split("T")[0]} to ${item.endDate.split("T")[0]}` : "" },
+            { header: "Target Qty", accessor: (item: any) => item.plannedQty || item.targetQty || 0 },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Weekly_Machine_Schedules_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     useEffect(() => {
         dispatch(fetchMachines());
@@ -398,6 +422,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchSchedulesForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                         {can("weekly_programs.create") && (
                             <CustomButton

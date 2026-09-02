@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { FaPlus, FaTrash, FaEye, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,6 +13,7 @@ import StatusBadge from "../../components/ui/StatusBadge/Badge";
 import EditButton from "../../components/ui/EditButton/EditButton";
 import DataTable, { type DataTableColumn } from "../../components/ui/table/DataTable";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
+import ExportCSVButton from "../../components/ui/ExportCSVButton/ExportCSVButton";
 import EmailButton from "../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../components/ui/WhatsappButton/WhatsappButton";
 import { Mail } from "lucide-react";
@@ -232,6 +233,26 @@ const SalesInvoiceList: React.FC = () => {
         // }
     };
 
+    const fetchSalesInvoicesForExport = useCallback(async () => {
+        const res = await salesInvoiceService.fetchAll({ page: 1, pageSize: 100000 });
+        return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Invoice No", accessor: (item: any) => item.invoiceNo || "" },
+            { header: "Invoice Date", accessor: (item: any) => formatDate(item.invoiceDate) },
+            { header: "Due Date", accessor: (item: any) => formatDate(item.dueDate) },
+            { header: "Customer", accessor: (item: any) => item.customer?.displayName || item.customer?.firmName || "N/A" },
+            { header: "Net Amount", accessor: (item: any) => item.grandTotal != null ? Number(item.grandTotal).toFixed(2) : "0.00" },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Sales_Invoice_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
+
     const columns: DataTableColumn<any>[] = [
         {
             header: "#",
@@ -316,6 +337,12 @@ const SalesInvoiceList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search invoices..."
+                        />
+                        <ExportCSVButton
+                            fetchData={fetchSalesInvoicesForExport}
+                            columns={csvColumns}
+                            filename={csvFilename}
+                            text="Export"
                         />
                         <CustomButton
                             text="Create Invoice"

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUndo, FaPlus, FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -16,6 +16,7 @@ import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import DataTable, { type DataTableColumn } from "../../../../components/ui/table/DataTable";
+import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 interface FilterState {
   customerGradeId: string;
@@ -101,6 +102,32 @@ export const SalesReturnPage: React.FC = () => {
 
     return true;
   });
+
+  const fetchSalesReturnsForExport = useCallback(async () => {
+    try {
+      const list = await returnService.fetchSalesReturns();
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch (e) {
+      console.warn("fetchSalesReturns failed, using current returns:", e);
+    }
+    return Array.isArray(returns) ? returns : [];
+  }, [returns]);
+
+  const { csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "Return No", accessor: (item: any) => item.returnNo || "" },
+      { header: "Return Date", accessor: (item: any) => item.returnDate ? new Date(item.returnDate).toLocaleDateString("en-IN") : "" },
+      { header: "Customer", accessor: (item: any) => item.customer?.firmName || item.customer?.displayName || "" },
+      { header: "Invoice No", accessor: (item: any) => item.salesInvoice?.invoiceNo || (item.salesInvoiceId ? `INV #${item.salesInvoiceId}` : "") },
+      { header: "Grand Total (₹)", accessor: (item: any) => item.grandTotal != null ? Number(item.grandTotal).toFixed(2) : "0.00" },
+      { header: "Reason", accessor: (item: any) => item.reason || "" },
+      { header: "Status", accessor: (item: any) => item.status || "" },
+    ];
+    return {
+      csvColumns: columns,
+      csvFilename: `Sales_Returns_List_${new Date().toISOString().split("T")[0]}.csv`,
+    };
+  }, []);
 
   const activeGradeName = customerGrades.find(
     (g) => String(g.id) === appliedFilters.customerGradeId
@@ -244,6 +271,13 @@ export const SalesReturnPage: React.FC = () => {
                 </div>
               </div>
             </FilterPopover>
+
+            <ExportCSVButton
+              fetchData={fetchSalesReturnsForExport}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
 
             <CustomButton
               text="New Sales Return"
