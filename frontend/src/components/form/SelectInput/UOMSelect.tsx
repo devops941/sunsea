@@ -71,7 +71,7 @@ const CustomSingleSelect = ({
       const viewportHeight = window.innerHeight;
       const spaceBelow = viewportHeight - rect.bottom;
       const spaceAbove = rect.top;
-      const dropdownEstHeight = 240;
+      const dropdownMaxHeight = 180;
 
       let style: React.CSSProperties = {
         position: "fixed",
@@ -80,19 +80,19 @@ const CustomSingleSelect = ({
         zIndex: 100000,
       };
 
-      if (spaceBelow < dropdownEstHeight && spaceAbove > spaceBelow) {
-        const maxH = Math.min(240, spaceAbove - 16);
+      if (spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow) {
+        const maxH = Math.min(dropdownMaxHeight, spaceAbove - 16);
         style = {
           ...style,
           bottom: `${viewportHeight - rect.top + 4}px`,
-          maxHeight: `${Math.max(120, maxH)}px`,
+          maxHeight: `${Math.max(100, maxH)}px`,
         };
       } else {
-        const maxH = Math.min(240, spaceBelow - 16);
+        const maxH = Math.min(dropdownMaxHeight, spaceBelow - 16);
         style = {
           ...style,
           top: `${rect.bottom + 4}px`,
-          maxHeight: `${Math.max(120, maxH)}px`,
+          maxHeight: `${Math.max(100, maxH)}px`,
         };
       }
 
@@ -164,39 +164,48 @@ const CustomSingleSelect = ({
       </button>
 
       {isOpen && createPortal(
-        <div ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100 text-ink" style={dropdownStyle}>
-          <div
-            onClick={() => {
-              onChange("");
-              setIsOpen(false);
-            }}
-            className={`
-              px-4 py-2.5 text-sm cursor-pointer
-              transition-colors duration-150
-              ${!value ? "bg-primary/15 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
-            `}
-          >
-            {placeholder}
-          </div>
-          {options.map((u) => (
+        <div
+          ref={portalRef}
+          className="bg-card border border-line rounded-lg flex flex-col text-ink"
+          style={{
+            ...dropdownStyle,
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <div className="overflow-y-auto py-1 min-h-0 flex-1">
             <div
-              key={u.code}
               onClick={() => {
-                onChange(u.code);
+                onChange("");
                 setIsOpen(false);
               }}
               className={`
                 px-4 py-2.5 text-sm cursor-pointer
                 transition-colors duration-150
-                ${value === u.code
-                  ? "bg-primary/15 text-primary font-semibold"
-                  : "text-ink hover:bg-card-2"
-                }
+                ${!value ? "bg-primary/15 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
               `}
             >
-              {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
+              {placeholder}
             </div>
-          ))}
+            {options.map((u) => (
+              <div
+                key={u.code}
+                onClick={() => {
+                  onChange(u.code);
+                  setIsOpen(false);
+                }}
+                className={`
+                  px-4 py-2.5 text-sm cursor-pointer
+                  transition-colors duration-150
+                  ${value === u.code
+                    ? "bg-primary/15 text-primary font-semibold"
+                    : "text-ink hover:bg-card-2"
+                  }
+                `}
+              >
+                {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
+              </div>
+            ))}
+          </div>
         </div>,
         document.body
       )}
@@ -261,31 +270,40 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
       minHeight: '40px',
       borderRadius: '0.375rem',
       fontSize: '15px',
-      boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.15)' : 'none',
-      borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : 'var(--border-line-soft, #202A3C)',
+      boxShadow: state.isFocused
+        ? isError
+          ? '0 0 0 4px rgba(239, 68, 68, 0.15)'
+          : '0 0 0 4px color-mix(in srgb, var(--color-primary) 15%, transparent)'
+        : 'none',
+      borderColor: isError
+        ? '#ef4444'
+        : state.isFocused
+        ? 'var(--color-primary)'
+        : 'var(--color-line-soft)',
       '&:hover': {
-        borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : 'var(--border-line, #334155)'
+        borderColor: isError ? '#ef4444' : state.isFocused ? 'var(--color-primary)' : 'var(--color-line)'
       },
-      backgroundColor: disabled ? 'var(--bg-card-2, #1C2536)' : 'var(--bg-card-2, #1C2536)',
-      color: 'var(--text-ink, #E2E8F0)',
+      backgroundColor: 'var(--color-card-2)',
+      color: 'var(--color-ink)',
+      opacity: disabled ? 0.6 : 1,
     }),
     singleValue: (base: any) => ({
       ...base,
-      color: 'var(--text-ink, #E2E8F0)',
+      color: 'var(--color-ink)',
     }),
     multiValue: (base: any) => ({
       ...base,
-      backgroundColor: 'var(--bg-card, #151D2C)',
+      backgroundColor: 'var(--color-card)',
       borderRadius: '0.25rem',
-      border: '1px solid var(--border-line-soft, #202A3C)',
+      border: '1px solid var(--color-line-soft)',
     }),
     multiValueLabel: (base: any) => ({
       ...base,
-      color: 'var(--text-ink, #E2E8F0)',
+      color: 'var(--color-ink)',
     }),
     multiValueRemove: (base: any) => ({
       ...base,
-      color: 'var(--text-ink-subtle, #64748B)',
+      color: 'var(--color-ink-subtle)',
       ':hover': {
         backgroundColor: 'rgba(239, 68, 68, 0.2)',
         color: '#ef4444',
@@ -293,32 +311,64 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
     }),
     menu: (base: any) => ({
       ...base,
-      backgroundColor: 'var(--bg-card, #151D2C)',
-      border: '1px solid var(--border-line-soft, #202A3C)',
-      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
+      backgroundColor: 'var(--color-card)',
+      border: '1px solid var(--color-line)',
+      borderRadius: '0.5rem',
+      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)',
       zIndex: 100000,
+      overflow: 'hidden',
     }),
     menuPortal: (base: any) => ({
       ...base,
       zIndex: 100000,
     }),
+    menuList: (base: any) => ({
+      ...base,
+      padding: '4px 0',
+      maxHeight: '180px',
+    }),
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isSelected
-        ? 'var(--color-primary, #3b82f6)'
+        ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)'
         : state.isFocused
-        ? 'var(--bg-card-2, #1C2536)'
+        ? 'var(--color-card-2)'
         : 'transparent',
-      color: state.isSelected ? '#ffffff' : 'var(--text-ink, #E2E8F0)',
+      color: state.isSelected ? 'var(--color-primary)' : 'var(--color-ink)',
+      fontWeight: state.isSelected ? 600 : 400,
       cursor: 'pointer',
+      padding: '10px 16px',
+      fontSize: '14px',
+      transition: 'background-color 150ms ease',
     }),
     input: (base: any) => ({
       ...base,
-      color: 'var(--text-ink, #E2E8F0)',
+      color: 'var(--color-ink)',
     }),
     placeholder: (base: any) => ({
       ...base,
-      color: 'var(--text-ink-subtle, #64748B)',
+      color: 'var(--color-ink-subtle)',
+    }),
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: 'var(--color-ink-muted)',
+      '&:hover': {
+        color: 'var(--color-ink)',
+      },
+    }),
+    clearIndicator: (base: any) => ({
+      ...base,
+      color: 'var(--color-ink-muted)',
+      '&:hover': {
+        color: '#ef4444',
+      },
+    }),
+    noOptionsMessage: (base: any) => ({
+      ...base,
+      color: 'var(--color-ink-subtle)',
     }),
   });
 

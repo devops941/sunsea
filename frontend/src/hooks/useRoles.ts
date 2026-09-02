@@ -1,13 +1,46 @@
-import React, { useCallback, useMemo } from "react";
-import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchRoles, createRole, updateRole, deleteRole, roleCreated, roleUpdated, roleDeleted } from "../features/roles/roleSlice";
+import { useCallback, useMemo, useRef } from "react";
 import type { Role, CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
+import { roleService } from "../services/roleService";
+import { useListCache, invalidateCache, markStaleByPrefix } from "./useListCache";
 import { useSocketSync } from "./useSocketSync";
 
-export const useRoles = () => {
-  const dispatch = useAppDispatch();
-  const { data: rawRoles, total, loading, error } = useAppSelector((state) => state.roles);
+const CACHE_PREFIX = "roles:";
 
+export const useRoles = () => {
+  // Track current fetch params so the cache key stays in sync
+  const paramsRef = useRef<{ page: number; limit: number; search: string }>({
+    page: 1, limit: 15, search: "",
+  });
+
+  const cacheKey = `${CACHE_PREFIX}${paramsRef.current.page}:${paramsRef.current.limit}:${paramsRef.current.search}`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const { page, limit, search } = paramsRef.current;
+    const res = await roleService.fetchAll({
+      page,
+      limit,
+      search: search || undefined,
+    });
+    return { data: res.data || [], total: res.total || 0 };
+  }, []);
+
+  const { data: rawRoles, total, loading, refreshing, refresh } = useListCache<Role>({
+    cacheKey,
+    socketModule: "role",
+    fetcher,
+  });
+
+  // After any mutation (create/edit/delete), mark all role caches stale
+  // so the next render shows cached data instantly + refetches silently.
+  const invalidateAndRefresh = useCallback(() => {
+    markStaleByPrefix(CACHE_PREFIX);
+    refresh();
+  }, [refresh]);
+
+  // Socket live-sync — refetch on any role event from other clients
+  useSocketSync("role", undefined, invalidateAndRefresh);
+
+  // Filter out super admin roles from display
   const roles = useMemo(() => {
     if (!rawRoles) return [];
     return rawRoles.filter((role) => {
@@ -24,45 +57,52 @@ export const useRoles = () => {
   }, [rawRoles]);
 
   const loadRoles = useCallback((page?: number, limit?: number, search?: string) => {
-    dispatch(fetchRoles({ page, limit, search }));
-  }, [dispatch]);
-
-  // Listen for real-time updates from other clients
-  useSocketSync<Role>("role", {
-    created: roleCreated,
-    updated: roleUpdated,
-    deleted: roleDeleted,
-  });
+    paramsRef.current = {
+      page: page || 1,
+      limit: limit || 15,
+      search: search || "",
+    };
+    // Invalidate current cache key so useListCache refetches with new params
+    invalidateCache(cacheKey);
+    refresh();
+  }, [cacheKey, refresh]);
 
   const addRole = useCallback(
     async (data: CreateRoleDto) => {
-      return await dispatch(createRole(data)).unwrap();
+      const result = await roleService.create(data);
+      invalidateAndRefresh();
+      return result;
     },
-    [dispatch]
+    [invalidateAndRefresh]
   );
 
   const editRole = useCallback(
     async (id: number, data: UpdateRoleDto) => {
-      return await dispatch(updateRole({ id, data })).unwrap();
+      const result = await roleService.update(id, data);
+      invalidateAndRefresh();
+      return result;
     },
-    [dispatch]
+    [invalidateAndRefresh]
   );
 
   const removeRole = useCallback(
     async (id: number) => {
-      return await dispatch(deleteRole(id)).unwrap();
+      await roleService.delete(id);
+      invalidateAndRefresh();
     },
-    [dispatch]
+    [invalidateAndRefresh]
   );
 
   return {
     roles,
     total,
     loading,
-    error,
+    refreshing,
+    error: null as string | null,
     loadRoles,
     addRole,
     editRole,
     removeRole,
+    refresh,
   };
 };
