@@ -12,13 +12,35 @@ import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
-import ColumnToggle from "../../../../components/ui/ColumnToggle/ColumnToggle";
-import type { DataTableColumn } from "../../../../components/ui/table/DataTable";
-import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableSummary } from "../../../../services/payableService";
 import { supplierService } from "../../../../services/supplierService";
 import { useListCache, prefetchCache } from "../../../../hooks/useListCache";
+
+type ColumnKey =
+  | "index"
+  | "code"
+  | "supplier"
+  | "invoiced"
+  | "paid"
+  | "debit"
+  | "credit"
+  | "netBalance"
+  | "dueDays"
+  | "action";
+
+const ALL_COLUMNS: { id: ColumnKey; label: string; alwaysOn?: boolean }[] = [
+  { id: "index", label: "#", alwaysOn: true },
+  { id: "code", label: "Code" },
+  { id: "supplier", label: "Supplier", alwaysOn: true },
+  { id: "invoiced", label: "Invoiced" },
+  { id: "paid", label: "Paid" },
+  { id: "debit", label: "Debit" },
+  { id: "credit", label: "Credit" },
+  { id: "netBalance", label: "Net Balance", alwaysOn: true },
+  { id: "dueDays", label: "Due Days" },
+  { id: "action", label: "Action", alwaysOn: true },
+];
 
 export const AmountPayablePage: React.FC = () => {
   const navigate = useNavigate();
@@ -38,42 +60,36 @@ export const AmountPayablePage: React.FC = () => {
   const [draftSupplierId, setDraftSupplierId] = useState<string>(supplierId);
   const [draftSearch, setDraftSearch] = useState<string>(search);
 
-  // Data & Loading state
   const [suppliersList, setSuppliersList] = useState<any[]>([]);
 
-  // Columns & Column Toggle by stable IDs
-  const ALL_COLUMN_IDS = [
-    "index",
-    "code",
-    "supplier",
-    "invoiced",
-    "paid",
-    "debit",
-    "credit",
-    "netBalance",
-    // "dueDays",
-    "action"
-  ];
+  // Row selection for status bar
+  const [selectedRow, setSelectedRow] = useState<string | number | null>(null);
 
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+  // Column visibility (persisted)
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
     const saved = localStorage.getItem("amountPayableVisibleColumns_v2");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const valid = parsed.filter((id: string) => ALL_COLUMN_IDS.includes(id));
+          const valid = parsed.filter((id: string): id is ColumnKey =>
+            ALL_COLUMNS.some((c) => c.id === id)
+          );
           if (valid.length > 0) return valid;
         }
-      } catch (e) {
-        return ALL_COLUMN_IDS;
+      } catch {
+        return ALL_COLUMNS.map((c) => c.id);
       }
     }
-    return ALL_COLUMN_IDS;
+    return ALL_COLUMNS.map((c) => c.id);
   });
+  const [colsMenuOpen, setColsMenuOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("amountPayableVisibleColumns_v2", JSON.stringify(visibleColumns));
   }, [visibleColumns]);
+
+  const isVisible = (id: ColumnKey) => visibleColumns.includes(id);
 
   // Load suppliers list for filter dropdown
   useEffect(() => {
@@ -114,7 +130,6 @@ export const AmountPayablePage: React.FC = () => {
   );
 
   // Prefetch each supplier's breakdown in the background when the list loads.
-  // Detail cache is warm by the time user clicks "View" → no loading flash.
   const onListSuccess = useCallback((list: SupplierPayableSummary[]) => {
     for (const s of list) {
       const detailKey = `accounts:supplier-breakdown-${s.supplierId}::`;
@@ -190,7 +205,13 @@ export const AmountPayablePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>("activity");
 
   const filteredSuppliers = useMemo(() => {
-    const list = Array.isArray(payables) ? [...payables] : [];
+    // Only suppliers with a POSITIVE Cr balance (we owe them) actually count
+    // as payable. A supplier with a Dr balance (we paid advance / debit note
+    // pending from them) is NOT a payable — it's an asset. Hide them so this
+    // page only shows real dues. Supplier `balanceAsOnDate` uses the same
+    // sign convention as customer: positive = we owe them (Cr from our side).
+    const list = (Array.isArray(payables) ? payables : [])
+      .filter((s: any) => Number(s.balanceAsOnDate || 0) > 0.005);
     if (sortBy === "activity") {
       list.sort((a: any, b: any) => {
         const aAct = (a.totalBilled || 0) + (a.totalPaid || 0);
@@ -255,121 +276,92 @@ export const AmountPayablePage: React.FC = () => {
     };
   }, [filteredSuppliers, asOnDate]);
 
-  // Table Columns with stable IDs
-  const tableColumns: (DataTableColumn<SupplierPayableSummary> & { id: string })[] = [
-    {
-      id: "index",
-      header: "#",
-      width: "50px",
-      render: (_item, index) => index + 1,
-    },
-    {
-      id: "code",
-      header: "CODE",
-      render: (item: any) => <span className="font-mono font-medium text-ink-muted">{item.supplierCode}</span>,
-    },
-    {
-      id: "supplier",
-      header: "SUPPLIER",
-      render: (item: any) => (
-        <div>
-          <div className="font-bold text-ink">{item.legalName}</div>
-          {item.gstin && <div className="text-[10px] text-ink-subtle font-mono">GST: {item.gstin}</div>}
-        </div>
-      ),
-    },
-    {
-      id: "invoiced",
-      header: "INVOICED",
-      render: (item: any) => (
-        <div className="text-right font-mono text-ink-muted">
-          ₹{(item.totalBilled || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      id: "paid",
-      header: "PAID",
-      render: (item: any) => (
-        <div className="text-right font-mono text-ink-muted">
-          ₹{(item.totalPaid || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      id: "debit",
-      header: "DEBIT",
-      render: (item: any) => (
-        <div className="text-right font-mono text-ink-muted">
-          ₹{(item.debit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      id: "credit",
-      header: "CREDIT",
-      render: (item: any) => (
-        <div className="text-right font-mono font-bold text-amber-800">
-          ₹{(item.credit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      ),
-    },
-    {
-      id: "netBalance",
-      header: "NET BALANCE",
-      render: (item: any) => {
-        const bal = Number(item.balanceAsOnDate || 0);
-        const abs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        if (Math.abs(bal) < 0.005) {
-          return <div className="text-right font-mono font-bold text-ink">₹0.00</div>;
-        }
-        if (bal > 0) {
-          // We owe the supplier — payable (Cr on our books)
-          return <div className="text-right font-mono font-bold text-ink">₹{abs} <span className="text-[10px] text-ink-subtle">Cr</span></div>;
-        }
-        // Supplier owes us — advance we paid (Dr on our books)
-        return <div className="text-right font-mono font-bold text-emerald-500">₹{abs} <span className="text-[10px] text-emerald-500/70">Dr</span></div>;
-      },
-    },
-    {
-      id: "dueDays",
-      header: "DUE DAYS",
-      render: (item: any) => (
-        <div className="text-center font-mono text-xs text-ink-muted">
-          {item.dueDays !== null && item.dueDays !== undefined ? `${item.dueDays} d` : "—"}
-        </div>
-      ),
-    },
-    {
-      id: "action",
-      header: "ACTION",
-      render: (item: any) => (
-        <button
-          onClick={() => navigate(`/accounts/payable/${item.supplierId}`)}
-          className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 font-semibold rounded text-[11px] transition-colors border border-orange-200"
-        >
-          View <FaChevronRight size={8} />
-        </button>
-      ),
-    },
-  ];
-
   return (
-    <div className="p-3 space-y-3 min-h-screen font-sans text-ink">
-      {/* COMPACT HEADER + FILTERS */}
-      <div className="bg-card rounded-lg border border-line">
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
-          <h1 className="text-sm font-bold text-ink flex items-center gap-2">
-            <FaBuilding className="text-orange-600 text-sm" /> Amount Payable
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded uppercase tracking-wide">
-              A/P
-            </span>
-            {refreshing && <FaSync className="animate-spin text-orange-600 text-[10px]" />}
-          </h1>
-          <div className="flex items-center gap-2">
+    <div className="p-3 flex gap-3 w-full items-start font-sans text-ink">
+      <div className="flex-1 space-y-2 min-w-0 max-w-7xl">
+
+        {/* Single-row header — filters + actions */}
+        <div className="bg-card rounded-md border border-line shadow-sm px-3 py-2 flex flex-wrap items-end gap-2">
+          <div className="w-[120px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">As On</label>
+            <DatePickerCalendar
+              name="draftAsOnDate"
+              value={draftAsOnDate}
+              onChange={(e) => setDraftAsOnDate(e.target.value)}
+            />
+          </div>
+
+          <div className="w-[120px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+            <SelectInput
+              name="dateRangePreset"
+              value={dateRangePreset}
+              options={DATE_RANGE_OPTIONS}
+              hideLabel
+              searchable={false}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
+            />
+          </div>
+
+          <div className="w-[120px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+            <DatePickerCalendar
+              name="draftStartDate"
+              value={draftStartDate}
+              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
+
+          <div className="w-[120px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+            <DatePickerCalendar
+              name="draftEndDate"
+              value={draftEndDate}
+              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+            />
+          </div>
+
+          <div className="w-[180px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
+            <input
+              type="text"
+              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
+              value={draftSearch}
+              onChange={(e) => setDraftSearch(e.target.value)}
+              placeholder="Code / Name..."
+            />
+          </div>
+
+          <div className="w-[150px]">
+            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Supplier</label>
+            <SelectInput
+              name="draftSupplierId"
+              value={draftSupplierId}
+              options={suppliersList.map(s => ({ label: s.legalName || s.displayName || s.supplierCode, value: s.id }))}
+              defaultOptionLabel="All Suppliers"
+              hideLabel
+              searchable
+              onChange={(e) => setDraftSupplierId(e.target.value)}
+            />
+          </div>
+
+          <button
+            onClick={handleClearFilters}
+            className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded border border-line"
+          >
+            Clear
+          </button>
+          <button
+            onClick={handleApplyFilters}
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded"
+          >
+            Apply
+          </button>
+
+          <div className="flex items-center gap-1.5 ml-auto">
             <button
               onClick={refresh}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line"
+              className="flex items-center gap-1 px-2 py-1.5 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
               title="Refresh"
             >
               <FaSync className={refreshing ? "animate-spin text-orange-600" : ""} /> Refresh
@@ -383,182 +375,325 @@ export const AmountPayablePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Row - single compact row */}
-        <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">As On</label>
-            <DatePickerCalendar
-              name="draftAsOnDate"
-              value={draftAsOnDate}
-              onChange={(e) => setDraftAsOnDate(e.target.value)}
-            />
-          </div>
-
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
-            <SelectInput
-              name="dateRangePreset"
-              value={dateRangePreset}
-              options={DATE_RANGE_OPTIONS}
-              hideLabel={true}
-              onChange={(e) => handleDateRangeChange(e.target.value)}
-            />
-          </div>
-
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
-            <DatePickerCalendar
-              name="draftStartDate"
-              value={draftStartDate}
-              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
-            />
-          </div>
-
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
-            <DatePickerCalendar
-              name="draftEndDate"
-              value={draftEndDate}
-              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
-            />
-          </div>
-
-          <div className="w-full max-w-[320px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
-            <input
-              type="text"
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-orange-500/40 focus:border-orange-500 focus:outline-none"
-              value={draftSearch}
-              onChange={(e) => setDraftSearch(e.target.value)}
-              placeholder="Code / Name..."
-            />
-          </div>
-
-          <div className="w-[160px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Supplier</label>
-            <SelectInput
-              name="draftSupplierId"
-              value={draftSupplierId}
-              options={suppliersList.map(s => ({ label: s.legalName || s.displayName || s.supplierCode, value: s.id }))}
-              defaultOptionLabel="All Suppliers"
-              hideLabel={true}
-              searchable
-              onChange={(e) => setDraftSupplierId(e.target.value)}
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleClearFilters}
-              className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded transition-colors border border-line"
-            >
-              Clear
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded transition-colors"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* COMPACT KPI CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-card border border-line rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Payable</span>
-            <FaMoneyBillWave className="text-orange-600 text-xs" />
-          </div>
-          {(() => {
-            const bal = Number(totals.totalNetBalance || 0);
-            const abs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            if (Math.abs(bal) < 0.005) {
-              return <div className="text-lg font-mono font-bold text-ink mt-1">₹ 0.00</div>;
-            }
-            return (
-              <div className={`text-lg font-mono font-bold mt-1 ${bal >= 0 ? "text-ink" : "text-emerald-500"}`}>
-                ₹ {abs} <span className="text-[10px]">{bal >= 0 ? "Cr" : "Dr"}</span>
+        {/* Table card — Busy density */}
+        <div
+          className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
+          style={{ height: "calc(100vh - 240px)" }}
+        >
+          {/* Table toolbar row */}
+          <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between gap-2 shrink-0">
+            <h2 className="text-xs font-semibold text-ink">Supplier Payables</h2>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Sort:</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-2 py-1 border border-line rounded text-[11px] bg-card text-ink focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+                >
+                  <option value="activity">Recent Activity</option>
+                  <option value="balance">Highest Balance</option>
+                  <option value="overdue">Overdue First</option>
+                  <option value="name">Name (A-Z)</option>
+                </select>
               </div>
-            );
-          })()}
-          <div className="text-[10px] text-ink-subtle mt-0.5">
-            {filteredSuppliers.length} suppliers
-          </div>
-        </div>
-
-        <div className="bg-card border border-line rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Suppliers</span>
-            <FaBuilding className="text-indigo-600 text-xs" />
-          </div>
-          <div className="text-lg font-mono font-bold text-ink mt-1">{payables.length}</div>
-          <div className="text-[10px] text-ink-subtle mt-0.5">Registered vendors</div>
-        </div>
-
-        <div className="bg-card border border-line rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Overdue</span>
-            <FaExclamationTriangle className="text-amber-600 text-xs" />
-          </div>
-          <div className="text-lg font-mono font-bold text-amber-600 mt-1">{totals.overdueCount}</div>
-          <div className="text-[10px] text-ink-subtle mt-0.5">Exceeding terms</div>
-        </div>
-
-        <div className="bg-card border border-line rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Total Credit</span>
-            <FaCheckCircle className="text-emerald-600 text-xs" />
-          </div>
-          <div className="text-lg font-mono font-bold text-ink mt-1">
-            ₹ {totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <div className="text-[10px] text-ink-subtle mt-0.5">Cumulative purchases</div>
-        </div>
-      </div>
-
-      {/* TABLE */}
-      <div className="bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between gap-2">
-          <h2 className="text-xs font-semibold text-ink">Supplier Payables</h2>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Sort:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-2 py-1 border border-line rounded text-[11px] bg-card text-ink focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
-              >
-                <option value="activity">Recent Activity</option>
-                <option value="balance">Highest Balance</option>
-                <option value="overdue">Overdue First</option>
-                <option value="name">Name (A-Z)</option>
-              </select>
+              <div className="relative">
+                <button
+                  onClick={() => setColsMenuOpen((o) => !o)}
+                  className="px-2 py-1 border border-line rounded text-[11px] bg-card text-ink hover:bg-card-2 cursor-pointer"
+                >
+                  Columns ▾
+                </button>
+                {colsMenuOpen && (
+                  <div className="absolute right-0 mt-1 z-20 w-52 bg-card border border-line rounded-md shadow-lg p-2 space-y-1">
+                    {ALL_COLUMNS.map((c) => (
+                      <label
+                        key={c.id}
+                        className={`flex items-center gap-2 px-1.5 py-1 rounded text-[11px] ${c.alwaysOn ? "opacity-60 cursor-not-allowed" : "hover:bg-card-2 cursor-pointer"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={c.alwaysOn}
+                          checked={isVisible(c.id)}
+                          onChange={(e) => {
+                            if (c.alwaysOn) return;
+                            setVisibleColumns((prev) =>
+                              e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)
+                            );
+                          }}
+                        />
+                        <span className="text-ink">{c.label}</span>
+                      </label>
+                    ))}
+                    <div className="pt-1 mt-1 border-t border-line-soft flex justify-end">
+                      <button
+                        onClick={() => setColsMenuOpen(false)}
+                        className="text-[10px] text-ink-subtle hover:text-ink px-2 py-0.5"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredSuppliers.length}</span>
             </div>
-            <ColumnToggle
-              columns={tableColumns.map(c => ({ ...c, header: c.header }))}
-              visibleColumns={visibleColumns.map(id => {
-                const col = tableColumns.find(c => c.id === id);
-                return col ? col.header : id;
-              })}
-              setVisibleColumns={(newHeaders) => {
-                const updatedIds = newHeaders.map(h => tableColumns.find(c => c.header === h)?.id || h);
-                setVisibleColumns(updatedIds);
-              }}
-            />
-            <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredSuppliers.length}</span>
+          </div>
+
+          {filteredSuppliers.length === 0 ? (
+            <div className="p-8 text-center text-xs text-ink-subtle flex-1">
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <FaSync className="animate-spin text-orange-600 text-[10px]" />
+                  Loading supplier payables…
+                </span>
+              ) : (
+                "No supplier payables matching the selected filter criteria."
+              )}
+            </div>
+          ) : (
+            <div className="overflow-auto flex-1">
+              <table className="w-full text-left text-[11px] text-ink-muted border-collapse">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-card-2 text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                    {isVisible("index") && <th className="px-2 py-1.5 border-r border-line w-10 text-center">#</th>}
+                    {isVisible("code") && <th className="px-2 py-1.5 border-r border-line w-24">Code</th>}
+                    {isVisible("supplier") && <th className="px-2 py-1.5 border-r border-line">Supplier</th>}
+                    {isVisible("invoiced") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Invoiced</th>}
+                    {isVisible("paid") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Paid</th>}
+                    {isVisible("debit") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Debit</th>}
+                    {isVisible("credit") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Credit</th>}
+                    {isVisible("netBalance") && <th className="px-2 py-1.5 border-r border-line w-32 text-right">Net Balance</th>}
+                    {isVisible("dueDays") && <th className="px-2 py-1.5 border-r border-line w-20 text-center">Due Days</th>}
+                    {isVisible("action") && <th className="px-2 py-1.5 w-20 text-center">Action</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSuppliers.map((item: any, rowIdx: number) => {
+                    const isSelected = selectedRow === item.supplierId;
+                    const bal = Number(item.balanceAsOnDate || 0);
+                    const balAbs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return (
+                      <tr
+                        key={item.supplierId}
+                        onClick={() => setSelectedRow(item.supplierId)}
+                        className={`border-b border-line-soft cursor-pointer ${
+                          isSelected
+                            ? "bg-orange-500/20 text-ink"
+                            : rowIdx % 2 === 0
+                              ? "hover:bg-card-2/70"
+                              : "bg-card-2/20 hover:bg-card-2/70"
+                        }`}
+                      >
+                        {isVisible("index") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-center font-mono text-[11px] text-ink-subtle">
+                            {rowIdx + 1}
+                          </td>
+                        )}
+                        {isVisible("code") && (
+                          <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-orange-500">
+                            {item.supplierCode || "-"}
+                          </td>
+                        )}
+                        {isVisible("supplier") && (
+                          <td className="px-2 py-1 border-r border-line-soft">
+                            <div className="font-bold text-ink uppercase truncate">{item.legalName}</div>
+                            {item.gstin && (
+                              <div className="text-[10px] text-ink-subtle font-mono">GST: {item.gstin}</div>
+                            )}
+                          </td>
+                        )}
+                        {isVisible("invoiced") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono">
+                            ₹{(item.totalBilled || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        )}
+                        {isVisible("paid") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono">
+                            ₹{(item.totalPaid || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        )}
+                        {isVisible("debit") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono">
+                            ₹{(item.debit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        )}
+                        {isVisible("credit") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-amber-700">
+                            ₹{(item.credit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        )}
+                        {isVisible("netBalance") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-bold whitespace-nowrap">
+                            {Math.abs(bal) < 0.005 ? (
+                              <span className="text-ink">₹0.00</span>
+                            ) : bal > 0 ? (
+                              <span className="text-ink">₹{balAbs} <span className="text-[10px] text-ink-subtle">Cr</span></span>
+                            ) : (
+                              <span className="text-emerald-500">₹{balAbs} <span className="text-[10px] text-emerald-500/70">Dr</span></span>
+                            )}
+                          </td>
+                        )}
+                        {isVisible("dueDays") && (
+                          <td className="px-2 py-1 border-r border-line-soft text-center font-mono text-[11px] text-ink-muted">
+                            {item.dueDays !== null && item.dueDays !== undefined ? `${item.dueDays} d` : "—"}
+                          </td>
+                        )}
+                        {isVisible("action") && (
+                          <td className="px-2 py-1 text-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/accounts/payable/${item.supplierId}`);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-semibold rounded text-[11px] border border-orange-200"
+                            >
+                              View <FaChevronRight size={8} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                  {/* Busy-style empty filler rows */}
+                  {Array.from({ length: Math.max(0, 25 - filteredSuppliers.length) }).map((_, i) => (
+                    <tr key={`empty-${i}`} className="border-b border-line-soft">
+                      {isVisible("index") && <td className="px-2 py-1 border-r border-line-soft">&nbsp;</td>}
+                      {isVisible("code") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("supplier") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("invoiced") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("paid") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("debit") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("credit") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("netBalance") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("dueDays") && <td className="px-2 py-1 border-r border-line-soft"></td>}
+                      {isVisible("action") && <td className="px-2 py-1"></td>}
+                    </tr>
+                  ))}
+                </tbody>
+                {/* Sticky footer with grand totals */}
+                <tfoot className="sticky bottom-0 z-10 bg-card-2 border-t-2 border-line">
+                  <tr>
+                    <td
+                      colSpan={
+                        (isVisible("index") ? 1 : 0) +
+                        (isVisible("code") ? 1 : 0) +
+                        (isVisible("supplier") ? 1 : 0)
+                      }
+                      className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide border-r border-line"
+                    >
+                      Grand Total ({filteredSuppliers.length})
+                    </td>
+                    {isVisible("invoiced") && (
+                      <td className="px-2 py-1.5 text-right font-mono font-bold text-ink border-r border-line">
+                        ₹{totals.totalBilled.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    )}
+                    {isVisible("paid") && (
+                      <td className="px-2 py-1.5 text-right font-mono font-bold text-ink border-r border-line">
+                        ₹{totals.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    )}
+                    {isVisible("debit") && (
+                      <td className="px-2 py-1.5 text-right font-mono font-bold text-ink border-r border-line">
+                        ₹{totals.totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    )}
+                    {isVisible("credit") && (
+                      <td className="px-2 py-1.5 text-right font-mono font-bold text-amber-700 border-r border-line">
+                        ₹{totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    )}
+                    {isVisible("netBalance") && (
+                      <td className="px-2 py-1.5 text-right font-mono font-bold text-orange-600 border-r border-line">
+                        ₹{Math.abs(totals.totalNetBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className="text-[10px] ml-1">{totals.totalNetBalance >= 0 ? "Cr" : "Dr"}</span>
+                      </td>
+                    )}
+                    {isVisible("dueDays") && <td className="border-r border-line"></td>}
+                    {isVisible("action") && <td></td>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* Busy-style status bar */}
+          <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[10px] font-mono text-ink-subtle shrink-0">
+            <div className="flex gap-4">
+              <span>
+                Entry No: <b className="text-ink">{filteredSuppliers.length > 0 ? 1 : 0} / {filteredSuppliers.length}</b>
+              </span>
+              <span>
+                Row No: <b className="text-ink">
+                  {selectedRow
+                    ? filteredSuppliers.findIndex((v: any) => v.supplierId === selectedRow) + 1
+                    : (filteredSuppliers.length > 0 ? 1 : 0)}
+                  {" / "}{filteredSuppliers.length}
+                </b>
+              </span>
+            </div>
+            <div className="flex gap-3 uppercase tracking-wide">
+              <span>Suppliers: <b className="text-ink">{filteredSuppliers.length}</b></span>
+              <span>Overdue: <b className="text-amber-600">{totals.overdueCount}</b></span>
+            </div>
           </div>
         </div>
-
-        <DataTable
-          columns={tableColumns.filter(c => visibleColumns.includes(c.id))}
-          data={filteredSuppliers}
-          rowKey={(item: any) => item.supplierId}
-          loading={loading}
-          emptyMessage="No supplier payables matching the selected filter criteria."
-        />
       </div>
+
+      {/* Right sidebar — 4 summary stats. Amounts render on their own row so
+         crores-scale values never squeeze the label or overflow the card. */}
+      <aside className="w-[240px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden">
+        <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
+          <FaBuilding className="text-orange-600 text-xs" /> Summary
+        </div>
+        <div className="divide-y divide-line-soft">
+          <div className="px-3 py-2 bg-orange-500/5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <FaMoneyBillWave className="text-orange-600 text-[10px]" />
+              <span className="text-[11px] font-semibold text-ink-muted">Total Payable</span>
+            </div>
+            {(() => {
+              const bal = Number(totals.totalNetBalance || 0);
+              const abs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              if (Math.abs(bal) < 0.005) {
+                return <div className="text-sm font-mono font-bold text-ink break-all leading-tight">₹0.00</div>;
+              }
+              return (
+                <div className={`text-sm font-mono font-bold break-all leading-tight ${bal >= 0 ? "text-orange-600" : "text-emerald-500"}`}>
+                  ₹{abs} <span className="text-[9px] font-sans">{bal >= 0 ? "Cr" : "Dr"}</span>
+                </div>
+              );
+            })()}
+          </div>
+
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <FaBuilding className="text-indigo-600 text-[10px]" />
+              <span className="text-[11px] font-semibold text-ink-muted">Suppliers</span>
+            </div>
+            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{filteredSuppliers.length}</div>
+          </div>
+
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <FaExclamationTriangle className="text-amber-600 text-[10px]" />
+              <span className="text-[11px] font-semibold text-ink-muted">Overdue</span>
+            </div>
+            <div className="text-sm font-mono font-bold text-amber-600 break-all leading-tight">{totals.overdueCount}</div>
+          </div>
+
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <FaCheckCircle className="text-emerald-600 text-[10px]" />
+              <span className="text-[11px] font-semibold text-ink-muted">Total Credit</span>
+            </div>
+            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">
+              ₹{totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 };

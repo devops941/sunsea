@@ -29,12 +29,30 @@ class PettyCashService {
       orderBy: { entryDate: "desc" },
     });
 
-    // Also fetch all Expense entries for this company to include as Petty Cash OUT entries
-    const expenses = await prisma.expense.findMany({
-      where: query.companyId ? { companyId: query.companyId } : {},
-      include: { supplier: true },
-      orderBy: { date: "desc" },
-    });
+    // Also fetch Expense entries so they appear as Petty Cash OUT rows. Must
+    // apply the SAME filters as `where` above — otherwise expenses ignore the
+    // user's date range and type=IN filter, causing:
+    //   * dates outside the picked range still showing
+    //   * OUT rows appearing even when user asked for Type = IN
+    // Fetching all expenses regardless of filter was the bug reported from
+    // the screenshot (Type IN filter returning 15 OUT rows).
+    const skipExpenses = query.type === "IN"; // no expense can ever be "IN"
+    const expenseWhere: Prisma.ExpenseWhereInput = {
+      ...(query.companyId && { companyId: query.companyId }),
+      ...((query.startDate || query.endDate) && {
+        date: {
+          ...(query.startDate && { gte: new Date(query.startDate) }),
+          ...(query.endDate && { lte: new Date(query.endDate) }),
+        },
+      }),
+    };
+    const expenses = skipExpenses
+      ? []
+      : await prisma.expense.findMany({
+          where: expenseWhere,
+          include: { supplier: true },
+          orderBy: { date: "desc" },
+        });
 
     let totalIn = 0;
     let totalOut = 0;

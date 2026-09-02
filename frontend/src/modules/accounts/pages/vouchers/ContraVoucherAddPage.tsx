@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useRef } from "react";
 import { FaExchangeAlt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { voucherService } from "../../../../services/voucherService";
+import { voucherService, type Voucher } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 
 // Contra is Journal's twin: free-form D/C rows with balanced totals. The
 // only real business rule is that every ledger picked must be a cash or
@@ -153,12 +153,16 @@ const ContraVoucherAddPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await voucherService.createVoucher({
+      const created = await voucherService.createVoucher({
         type: "CONTRA",
         date,
         narration: mainNarration || "Contra Entry",
         items,
       });
+      // Optimistic list update — Contra Register cache gets the new voucher.
+      if (created?.id) {
+        prependToListCacheByPrefix<Voucher>("accounts:contra-vouchers:", created);
+      }
       toast.success("Contra voucher saved successfully");
       resetForm();
     } catch (err: any) {

@@ -2,11 +2,11 @@ import React, { useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaBookOpen, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { voucherService } from "../../../../services/voucherService";
+import { voucherService, type Voucher } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { useListCache } from "../../../../hooks/useListCache";
+import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 
 // Journal = free-form debit/credit entries. Unlike Payment/Receipt there is
 // no fixed "Mode" account; every row picks its own ledger AND its own side
@@ -159,12 +159,16 @@ const JournalEntryAddPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await voucherService.createVoucher({
+      const created = await voucherService.createVoucher({
         type: "JOURNAL",
         date,
         narration: mainNarration || "Journal Entry",
         items,
       });
+      // Optimistic list update — Journal Register cache gets the new voucher.
+      if (created?.id) {
+        prependToListCacheByPrefix<Voucher>("accounts:journal-vouchers:", created);
+      }
       toast.success("Journal entry saved successfully");
       resetFormForNext();
     } catch (err: any) {

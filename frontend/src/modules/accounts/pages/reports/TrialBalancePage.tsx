@@ -456,6 +456,49 @@ export const TrialBalancePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Right sidebar — Summary. Amounts render on their own row so
+         crores-scale values never squeeze the label or overflow the card. */}
+      <aside className="w-[220px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden self-start">
+        <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
+          <FaBalanceScale className="text-indigo-500 text-xs" /> Summary
+        </div>
+        <div className="divide-y divide-line-soft">
+          <div className="px-3 py-2">
+            <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Debit</div>
+            <div className="text-sm font-mono font-bold text-emerald-500 break-all leading-tight">
+              ₹{totals.dr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Credit</div>
+            <div className="text-sm font-mono font-bold text-red-400 break-all leading-tight">
+              ₹{totals.cr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div className={`px-3 py-2 ${totals.isBalanced ? "bg-emerald-500/5" : "bg-red-500/5"}`}>
+            <div className="text-[11px] font-semibold text-ink-muted mb-1">Status</div>
+            {totals.isBalanced ? (
+              <div className="text-[12px] font-semibold text-emerald-500 flex items-center gap-1">
+                <FaCheckCircle className="text-[10px]" /> Balanced
+              </div>
+            ) : (
+              <>
+                <div className="text-[12px] font-semibold text-red-500 flex items-center gap-1 mb-1">
+                  <FaExclamationTriangle className="text-[10px]" /> Not balanced
+                </div>
+                <div className="text-[11px] font-mono font-bold text-red-500 break-all leading-tight">
+                  ₹{Math.abs(totals.dr - totals.cr).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[11px] font-semibold text-ink-muted mb-1">Accounts</div>
+            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{filteredRows.length}</div>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 };

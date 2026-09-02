@@ -1893,7 +1893,14 @@ export const LedgerStatementPage: React.FC = () => {
                           {row.credit > 0 ? `₹ ${row.credit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                         </td>
                         <td className="px-2 py-1 text-right font-mono font-bold text-ink whitespace-nowrap">
-                          ₹ {row.runningBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {Math.abs(row.runningBalance) < 0.005 ? (
+                            <>₹ 0.00</>
+                          ) : (
+                            <>
+                              ₹ {Math.abs(row.runningBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              <span className="ml-1 text-[10px] text-ink-subtle">{row.runningBalance >= 0 ? "Dr" : "Cr"}</span>
+                            </>
+                          )}
                         </td>
                       </tr>
                     );
@@ -2040,7 +2047,8 @@ export const LedgerStatementPage: React.FC = () => {
                   Cr ₹ {filteredEntries.reduce((s, e) => s + e.credit, 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="font-mono font-black text-blue-500">
-                  Closing ₹ {statement.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Closing ₹ {Math.abs(statement.closingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="ml-1 text-[10px] font-semibold">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                 </span>
               </div>
             </div>
