@@ -117,6 +117,7 @@ const QUOTATION_CACHE_PREFIX = "quotations:";
 const QuotationList: React.FC = () => {
     const navigate  = useNavigate();
     const { can }   = usePermission();
+    const canSendWhatsappEmail = can("quotations.whatsapp-email") || can("quotations.whatsapp_email");
     const company   = useAppSelector((state) => state.company.data);
 
     const location     = useLocation();
@@ -600,12 +601,14 @@ const QuotationList: React.FC = () => {
                             </div>
                         </FilterPopover>
 
-                        <ExportCSVButton
-                            fetchData={fetchQuotationsForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("quotations.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchQuotationsForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
 
                         {can("quotations.create") && (
                             <CustomButton
@@ -678,16 +681,20 @@ const QuotationList: React.FC = () => {
                                         )}
 
                                         {/* Email */}
-                                        <EmailButton
-                                            disabled={sendingEmail}
-                                            onClick={() => handleOpenEmailModal(item)}
-                                        />
+                                        {canSendWhatsappEmail && (
+                                            <EmailButton
+                                                disabled={sendingEmail}
+                                                onClick={() => handleOpenEmailModal(item)}
+                                            />
+                                        )}
 
                                         {/* WhatsApp */}
-                                        <WhatsappButton
-                                            disabled={sendingWhatsapp}
-                                            onClick={() => handleOpenWhatsappModal(item)}
-                                        />
+                                        {canSendWhatsappEmail && (
+                                            <WhatsappButton
+                                                disabled={sendingWhatsapp}
+                                                onClick={() => handleOpenWhatsappModal(item)}
+                                            />
+                                        )}
 
                                         {isDeletable && can("quotations.delete") && (
                                             <DeleteButton

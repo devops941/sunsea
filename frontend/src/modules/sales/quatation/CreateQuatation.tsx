@@ -933,12 +933,13 @@ const QuotationForm: React.FC = () => {
 
 
 
+    if (isLoading) {
+        return <CommonLoader text="Loading quotation..." fullScreen={false} />;
+    }
+
     return (
-        <div className=" xl:mr-auto">
-            {isLoading ? (
-                <CommonLoader text="Loading data..." fullScreen={false} />
-            ) : (
-                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
+        <div className="w-full xl:mr-auto">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
 
                     {/* Page Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
@@ -1328,7 +1329,6 @@ const QuotationForm: React.FC = () => {
                     </div>
 
                 </div>
-            )}
         </div>
     );
 };

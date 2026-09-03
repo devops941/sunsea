@@ -254,12 +254,14 @@ const GoodsDispatchList: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchDispatchesForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {can("goods-dispatch.export") && (
+              <ExportCSVButton
+                fetchData={fetchDispatchesForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             {can("goods-dispatch.create") && (
               <CustomButton

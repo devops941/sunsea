@@ -566,7 +566,7 @@ const WeeklyPayrollReport: React.FC = () => {
             </div>
           </FilterPopover>
 
-          {run && (
+          {run && (can("payroll.export") || can("payroll-run.export")) && (
             <ExportCSVButton
               data={csvData}
               columns={csvColsIndexed}

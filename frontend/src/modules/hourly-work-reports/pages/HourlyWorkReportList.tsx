@@ -523,12 +523,14 @@ const HourlyWorkReportList: React.FC = () => {
                                 onChange={(e) => setFilterDate(e.target.value)}
                             />
                         </div>
-                        <ExportCSVButton
-                            fetchData={fetchHourlyForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("hourly_productions.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchHourlyForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                     </div>
                 </div>
 

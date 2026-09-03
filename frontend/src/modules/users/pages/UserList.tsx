@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Container, Row, Col, Modal } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -11,6 +11,8 @@ import { useUsers } from "../../../hooks/useUsers";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import { usePermission } from "../../../hooks/usePermission";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { userService } from "../../../services/userService";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -65,6 +67,29 @@ const UserList: React.FC = () => {
     const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const fetchUsersForExport = useCallback(async () => {
+        try {
+            const list = await userService.fetchAll();
+            return Array.isArray(list) ? list : [];
+        } catch {
+            return users;
+        }
+    }, [users]);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Username", accessor: (item: any) => item.username || "" },
+            { header: "Full Name", accessor: (item: any) => item.fullName || "" },
+            { header: "Email", accessor: (item: any) => item.email || "" },
+            { header: "Role", accessor: (item: any) => item.roleId || "" },
+            { header: "Status", accessor: (item: any) => item.status || (item.isActive ? "Active" : "Inactive") },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `System_Users_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
 
 
@@ -130,6 +155,14 @@ const UserList: React.FC = () => {
                                         onChange={handleSearch}
                                     />
                                 </div>
+                                {can("users.export") && (
+                                    <ExportCSVButton
+                                        fetchData={fetchUsersForExport}
+                                        columns={csvColumns}
+                                        filename={csvFilename}
+                                        text="Export"
+                                    />
+                                )}
                             </div>
                         </Col>
                     </Row>

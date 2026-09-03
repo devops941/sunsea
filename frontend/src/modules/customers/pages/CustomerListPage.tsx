@@ -46,6 +46,7 @@ const CustomerListPage: React.FC = () => {
   const canCreate      = can("customers.create");
   const canEditCustomer   = can("customers.edit");
   const canDeleteCustomer = can("customers.delete");
+  const canExport      = can("customers.export");
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -275,12 +276,14 @@ const CustomerListPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchCustomersForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {canExport && (
+              <ExportCSVButton
+                fetchData={fetchCustomersForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             {canCreate && (
               <CustomButton

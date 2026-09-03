@@ -18,9 +18,11 @@ import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { voucherService, type Voucher, type VoucherType } from "../../../../services/voucherService";
 import { useListCache } from "../../../../hooks/useListCache";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { usePermission } from "../../../../hooks/usePermission";
 
 export const VoucherListPage: React.FC = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -307,12 +309,14 @@ export const VoucherListPage: React.FC = () => {
           >
             <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
           </button>
-          <ExportCSVButton
-            data={csvData}
-            columns={csvColumns}
-            filename={csvFilename}
-            text="Export"
-          />
+          {(can("vouchers.export") || can("accounts.export")) && (
+            <ExportCSVButton
+              data={csvData}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export"
+            />
+          )}
         </div>
       </div>
 

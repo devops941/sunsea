@@ -245,12 +245,14 @@ const WastageStoreList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search products..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchWastageForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("wastage-store.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchWastageForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {can("wastage-store.create") && (
                             <CustomButton
                                 text="Add Wastage Product"

@@ -675,12 +675,14 @@ const ProductionOrderList: React.FC = () => {
                         <h2 className="text-base font-bold text-ink">Production Order Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                        <ExportCSVButton
-                            fetchData={fetchProductionOrdersForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("production_orders.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchProductionOrdersForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {(can("weekly_programs.create") || can("weekly_programs.view")) && (
                             <CustomButton
                                 text="Weekly Scheduling"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { FaBoxes, FaPlus, FaSync, FaTimes, FaTrash, FaSearch, FaEye } from "react-icons/fa";
+import { FaBoxes, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
 import { supplierService } from "../../../../services/supplierService";
@@ -8,7 +8,18 @@ import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { storeService } from "../../../../services/storeService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 import { useListCache } from "../../../../hooks/useListCache";
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
+import CustomButton from "../../../../components/ui/Button/Button";
+import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import DataTable, { type DataTableColumn } from "../../../../components/ui/table/DataTable";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
+import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
+import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
+import { usePermission } from "../../../../hooks/usePermission";
 
 interface FormReturnRow {
   rawMaterialId: string;
@@ -23,9 +34,18 @@ interface FormReturnRow {
   isGrnLinked?: boolean;
 }
 
-import { useSocketSync } from "../../../../hooks/useSocketSync";
+interface FilterState {
+  supplierId: string;
+  status: string;
+}
+
+const DEFAULT_FILTERS: FilterState = {
+  supplierId: "",
+  status: "",
+};
 
 export const PurchaseReturnPage: React.FC = () => {
+  const { can } = usePermission();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
@@ -34,6 +54,21 @@ export const PurchaseReturnPage: React.FC = () => {
   const [selectedViewReturn, setSelectedViewReturn] = useState<PurchaseReturn | null>(null);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<FilterState>(DEFAULT_FILTERS);
+
+  const activeFilterCount = [appliedFilters.supplierId, appliedFilters.status].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const handleFilterOpen = () => setDraftFilters(appliedFilters);
+  const handleApplyFilters = () => setAppliedFilters(draftFilters);
+  const handleClearFilters = () => {
+    setDraftFilters(DEFAULT_FILTERS);
+    setAppliedFilters(DEFAULT_FILTERS);
+  };
+  const handleRemoveFilter = (key: keyof FilterState) => {
+    setAppliedFilters((prev) => ({ ...prev, [key]: "" }));
+  };
 
   const { data: company } = useAppSelector((state) => state.company);
 
@@ -290,18 +325,42 @@ export const PurchaseReturnPage: React.FC = () => {
     setNarration("");
   };
 
-  const filteredReturns = returns.filter((r) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      r.returnNo?.toLowerCase().includes(term) ||
-      r.supplier?.legalName?.toLowerCase().includes(term) ||
-      r.grnInvoice?.invoiceNo?.toLowerCase().includes(term) ||
-      r.reason?.toLowerCase().includes(term)
-    );
-  });
+  const supplierOptions = useMemo(() => {
+    return suppliers.map((s) => ({
+      label: s.legalName || s.displayName || `Supplier #${s.id}`,
+      value: String(s.id),
+    }));
+  }, [suppliers]);
 
-  const paginatedReturns = filteredReturns;
+  const activeSupplierName = suppliers.find(
+    (s) => String(s.id) === appliedFilters.supplierId
+  )?.legalName;
+
+  const filteredReturns = useMemo(() => {
+    return returns.filter((r) => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchesSearch =
+          r.returnNo?.toLowerCase().includes(term) ||
+          r.supplier?.legalName?.toLowerCase().includes(term) ||
+          (r.supplier as any)?.displayName?.toLowerCase().includes(term) ||
+          r.grnInvoice?.invoiceNo?.toLowerCase().includes(term) ||
+          r.reason?.toLowerCase().includes(term) ||
+          r.status?.toLowerCase().includes(term);
+        if (!matchesSearch) return false;
+      }
+
+      if (appliedFilters.supplierId) {
+        if (String(r.supplierId) !== appliedFilters.supplierId) return false;
+      }
+
+      if (appliedFilters.status) {
+        if (r.status !== appliedFilters.status) return false;
+      }
+
+      return true;
+    });
+  }, [returns, searchTerm, appliedFilters]);
 
   const fetchPurchaseReturnsForExport = useCallback(async () => {
     try {
@@ -345,83 +404,190 @@ export const PurchaseReturnPage: React.FC = () => {
     };
   }, []);
 
+  const columns: DataTableColumn<PurchaseReturn>[] = [
+    {
+      header: "#",
+      width: "60px",
+      render: (_item, index) => index + 1,
+      align: "center",
+    },
+    {
+      header: "RETURN NO",
+      render: (item) => (
+        <button
+          onClick={() => setSelectedViewReturn(item)}
+          className="font-mono font-semibold text-indigo-500 hover:underline cursor-pointer"
+        >
+          {item.returnNo}
+        </button>
+      ),
+    },
+    {
+      header: "DATE",
+      render: (item) => (
+        <span className="font-mono text-xs">
+          {item.returnDate ? new Date(item.returnDate).toLocaleDateString("en-IN") : "—"}
+        </span>
+      ),
+    },
+    {
+      header: "SUPPLIER",
+      render: (item) => (
+        <span className="font-semibold text-ink">
+          {item.supplier?.legalName || (item.supplier as any)?.displayName || "—"}
+        </span>
+      ),
+    },
+    {
+      header: "STATUS",
+      render: (item) => <StatusBadge status={item.status} />,
+      align: "center",
+    },
+    {
+      header: "GRAND TOTAL (₹)",
+      render: (item) => (
+        <span className="font-mono font-semibold text-indigo-500 whitespace-nowrap">
+          ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+        </span>
+      ),
+      align: "right",
+    },
+    {
+      header: "REASON",
+      render: (item) => (
+        <span className="text-ink-subtle truncate max-w-xs block">{item.reason || "—"}</span>
+      ),
+    },
+    {
+      header: "ACTIONS",
+      align: "center",
+      render: (item) => (
+        <div className="flex items-center justify-center gap-2">
+          <ViewButton onClick={() => setSelectedViewReturn(item)} />
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="w-full max-w-[1200px] mr-auto">
-      <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
+    <div>
+      <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-line-soft">
-          <h2 className="text-base font-bold text-ink">Purchase Returns (Debit Note)</h2>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <input type="text" placeholder="Search returns..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-7 pr-3 py-1.5 border border-line-soft bg-card-2 rounded text-xs text-ink focus:outline-none focus:border-primary w-56" />
-              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
-            </div>
-            <button onClick={refresh} className="flex items-center gap-1 px-2.5 py-1.5 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line-soft">
-              <FaSync className={refreshing ? "animate-spin text-primary" : ""} /> Refresh
-            </button>
-            <ExportCSVButton
-              fetchData={fetchPurchaseReturnsForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
+          <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+            Purchase Returns
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-3 relative w-full md:w-auto">
+            <SearchInput
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Return no, supplier, reason..."
             />
-            <button onClick={() => { resetForm(); setShowModal(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded text-xs font-semibold transition cursor-pointer">
-              <FaPlus className="text-[10px]" /> Process Return
-            </button>
+
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onOpen={handleFilterOpen}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+            >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Supplier
+                  </label>
+                  <SelectInput
+                    name="filterSupplier"
+                    value={draftFilters.supplierId}
+                    options={supplierOptions}
+                    defaultOptionLabel="All Suppliers"
+                    searchable={true}
+                    noMargin
+                    onChange={(e) =>
+                      setDraftFilters((p) => ({ ...p, supplierId: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Status
+                  </label>
+                  <SelectInput
+                    name="filterStatus"
+                    value={draftFilters.status}
+                    options={[
+                      { value: "APPROVED", label: "Approved" },
+                      { value: "COMPLETED", label: "Completed" },
+                    ]}
+                    defaultOptionLabel="All Statuses"
+                    searchable={false}
+                    noMargin
+                    onChange={(e) =>
+                      setDraftFilters((p) => ({ ...p, status: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            </FilterPopover>
+
+            {can("purchase-returns.export") && (
+              <ExportCSVButton
+                fetchData={fetchPurchaseReturnsForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
+
+            <CustomButton
+              text="New Purchase Return"
+              icon={FaPlus}
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
+            />
           </div>
         </div>
 
-        {/* Table */}
-        {paginatedReturns.length === 0 ? (
-          loading ? null : <div className="p-8 text-center text-xs text-ink-subtle">No purchase return records found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-card-2 text-ink-subtle uppercase font-extrabold text-[10px] tracking-wide border-b border-line-soft">
-                <tr>
-                  <th className="px-3 py-2 w-10">#</th>
-                  <th className="px-3 py-2">Return No</th>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Supplier</th>
-                  <th className="px-3 py-2">GRN Invoice</th>
-                  <th className="px-3 py-2 text-center">Status</th>
-                  <th className="px-3 py-2 text-right">Grand Total (₹)</th>
-                  <th className="px-3 py-2">Reason</th>
-                  <th className="px-3 py-2 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-soft">
-                {paginatedReturns.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-card-2 transition-colors">
-                    <td className="px-3 py-1.5 text-ink-subtle font-mono text-[11px]">{index + 1}</td>
-                    <td className="px-3 py-1.5">
-                      <button onClick={() => setSelectedViewReturn(item)} className="font-mono font-semibold text-primary hover:underline cursor-pointer">{item.returnNo}</button>
-                    </td>
-                    <td className="px-3 py-1.5 font-mono text-[11px]">{new Date(item.returnDate).toLocaleDateString("en-IN")}</td>
-                    <td className="px-3 py-1.5 font-semibold text-ink">{item.supplier?.legalName || "-"}</td>
-                    <td className="px-3 py-1.5 text-ink-muted font-mono text-[11px]">{item.grnInvoice?.invoiceNo || (item.grnInvoiceId ? `GRN #${item.grnInvoiceId}` : "-")}</td>
-                    <td className="px-3 py-1.5 text-center">
-                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">{item.status}</span>
-                    </td>
-                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="px-3 py-1.5 text-ink-subtle max-w-xs truncate">{item.reason || "-"}</td>
-                    <td className="px-3 py-1.5 text-center">
-                      <button onClick={() => setSelectedViewReturn(item)} className="p-1 text-primary hover:bg-primary/10 border border-line-soft rounded transition cursor-pointer"><FaEye className="w-2.5 h-2.5" /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t-2 border-line-soft bg-card-2">
-                <tr>
-                  <td colSpan={6} className="px-3 py-2 text-right text-[10px] font-bold text-ink uppercase tracking-wide">Total ({paginatedReturns.length}):</td>
-                  <td className="px-3 py-2 text-right font-bold text-sm text-primary font-mono">₹{paginatedReturns.reduce((s, r) => s + Number(r.grandTotal || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
+        {/* Active filter chips */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 px-6 py-2 border-b border-line flex-wrap">
+            <span className="text-xs text-ink-subtle">Active filters:</span>
+
+            {appliedFilters.supplierId && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Supplier: {activeSupplierName || appliedFilters.supplierId}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => handleRemoveFilter("supplierId")}
+                />
+              </span>
+            )}
+
+            {appliedFilters.status && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Status: {appliedFilters.status}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => handleRemoveFilter("status")}
+                />
+              </span>
+            )}
           </div>
         )}
+
+        {/* Table */}
+        <DataTable
+          columns={columns}
+          data={filteredReturns}
+          rowKey={(item) => item.id}
+          loading={loading}
+          emptyMessage="No purchase return records found."
+        />
       </div>
 
       {/* ── Purchase Return Modal ── */}
@@ -564,73 +730,49 @@ export const PurchaseReturnPage: React.FC = () => {
         </div>
       )}
 
-      {/* PO Return Detail Modal - compact */}
-      {selectedViewReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 overflow-y-auto">
-          <div className="bg-card rounded-lg border border-line w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center justify-between">
+      {/* Details View Modal */}
+      <CommonViewModal
+        show={Boolean(selectedViewReturn)}
+        onHide={() => setSelectedViewReturn(null)}
+        modalTitle="Purchase Return Details"
+        avatarText={selectedViewReturn?.returnNo ? "PR" : ""}
+        headerTitle={selectedViewReturn?.returnNo || ""}
+        headerSubtitle={selectedViewReturn?.supplier?.legalName || (selectedViewReturn?.supplier as any)?.displayName || ""}
+        statusNode={<StatusBadge status={selectedViewReturn?.status || "COMPLETED"} />}
+        sections={[
+          {
+            fields: [
+              {
+                label: "Return Date",
+                value: selectedViewReturn
+                  ? new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")
+                  : "—",
+              },
+              {
+                label: "Supplier",
+                value: selectedViewReturn?.supplier?.legalName || (selectedViewReturn?.supplier as any)?.displayName || "—",
+              },
+              {
+                label: "GRN Invoice",
+                value: selectedViewReturn?.grnInvoice?.invoiceNo
+                  ? selectedViewReturn.grnInvoice.invoiceNo
+                  : (selectedViewReturn?.grnInvoiceId ? `GRN #${selectedViewReturn.grnInvoiceId}` : "Direct Return"),
+              },
+              {
+                label: "Grand Total",
+                value: selectedViewReturn
+                  ? `₹${Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                  : "—",
+              },
+            ],
+          },
+        ]}
+        customContent={
+          selectedViewReturn && (
+            <div className="space-y-3">
               <div>
-                <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Purchase Return Detail</span>
-                <h3 className="text-sm font-bold text-ink font-mono flex items-center gap-2 mt-0.5">
-                  {selectedViewReturn.returnNo}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedViewReturn(null)}
-                className="p-1 text-ink-subtle hover:text-ink hover:bg-card rounded cursor-pointer"
-              >
-                <FaTimes className="text-xs" />
-              </button>
-            </div>
-
-            <div className="p-3 space-y-3 overflow-y-auto flex-1 text-xs">
-              {/* Key Metadata */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-card-2 p-2 rounded border border-line">
-                <div>
-                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Return Date</div>
-                  <div className="font-semibold text-ink mt-0.5 text-xs">
-                    {new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Supplier</div>
-                  <div className="font-semibold text-ink mt-0.5 text-xs">
-                    {selectedViewReturn.supplier?.legalName || "-"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">GRN Invoice Ref</div>
-                  <div className="font-semibold text-ink mt-0.5 font-mono text-[11px]">
-                    {selectedViewReturn.grnInvoice?.invoiceNo || (selectedViewReturn.grnInvoiceId ? `GRN #${selectedViewReturn.grnInvoiceId}` : "Direct Return")}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Status</div>
-                  <div className="mt-0.5">
-                    <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                      {selectedViewReturn.status}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Grand Total</div>
-                  <div className="font-bold text-primary mt-0.5 font-mono text-xs">
-                    ₹{Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide">Reason</div>
-                  <div className="font-medium text-ink-muted mt-0.5 truncate text-xs">
-                    {selectedViewReturn.reason || "-"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <div>
-                <h4 className="text-xs font-semibold text-ink mb-1.5 flex items-center justify-between">
-                  <span>Returned Raw Materials</span>
-                  <span className="text-[11px] font-normal text-ink-subtle">Items: {selectedViewReturn.items?.length || 0}</span>
+                <h4 className="font-semibold text-ink mb-1.5 text-[10px] uppercase tracking-wide">
+                  Returned Raw Materials
                 </h4>
                 <div className="border border-line rounded overflow-hidden">
                   <table className="w-full text-left text-xs">
@@ -643,11 +785,11 @@ export const PurchaseReturnPage: React.FC = () => {
                         <th className="px-3 py-1.5 text-right">Line Total (₹)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line-soft text-ink-muted">
+                    <tbody className="divide-y divide-line-soft">
                       {selectedViewReturn.items && selectedViewReturn.items.length > 0 ? (
                         selectedViewReturn.items.map((item, i) => (
-                          <tr key={item.id || i} className="hover:bg-card-2/50">
-                            <td className="px-3 py-1.5 font-mono text-primary font-medium">
+                          <tr key={item.id || i} className="hover:bg-card-2 transition-colors">
+                            <td className="px-3 py-1.5 font-mono text-indigo-400 font-medium">
                               {item.rawMaterialId}
                             </td>
                             <td className="px-3 py-1.5 font-medium text-ink">
@@ -656,7 +798,7 @@ export const PurchaseReturnPage: React.FC = () => {
                             <td className="px-3 py-1.5 text-center font-mono font-semibold text-ink">
                               {item.quantity}
                             </td>
-                            <td className="px-3 py-1.5 text-right font-mono">
+                            <td className="px-3 py-1.5 text-right font-mono text-ink">
                               ₹{Number(item.unitPrice).toFixed(2)}
                             </td>
                             <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
@@ -678,23 +820,18 @@ export const PurchaseReturnPage: React.FC = () => {
 
               {selectedViewReturn.narration && (
                 <div className="bg-card-2 p-2 rounded border border-line text-xs">
-                  <span className="font-semibold text-ink block mb-0.5 text-[10px] uppercase tracking-wide">Narration / Notes</span>
+                  <span className="font-semibold text-ink block mb-0.5 text-[10px] uppercase tracking-wide">
+                    Narration / Notes
+                  </span>
                   <p className="text-ink-muted leading-relaxed">{selectedViewReturn.narration}</p>
                 </div>
               )}
             </div>
-
-            <div className="px-3 py-2 border-t border-line bg-card-2 flex justify-end">
-              <button
-                onClick={() => setSelectedViewReturn(null)}
-                className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded font-semibold text-xs transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )
+        }
+      />
     </div>
   );
 };
+
+export default PurchaseReturnPage;

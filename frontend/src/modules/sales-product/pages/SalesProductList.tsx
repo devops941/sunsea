@@ -180,12 +180,14 @@ const SalesProductList: React.FC = () => {
                                 placeholder="Search by sales product..."
                             />
                         </div>
-                        <ExportCSVButton
-                            fetchData={fetchSalesProductsForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("sales_products.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchSalesProductsForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {can("sales_products.create") && (
                             <CustomButton text="Add Sales Product" icon={FaPlus} onClick={handleOpenAdd} />
                         )}

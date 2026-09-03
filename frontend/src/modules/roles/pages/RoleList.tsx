@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Search } from "lucide-react";
 import { FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -11,6 +11,8 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useRoles } from "../../../hooks/useRoles";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { roleService } from "../../../services/roleService";
 // import { useAppSelector } from "../../../hooks/reduxHooks";
 import { usePermission } from "../../../hooks/usePermission";
 import { useSearchParams } from "react-router-dom";
@@ -80,6 +82,25 @@ const RoleList: React.FC = () => {
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedRoles = roles; // Data is already paginated by backend
+
+    const fetchRolesForExport = useCallback(async () => {
+        const res = await roleService.fetchAll({ page: 1, limit: 100000 });
+        const list = res?.data || (Array.isArray(res) ? res : []);
+        return Array.isArray(list) ? list : [];
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Role Name", accessor: (item: any) => item.name || "" },
+            { header: "Code", accessor: (item: any) => item.code || "" },
+            { header: "Description", accessor: (item: any) => item.description || "" },
+            { header: "Status", accessor: (item: any) => item.status || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Role_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     const handleOpenAdd = useCallback(() => {
         setEditMode(false);
@@ -269,6 +290,14 @@ const RoleList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
+                            {can("roles.export") && (
+                                <ExportCSVButton
+                                    fetchData={fetchRolesForExport}
+                                    columns={csvColumns}
+                                    filename={csvFilename}
+                                    text="Export"
+                                />
+                            )}
                             {can("roles.create") && (
                                 <CustomButton
                                     text="Add Role"

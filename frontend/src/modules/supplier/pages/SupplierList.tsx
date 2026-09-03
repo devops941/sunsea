@@ -24,6 +24,7 @@ const SupplierList: React.FC = () => {
     const canDeleteSupplier = can("suppliers.delete");
     const canViewPricing = can("supplierpricelist.view");
     const canCreateSupplier = can("suppliers.create");
+    const canExportSupplier = can("suppliers.export");
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -151,12 +152,14 @@ const SupplierList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <ExportCSVButton
-                                fetchData={fetchSuppliersForExport}
-                                columns={csvColumns}
-                                filename={csvFilename}
-                                text="Export"
-                            />
+                            {canExportSupplier && (
+                                <ExportCSVButton
+                                    fetchData={fetchSuppliersForExport}
+                                    columns={csvColumns}
+                                    filename={csvFilename}
+                                    text="Export"
+                                />
+                            )}
                             {/* BUG-SUP-009 fix: only show Add Supplier button to users with create permission */}
                             {canCreateSupplier && (
                                 <CustomButton

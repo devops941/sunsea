@@ -956,12 +956,14 @@ const DailyProductionPlanningPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchDailyPlansForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {can("daily-machine-planning.export") && (
+              <ExportCSVButton
+                fetchData={fetchDailyPlansForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             {can("daily-machine-planning.view") && (
               <CustomButton text="Daily Report" icon={FaChartBar} onClick={() => {

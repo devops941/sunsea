@@ -35,6 +35,7 @@ const Employeelist: React.FC = () => {
   const canCreate = can("employees.create");
   const canEdit = can("employees.edit");
   const canDelete = can("employees.delete");
+  const canExport = can("employees.export");
 
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -316,12 +317,14 @@ const Employeelist: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchEmployeesForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {canExport && (
+              <ExportCSVButton
+                fetchData={fetchEmployeesForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             {canCreate && (
               <CustomButton

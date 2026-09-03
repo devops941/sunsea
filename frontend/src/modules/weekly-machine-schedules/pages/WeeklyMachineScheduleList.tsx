@@ -423,12 +423,14 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchSchedulesForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("weekly_programs.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchSchedulesForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {can("weekly_programs.create") && (
                             <CustomButton
                                 text="Add Schedule"

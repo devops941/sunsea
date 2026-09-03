@@ -21,6 +21,15 @@ export const bootstrapAdmin = async (prisma: PrismaClient): Promise<boolean> => 
     if (count > 0) {
       console.log(`✅ ${count} new permissions seeded from registry`);
     }
+    // Ensure Super Admin has all permissions mapped
+    const adminRole = await prisma.role.findUnique({ where: { code: "ROLE_ADMIN" } });
+    if (adminRole) {
+      const allPerms = await prisma.permission.findMany({ select: { id: true } });
+      await prisma.rolePermission.createMany({
+        data: allPerms.map(p => ({ roleId: adminRole.id, permissionId: p.id })),
+        skipDuplicates: true,
+      });
+    }
     return false;
   }
 

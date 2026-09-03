@@ -806,7 +806,7 @@ const MonthlyPayrollReport: React.FC = () => {
             </div>
           </FilterPopover>
 
-          {run && (
+          {run && (can("payroll.export") || can("payroll-run.export")) && (
             <ExportCSVButton
               data={getCsvData()}
               columns={getCsvCols()}

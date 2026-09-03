@@ -63,6 +63,7 @@ const ShiftList: React.FC = () => {
     const canCreateShift = can("shifts.create");
     const canEditShift = can("shifts.edit");
     const canDeleteShift = can("shifts.delete");
+    const canExportShift = can("shifts.export");
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -175,12 +176,14 @@ const ShiftList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <ExportCSVButton
-                                data={csvData}
-                                columns={csvColumns}
-                                filename={csvFilename}
-                                text="Export"
-                            />
+                            {canExportShift && (
+                                <ExportCSVButton
+                                    data={csvData}
+                                    columns={csvColumns}
+                                    filename={csvFilename}
+                                    text="Export"
+                                />
+                            )}
                             {canCreateShift && (
                                 <CustomButton
                                     text="Add Shift"

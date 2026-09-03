@@ -290,7 +290,7 @@ const EodStockList: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              {can("inventory.view") && (
+              {(can("eod-stock.export") || can("inventory.export")) && (
                 <ExportCSVButton
                   data={data}
                   columns={csvColumns}

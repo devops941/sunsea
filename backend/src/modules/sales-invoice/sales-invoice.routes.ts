@@ -53,14 +53,14 @@ router.delete(
 router.post(
   "/:id/email-invoice",
   authMiddleware,
-  requirePermission("sales-invoices.view"),
+  requirePermission("sales-invoices.whatsapp-email"),
   validateMiddleware(salesInvoiceIdRequestSchema),
   salesInvoiceController.emailInvoice
 );
 router.post(
   "/:id/whatsapp-invoice",
   authMiddleware,
-  requirePermission("sales-invoices.view"),
+  requirePermission("sales-invoices.whatsapp-email"),
   validateMiddleware(salesInvoiceIdRequestSchema),
   salesInvoiceController.whatsappInvoice
 );

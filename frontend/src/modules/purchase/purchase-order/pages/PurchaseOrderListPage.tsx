@@ -38,6 +38,8 @@ const PurchaseOrderListPage: React.FC = () => {
   const canCreate = can("purchaseOrders.create");
   const canEdit = can("purchaseOrders.edit");
   const canDelete = can("purchaseOrders.delete");
+  const canExport = can("purchaseOrders.export");
+  const canSendWhatsappEmail = can("purchaseOrders.whatsapp-email") || can("purchaseOrders.whatsapp_email");
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -320,12 +322,14 @@ const PurchaseOrderListPage: React.FC = () => {
               />
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchPOsForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {canExport && (
+              <ExportCSVButton
+                fetchData={fetchPOsForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
 
             {canCreate && (
@@ -392,14 +396,18 @@ const PurchaseOrderListPage: React.FC = () => {
                           title="PO Invoice"
                           onClick={() => navigate(`/po-invoice/${item.id}`)}
                         />
-                        <EmailButton 
-                          onClick={() => handleOpenEmailModal(item)} 
-                          disabled={sendingEmail && emailPo?.id === item.id} 
-                        />
-                        <WhatsappButton 
-                          onClick={() => handleOpenWhatsappModal(item)} 
-                          disabled={sendingWhatsapp && whatsappPo?.id === item.id} 
-                        />
+                        {canSendWhatsappEmail && (
+                          <EmailButton 
+                            onClick={() => handleOpenEmailModal(item)} 
+                            disabled={sendingEmail && emailPo?.id === item.id} 
+                          />
+                        )}
+                        {canSendWhatsappEmail && (
+                          <WhatsappButton 
+                            onClick={() => handleOpenWhatsappModal(item)} 
+                            disabled={sendingWhatsapp && whatsappPo?.id === item.id} 
+                          />
+                        )}
                       </>
                     )}
                     {canDelete && item.status === "DRAFT" && (

@@ -14,6 +14,7 @@ import { Search } from "lucide-react";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { categoryService } from "../../../services/categoryService";
+import { usePermission } from "../../../hooks/usePermission";
 
 const formatUom = (uomCode: string | undefined) => {
     if (!uomCode) return "PCS";
@@ -29,6 +30,8 @@ interface FinishedStockListProps {
 }
 
 const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStoreId }) => {
+
+    const { can } = usePermission();
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const activeStoreId = propStoreId || "";
@@ -171,11 +174,13 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                                 </div>
                             </div>
                         </FilterPopover>
-                        <ExportCSVButton
-                            data={data || []}
-                            columns={exportColumns}
-                            filename="finished_goods_stock.csv"
-                        />
+                        {can("finished_goods_stocks.export") && (
+                            <ExportCSVButton
+                                data={data || []}
+                                columns={exportColumns}
+                                filename="finished_goods_stock.csv"
+                            />
+                        )}
                     </div>
                 </div>
 

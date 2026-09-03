@@ -16,12 +16,13 @@ import WastageViewModal from "../components/WastageViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { productionWastageService } from "../../../services/productionWastageService";
+import { usePermission } from "../../../hooks/usePermission";
 const ITEMS_PER_PAGE = 15;
 
 const WastageList: React.FC = () => {
-
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   // Redux state
   const { data: wastages, loading, error, total } = useAppSelector((state) => state.productionWastages);
@@ -154,12 +155,14 @@ const WastageList: React.FC = () => {
             <h2 className="text-2xl font-bold text-ink">Production Wastage Auditing</h2>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <ExportCSVButton
-              fetchData={fetchWastagesForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {can("production-wastages.export") && (
+              <ExportCSVButton
+                fetchData={fetchWastagesForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
           </div>
         </div>
 
