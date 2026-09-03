@@ -14,7 +14,7 @@ import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache, markStaleByPrefix } from "../../../hooks/useListCache";
 import EmailButton from "../../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../../components/ui/WhatsappButton/WhatsappButton";
 import { Mail, MessageCircle } from "lucide-react";
@@ -112,6 +112,8 @@ function groupQuotationItems(orderItems: any[], salesProducts: any[]) {
     return result;
 }
 
+const QUOTATION_CACHE_PREFIX = "quotations:";
+
 const QuotationList: React.FC = () => {
     const navigate  = useNavigate();
     const { can }   = usePermission();
@@ -120,11 +122,9 @@ const QuotationList: React.FC = () => {
     const location     = useLocation();
     const initialSearch = new URLSearchParams(location.search).get("search") || "";
 
-    const [data, setData]               = useState<SalesOrder[]>([]);
-    const [loading, setLoading]         = useState(false);
     const [searchTerm, setSearchTerm]   = useState(initialSearch);
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
-    const [total, setTotal]             = useState(0);
 
     // ─── Delete ──────────────────────────────────────────────────────────────
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -210,41 +210,41 @@ const QuotationList: React.FC = () => {
 
     // ─── Fetch orders ─────────────────────────────────────────────────────────
 
-    const fetchOrders = useCallback(async () => {
-        if (!can("quotations.view")) return;
-        setLoading(true);
-        try {
-            const response = await salesOrderService.fetchAll({
-                page: currentPage,
-                pageSize: ITEMS_PER_PAGE,
-                search: searchTerm || undefined,
-                fromDate: fromDate || undefined,
-                toDate: toDate || undefined,
-                customerGradeId: customerGradeId || undefined,
-                customerTypeId: customerTypeId || undefined,
-                dispatchType: dispatchType || undefined,
-                orderSource: orderSource || undefined,
-                quotationOnly: true,
-                status: [
-                    "QUOTED",
-                ] as SalesOrderStatus[],
-            });
-            setData(response.data || []);
-            setTotal(Math.ceil((response.total ?? 0) / ITEMS_PER_PAGE));
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Failed to fetch orders");
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, searchTerm, fromDate, toDate, customerGradeId, customerTypeId, dispatchType, orderSource, can]);
-
-    useSocketSync("salesOrder", undefined, fetchOrders);
-
+    // Debounce search
     useEffect(() => {
-        const timer = setTimeout(() => fetchOrders(), 300);
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
         return () => clearTimeout(timer);
-    }, [fetchOrders]);
+    }, [searchTerm]);
+
+    const cacheKey = `${QUOTATION_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${fromDate}:${toDate}:${customerGradeId}:${customerTypeId}:${dispatchType}:${orderSource}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const response = await salesOrderService.fetchAll({
+            page: currentPage,
+            pageSize: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            fromDate: fromDate || undefined,
+            toDate: toDate || undefined,
+            customerGradeId: customerGradeId || undefined,
+            customerTypeId: customerTypeId || undefined,
+            dispatchType: dispatchType || undefined,
+            orderSource: orderSource || undefined,
+            quotationOnly: true,
+            status: [
+                "QUOTED",
+            ] as SalesOrderStatus[],
+        });
+        return { data: response.data || [], total: response.total ?? 0 };
+    }, [currentPage, debouncedSearch, fromDate, toDate, customerGradeId, customerTypeId, dispatchType, orderSource]);
+
+    const { data, total, loading, refresh } = useListCache({
+        cacheKey,
+        socketModule: "salesOrder",
+        fetcher,
+        enabled: can("quotations.view"),
+    });
+
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -502,7 +502,8 @@ const QuotationList: React.FC = () => {
             toast.success("Quotation deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
-            fetchOrders();
+            markStaleByPrefix(QUOTATION_CACHE_PREFIX);
+            refresh();
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to delete quotation");
         } finally {
@@ -623,7 +624,7 @@ const QuotationList: React.FC = () => {
                     emptyMessage="No quotations found."
                     pagination={{
                         currentPage,
-                        totalPages: total,
+                        totalPages,
                         onPageChange: (page) => setCurrentPage(page),
                     }}
                     columns={[

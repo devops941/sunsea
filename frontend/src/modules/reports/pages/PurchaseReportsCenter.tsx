@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { FaFilter } from "react-icons/fa";
 import { reportsService } from "../../../services/reportsService";
 import { supplierService } from "../../../services/supplierService";
 import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
@@ -12,7 +11,7 @@ import Button from "../../../components/ui/Button/Button";
 import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DataTable from "../../../components/ui/table/DataTable";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache } from "../../../hooks/useListCache";
 
 const PurchaseReportsCenter: React.FC = () => {
   // Filters state
@@ -29,13 +28,9 @@ const PurchaseReportsCenter: React.FC = () => {
   const [draftSupplierId, setDraftSupplierId] = useState(supplierId);
   const [draftStatus, setDraftStatus] = useState(status);
 
-  // Backend direct reports loading
-  const [backendReports, setBackendReports] = useState<any[]>([]);
-  const [loadingBackend, setLoadingBackend] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
-  console.log(suppliers, 'kjlkjlk')
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const LIMIT = 10;
 
   const DEFAULT_COLUMNS = [
     "#", "PO NUMBER", "PO DATE", "DELIVERY DATE", "SUPPLIER", "BILLING ADDRESS",
@@ -70,35 +65,26 @@ const PurchaseReportsCenter: React.FC = () => {
     loadSuppliers();
   }, []);
 
-  const loadReport = React.useCallback(async () => {
-    setLoadingBackend(true);
-    try {
-      const res = await reportsService.getPurchaseOrderReport({
-        startDate,
-        endDate,
-        poNumber,
-        supplierId,
-        status,
-        page,
-        limit: 10
-      });
-      setBackendReports(res?.data?.data || []);
-      setTotalPages(res?.data?.totalPages || 1);
-    } catch (err) {
-      console.error("Failed to load backend report", err);
-      setBackendReports([]);
-      setTotalPages(1);
-    } finally {
-      setLoadingBackend(false);
-    }
+  // Load report data via useListCache
+  const cacheKey = `purchaseReport:${page}:${LIMIT}:${startDate}:${endDate}:${poNumber}:${supplierId}:${status}`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await reportsService.getPurchaseOrderReport({
+      startDate, endDate, poNumber, supplierId, status,
+      page, limit: LIMIT,
+    });
+    const data = res?.data?.data || [];
+    const tp = res?.data?.totalPages || 1;
+    return { data, total: tp * LIMIT };
   }, [startDate, endDate, poNumber, supplierId, status, page]);
 
-  useSocketSync("purchaseOrder", undefined, loadReport);
+  const { data: backendReports, total, loading: loadingBackend } = useListCache({
+    cacheKey,
+    socketModule: "purchaseOrder",
+    fetcher,
+  });
 
-  // Load report data from backend
-  useEffect(() => {
-    loadReport();
-  }, [loadReport]);
+  const totalPages = Math.ceil((total || 0) / LIMIT) || 1;
 
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     const columns = [

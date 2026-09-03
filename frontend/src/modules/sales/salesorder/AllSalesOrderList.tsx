@@ -20,7 +20,7 @@ import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVBut
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { FiClipboard } from "react-icons/fi";
 import { SalesOrderDeliveryEstimate } from "../../../components/salesOrder/SalesOrderDeliveryEstimate";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache, markStaleByPrefix } from "../../../hooks/useListCache";
 import { usePermission } from "../../../hooks/usePermission";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -105,18 +105,18 @@ function groupItemsBySalesProduct(orderItems: any[], salesProducts: any[]) {
     return result;
 }
 
+const CACHE_PREFIX = "salesOrders:";
+
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
     const { can } = usePermission();
     const company = useAppSelector((state) => state.company.data);
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const location = useLocation();
     const searchParams = new URLSearchParams(location.search);
     const initialSearch = searchParams.get("search") || "";
     const [searchTerm, setSearchTerm] = useState(initialSearch);
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
-    const [total, setTotal] = useState(0);
 
     const [showEstimateModal, setShowEstimateModal] = useState(false);
     const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
@@ -142,7 +142,8 @@ const AllSalesOrderList: React.FC = () => {
             toast.success("Sales order deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
-            fetchOrders();
+            markStaleByPrefix(CACHE_PREFIX);
+            refresh();
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to delete order");
         } finally {
@@ -275,40 +276,36 @@ const AllSalesOrderList: React.FC = () => {
     const hasActiveFilters = !!(fromDate || toDate || customerGradeId || customerTypeId || orderSource);
     const activeFilterCount = [fromDate, toDate, customerGradeId, customerTypeId, orderSource].filter(Boolean).length;
 
-    const fetchOrders = useCallback(async () => {
-        if (!can("sales-orders.view")) return;
-        setLoading(true);
-        try {
-            const response = await salesOrderService.fetchAll({
-                page: currentPage,
-                pageSize: ITEMS_PER_PAGE,
-                search: searchTerm || undefined,
-                fromDate: fromDate || undefined,
-                toDate: toDate || undefined,
-                customerGradeId: customerGradeId || undefined,
-                customerTypeId: customerTypeId || undefined,
-                orderSource: orderSource || undefined,
-            });
-
-            setData(response.data || []);
-            setTotal(Math.ceil((response.total ?? 0) / ITEMS_PER_PAGE));
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Failed to fetch orders");
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, searchTerm, fromDate, toDate, customerGradeId, customerTypeId, orderSource, can]);
-
-    useSocketSync("salesOrder", undefined, fetchOrders);
-
-    // ─── Load Data on Mount & Dependencies ─────────────────────
+    // Debounce search
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchOrders();
-        }, 300);
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
         return () => clearTimeout(timer);
-    }, [fetchOrders]);
+    }, [searchTerm]);
+
+    const cacheKey = `${CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${fromDate}:${toDate}:${customerGradeId}:${customerTypeId}:${orderSource}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const response = await salesOrderService.fetchAll({
+            page: currentPage,
+            pageSize: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            fromDate: fromDate || undefined,
+            toDate: toDate || undefined,
+            customerGradeId: customerGradeId || undefined,
+            customerTypeId: customerTypeId || undefined,
+            orderSource: orderSource || undefined,
+        });
+        return { data: response.data || [], total: response.total ?? 0 };
+    }, [currentPage, debouncedSearch, fromDate, toDate, customerGradeId, customerTypeId, orderSource]);
+
+    const { data, total, loading, refresh } = useListCache({
+        cacheKey,
+        socketModule: "salesOrder",
+        fetcher,
+        enabled: can("sales-orders.view"),
+    });
+
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -484,7 +481,7 @@ const AllSalesOrderList: React.FC = () => {
                     emptyMessage="No sales orders found."
                     pagination={{
                         currentPage,
-                        totalPages: total,
+                        totalPages,
                         onPageChange: (page) => setCurrentPage(page),
                     }}
                     columns={[
@@ -500,7 +497,7 @@ const AllSalesOrderList: React.FC = () => {
                             render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
                         },
                         { header: "DISPATCH", render: (item) => item?.dispatchType },
-                        { header: "STATUS", render: (item) => <StatusBadge status={item.status} /> },
+                        { header: "STATUS", render: (item) => <StatusBadge status={item.status || ""} /> },
                         {
                             header: "ACTIONS",
                             width: "210px",

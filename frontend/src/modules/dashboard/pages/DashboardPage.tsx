@@ -20,7 +20,7 @@ import {
   FaShoppingCart, FaTruck, FaChartLine, FaClock,
   FaMoneyBillWave, FaCalendarAlt, FaHourglassHalf, FaUserFriends,
   FaArrowUp, FaArrowDown, FaHandHoldingUsd, FaFileInvoiceDollar,
-  FaUniversity, FaWarehouse, FaCheckCircle, FaTimesCircle, FaSync, FaMapMarkerAlt, FaTimes,
+  FaUniversity, FaWarehouse, FaCheckCircle, FaTimesCircle, FaSync, FaMapMarkerAlt, FaTimes,FaTv,
   FaChartBar, FaChartPie, FaListUl, FaArrowLeft, FaArrowRight, FaPlus, FaSearch, FaBox,
   FaBell, FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaChevronRight,
 } from "react-icons/fa";
@@ -495,6 +495,16 @@ const DashboardPage: React.FC = () => {
                 <FaSync className="animate-spin text-[10px]" /> Syncing…
               </span>
             )}
+              
+              <button
+              type="button"
+              onClick={() => navigate("/tv-dashboard")}
+              title="Open the full-screen TV dashboard"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-accent/10 text-accent border border-accent/20 shadow-xs hover:bg-accent/20 transition-colors cursor-pointer"
+            >
+              <FaTv className="text-[11px]" /> TV Dashboard
+            </button>
+            
           </div>
         </div>
 

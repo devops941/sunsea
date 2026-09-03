@@ -12,7 +12,7 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import { useCustomers } from "../../../hooks/useCustomers";
+import { useListCache, markStaleByPrefix } from "../../../hooks/useListCache";
 import { usePermission } from "../../../hooks/usePermission";
 import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
@@ -35,9 +35,10 @@ const DEFAULT_FILTERS: FilterState = {
   customerGradeId: "",
 };
 
+const CACHE_PREFIX = "customers:";
+
 const CustomerListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { customers, loading, error, totalPages, loadCustomers, removeCustomer } = useCustomers();
   const { customerTypes } = useCustomerTypes();
   const { customerGrades } = useCustomerGrades();
 
@@ -53,6 +54,7 @@ const CustomerListPage: React.FC = () => {
   const location = useLocation();
   const initialSearch = new URLSearchParams(location.search).get("search") || "";
   const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
 
   // Applied = sent to server; Draft = shown inside filter panel before Apply
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -71,26 +73,34 @@ const CustomerListPage: React.FC = () => {
 
   const hasActiveFilters = activeFilterCount > 0;
 
-  // Debounced server fetch
+  // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (can("customers.view")) {
-        loadCustomers({
-          search:          searchTerm || undefined,
-          page:            currentPage,
-          limit:           ITEMS_PER_PAGE,
-          status:          appliedFilters.status        || undefined,
-          customerTypeId:  appliedFilters.customerTypeId  ? Number(appliedFilters.customerTypeId)  : undefined,
-          customerGradeId: appliedFilters.customerGradeId ? Number(appliedFilters.customerGradeId) : undefined,
-        });
-      }
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
-  }, [searchTerm, currentPage, appliedFilters, loadCustomers, can]);
+  }, [searchTerm]);
 
-  useEffect(() => {
-    if (error) toast.error(error);
-  }, [error]);
+  const cacheKey = `${CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${appliedFilters.status}:${appliedFilters.customerTypeId}:${appliedFilters.customerGradeId}`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await customerService.fetchAll({
+      search:          debouncedSearch || undefined,
+      page:            currentPage,
+      limit:           ITEMS_PER_PAGE,
+      status:          appliedFilters.status        || undefined,
+      customerTypeId:  appliedFilters.customerTypeId  ? Number(appliedFilters.customerTypeId)  : undefined,
+      customerGradeId: appliedFilters.customerGradeId ? Number(appliedFilters.customerGradeId) : undefined,
+    });
+    return { data: res.customers || [], total: res.total || 0 };
+  }, [debouncedSearch, currentPage, appliedFilters]);
+
+  const { data: customers, total, loading, refresh } = useListCache({
+    cacheKey,
+    socketModule: "customer",
+    fetcher,
+    enabled: can("customers.view"),
+  });
+
+  const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,16 +170,10 @@ const CustomerListPage: React.FC = () => {
     if (!customerToDelete || isDeleting) return;
     setIsDeleting(true);
     try {
-      await removeCustomer(customerToDelete);
+      await customerService.delete(customerToDelete);
       toast.success("Customer deleted successfully!");
-      loadCustomers({
-        search:          searchTerm || undefined,
-        page:            currentPage,
-        limit:           ITEMS_PER_PAGE,
-        status:          appliedFilters.status        || undefined,
-        customerTypeId:  appliedFilters.customerTypeId  ? Number(appliedFilters.customerTypeId)  : undefined,
-        customerGradeId: appliedFilters.customerGradeId ? Number(appliedFilters.customerGradeId) : undefined,
-      });
+      markStaleByPrefix(CACHE_PREFIX);
+      refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err.message || "Failed to delete customer");
     } finally {
@@ -177,7 +181,7 @@ const CustomerListPage: React.FC = () => {
       setCustomerToDelete(null);
       setIsDeleting(false);
     }
-  }, [customerToDelete, isDeleting, removeCustomer, loadCustomers, searchTerm, currentPage, appliedFilters]);
+  }, [customerToDelete, isDeleting, refresh]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;

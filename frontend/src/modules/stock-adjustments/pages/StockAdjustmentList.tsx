@@ -1,19 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   FaPlus,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import {
-  fetchStockAdjustments,
-  deleteStockAdjustment,
-  stockAdjustmentCreated,
-  stockAdjustmentUpdated,
-  stockAdjustmentDeleted,
-} from "../../../features/stock-adjustments/stockAdjustmentSlice";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache, markStaleByPrefix } from "../../../hooks/useListCache";
+import { stockAdjustmentService } from "../../../services/stockAdjustmentService";
 import { usePermission } from "../../../hooks/usePermission";
 
 import { Search } from "lucide-react";
@@ -199,14 +192,11 @@ const getItemPrimaryUom = (item: any) => {
   return "";
 };
 
+const SA_CACHE_PREFIX = "stockAdjustments:";
+
 const StockAdjustmentList: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const { can } = usePermission();
-
-  const { data, meta, loading, error } = useAppSelector(
-    (state) => state.stockAdjustments
-  );
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -228,40 +218,35 @@ const StockAdjustmentList: React.FC = () => {
   const activeFilterCount = [status, adjustmentType, dateFrom, dateTo].filter(Boolean).length;
 
   // Debounce search — 300 ms
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
+    const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
       setCurrentPage(1);
     }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    dispatch(
-      fetchStockAdjustments({
-        search: debouncedSearch,
-        status,
-        adjustmentType,
-        dateFrom,
-        dateTo,
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-      })
-    );
-  }, [dispatch, debouncedSearch, status, adjustmentType, dateFrom, dateTo, currentPage]);
+  const cacheKey = `${SA_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${status}:${adjustmentType}:${dateFrom}:${dateTo}`;
 
-  useEffect(() => {
-    if (error) toast.error(error);
-  }, [error]);
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await stockAdjustmentService.fetchAll({
+      search: debouncedSearch,
+      status,
+      adjustmentType,
+      dateFrom,
+      dateTo,
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+    });
+    const list = Array.isArray(res) ? res : (res.data || []);
+    const tot = Array.isArray(res) ? res.length : (res.meta?.total || res.total || list.length);
+    return { data: list, total: tot };
+  }, [debouncedSearch, status, adjustmentType, dateFrom, dateTo, currentPage]);
 
-  useSocketSync("stockAdjustment", {
-    created: stockAdjustmentCreated,
-    updated: stockAdjustmentUpdated,
-    deleted: stockAdjustmentDeleted,
+  const { data, total, loading, refresh } = useListCache({
+    cacheKey,
+    socketModule: "stockAdjustment",
+    fetcher,
   });
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,15 +284,17 @@ const StockAdjustmentList: React.FC = () => {
     if (!deleteId || isDeleting) return;
     setIsDeleting(true);
     try {
-      await dispatch(deleteStockAdjustment(deleteId)).unwrap();
+      await stockAdjustmentService.delete(deleteId);
       toast.success("Stock Adjustment deleted successfully");
       setDeleteId(null);
+      markStaleByPrefix(SA_CACHE_PREFIX);
+      refresh();
     } catch (err: any) {
-      toast.error(err || "Failed to delete stock adjustment");
+      toast.error(err?.response?.data?.message || "Failed to delete stock adjustment");
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteId, isDeleting, dispatch]);
+  }, [deleteId, isDeleting, refresh]);
 
   const getTypeBadge = (type: string) => (
     <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wider ${getTypeBadgeClass(type)}`}>
@@ -315,7 +302,7 @@ const StockAdjustmentList: React.FC = () => {
     </span>
   );
 
-  const totalPages = meta?.totalPages || 1;
+  const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
 
   return (
     <div>

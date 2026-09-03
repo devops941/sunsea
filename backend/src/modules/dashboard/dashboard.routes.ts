@@ -6,5 +6,6 @@ const router = Router();
 
 router.get("/summary", authMiddleware, dashboardController.getSummary);
 router.get("/accounts-summary", authMiddleware, dashboardController.getAccountsSummary);
+router.get("/tv-summary", authMiddleware, dashboardController.getTvSummary);
 
 export default router;
