@@ -6,7 +6,6 @@ import PageContainer from "../components/layout/PageContainer";
 import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
 import CommonLoader from "../components/ui/Loader/CommonLoader";
-import logo from '../../public/loaderimage.png'
 
 // ===========================================================================
 // CORE

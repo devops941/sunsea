@@ -3,7 +3,6 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAppSelector, useAppDispatch } from "../hooks/reduxHooks";
 import { fetchCompany } from "../features/company/companySlice";
 import CommonLoader from "../components/ui/Loader/CommonLoader";
-import logo from '../../public/loaderimage.png';
 import { usePermission } from "../hooks/usePermission";
 
 interface ProtectedRouteProps {

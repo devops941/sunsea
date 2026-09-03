@@ -12,8 +12,11 @@ import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DataTable from "../../../components/ui/table/DataTable";
 import { useListCache } from "../../../hooks/useListCache";
+import { usePermission } from "../../../hooks/usePermission";
+
 
 const SalesReportsCenter: React.FC = () => {
+  const { can } = usePermission();
   // Filters state
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -270,12 +273,14 @@ const SalesReportsCenter: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-            <ExportCSVButton
-              data={csvData}
-              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
-              filename={csvFilename}
-              text="Export CSV"
-            />
+            {can("sales-reports.export") && (
+              <ExportCSVButton
+                data={csvData}
+                columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
+                filename={csvFilename}
+                text="Export CSV"
+              />
+            )}
           </div>
         </div>
 

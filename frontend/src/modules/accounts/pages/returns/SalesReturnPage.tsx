@@ -17,6 +17,7 @@ import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import DataTable, { type DataTableColumn } from "../../../../components/ui/table/DataTable";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { usePermission } from "../../../../hooks/usePermission";
 
 interface FilterState {
   customerGradeId: string;
@@ -30,6 +31,7 @@ const DEFAULT_FILTERS: FilterState = {
 
 export const SalesReturnPage: React.FC = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [selectedViewReturn, setSelectedViewReturn] = useState<SalesReturn | null>(null);
 
   const { customerGrades } = useCustomerGrades();
@@ -272,12 +274,14 @@ export const SalesReturnPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchSalesReturnsForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {can("sales-returns.export") && (
+              <ExportCSVButton
+                fetchData={fetchSalesReturnsForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             <CustomButton
               text="New Sales Return"

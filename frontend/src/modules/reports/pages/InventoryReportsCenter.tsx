@@ -9,8 +9,11 @@ import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import { useListCache } from "../../../hooks/useListCache";
+import { usePermission } from "../../../hooks/usePermission";
+
 
 const InventoryReportsCenter: React.FC = () => {
+  const { can } = usePermission();
   // Filters state
   const [date, setDate] = useState("");
   const [category, setCategory] = useState("");
@@ -176,12 +179,14 @@ const InventoryReportsCenter: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-            <ExportCSVButton
-              data={csvData}
-              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
-              filename={csvFilename}
-              text="Export CSV"
-            />
+            {can("inventory-reports.export") && (
+              <ExportCSVButton
+                data={csvData}
+                columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
+                filename={csvFilename}
+                text="Export CSV"
+              />
+            )}
           </div>
         </div>
 

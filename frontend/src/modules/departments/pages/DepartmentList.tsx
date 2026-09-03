@@ -1,4 +1,4 @@
-import React, { useState, useEffect,useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -11,6 +11,8 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useDepartments } from "../../../hooks/useDepartments";
 import { usePermission } from "../../../hooks/usePermission";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { departmentService } from "../../../services/departmentService";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 
@@ -96,6 +98,23 @@ const DepartmentList: React.FC = () => {
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedDepts = departments;
+
+    const fetchDepartmentsForExport = useCallback(async () => {
+        const res = await departmentService.fetchAll({ page: 1, limit: 100000 });
+        const list = res?.data || (Array.isArray(res) ? res : []);
+        return Array.isArray(list) ? list : [];
+    }, []);
+
+    const { csvColumns, csvFilename } = useMemo(() => {
+        const columns = [
+            { header: "Department Name", accessor: (item: any) => item.name || "" },
+            { header: "Description", accessor: (item: any) => item.description || "" },
+        ];
+        return {
+            csvColumns: columns,
+            csvFilename: `Department_List_${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    }, []);
 
     const handleOpenAdd = () => {
         setEditMode(false);
@@ -239,6 +258,14 @@ const DepartmentList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
+                            {can("departments.export") && (
+                                <ExportCSVButton
+                                    fetchData={fetchDepartmentsForExport}
+                                    columns={csvColumns}
+                                    filename={csvFilename}
+                                    text="Export"
+                                />
+                            )}
                             {canCreateDepartment && (
                                 <CustomButton
                                     text="Add Department"

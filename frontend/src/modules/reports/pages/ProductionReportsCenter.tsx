@@ -18,9 +18,11 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
 import { useListCache } from "../../../hooks/useListCache";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ProductionReportsCenter: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   // Redux state
   const { data: productionOrders, loading: loadingOrders } = useAppSelector((state) => state.productionOrders);
@@ -439,12 +441,14 @@ const ProductionReportsCenter: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-            <ExportCSVButton
-              data={csvAllData}
-              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
-              filename={csvFilename}
-              text="Export CSV"
-            />
+            {can("production-reports.export") && (
+              <ExportCSVButton
+                data={csvAllData}
+                columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
+                filename={csvFilename}
+                text="Export CSV"
+              />
+            )}
           </div>
         </div>
 

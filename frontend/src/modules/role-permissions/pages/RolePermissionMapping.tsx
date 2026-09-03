@@ -321,6 +321,8 @@ const ACTIONS = [
   { key: "create", label: "Add", headerColor: "text-emerald-500", hex: "#059669", colBg: "bg-emerald-500/5" },
   { key: "edit", label: "Edit", headerColor: "text-amber-500", hex: "#d97706", colBg: "bg-amber-500/5" },
   { key: "delete", label: "Delete", headerColor: "text-rose-500", hex: "#e11d48", colBg: "bg-rose-500/5" },
+  { key: "export", label: "Export", headerColor: "text-teal-500", hex: "#0d9488", colBg: "bg-teal-500/5" },
+  { key: "whatsapp-email", label: "WhatsApp & Email", headerColor: "text-indigo-500", hex: "#6366f1", colBg: "bg-indigo-500/5" },
 ] as const;
 
 const STANDARD_ACTION_KEYS = new Set<string>(ACTIONS.map(a => a.key));
@@ -331,10 +333,13 @@ const STANDARD_ACTION_KEYS = new Set<string>(ACTIONS.map(a => a.key));
  */
 const MUTUALLY_EXCLUSIVE: Record<string, string> = {};
 
-/** Format "view-gst" → "View GST", "view-estimate" → "View Estimate" */
+/** Format "view-gst" → "View GST", "whatsapp-email" → "WhatsApp & Email" */
 function formatActionLabel(action: string): string {
-  return action.split("-").map(w => {
+  if (action === "whatsapp-email" || action === "whatsapp_email") return "WhatsApp & Email";
+  return action.split(/[-_]/).map(w => {
     if (w.toLowerCase() === "gst") return "GST";
+    if (w.toLowerCase() === "whatsapp") return "WhatsApp";
+    if (w.toLowerCase() === "email") return "Email";
     return w.charAt(0).toUpperCase() + w.slice(1);
   }).join(" ");
 }
@@ -638,7 +643,7 @@ const RolePermissionMapping: React.FC = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[1024px] xl:mr-auto space-y-5">
+    <div className="max-w-[1180px] xl:mr-auto space-y-5">
       {/* ROLE SELECTOR */}
       <div className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
@@ -752,7 +757,7 @@ const RolePermissionMapping: React.FC = () => {
 
                 {/* Matrix table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs min-w-[500px]">
+                  <table className="w-full text-xs min-w-[660px]">
                     <thead>
                       <tr className="border-b border-line bg-card-2/60">
                         <th className="text-left py-2.5 px-4 text-[10px] font-extrabold text-ink-muted uppercase tracking-[1.5px] w-[220px]">
@@ -846,7 +851,7 @@ const RolePermissionMapping: React.FC = () => {
                             </tr>
 
                             {/* Dedicated Special Access Row */}
-                            {isSuperAdmin && extraPerms.length > 0 && (
+                            {extraPerms.length > 0 && (
                               <tr className="bg-violet-500/10 border-b border-line-soft transition-colors hover:bg-violet-500/15">
                                 <td className="py-3.5 px-5">
                                   <div className="flex items-center gap-2">

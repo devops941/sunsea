@@ -16,6 +16,7 @@ import { formatLocationAddress } from "../../../utils/addressUtils";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { categoryService } from "../../../services/categoryService";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -30,6 +31,7 @@ const parseBaseUom = (uomStr?: string) => {
 };
 
 const WastageStockList: React.FC = () => {
+    const { can } = usePermission();
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -207,11 +209,13 @@ const WastageStockList: React.FC = () => {
                                 </div>
                             </div>
                         </FilterPopover>
-                        <ExportCSVButton
-                            data={data || []}
-                            columns={exportColumns}
-                            filename="wastage_stock_ledger.csv"
-                        />
+                        {can("wastage-stock.export") && (
+                            <ExportCSVButton
+                                data={data || []}
+                                columns={exportColumns}
+                                filename="wastage_stock_ledger.csv"
+                            />
+                        )}
                     </div>
                 </div>
 

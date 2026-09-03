@@ -456,12 +456,14 @@ const AllSalesOrderList: React.FC = () => {
                             </div>
                         </FilterPopover>
 
-                        <ExportCSVButton
-                            fetchData={fetchSalesOrdersForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("sales-orders.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchSalesOrdersForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
 
                         {can("sales-orders.create") && (
                             <CustomButton

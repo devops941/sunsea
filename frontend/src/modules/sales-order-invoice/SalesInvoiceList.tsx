@@ -50,6 +50,9 @@ const INVOICE_CACHE_PREFIX = "salesInvoices:";
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
     const { can } = usePermission();
+    const canSendWhatsappEmail = can("sales-invoices.whatsapp-email") || can("sales-invoices.whatsapp_email");
+    const canEdit = can("sales-invoices.edit");
+    const canDelete = can("sales-invoices.delete");
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -305,16 +308,18 @@ const SalesInvoiceList: React.FC = () => {
             width: "250px",   // was 160px — too tight for 5 icons + gaps
             render: (item) => (
                 <div className="flex justify-start items-center gap-1.5 whitespace-nowrap">
-                    <EmailButton onClick={() => handleOpenEmailModal(item)} />
-                    <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
+                    {canSendWhatsappEmail && <EmailButton onClick={() => handleOpenEmailModal(item)} />}
+                    {canSendWhatsappEmail && <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />}
                     <ViewButton onClick={() => handleOpenView(item)} />
-                    {item.status !== "PAID" && (
+                    {item.status !== "PAID" && canEdit && (
                         <EditButton onClick={() => navigate(`/sales-invoices/edit/${item.id}`)} />
                     )}
-                    <DeleteButton onClick={() => {
-                        setItemToDelete(item.id);
-                        setShowDeleteModal(true);
-                    }} />
+                    {canDelete && (
+                        <DeleteButton onClick={() => {
+                            setItemToDelete(item.id);
+                            setShowDeleteModal(true);
+                        }} />
+                    )}
                 </div>
             ),
             align: "left"
@@ -336,17 +341,21 @@ const SalesInvoiceList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search invoices..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchSalesInvoicesForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
-                        <CustomButton
-                            text="Create Invoice"
-                            icon={FaPlus}
-                            onClick={() => navigate("/sales-invoices/create")}
-                        />
+                        {can("sales-invoices.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchSalesInvoicesForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
+                        {can("sales-invoices.create") && (
+                            <CustomButton
+                                text="Create Invoice"
+                                icon={FaPlus}
+                                onClick={() => navigate("/sales-invoices/create")}
+                            />
+                        )}
                     </div>
                 </div>
 

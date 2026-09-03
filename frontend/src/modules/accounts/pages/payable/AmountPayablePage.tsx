@@ -16,6 +16,7 @@ import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableSummary } from "../../../../services/payableService";
 import { supplierService } from "../../../../services/supplierService";
 import { useListCache, prefetchCache } from "../../../../hooks/useListCache";
+import { usePermission } from "../../../../hooks/usePermission";
 
 type ColumnKey =
   | "index"
@@ -44,6 +45,7 @@ const ALL_COLUMNS: { id: ColumnKey; label: string; alwaysOn?: boolean }[] = [
 
 export const AmountPayablePage: React.FC = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
 
   // Applied filter state
   const [startDate, setStartDate] = useState<string>("");
@@ -366,12 +368,14 @@ export const AmountPayablePage: React.FC = () => {
             >
               <FaSync className={refreshing ? "animate-spin text-orange-600" : ""} /> Refresh
             </button>
-            <ExportCSVButton
-              data={csvData}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {(can("payable.export") || can("accounts.export")) && (
+              <ExportCSVButton
+                data={csvData}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
           </div>
         </div>
 

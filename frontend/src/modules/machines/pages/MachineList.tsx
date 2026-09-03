@@ -28,6 +28,7 @@ const MachineList: React.FC = () => {
     const canCreateMachine = can("machines.create");
     const canEditMachine = can("machines.edit");
     const canDeleteMachine = can("machines.delete");
+    const canExportMachine = can("machines.export");
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -152,12 +153,14 @@ const MachineList: React.FC = () => {
                                 onChange={handleSearch}
                             />
                         </div>
-                        <ExportCSVButton
-                            fetchData={fetchMachinesForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {canExportMachine && (
+                            <ExportCSVButton
+                                fetchData={fetchMachinesForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {canCreateMachine && (
                             <CustomButton
                                 text="Add Machine"

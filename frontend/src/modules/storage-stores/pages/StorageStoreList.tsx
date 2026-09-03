@@ -186,12 +186,14 @@ const StorageStoreList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search stores..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchStoresForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("stores.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchStoresForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {can("stores.create") && (
                             <CustomButton
                                 text="Add Store"

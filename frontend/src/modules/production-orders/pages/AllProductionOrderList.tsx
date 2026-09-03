@@ -13,11 +13,13 @@ import { productionOrderService } from "../../../services/productionOrderService
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 15;
 
 const AllProductionOrderList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [data, setData] = useState<ProductionOrder[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -263,12 +265,14 @@ const AllProductionOrderList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search orders..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchOrdersForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("production_orders.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchOrdersForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                     </div>
                 </div>
 

@@ -284,12 +284,14 @@ const RawMaterialList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search materials..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchRawMaterialsForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
+                        {can("raw_materials.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchRawMaterialsForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
                         {can("raw_materials.create") && (
                             <CustomButton
                                 text="Add Material"

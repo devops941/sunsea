@@ -218,7 +218,7 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                                 </div>
                             </div>
                         </FilterPopover>
-                        {can("raw_material_stocks.view") && (
+                        {can("raw_material_stocks.export") && (
                             <ExportCSVButton
                                 data={data || []}
                                 columns={exportColumns}

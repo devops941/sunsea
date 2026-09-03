@@ -62,7 +62,7 @@ router.delete(
 router.post(
     "/:id/email-po-invoice",
     authMiddleware,
-    requirePermission("purchaseOrders.view"),
+    requirePermission("purchaseOrders.whatsapp-email"),
     validateMiddleware(purchaseOrderIdRequestSchema),
     purchaseOrderController.emailPoInvoice
 );
@@ -70,7 +70,7 @@ router.post(
 router.post(
     "/:id/whatsapp-po",
     authMiddleware,
-    requirePermission("purchaseOrders.view"),
+    requirePermission("purchaseOrders.whatsapp-email"),
     validateMiddleware(purchaseOrderIdRequestSchema),
     purchaseOrderController.whatsappPO
 );

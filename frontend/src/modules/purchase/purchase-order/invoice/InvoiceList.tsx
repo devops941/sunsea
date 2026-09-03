@@ -16,6 +16,7 @@ import EditButton from "../../../../components/ui/EditButton/EditButton";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useListCache } from "../../../../hooks/useListCache";
 
+
 const ITEMS_PER_PAGE = 15;
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
@@ -43,6 +44,7 @@ const calculatePendingAmount = (item: any) => {
 
 const InvoiceList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -139,17 +141,21 @@ const InvoiceList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search invoices..."
                         />
-                        <ExportCSVButton
-                            fetchData={fetchInvoicesForExport}
-                            columns={csvColumns}
-                            filename={csvFilename}
-                            text="Export"
-                        />
-                        <CustomButton
-                            text="Create Invoice"
-                            icon={FaPlus}
-                            onClick={() => navigate("/invoice/create")}
-                        />
+                        {can("invoice.export") && (
+                            <ExportCSVButton
+                                fetchData={fetchInvoicesForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
+                        {can("invoice.create") && (
+                            <CustomButton
+                                text="Create Invoice"
+                                icon={FaPlus}
+                                onClick={() => navigate("/invoice/create")}
+                            />
+                        )}
                     </div>
                 </div>
 

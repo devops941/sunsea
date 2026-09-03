@@ -47,6 +47,7 @@ const CategoryList: React.FC = () => {
   const canCreate = can("categories.create");
   const canEdit = can("categories.edit");
   const canDelete = can("categories.delete");
+  const canExport = can("categories.export");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -213,12 +214,14 @@ const CategoryList: React.FC = () => {
               />
             </div>
 
-            <ExportCSVButton
-              fetchData={fetchCategoriesForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {canExport && (
+              <ExportCSVButton
+                fetchData={fetchCategoriesForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             {canCreate && (
               <CustomButton

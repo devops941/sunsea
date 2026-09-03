@@ -36,6 +36,7 @@ const MachineAssignmentList: React.FC = () => {
   const canCreateAssignment = can("machine-assignments.create");
   const canEditAssignment = can("machine-assignments.edit");
   const canDeleteAssignment = can("machine-assignments.delete");
+  const canExportAssignment = can("machine-assignments.export");
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -249,12 +250,14 @@ const MachineAssignmentList: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <ExportCSVButton
-              fetchData={fetchAssignmentsForExport}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {canExportAssignment && (
+              <ExportCSVButton
+                fetchData={fetchAssignmentsForExport}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
 
             {canCreateAssignment && (
               <CustomButton

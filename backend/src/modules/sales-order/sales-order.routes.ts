@@ -85,7 +85,7 @@ router.get(
 router.post(
     "/:id/email-quotation",
     authMiddleware,
-    requirePermission("sales-orders.view"),
+    requirePermission("quotations.whatsapp-email"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.emailQuotation
 );
@@ -93,7 +93,7 @@ router.post(
 router.post(
     "/:id/whatsapp-quotation",
     authMiddleware,
-    requirePermission("sales-orders.view"),
+    requirePermission("quotations.whatsapp-email"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.whatsappQuotation
 );

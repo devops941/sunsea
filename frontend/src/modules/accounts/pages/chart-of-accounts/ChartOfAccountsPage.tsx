@@ -14,8 +14,10 @@ import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
+import { usePermission } from "../../../../hooks/usePermission";
 
 export const ChartOfAccountsPage: React.FC = () => {
+  const { can } = usePermission();
   // Applied filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("ALL");
@@ -236,12 +238,14 @@ export const ChartOfAccountsPage: React.FC = () => {
             >
               <FaSync className={refreshing ? "animate-spin text-slate-500" : ""} /> Refresh
             </button>
-            <ExportCSVButton
-              data={csvData}
-              columns={csvColumns}
-              filename={csvFilename}
-              text="Export"
-            />
+            {(can("chart-of-accounts.export") || can("accounts.export")) && (
+              <ExportCSVButton
+                data={csvData}
+                columns={csvColumns}
+                filename={csvFilename}
+                text="Export"
+              />
+            )}
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-semibold cursor-pointer"
