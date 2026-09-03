@@ -93,10 +93,9 @@ class ProductService {
       categoryId: data.categoryId ? Number(data.categoryId) : null,
 
       weightPerPiece: toNumberOrNull(data.weightPerPiece),
-      weightUom: cleanString(data.weightUom, 10) || "kg",
+      weightUom: cleanString(data.weightUom, 10) || "g",
       isActive: toBoolean(data.isActive, true),
 
-      hsnCode: cleanString(data.hsnCode, 20),
       minimumQty: data.minimumQty || "0",
       rate: toNumberOrNull(data.rate),
       gradeRates: data.gradeRates
@@ -463,11 +462,10 @@ class ProductService {
       categoryId: data.categoryId ? Number(data.categoryId) : undefined,
 
       weightPerPiece: data.weightPerPiece !== undefined ? toNumberOrNull(data.weightPerPiece) : undefined,
-      weightUom: data.weightUom !== undefined ? (cleanString(data.weightUom, 10) || "kg") : undefined,
+      weightUom: data.weightUom !== undefined ? (cleanString(data.weightUom, 10) || "g") : undefined,
       minimumQty: data.minimumQty !== undefined ? data.minimumQty : undefined,
       isActive: data.isActive !== undefined ? toBoolean(data.isActive, true) : undefined,
 
-      hsnCode: data.hsnCode !== undefined ? cleanString(data.hsnCode, 20) : undefined,
       rate: data.rate !== undefined ? toNumberOrNull(data.rate) : undefined,
       gradeRates: data.gradeRates !== undefined
         ? (typeof data.gradeRates === "string" ? JSON.parse(data.gradeRates) : data.gradeRates)

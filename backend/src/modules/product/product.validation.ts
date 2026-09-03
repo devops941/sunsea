@@ -19,7 +19,6 @@ export const createProductSchema = z.object({
     weightPerPiece: z.coerce.number().optional(),
     weightUom: z.string().trim().max(10).optional(),
 
-    hsnCode: z.string().trim().max(20).optional(),
     rate: z.coerce.number().optional(),
     // Grade-based dynamic pricing stored as JSON { "<gradeId>": <rate> }
     gradeRates: z.any().optional(),

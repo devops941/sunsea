@@ -7,6 +7,7 @@ interface Option {
   value: string | number;
   disabled?: boolean;
   selectedLabel?: string | React.ReactNode;
+  badge?: React.ReactNode;
 }
 
 interface SelectInputProps {
@@ -266,7 +267,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
               }}
               onKeyDown={handleKeyDown}
               className={`
-                w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
+                w-full h-8 sm:h-10 pl-3 sm:pl-4 ${selectedOption?.badge && !isOpen ? "pr-24 sm:pr-28" : "pr-8 sm:pr-10"}
                 border rounded-md outline-none
                 text-xs sm:text-[15px] font-semibold flex items-center justify-between
                 transition-all duration-250 text-left
@@ -293,7 +294,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
               }}
               onKeyDown={handleKeyDown}
               className={`
-                w-full h-8 sm:h-10 pl-3 sm:pl-4 pr-8 sm:pr-10
+                w-full h-8 sm:h-10 pl-3 sm:pl-4 ${selectedOption?.badge && !isOpen ? "pr-24 sm:pr-28" : "pr-8 sm:pr-10"}
                 border rounded-md outline-none
                 text-xs sm:text-[15px] font-semibold flex items-center justify-between
                 transition-all duration-250 text-left
@@ -308,6 +309,12 @@ const SelectInput: React.FC<SelectInputProps> = ({
             >
               <span className="truncate">{displayLabel}</span>
             </button>
+          )}
+
+          {selectedOption?.badge && !isOpen && (
+            <div className="absolute right-7 sm:right-9 top-1/2 -translate-y-1/2 pointer-events-none flex items-center z-10">
+              {selectedOption.badge}
+            </div>
           )}
 
           <span className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none">

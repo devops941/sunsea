@@ -274,9 +274,8 @@ const ProductList: React.FC = () => {
             {
                 header: "Weight / Piece",
                 accessor: (item: any) =>
-                    item.weightPerPiece != null ? `${item.weightPerPiece} ${item.weightUom || "kg"}` : "—",
+                    item.weightPerPiece != null ? `${item.weightPerPiece} ${item.weightUom || "g"}` : "—",
             },
-            { header: "HSN Code", accessor: (item: any) => item.hsnCode || "—" },
             { header: "Rate (₹)", accessor: (item: any) => item.rate != null ? item.rate : "—" },
             { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
         ];
@@ -416,12 +415,11 @@ const ProductList: React.FC = () => {
                                 { label: "Product Type", value: selectedProduct.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production" },
                                 {
                                     label: "Weight per Piece", value: (() => {
-                                        const weightUom = selectedProduct.weightUom || "kg";
+                                        const weightUom = selectedProduct.weightUom || "g";
                                         const weight = selectedProduct.weightPerPiece != null ? selectedProduct.weightPerPiece : "";
                                         return weight !== "" ? `${weight} ${weightUom}` : "N/A";
                                     })()
                                 },
-                                { label: "HSN Code", value: selectedProduct.hsnCode || "N/A" },
                                 { label: "Rate (₹)", value: selectedProduct.rate != null ? `₹${selectedProduct.rate}` : "N/A" },
                                 ...(selectedProduct.gradeRates && typeof selectedProduct.gradeRates === "object" && Object.keys(selectedProduct.gradeRates).length > 0
                                     ? Object.entries(selectedProduct.gradeRates as Record<string, number>).map(([grade, rate]) => ({

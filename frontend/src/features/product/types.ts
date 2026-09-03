@@ -24,7 +24,6 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   uom?: UOM | null;
-  hsnCode?: string | null;
   rate?: number | null;
   /** Grade-based dynamic pricing. Keys are grade names (e.g. "A", "B", "C"), values are prices. */
   gradeRates?: Record<string, number> | null;

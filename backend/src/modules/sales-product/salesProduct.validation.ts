@@ -18,7 +18,6 @@ export const createSalesProductSchema = z.object({
   body: z.object({
     salesProductName: z.string().trim().min(1, "Sales Product Name is required").max(160),
     description: z.string().trim().max(255).optional(),
-    hsnCode: z.string().trim().min(1, "HSN Code is required").max(20),
     rate: z.coerce.number().min(0, "Rate must be greater than or equal to 0").optional(),
     isActive: z.coerce.boolean().optional(),
 

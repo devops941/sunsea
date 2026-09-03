@@ -387,21 +387,17 @@ class PurchaseOrderService {
             const rm = rmMap.get(String(item.productId));
             const p = pMap.get(String(item.productId));
             const description = rm?.materialName || p?.productName || item.productId;
-            const hsnCode = rm?.hsnCode || p?.hsnCode || null;
             return {
                 ...item,
                 description,
-                hsnCode,
                 rawMaterial: rm || null,
                 product: p ? {
                     id: p.id,
                     productName: p.productName,
-                    hsnCode: p.hsnCode,
                 } : (rm ? {
                     id: rm.rawMaterialId,
                     productName: rm.materialName,
                     materialName: rm.materialName,
-                    hsnCode: rm.hsnCode,
                 } : null),
             };
         });

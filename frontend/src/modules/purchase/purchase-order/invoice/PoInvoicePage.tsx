@@ -81,12 +81,10 @@ const PoInvoicePage: React.FC = () => {
             );
 
             const description = item.description || item.product?.productName || item.product?.materialName || item.rawMaterial?.materialName || rm?.materialName || item.productId || "N/A";
-            const hsnCode = item.hsnCode || item.product?.hsnCode || item.rawMaterial?.hsnCode || rm?.hsnCode || "";
 
             return {
                 ...item,
                 description,
-                hsnCode,
                 qty,
                 rate,
                 amount,
@@ -300,7 +298,6 @@ const PoInvoicePage: React.FC = () => {
                                     <tr style={{ height: "32px" }}>
                                         <th className="text-center border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]" style={{ width: "45px" }}>S.N.</th>
                                         <th className="text-left border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]">Description of Goods</th>
-                                        <th className="text-center border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]" style={{ width: "80px" }}>HSN/SAC</th>
                                         <th className="text-right border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]" style={{ width: "70px" }}>Qty.</th>
                                         <th className="text-center border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]" style={{ width: "70px" }}>Unit</th>
                                         <th className="text-right border border-black px-2.5 py-0 align-middle font-bold bg-[#f7f7f7]" style={{ width: "90px" }}>Rate (₹)</th>
@@ -312,7 +309,6 @@ const PoInvoicePage: React.FC = () => {
                                         <tr key={item.id || idx} style={{ height: "28px" }}>
                                             <td className="text-center border border-black px-2.5 py-0 align-middle">{idx + 1}.</td>
                                             <td className="border border-black px-2.5 py-0 align-middle font-medium text-slate-800">{item.description}</td>
-                                            <td className="text-center border border-black px-2.5 py-0 align-middle text-slate-600">{item.hsnCode || "—"}</td>
                                             <td className="text-right border border-black px-2.5 py-0 align-middle font-bold">{item.qty}</td>
                                             <td className="text-center border border-black px-2.5 py-0 align-middle text-slate-600">{item.unit}</td>
                                             <td className="text-right border border-black px-2.5 py-0 align-middle">{formatMoney(item.rate)}</td>
@@ -328,13 +324,12 @@ const PoInvoicePage: React.FC = () => {
                                             <td className="border border-black px-2.5 py-0 align-middle"></td>
                                             <td className="border border-black px-2.5 py-0 align-middle"></td>
                                             <td className="border border-black px-2.5 py-0 align-middle"></td>
-                                            <td className="border border-black px-2.5 py-0 align-middle"></td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr className="font-bold bg-[#f7f7f7] border-t border-black" style={{ height: "32px" }}>
-                                        <td colSpan={3} className="text-right border border-black px-4 py-0 align-middle font-bold text-[14px]">
+                                        <td colSpan={2} className="text-right border border-black px-4 py-0 align-middle font-bold text-[14px]">
                                             Grand Total
                                         </td>
                                         <td className="text-right border border-black px-2.5 py-0 align-middle font-bold text-[14px]">

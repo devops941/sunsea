@@ -336,7 +336,6 @@ const RawMaterialList: React.FC = () => {
                                     { label: "Material ID", value: selectedItem.rawMaterialId },
                                     { label: "Material Name", value: selectedItem.materialName },
                                     { label: "Category", value: selectedItem.category?.name || "N/A" },
-                                    { label: "HSN Code", value: selectedItem.hsnCode || "N/A" },
                                     { label: "Primary UOM", value: parseBaseUom(selectedItem.baseUom).primary },
                                     { label: "Secondary UOM(s)", value: parseBaseUom(selectedItem.baseUom).secondary },
                                     {

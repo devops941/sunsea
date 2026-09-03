@@ -16,7 +16,16 @@ function cleanString(value: any, maxLength?: number): string | null {
 }
 
 const includeDefaults = {
-  components: { include: { componentProduct: true } },
+  components: {
+    include: {
+      componentProduct: {
+        include: {
+          finishedGoodsStocks: true,
+          uom: true,
+        },
+      },
+    },
+  },
   stocks: true,
 };
 
@@ -43,7 +52,6 @@ class SalesProductService {
         salesProductCode,
         salesProductName: cleanString(data.salesProductName, 160)!,
         description: cleanString(data.description, 255),
-        hsnCode: cleanString(data.hsnCode, 20),
         rate: toNumberOrNull(data.rate),
         isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
 
@@ -151,7 +159,6 @@ class SalesProductService {
       data: {
         salesProductName: data.salesProductName !== undefined ? cleanString(data.salesProductName, 160)! : undefined,
         description: data.description !== undefined ? cleanString(data.description, 255) : undefined,
-        hsnCode: data.hsnCode !== undefined ? cleanString(data.hsnCode, 20) : undefined,
         rate: data.rate !== undefined ? toNumberOrNull(data.rate) : undefined,
         isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined,
       },
