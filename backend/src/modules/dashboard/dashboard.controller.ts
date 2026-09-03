@@ -233,11 +233,11 @@ const dashboardController = {
           }),
           tx.accountLedger.findMany({
             where: { customerId: { not: null } },
-            select: { id: true, customer: { select: { openingBalance: true, openingBalanceType: true } } },
+            select: { id: true, customer: { select: { firmName: true, displayName: true, openingBalance: true, openingBalanceType: true } } },
           }),
           tx.accountLedger.findMany({
             where: { supplierId: { not: null } },
-            select: { id: true, supplier: { select: { openingBalance: true, openingBalanceType: true } } },
+            select: { id: true, supplier: { select: { legalName: true, displayName: true, openingBalance: true, openingBalanceType: true } } },
           }),
           tx.salesInvoice.findMany({
             select: { id: true, grandTotal: true, payments: true, status: true, invoiceDate: true, createdAt: true },
@@ -340,16 +340,22 @@ const dashboardController = {
       let totalCustomerAdvances = 0;
       let receivableCustomerCount = 0;
       let customerAdvanceCount = 0;
+      const receivableDetails: Array<{ name: string; amount: number }> = [];
       for (const cl of customerLedgers) {
         const netDr = (debitMap.get(cl.id) || 0) - (creditMap.get(cl.id) || 0);
         if (netDr > 0.005) {
           totalReceivable += netDr;
           receivableCustomerCount++;
+          receivableDetails.push({
+            name: cl.customer?.displayName || cl.customer?.firmName || "Unknown",
+            amount: netDr,
+          });
         } else if (netDr < -0.005) {
           totalCustomerAdvances += -netDr;
           customerAdvanceCount++;
         }
       }
+      receivableDetails.sort((a, b) => b.amount - a.amount);
 
       // ─── Payable (we owe suppliers) — POSITIVE netCr only ─────
       // Mirror of receivable rule: a supplier with a Dr balance (we paid
@@ -359,16 +365,22 @@ const dashboardController = {
       let totalSupplierAdvances = 0;
       let payableSupplierCount = 0;
       let supplierAdvanceCount = 0;
+      const payableDetails: Array<{ name: string; amount: number }> = [];
       for (const sl of supplierLedgers) {
         const netCr = (creditMap.get(sl.id) || 0) - (debitMap.get(sl.id) || 0);
         if (netCr > 0.005) {
           totalPayable += netCr;
           payableSupplierCount++;
+          payableDetails.push({
+            name: sl.supplier?.displayName || sl.supplier?.legalName || "Unknown",
+            amount: netCr,
+          });
         } else if (netCr < -0.005) {
           totalSupplierAdvances += -netCr;
           supplierAdvanceCount++;
         }
       }
+      payableDetails.sort((a, b) => b.amount - a.amount);
 
       // ─── Sales / Purchase invoice totals ─────────────────────
       const totalSales = salesInvoices.reduce((s: number, inv: any) => s + Number(inv.grandTotal || 0), 0);
@@ -416,19 +428,22 @@ const dashboardController = {
       });
 
       // ─── Alerts — each item is a scrollable clickable row ───
-      const alerts: Array<{ level: "info" | "warn" | "danger"; message: string; link?: string }> = [];
+      const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const alerts: Array<{ level: "info" | "warn" | "danger"; message: string; link?: string; details?: Array<{ name: string; amount: string }> }> = [];
       if (totalReceivable > 0) {
         alerts.push({
           level: "danger",
-          message: `Total outstanding receivable: ₹${totalReceivable.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${customerLedgers.length} customers)`,
+          message: `Total outstanding receivable: ${fmtINR(totalReceivable)} (${receivableCustomerCount} customer${receivableCustomerCount > 1 ? "s" : ""})`,
           link: "/accounts/receivable",
+          details: receivableDetails.map((d) => ({ name: d.name, amount: fmtINR(d.amount) })),
         });
       }
       if (totalPayable > 0) {
         alerts.push({
           level: "danger",
-          message: `Total outstanding payable: ₹${totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${supplierLedgers.length} suppliers)`,
+          message: `Total outstanding payable: ${fmtINR(totalPayable)} (${payableSupplierCount} supplier${payableSupplierCount > 1 ? "s" : ""})`,
           link: "/accounts/payable",
+          details: payableDetails.map((d) => ({ name: d.name, amount: fmtINR(d.amount) })),
         });
       }
       if (draftVouchers > 0) {
