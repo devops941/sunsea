@@ -22,12 +22,6 @@ export const createRawMaterialSchema = z.object({
       .optional()
       .nullable(),
 
-    hsnCode: z
-      .string()
-      .max(20, "HSN Code cannot exceed 20 characters")
-      .optional()
-      .nullable(),
-
     minimumStock: z
       .number()
       .nonnegative()

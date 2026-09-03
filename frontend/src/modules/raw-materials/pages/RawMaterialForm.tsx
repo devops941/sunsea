@@ -21,7 +21,6 @@ const initialFormState = {
     rawMaterialId: "",
     materialName: "",
     categoryId: "" as string | number,
-    hsnCode: "",
     minimumStock: "",
     storeId: "",
     baseUom: "",
@@ -45,14 +44,6 @@ const rawMaterialSchema = z
             .regex(
                 /^(?=.*[A-Za-z])[A-Za-z0-9\s&().,-]+$/,
                 "Material Name must contain at least one letter and only valid characters"
-            ),
-        hsnCode: z
-            .string()
-            .trim()
-            .min(1, "HSN Code is required")
-            .regex(
-                /^\d{4,8}$/,
-                "HSN Code must contain 4 to 8 digits"
             ),
 
         storeId: z
@@ -184,7 +175,6 @@ const RawMaterialForm: React.FC = () => {
             rawMaterialId: data.rawMaterialId || "",
             materialName: data.materialName || "",
             categoryId: data.categoryId ?? "",
-            hsnCode: data.hsnCode || "",
             minimumStock: data.minimumStock !== null && data.minimumStock !== undefined ? String(data.minimumStock) : "",
             storeId: data.storeId || data.store?.storeId || "",
             baseUom: data.baseUom || "",
@@ -296,7 +286,6 @@ const RawMaterialForm: React.FC = () => {
                 rawMaterialId: formData.rawMaterialId,
                 materialName: formData.materialName,
                 categoryId: formData.categoryId ? Number(formData.categoryId) : null,
-                hsnCode: formData.hsnCode || null,
                 storeId: formData.storeId || null,
                 baseUom: formData.baseUom,
                 minimumStock: convertedMinStock,
@@ -367,7 +356,7 @@ const RawMaterialForm: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Row 2: Category | Store | HSN Code */}
+                            {/* Row 2: Category | Store */}
                             <SelectInput
                                 label="Category"
                                 name="categoryId"
@@ -376,29 +365,23 @@ const RawMaterialForm: React.FC = () => {
                                 onChange={handleChange}
                                 searchable
                             />
-                            <SelectInput
-                                label="Store"
-                                name="storeId"
-                                value={formData.storeId}
-                                options={[
-                                    { label: "Select Store", value: "" },
-                                    ...(stores || []).map((store: any) => ({
-                                        label: store.storeName,
-                                        value: store.storeId
-                                    }))
-                                ]}
-                                required
-                                error={errors.storeId}
-                                onChange={handleChange}
-                            />
-                            <TextInput
-                                label="HSN Code"
-                                name="hsnCode"
-                                value={formData.hsnCode}
-                                required
-                                error={errors.hsnCode}
-                                onChange={handleChange}
-                            />
+                            <div className="md:col-span-2">
+                                <SelectInput
+                                    label="Store"
+                                    name="storeId"
+                                    value={formData.storeId}
+                                    options={[
+                                        { label: "Select Store", value: "" },
+                                        ...(stores || []).map((store: any) => ({
+                                            label: store.storeName,
+                                            value: store.storeId
+                                        }))
+                                    ]}
+                                    required
+                                    error={errors.storeId}
+                                    onChange={handleChange}
+                                />
+                            </div>
 
                             {/* Row 3: Base UOM (full width) */}
                             <div className="md:col-span-3">

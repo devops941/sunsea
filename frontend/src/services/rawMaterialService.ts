@@ -6,7 +6,6 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
   rawMaterialId: item.rawMaterialId,
   materialName: item.materialName,
 
-  hsnCode: item.hsnCode,
   minimumStock: item.minimumStock,
 
   storeId: item.storeId,

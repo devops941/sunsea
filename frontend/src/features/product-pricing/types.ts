@@ -3,7 +3,6 @@ import type { Product } from "../product/types";
 export interface ProductPricing {
   id: number;
   productId: number;
-  hsnCode?: string | null;
   gstRate?: number | null;
   cess?: number | null;
   unitPrice?: number | null;
@@ -17,7 +16,6 @@ export interface ProductPricing {
 
 export interface CreateProductPricingDto {
   productId: string;
-  hsnCode?: string;
   gstRate?: number;
   cess?: number;
   unitPrice?: number;
@@ -29,7 +27,6 @@ export interface CreateProductPricingDto {
 }
 
 export interface UpdateProductPricingDto {
-  hsnCode?: string;
   gstRate?: number;
   cess?: number;
   unitPrice?: number;

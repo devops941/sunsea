@@ -182,7 +182,6 @@ const GrnInvoiceViewPage: React.FC = () => {
                 qty,
                 rate,
                 amount,
-                hsnCode: item.rawMaterial?.hsnCode || "-",
                 unit: item.uom || "Pcs.",
                 cgstRate,
                 sgstRate,
@@ -465,7 +464,6 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     <tr>
                                         <Th w="35px">S.N.</Th>
                                         <Th>Description of Goods</Th>
-                                        <Th w="60px">HSN/SAC</Th>
                                         <Th w="55px" align="right">Qty.</Th>
                                         <Th w="45px">Unit</Th>
                                         <Th w="60px" align="right">Price</Th>
@@ -490,7 +488,6 @@ const GrnInvoiceViewPage: React.FC = () => {
                                         <tr key={item.id || idx}>
                                             <Td align="center">{idx + 1}.</Td>
                                             <Td>{item.rawMaterial?.materialName || item.description || "N/A"}</Td>
-                                            <Td align="center">{item.hsnCode}</Td>
                                             <Td align="right">{item.qty}</Td>
                                             <Td align="center">{item.unit}</Td>
                                             <Td align="right">{formatMoney(item.rate)}</Td>
@@ -512,7 +509,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     ))}
                                     {(!selectedItem.items || selectedItem.items.length === 0) && (
                                         <tr>
-                                            <td colSpan={isInterState ? 8 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
+                                            <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
                                                 No items found for this invoice.
                                             </td>
                                         </tr>
@@ -520,7 +517,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colSpan={isInterState ? 7 : 10} className="border border-black px-2 py-1 text-right font-bold">
+                                        <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">
                                             Grand Total
                                         </td>
                                         <td className="border border-black px-2 py-1 text-right font-bold font-mono">

@@ -101,7 +101,6 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
             qty,
             rate,
             amount,
-            hsnCode: item.product?.hsnCode || item.hsnCode || "-",
             unit: item.product?.uom?.uomName || item.unit || "Pcs.",
             cgstRate,
             sgstRate,
@@ -164,7 +163,6 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
             <tr>
                 <td class="border border-black px-2 py-1 align-middle text-center">${idx + 1}.</td>
                 <td class="border border-black px-2 py-1 align-middle text-left">${item.description || item.product?.productName || "N/A"}</td>
-                <td class="border border-black px-2 py-1 align-middle text-center">${item.hsnCode}</td>
                 <td class="border border-black px-2 py-1 align-middle text-right">${item.qty}</td>
                 <td class="border border-black px-2 py-1 align-middle text-center">${item.unit}</td>
                 <td class="border border-black px-2 py-1 align-middle text-right">${item.rate.toFixed(2)}</td>
@@ -177,7 +175,7 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
     if (itemsWithTax.length === 0) {
         itemsHtml += `
             <tr>
-                <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-4 text-center text-slate-500">
+                <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-4 text-center text-slate-500">
                     No items found for this invoice.
                 </td>
             </tr>
@@ -302,7 +300,6 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     <tr>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 35px;">S.N.</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left">Description of Goods</th>
-                        <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 60px;">HSN/SAC</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 55px;">Qty.</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 45px;">Unit</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 60px;">Price</th>
@@ -322,39 +319,39 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right font-bold">Sub Total</td>
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right font-bold">Sub Total</td>
                         <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(totalTaxable)}</td>
                     </tr>
                     ${invoiceDiscount > 0 ? `
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px] text-red-600">
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right text-[13px] text-red-600">
                             Discount ${discountValue > 0 ? `(${discountValue}${discountType === "PERCENT" ? '%' : ' Flat'})` : ''} (-)
                         </td>
                         <td class="border border-black px-2 py-1 text-right text-[13px] text-red-600">- ${formatMoney(invoiceDiscount)}</td>
                     </tr>
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">Taxable Amount</td>
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right text-[13px]">Taxable Amount</td>
                         <td class="border border-black px-2 py-1 text-right text-[13px]">${formatMoney(totalTaxable - invoiceDiscount)}</td>
                     </tr>
                     ` : ''}
                     ${totalTax > 0 ? (isInterState ? `
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">IGST</td>
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right text-[13px]">IGST</td>
                         <td class="border border-black px-2 py-1 text-right text-[13px]">+ ${formatMoney(totalIgst)}</td>
                     </tr>
                     ` : `
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">CGST</td>
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right text-[13px]">CGST</td>
                         <td class="border border-black px-2 py-1 text-right text-[13px]">+ ${formatMoney(totalCgst)}</td>
                     </tr>
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">SGST</td>
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right text-[13px]">SGST</td>
                         <td class="border border-black px-2 py-1 text-right text-[13px]">+ ${formatMoney(totalSgst)}</td>
                     </tr>
                     `) : ''}
                     ${chargeRows.map(cr => `
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right text-[13px]">
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right text-[13px]">
                             ${cr.label} ${cr.sign === 1 ? '(+)' : '(-)'}
                         </td>
                         <td class="border border-black px-2 py-1 text-right text-[13px]">
@@ -362,7 +359,7 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                         </td>
                     </tr>`).join('')}
                     <tr>
-                        <td colspan="${isInterState ? 8 : 10}" class="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
                         <td class="border border-black px-2 py-1 text-right font-bold">${formatMoney(grandTotal)}</td>
                     </tr>
                 </tfoot>

@@ -37,11 +37,10 @@ const initialFormState = {
     productName: "",
     categoryId: "",
     weightPerPiece: "",
-    weightUom: "kg",
+    weightUom: "g",
     productType: "SALES_PRODUCTION",
     description: "",
     isActive: "true",
-    hsnCode: "",
     rate: "",
     minimumQty: "",
     openingStockQty: "",
@@ -167,11 +166,10 @@ const ProductForm: React.FC = () => {
             productName: productData.productName || "",
             categoryId: productData.categoryId ? String(productData.categoryId) : (productData.category?.id ? String(productData.category.id) : ""),
             weightPerPiece: productData.weightPerPiece != null ? String(productData.weightPerPiece) : "",
-            weightUom: productData.weightUom || "kg",
+            weightUom: productData.weightUom || "g",
             productType: productData.productType || "SALES_PRODUCTION",
             description: productData.description || "",
             isActive: productData.isActive ? "true" : "false",
-            hsnCode: productData.hsnCode || "",
             rate: productData.rate != null ? String(productData.rate) : "",
             minimumQty: productData.minimumQty != null ? String(productData.minimumQty) : "",
             openingStockQty: latestStock ? String(latestStock.onHandQty) : "",
@@ -244,9 +242,6 @@ const ProductForm: React.FC = () => {
 
         if (!formData.productName.trim())
             newErrors.productName = "Product Name is required.";
-
-        if (!formData.hsnCode.trim())
-            newErrors.hsnCode = "HSN Code is required.";
 
         if (!formData.categoryId)
             newErrors.categoryId = "Category is required.";
@@ -465,7 +460,6 @@ const ProductForm: React.FC = () => {
             if (formData.description) payload.append("description", formData.description);
             payload.append("isActive", String(formData.isActive === "true"));
 
-            if (formData.hsnCode) payload.append("hsnCode", formData.hsnCode);
             if (formData.rate) payload.append("rate", formData.rate);
 
             // Build grade rates object (only filled-in grades)
@@ -587,8 +581,7 @@ const ProductForm: React.FC = () => {
                             <TextInput label="Product Name" name="productName" value={formData.productName} placeholder="e.g. Plastic Bucket 20L" required onChange={handleChange} error={errors.productName} />
                             <SelectInput label="Category" name="categoryId" value={formData.categoryId} options={categoryOptions} defaultOptionLabel="-- Select Category --" required onChange={handleChange} error={errors.categoryId} disabled={isEditMode} />
                             <SelectInput label="Product Type" name="productType" value={formData.productType} options={[{ value: "PRODUCTION", label: "Production" }, { value: "SALES_PRODUCTION", label: "Sales Production" }]} required onChange={handleChange} error={errors.productType} />
-                            <TextInput label="HSN Code" name="hsnCode" value={formData.hsnCode} placeholder="e.g. 3924" required onChange={handleChange} error={errors.hsnCode} />
-                            <QuantityInput label="Weight per Piece" name="weightPerPiece" required value={formData.weightPerPiece} baseUoms="kg,g" uom={formData.weightUom} onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))} onChange={handleChange} error={errors.weightPerPiece} disabled={isEditMode} />
+                            <QuantityInput label="Weight per Piece" name="weightPerPiece" required value={formData.weightPerPiece} baseUoms="g,kg" uom={formData.weightUom} onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))} onChange={handleChange} error={errors.weightPerPiece} disabled={isEditMode} />
                             <TextInput label="Rate (₹)" name="rate" type="number" step="0.01" value={formData.rate} placeholder="0.00" onChange={handleChange} error={errors.rate} />
                             <SelectInput label="Opening Stock Store" name="openingStockStoreId" required value={formData.openingStockStoreId} options={storeOptions} onChange={handleChange} error={errors.openingStockStoreId} disabled={isEditMode} />
                             <TextInput label="Opening Stock Qty" name="openingStockQty" type="number" placeholder="0" required value={formData.openingStockQty} onChange={handleChange} error={errors.openingStockQty} disabled={isEditMode} />

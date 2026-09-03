@@ -23,7 +23,6 @@ const productLabel = (p: any) => {
 
 const initialFormState = {
     salesProductName: "",
-    hsnCode: "",
 };
 
 const SalesProductForm: React.FC = () => {
@@ -67,7 +66,6 @@ const SalesProductForm: React.FC = () => {
     const populateForm = useCallback((sp: any) => {
         setFormData({
             salesProductName: sp.salesProductName || "",
-            hsnCode: sp.hsnCode || "",
         });
         replace((sp.components || []).map((it: any) => ({
             productCode: String(it.componentProductId),
@@ -109,7 +107,6 @@ const SalesProductForm: React.FC = () => {
         clearErrors();
 
         if (!formData.salesProductName.trim()) newErrors.salesProductName = "Sales Product Name is required.";
-        if (!formData.hsnCode.trim()) newErrors.hsnCode = "HSN Code is required.";
         const items = getValues("items");
         if (items.length === 0) {
             newErrors.items = "At least one component product is required.";
@@ -126,7 +123,7 @@ const SalesProductForm: React.FC = () => {
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0 || items.some(it => !it.productCode || !it.quantity || Number(it.quantity) <= 0)) {
-            toast.error(newErrors.items || newErrors.salesProductName || newErrors.hsnCode || "Please fix the highlighted fields.");
+            toast.error(newErrors.items || newErrors.salesProductName || "Please fix the highlighted fields.");
             return false;
         }
         return true;
@@ -150,7 +147,6 @@ const SalesProductForm: React.FC = () => {
 
         const payload: any = {
             salesProductName: formData.salesProductName,
-            hsnCode: formData.hsnCode,
             components: getValues("items").map(it => ({
                 componentProductId: Number(it.productCode),
                 quantity: Number(it.quantity),
@@ -205,7 +201,7 @@ const SalesProductForm: React.FC = () => {
                 <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
                     <div>
                         <h6 className="text-base font-semibold text-ink mb-3">Basic Information</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <TextInput
                                 label="Sales Product Name"
                                 name="salesProductName"
@@ -214,16 +210,6 @@ const SalesProductForm: React.FC = () => {
                                 required
                                 onChange={handleChange}
                                 error={errors.salesProductName}
-                                disabled={!canSave}
-                            />
-                            <TextInput
-                                label="HSN Code"
-                                name="hsnCode"
-                                value={formData.hsnCode}
-                                placeholder="e.g. 3924"
-                                required
-                                onChange={handleChange}
-                                error={errors.hsnCode}
                                 disabled={!canSave}
                             />
                         </div>

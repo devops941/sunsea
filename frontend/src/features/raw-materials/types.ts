@@ -5,8 +5,6 @@ export interface RawMaterial {
   rawMaterialId: string;
   materialName: string;
 
-  hsnCode?: string | null;
-
   minimumStock?: number | string | null;
 
   baseUom: string;
@@ -54,7 +52,6 @@ export interface CreateRawMaterialDto {
   materialCode?: string;
 
   materialName: string;
-  hsnCode?: string | null;
 
   minimumStock?: number | null;
   storeId?: string | null;
@@ -76,7 +73,6 @@ export interface CreateRawMaterialDto {
 
 export interface UpdateRawMaterialDto {
   materialName?: string;
-  hsnCode?: string | null;
 
   minimumStock?: number | null;
 

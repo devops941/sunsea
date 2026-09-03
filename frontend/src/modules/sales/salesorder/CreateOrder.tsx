@@ -136,6 +136,28 @@ function buildComponents(sp: any, orderQty: number = 1): ComponentItem[] {
     return list;
 }
 
+/** Compute live available stock for a SalesProduct based on its component products */
+function computeSalesProductLiveStock(sp: any): number {
+    if (!sp) return 0;
+    const comps = (sp.components || []).filter((c: any) => c?.componentProduct);
+    if (comps.length === 0) {
+        return (sp.stocks || []).reduce((sum: number, s: any) => sum + Number(s.onHandQty || 0), 0);
+    }
+    const possibleQuantities = comps.map((c: any) => {
+        const prodStocks = c.componentProduct?.finishedGoodsStocks || [];
+        const totalCompStock = prodStocks.reduce((sum: number, s: any) => sum + Number(s.onHandQty || 0), 0);
+        const perUnit = Number(c.quantity || 1);
+        return perUnit > 0 ? Math.floor(totalCompStock / perUnit) : 0;
+    });
+    return Math.max(0, Math.min(...possibleQuantities));
+}
+
+/** Get total on-hand stock for a component product across all stores */
+function getComponentProductStock(componentProduct: any): number {
+    const prodStocks = componentProduct?.finishedGoodsStocks || [];
+    return prodStocks.reduce((sum: number, s: any) => sum + Number(s.onHandQty || 0), 0);
+}
+
 /** Reconstruct form items from saved SalesOrder items and SalesProducts */
 function reconstructFormItems(orderItems: any[], salesProducts: any[]): Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }> {
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
@@ -308,6 +330,8 @@ const ItemRow: React.FC<ItemRowProps> = ({
         setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
     };
 
+    const selectedSp = salesProducts.find(s => String(s.id) === itemValue?.salesProductId);
+    const liveStock = selectedSp ? computeSalesProductLiveStock(selectedSp) : null;
     const hasComponents = components.length > 0;
     const hasNoSalesProductionComponents = itemValue?.salesProductId &&
         salesProducts.find(s => String(s.id) === itemValue.salesProductId)?.components?.length > 0 &&
@@ -364,32 +388,40 @@ const ItemRow: React.FC<ItemRowProps> = ({
                 <tr className="bg-card-2/50">
                     <td colSpan={5} className="px-3 py-2">
                         <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
-                            <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
+                            <div className="grid grid-cols-[auto_1fr_auto_80px_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
                                 <div className="w-4" />
-                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component Product</span>
                                 <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Live Stock</span>
                                 <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
                             </div>
-                            {components.map((comp, compIdx) => (
-                                <div
-                                    key={comp.componentProductId}
-                                    className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={comp.included}
-                                        onChange={() => toggleIncluded(compIdx)}
-                                        className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
-                                    />
-                                    <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
-                                        {comp.productName}
-                                    </span>
-                                    <span className="text-[11px] text-ink-subtle text-center w-12">×{comp.perUnit}</span>
-                                    <span className="text-xs text-ink font-medium text-center">
-                                        {comp.quantity}
-                                    </span>
-                                </div>
-                            ))}
+                            {components.map((comp, compIdx) => {
+                                const spComp = selectedSp?.components?.find((c: any) => String(c.componentProductId) === String(comp.componentProductId));
+                                const compStock = spComp ? getComponentProductStock(spComp.componentProduct) : null;
+                                return (
+                                    <div
+                                        key={comp.componentProductId}
+                                        className={`grid grid-cols-[auto_1fr_auto_80px_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={comp.included}
+                                            onChange={() => toggleIncluded(compIdx)}
+                                            className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
+                                        />
+                                        <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
+                                            {comp.productName}
+                                        </span>
+                                        <span className="text-[11px] text-ink-subtle text-center w-12">×{comp.perUnit}</span>
+                                        <span className="text-xs font-semibold text-center text-ink-subtle">
+                                            {compStock != null ? `${compStock} pcs` : "—"}
+                                        </span>
+                                        <span className="text-xs text-ink font-medium text-center">
+                                            {comp.quantity}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </td>
                 </tr>
@@ -526,10 +558,30 @@ const SalesOrderForm: React.FC = () => {
     );
 
     const salesProductOptions = useMemo(() =>
-        salesProducts.map(sp => ({
-            value: String(sp.id),
-            label: sp.salesProductName || sp.salesProductCode,
-        })),
+        salesProducts.map(sp => {
+            const liveStock = computeSalesProductLiveStock(sp);
+            const name = sp.salesProductName || sp.salesProductCode;
+            const badge = (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
+                    liveStock > 0
+                        ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                        : "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                }`}>
+                    {liveStock} pcs
+                </span>
+            );
+            return {
+                value: String(sp.id),
+                selectedLabel: name,
+                badge,
+                label: (
+                    <div className="flex items-center justify-between w-full gap-2">
+                        <span className="truncate">{name}</span>
+                        {badge}
+                    </div>
+                ),
+            };
+        }),
         [salesProducts]
     );
 

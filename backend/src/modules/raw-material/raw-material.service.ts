@@ -21,7 +21,6 @@ class RawMaterialService {
           rawMaterialId: data.rawMaterialId,
           materialName: data.materialName,
           ...(data.categoryId ? { category: { connect: { id: data.categoryId } } } : {}),
-          hsnCode: data.hsnCode || null,
           minimumStock: data.minimumStock,
           baseUom: data.baseUom,
           reorderLevel: data.reorderLevel,

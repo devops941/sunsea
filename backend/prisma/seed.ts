@@ -921,7 +921,6 @@
 //       weightPerPiece: 0.250,
 //       bundleQty: 50,
 //       isActive: true,
-//       hsnCode: '39249090',
 //       gstRate: 18,
 //       cess: 0,
 //       minimumQty: "10",
@@ -945,7 +944,6 @@
 //       weightPerPiece: 0.500,
 //       bundleQty: 25,
 //       isActive: true,
-//       hsnCode: '39249090',
 //       gstRate: 18,
 //       cess: 0,
 //       minimumQty: "10",
@@ -969,7 +967,6 @@
 //       weightPerPiece: 0.420,
 //       bundleQty: 40,
 //       isActive: true,
-//       hsnCode: '39249090',
 //       gstRate: 18,
 //       cess: 0,
 //       minimumQty: "15",
@@ -993,7 +990,6 @@
 //       weightPerPiece: 0.650,
 //       bundleQty: 20,
 //       isActive: true,
-//       hsnCode: '39249090',
 //       gstRate: 18,
 //       cess: 0,
 //       minimumQty: "20",
@@ -1053,14 +1049,14 @@
 //     // Polymers & Resins (Category 1)
 //     {
 //       rawMaterialId: 'RM-001', materialName: 'HDPE Granules Grade A', categoryId: createdCategories[0].id,
-//       hsnCode: '39012000', minimumStock: 1000, leadTimeDays: 7, baseUom: 'KG', reorderLevel: 2000,
+//       minimumStock: 1000, leadTimeDays: 7, baseUom: 'KG', reorderLevel: 2000,
 //       unitPrice: 120.50, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-H001', onHandQty: 5000, reservedQty: 0, avgCost: 118.00, remarks: 'High Density Polyethylene',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
 //     },
 //     {
 //       rawMaterialId: 'RM-002', materialName: 'PVC Resin K-67', categoryId: createdCategories[0].id,
-//       hsnCode: '39041020', minimumStock: 800, leadTimeDays: 10, baseUom: 'KG', reorderLevel: 1500,
+//       minimumStock: 800, leadTimeDays: 10, baseUom: 'KG', reorderLevel: 1500,
 //       unitPrice: 95.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-P002', onHandQty: 3000, reservedQty: 0, avgCost: 92.50, remarks: 'Polyvinyl Chloride Resin',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
@@ -1068,14 +1064,14 @@
 //     // Additives & Chemicals (Category 2)
 //     {
 //       rawMaterialId: 'RM-003', materialName: 'UV Stabilizer UV-328', categoryId: createdCategories[1].id,
-//       hsnCode: '38122010', minimumStock: 50, leadTimeDays: 15, baseUom: 'KG', reorderLevel: 100,
+//       minimumStock: 50, leadTimeDays: 15, baseUom: 'KG', reorderLevel: 100,
 //       unitPrice: 850.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-U003', onHandQty: 150, reservedQty: 0, avgCost: 840.00, remarks: 'Prevents UV degradation',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
 //     },
 //     {
 //       rawMaterialId: 'RM-004', materialName: 'Plasticizer DOP', categoryId: createdCategories[1].id,
-//       hsnCode: '29173200', minimumStock: 200, leadTimeDays: 5, baseUom: 'LITRE', reorderLevel: 400,
+//       minimumStock: 200, leadTimeDays: 5, baseUom: 'LITRE', reorderLevel: 400,
 //       unitPrice: 150.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-D004', onHandQty: 800, reservedQty: 0, avgCost: 145.00, remarks: 'Dioctyl Phthalate',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
@@ -1083,14 +1079,14 @@
 //     // Colorants & Masterbatches (Category 3)
 //     {
 //       rawMaterialId: 'RM-005', materialName: 'Titanium White Masterbatch', categoryId: createdCategories[2].id,
-//       hsnCode: '32061110', minimumStock: 100, leadTimeDays: 5, baseUom: 'KG', reorderLevel: 250,
+//       minimumStock: 100, leadTimeDays: 5, baseUom: 'KG', reorderLevel: 250,
 //       unitPrice: 320.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-W005', onHandQty: 400, reservedQty: 0, avgCost: 315.00, remarks: 'White pigment concentrate',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
 //     },
 //     {
 //       rawMaterialId: 'RM-006', materialName: 'Carbon Black Masterbatch', categoryId: createdCategories[2].id,
-//       hsnCode: '32064990', minimumStock: 100, leadTimeDays: 5, baseUom: 'KG', reorderLevel: 250,
+//       minimumStock: 100, leadTimeDays: 5, baseUom: 'KG', reorderLevel: 250,
 //       unitPrice: 280.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-B006', onHandQty: 350, reservedQty: 0, avgCost: 275.00, remarks: 'Black pigment concentrate',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
@@ -1098,14 +1094,14 @@
 //     // Packaging Materials (Category 4)
 //     {
 //       rawMaterialId: 'RM-007', materialName: 'Corrugated Box 5-Ply', categoryId: createdCategories[3].id,
-//       hsnCode: '48191010', minimumStock: 500, leadTimeDays: 3, baseUom: 'NOS', reorderLevel: 1000,
+//       minimumStock: 500, leadTimeDays: 3, baseUom: 'NOS', reorderLevel: 1000,
 //       unitPrice: 45.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-C007', onHandQty: 2500, reservedQty: 0, avgCost: 44.00, remarks: 'Outer packaging box',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId
 //     },
 //     {
 //       rawMaterialId: 'RM-008', materialName: 'BOPP Packing Tape', categoryId: createdCategories[3].id,
-//       hsnCode: '39191000', minimumStock: 200, leadTimeDays: 2, baseUom: 'ROLL', reorderLevel: 500,
+//       minimumStock: 200, leadTimeDays: 2, baseUom: 'ROLL', reorderLevel: 500,
 //       unitPrice: 25.00, storeId: mainStoreId, isActive: true, createdBy: "SYSTEM", updatedBy: "SYSTEM",
 //       batchNo: 'BATCH-T008', onHandQty: 1200, reservedQty: 0, avgCost: 24.50, remarks: 'Adhesive tape 2 inch',
 //       lastMovementAt: new Date(), status: 'Active', locationId: rawMaterialLocationId

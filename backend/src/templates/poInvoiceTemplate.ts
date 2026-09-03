@@ -50,12 +50,10 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
             const totalAmount = amount + cgstAmount + sgstAmount + igstAmount;
 
             const description = item.description || item.product?.productName || item.product?.materialName || item.rawMaterial?.materialName || item.productId || "N/A";
-            const hsnCode = item.hsnCode || item.product?.hsnCode || item.rawMaterial?.hsnCode || "—";
 
             return {
                 ...item,
                 description,
-                hsnCode,
                 qty,
                 rate,
                 amount,
@@ -94,7 +92,7 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
     let itemsHtml = '';
     if (itemsWithTax.length === 0) {
         itemsHtml = `<tr>
-            <td colspan="${isInterState ? 8 : 9}" class="border border-black px-2 py-4 text-center text-slate-500">
+            <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-4 text-center text-slate-500">
                 No items found.
             </td>
         </tr>`;
@@ -118,7 +116,6 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
             <tr>
                 <td class="border border-black px-2 py-1 align-middle text-center">${idx + 1}.</td>
                 <td class="border border-black px-2 py-1 align-middle text-left">${item.description}</td>
-                <td class="border border-black px-2 py-1 align-middle text-center">${item.hsnCode}</td>
                 <td class="border border-black px-2 py-1 align-middle text-right">${item.qty}</td>
                 <td class="border border-black px-2 py-1 align-middle text-center">${item.unit}</td>
                 <td class="border border-black px-2 py-1 align-middle text-right">${formatMoney(item.rate)}</td>
@@ -260,7 +257,6 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
                     <tr>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 35px;">S.N.</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left">Description of Goods</th>
-                        <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 60px;">HSN/SAC</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 55px;">Qty.</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-left" style="width: 45px;">Unit</th>
                         <th class="border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-right" style="width: 60px;">Price</th>
@@ -281,7 +277,7 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="${isInterState ? 7 : 10}" class="border border-black px-2 py-1 text-right font-bold">
+                        <td colspan="${isInterState ? 7 : 9}" class="border border-black px-2 py-1 text-right font-bold">
                             Grand Total
                         </td>
                         <td class="border border-black px-2 py-1 text-right font-bold font-mono">

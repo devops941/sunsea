@@ -462,7 +462,6 @@ class SalesInvoiceService {
                 id: true,
                 productCode: true,
                 productName: true,
-                hsnCode: true,
                 uom: { select: { uomName: true } },
               },
             },

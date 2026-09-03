@@ -259,7 +259,6 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                                 { label: "Product Name", value: selectedItem.product?.productName || "N/A" },
                                 { label: "Category", value: selectedItem.product?.category?.name || selectedItem.product?.category?.categoryName || "N/A" },
                                 { label: "Store / Location", value: selectedItem.store?.storeName || "N/A" },
-                                { label: "HSN Code", value: selectedItem.product?.hsnCode || "N/A" },
                             ]
                         },
                         {
@@ -267,7 +266,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                             fields: [
                                 { label: "Physical Stock (On Hand)", value: `${selectedItem.onHandQty} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
                                 { label: "Minimum Quantity limit", value: `${(selectedItem.product as any)?.minimumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
-                                { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} ${(selectedItem.product as any)?.weightUom || "kg"}` : "N/A" },
+                                { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} ${(selectedItem.product as any)?.weightUom || "g"}` : "N/A" },
                             ]
                         }
                     ] : []}
