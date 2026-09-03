@@ -328,6 +328,9 @@ model Customer {
   email                String?                  @db.VarChar(120)
   gstin                String?                  @db.VarChar(15)
   creditLimit          Decimal                  @default(0) @db.Decimal(14, 2)
+  creditDays           Int?                     @map("credit_days")
+
+  transports           Json?                    @map("transports")
 
   outstandingAmount    Decimal                  @default(0) @db.Decimal(14, 2)
   createdBy            String

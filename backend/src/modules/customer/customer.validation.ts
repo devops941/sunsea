@@ -31,6 +31,13 @@ export const createCustomerSchema = z.object({
 
 
   creditLimit: z.number().optional(),
+  creditDays: z.number().nullable().optional(),
+
+  transports: z.array(z.object({
+    name: z.string().min(1),
+    address: z.string().optional().default(""),
+    phone: z.string().optional().default(""),
+  })).nullable().optional(),
 
   // Opening balance — set once at creation, never editable
   openingBalance: z.number().min(0, "Opening balance cannot be negative").optional().default(0),

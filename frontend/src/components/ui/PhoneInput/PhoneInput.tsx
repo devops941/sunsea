@@ -64,7 +64,7 @@ interface SinglePhoneFieldProps {
     showRemove?: boolean;
 }
 
-const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
+export const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
     name,
     value,
     placeholder,
