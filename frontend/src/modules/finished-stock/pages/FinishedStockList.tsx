@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchFinishedGoodsStocks, finishedGoodsStockCreated, finishedGoodsStockUpdated, finishedGoodsStockDeleted } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
+import { useListCache } from "../../../hooks/useListCache";
+import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
-
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -30,9 +29,6 @@ interface FinishedStockListProps {
 }
 
 const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStoreId }) => {
-    const dispatch = useAppDispatch();
-    const { data, loading, error, total } = useAppSelector((state) => state.finishedGoodsStocks);
-
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const activeStoreId = propStoreId || "";
@@ -59,16 +55,12 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     }, [fetchCategoriesData]);
 
     // Debounce search — 300 ms
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+        const timer = setTimeout(() => {
             setDebouncedSearch(searchTerm);
             setCurrentPage(1);
         }, 300);
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
+        return () => clearTimeout(timer);
     }, [searchTerm]);
 
     // Reset page to 1 when storeId changes
@@ -76,28 +68,29 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
         setCurrentPage(1);
     }, [activeStoreId]);
 
-    // Fetch stocks based on search, page, limit, storeId and categoryId
-    useEffect(() => {
-        dispatch(fetchFinishedGoodsStocks({
+    const cacheKey = `finishedGoodsStock:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${activeStoreId}:${appliedCategory}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await finishedGoodsStockService.fetchAll({
             storeId: activeStoreId,
             search: debouncedSearch,
             categoryId: appliedCategory || undefined,
             page: currentPage,
-            limit: ITEMS_PER_PAGE
-        }));
-    }, [dispatch, activeStoreId, debouncedSearch, appliedCategory, currentPage]);
+            limit: ITEMS_PER_PAGE,
+        });
+        const list = Array.isArray(res) ? res : (res.data || []);
+        const tot = Array.isArray(res) ? res.length : (res.total || list.length);
+        return { data: list, total: tot };
+    }, [activeStoreId, debouncedSearch, appliedCategory, currentPage]);
 
-    useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
-    }, [error]);
-
-    useSocketSync("finishedGoodsStock", {
-        created: finishedGoodsStockCreated,
-        updated: finishedGoodsStockUpdated,
-        deleted: finishedGoodsStockDeleted,
+    const { data, total, loading } = useListCache({
+        cacheKey,
+        socketModule: "finishedGoodsStock",
+        fetcher,
     });
+
+    // Re-fetch category options on category changes
+    useSocketSync("category", undefined, fetchCategoriesData);
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

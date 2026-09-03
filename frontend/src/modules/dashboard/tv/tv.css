@@ -1,0 +1,140 @@
+/* ══════════════════════════════════════════════════════════════════
+   MANAGEMENT TV DASHBOARD
+   ------------------------------------------------------------------
+   The design was drawn on a fixed 1920×1080 board. Rather than scaling
+   that board with a transform (which letterboxes on any other ratio),
+   the layout here is fluid: `--tv-u` scales typography and spacing off
+   whichever viewport axis is tighter, while flex/grid stretch to fill
+   whatever space is actually available. The result holds its
+   proportions on a 16:9 panel, a 32:9 ultrawide, or a portrait screen.
+   ══════════════════════════════════════════════════════════════════ */
+
+.tv-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  /* 1 unit == 1px at exactly 1920×1080; shrinks on the tighter axis. */
+  --tv-u: min(calc(100vw / 1920), calc(100vh / 1080));
+  --tv-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--tv-mono);
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Portrait and near-square displays: the width axis is the constraint,
+   so give type a floor and let the board scroll-free reflow instead. */
+@media (max-aspect-ratio: 1/1) {
+  .tv-root {
+    --tv-u: min(calc(100vw / 1280), calc(100vh / 1080));
+  }
+}
+
+.tv-board {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* CRT-style scanline texture from the design. */
+.tv-scan {
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--tv-scan) 0px,
+    var(--tv-scan) 1px,
+    transparent 1px,
+    transparent 28px
+  );
+}
+
+.tv-root ::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Scene area ─────────────────────────────────────────────────── */
+.tv-scene {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Panels must never push the board taller than the screen. */
+.tv-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ── Aspect-ratio reflow ────────────────────────────────────────── */
+
+/* Ultrawide (wider than ~21:9): the KPI strip has room to breathe, but
+   the two-column body would get uncomfortably short. Flatten it. */
+@media (min-aspect-ratio: 21/9) {
+  .tv-split-2 {
+    grid-template-rows: 1fr !important;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+}
+
+/* Narrow / portrait: stack the main two-column body and wrap the KPI
+   strip so nothing is squeezed below a readable size. */
+@media (max-aspect-ratio: 5/4) {
+  .tv-body-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-rows: minmax(0, 1fr);
+  }
+  .tv-kpi-strip {
+    flex-wrap: wrap;
+  }
+  .tv-kpi-strip > * {
+    flex: 1 1 30%;
+  }
+}
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes tv-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes tv-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.tv-live-dot {
+  animation: tv-blink 1.4s steps(2, jump-none) infinite;
+}
+
+.tv-ticker {
+  display: inline-block;
+  white-space: nowrap;
+  animation: tv-ticker 26s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-live-dot,
+  .tv-ticker {
+    animation: none;
+  }
+}

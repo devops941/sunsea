@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 import { toast } from "react-toastify";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchRawMaterialStocks, rawMaterialStockCreated, rawMaterialStockUpdated, rawMaterialStockDeleted } from "../../../features/raw-materials/rawMaterialStockSlice";
+import { useListCache } from "../../../hooks/useListCache";
+import { rawMaterialStockService } from "../../../services/rawMaterialStockService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -30,10 +30,6 @@ const parseBaseUom = (uomStr?: string) => {
 };
 
 const WastageStockList: React.FC = () => {
-    const dispatch = useAppDispatch();
-
-    const { data, loading, error, totalPages, total } = useAppSelector((state) => state.rawMaterialStocks);
-
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -61,21 +57,18 @@ const WastageStockList: React.FC = () => {
     }, [fetchCategoriesData]);
 
     // Debounce search — 300 ms
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+        const timer = setTimeout(() => {
             setDebouncedSearch(searchTerm);
             setCurrentPage(1);
         }, 300);
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
+        return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Server-side fetch with all filters
-    const loadData = useCallback(() => {
-        dispatch(fetchRawMaterialStocks({
+    const cacheKey = `wastageStock:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${appliedCategory}:${appliedStatus}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await rawMaterialStockService.fetchAll({
             search: debouncedSearch || undefined,
             storeCategory: "WASTAGE",
             itemType: "WASTAGE",
@@ -83,22 +76,20 @@ const WastageStockList: React.FC = () => {
             status: appliedStatus || undefined,
             page: currentPage,
             limit: ITEMS_PER_PAGE,
-        }));
-    }, [dispatch, debouncedSearch, appliedCategory, appliedStatus, currentPage]);
+        });
+        return { data: res.data || [], total: res.total || 0 };
+    }, [debouncedSearch, appliedCategory, appliedStatus, currentPage]);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
-
-    useEffect(() => {
-        if (error) toast.error(error);
-    }, [error]);
-
-    useSocketSync("rawMaterialStock", {
-        created: rawMaterialStockCreated,
-        updated: rawMaterialStockUpdated,
-        deleted: rawMaterialStockDeleted,
+    const { data, total, loading } = useListCache({
+        cacheKey,
+        socketModule: "rawMaterialStock",
+        fetcher,
     });
+
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
+
+    // Re-fetch category options on category changes
+    useSocketSync("category", undefined, fetchCategoriesData);
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

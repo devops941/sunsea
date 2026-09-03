@@ -18,7 +18,7 @@ import EmailButton from "../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../components/ui/WhatsappButton/WhatsappButton";
 import { Mail } from "lucide-react";
 import { useAppSelector } from "../../hooks/reduxHooks";
-import { useSocketSync } from "../../hooks/useSocketSync";
+import { useListCache, markStaleByPrefix } from "../../hooks/useListCache";
 import { usePermission } from "../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 15;
@@ -45,14 +45,14 @@ const calculateSalesPendingAmount = (item: any) => {
     return pending > 0 ? pending : 0;
 };
 
+const INVOICE_CACHE_PREFIX = "salesInvoices:";
+
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
     const { can } = usePermission();
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [total, setTotal] = useState(0);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -74,32 +74,29 @@ const SalesInvoiceList: React.FC = () => {
     const [whatsappMessage, setWhatsappMessage] = useState("");
     const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
-    const fetchInvoices = useCallback(async () => {
-        if (!can("sales-invoices.view")) return;
-        setLoading(true);
-        try {
-            const response = await salesInvoiceService.fetchAll({
-                page: currentPage,
-                pageSize: ITEMS_PER_PAGE,
-                search: searchTerm || undefined,
-            });
-
-            setData(response.data || []);
-            setTotal(response.total ?? 0)
-        } catch (error: any) {
-            console.error("❌ Fetch error:", error);
-            toast.error(error?.response?.data?.message || "Failed to fetch invoices");
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, searchTerm, can]);
-
+    // Debounce search
     useEffect(() => {
-        fetchInvoices();
-    }, [fetchInvoices]);
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-    useSocketSync("salesInvoice", undefined, fetchInvoices);
+    const cacheKey = `${INVOICE_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const response = await salesInvoiceService.fetchAll({
+            page: currentPage,
+            pageSize: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+        });
+        return { data: response.data || [], total: response.total ?? 0 };
+    }, [currentPage, debouncedSearch]);
+
+    const { data, total, loading, refresh } = useListCache({
+        cacheKey,
+        socketModule: "salesInvoice",
+        fetcher,
+        enabled: can("sales-invoices.view"),
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -114,9 +111,10 @@ const SalesInvoiceList: React.FC = () => {
             toast.success("Invoice deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
-            fetchInvoices();
+            markStaleByPrefix(INVOICE_CACHE_PREFIX);
+            refresh();
         } catch (error: any) {
-            console.error("❌ Delete error:", error);
+            console.error("Delete error:", error);
             toast.error(error?.response?.data?.message || "Failed to delete invoice");
         }
     };

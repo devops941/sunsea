@@ -14,6 +14,7 @@ import logo from '../../public/loaderimage.png'
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
 const ProductionDashboard = lazy(() => import("../modules/dashboard/pages/ProductionDashboard"));
 const OeeDashboard = lazy(() => import("../modules/dashboard/pages/OeeDashboard"));
+const TvDashboard = lazy(() => import("../modules/dashboard/tv/TvDashboard"));
 const NotFoundPage = lazy(() => import("../modules/not-found/pages/NotFoundPage"));
 const UnauthorizedPage = lazy(() => import("../modules/unauthorized/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("../modules/login/pages/LoginPage"));
@@ -255,6 +256,9 @@ const AppRoutes = () => {
         <Route element={<ProtectedRoute />}>
           {/* Onboarding Route (Rendered without BaseLayout) */}
           <Route path="/company/create" element={<CompanySettings />} />
+
+          {/* TV Dashboard — full-screen, no navbar/footer */}
+          <Route path="/tv-dashboard" element={<TvDashboard />} />
 
           <Route element={<BaseLayout />}>
 

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { FaFilter } from "react-icons/fa";
 import { reportsService } from "../../../services/reportsService";
 import { customerService } from "../../../services/customerService";
 import { DISPATCH_TYPE_OPTIONS, DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
@@ -12,7 +11,7 @@ import Button from "../../../components/ui/Button/Button";
 import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DataTable from "../../../components/ui/table/DataTable";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useListCache } from "../../../hooks/useListCache";
 
 const SalesReportsCenter: React.FC = () => {
   // Filters state
@@ -31,12 +30,9 @@ const SalesReportsCenter: React.FC = () => {
   const [draftStatus, setDraftStatus] = useState(status);
   const [draftDispatchType, setDraftDispatchType] = useState(dispatchType);
 
-  // Backend direct reports loading
-  const [backendReports, setBackendReports] = useState<any[]>([]);
-  const [loadingBackend, setLoadingBackend] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const LIMIT = 10;
 
   const DEFAULT_COLUMNS = [
     "#", "ORDER NUMBER", "ORDER DATE", "CUSTOMER", "BILLING ADDRESS",
@@ -56,13 +52,9 @@ const SalesReportsCenter: React.FC = () => {
     return DEFAULT_COLUMNS;
   });
 
-  const [refreshKey, setRefreshKey] = useState(0);
-
   useEffect(() => {
     localStorage.setItem("salesReportVisibleColumns", JSON.stringify(visibleColumns));
   }, [visibleColumns]);
-
-  useSocketSync("salesOrder", undefined, () => setRefreshKey(k => k + 1));
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -76,33 +68,26 @@ const SalesReportsCenter: React.FC = () => {
     loadCustomers();
   }, []);
 
-  // Load report data from backend
-  useEffect(() => {
-    const loadReport = async () => {
-      setLoadingBackend(true);
-      try {
-        const res = await reportsService.getSalesOrderReport({
-          startDate,
-          endDate,
-          orderNo,
-          customerId,
-          status,
-          dispatchType,
-          page,
-          limit: 10
-        });
-        setBackendReports(res?.data?.data || []);
-        setTotalPages(res?.data?.totalPages || 1);
-      } catch (err) {
-        console.error("Failed to load backend report", err);
-        setBackendReports([]);
-        setTotalPages(1);
-      } finally {
-        setLoadingBackend(false);
-      }
-    };
-    loadReport();
-  }, [startDate, endDate, orderNo, customerId, status, dispatchType, page, refreshKey]);
+  // Load report data via useListCache
+  const cacheKey = `salesReport:${page}:${LIMIT}:${startDate}:${endDate}:${orderNo}:${customerId}:${status}:${dispatchType}`;
+
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await reportsService.getSalesOrderReport({
+      startDate, endDate, orderNo, customerId, status, dispatchType,
+      page, limit: LIMIT,
+    });
+    const data = res?.data?.data || [];
+    const totalPages = res?.data?.totalPages || 1;
+    return { data, total: totalPages * LIMIT };
+  }, [startDate, endDate, orderNo, customerId, status, dispatchType, page]);
+
+  const { data: backendReports, total, loading: loadingBackend } = useListCache({
+    cacheKey,
+    socketModule: "salesOrder",
+    fetcher,
+  });
+
+  const totalPages = Math.ceil((total || 0) / LIMIT) || 1;
 
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     const columns = [

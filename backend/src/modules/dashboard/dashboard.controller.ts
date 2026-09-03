@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../../config/prisma";
 import { LedgerType, VoucherType } from "@prisma/client";
+import { getTvSummary } from "./dashboard.tv.service";
 
 const dashboardController = {
   getSummary: async (req: Request, res: Response) => {
@@ -496,6 +497,15 @@ const dashboardController = {
     } catch (error) {
       console.error("Accounts summary error:", error);
       return res.status(500).json({ success: false, message: "Failed to load accounts summary" });
+    }
+  },
+   getTvSummary: async (_req: Request, res: Response) => {
+    try {
+      const data = await getTvSummary();
+      return res.json({ success: true, data });
+    } catch (error) {
+      console.error("TV summary error:", error);
+      return res.status(500).json({ success: false, message: "Failed to load TV dashboard data" });
     }
   },
 };

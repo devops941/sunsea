@@ -58,6 +58,49 @@ export interface AccountsSummary {
   alerts: AccountsSummaryAlert[];
 }
 
+export interface TvSeriesPoint { day: string; value: number }
+export interface TvTrend { label: string; series: TvSeriesPoint[]; trend: number | null }
+export interface TvLine { name: string; pct: number; status: string }
+export interface TvPipelineStage { key: string; label: string; count: number; delayed?: boolean }
+export interface TvAlert { level: "CRITICAL" | "HIGH" | "MEDIUM"; text: string }
+export interface TvReorderItem { name: string; stock: string; status: "CRITICAL" | "LOW" }
+export interface TvAgingBucket { label: string; value: string; pct: number; tone: "good" | "warn" | "bad" }
+
+export interface TvSummary {
+  generatedAt: string;
+  sales: {
+    today: number; todayLabel: string; todayTrend: number | null;
+    mtd: number; mtdLabel: string; mtdTrend: number | null;
+    lastMonth: number; lastMonthLabel: string;
+  };
+  orders: { total: number; active: number; delayed: number; trend: number | null };
+  production: {
+    planned: number; plannedLabel: string;
+    produced: number; producedLabel: string;
+    pending: number; pendingLabel: string;
+    achievement: number;
+    lines: TvLine[];
+  };
+  pipeline: TvPipelineStage[];
+  inventory: {
+    healthyPct: number; criticalCount: number; lowCount: number;
+    skuTotal: number; finishedUnits: number;
+    split: { label: string; pct: number }[];
+    reorderItems: TvReorderItem[];
+  };
+  finance: {
+    receivable: number; receivableLabel: string;
+    overdue: number; overdueLabel: string;
+    overdueCustomers: number;
+    receivableParties: number;
+    aging: TvAgingBucket[];
+  };
+  downtime: { line: string; reason: string; minutes: number }[];
+  topProducts: { name: string; value: string; pct: number }[];
+  trends: { sales: TvTrend; efficiency: TvTrend; orders: TvTrend };
+  alerts: TvAlert[];
+}
+
 const dashboardService = {
   getSummary: async () => {
     const res = await apiClient.get(`/dashboard/summary`);
@@ -66,6 +109,10 @@ const dashboardService = {
   getAccountsSummary: async () => {
     const res = await apiClient.get(`/dashboard/accounts-summary`);
     return res.data?.data as AccountsSummary;
+  },
+  getTvSummary: async (signal?: AbortSignal) => {
+    const res = await apiClient.get(`/dashboard/tv-summary`, { signal });
+    return res.data?.data as TvSummary;
   },
 };
 

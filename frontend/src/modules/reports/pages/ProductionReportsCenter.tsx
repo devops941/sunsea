@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
-import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { fetchHourlyProductions } from "../../../features/hourly-productions/hourlyProductionSlice";
 import { fetchEmployees } from "../../../features/employee/employeeSlice";
@@ -17,6 +16,7 @@ import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
+import { useListCache } from "../../../hooks/useListCache";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ProductionReportsCenter: React.FC = () => {
@@ -45,9 +45,6 @@ const ProductionReportsCenter: React.FC = () => {
 
   const [page, setPage] = useState(1);
   const limit = 10;
-
-  const [backendReports, setBackendReports] = useState<any[]>([]);
-  const [loadingBackend, setLoadingBackend] = useState(false);
 
   const [visibleColumnsConfig, setVisibleColumnsConfig] = useState<Record<string, string[]>>(() => {
     const saved = localStorage.getItem("productionReportVisibleColumns");
@@ -80,25 +77,21 @@ const ProductionReportsCenter: React.FC = () => {
   useSocketSync("machine", undefined, fetchAllData);
   useSocketSync("shift", undefined, fetchAllData);
 
-  // Load report data from backend if applicable
-  useEffect(() => {
-    const loadReport = async () => {
-      if (selectedReportType === "weekly") {
-        setLoadingBackend(true);
-        try {
-          const res = await reportsService.getWeeklyProgramReport(startDate, endDate);
-          setBackendReports(res);
-        } catch (err) {
-          console.error("Failed to load backend report", err);
-        } finally {
-          setLoadingBackend(false);
-        }
-      } else {
-        setBackendReports([]);
-      }
-    };
-    loadReport();
-  }, [selectedReportType, startDate, endDate]);
+  // Load weekly report data via useListCache
+  const weeklyCacheKey = `weeklyProductionReport:${startDate}:${endDate}`;
+
+  const weeklyFetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await reportsService.getWeeklyProgramReport(startDate, endDate);
+    const list = Array.isArray(res) ? res : [];
+    return { data: list, total: list.length };
+  }, [startDate, endDate]);
+
+  const { data: backendReports, loading: loadingBackend } = useListCache({
+    cacheKey: weeklyCacheKey,
+    socketModule: "weeklyProgram",
+    fetcher: weeklyFetcher,
+    enabled: selectedReportType === "weekly",
+  });
 
   // Dynamic filter utility for local calculations (Production Orders)
   const filteredOrders = useMemo(() => {
