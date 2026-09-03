@@ -11,7 +11,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { customerService } from "../../../services/customerService";
-import IndiaPhoneInput, { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { validatePhoneNumber, SinglePhoneField } from "../../../components/ui/PhoneInput/PhoneInput";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
@@ -48,7 +48,13 @@ const customerFormSchema = z.object({
   openingBalance: z.string().min(1, "Opening Balance is required"),
   openingBalanceType: z.string().min(1, "Opening Balance Type is required"),
   creditLimit: z.string().min(1, "Credit Limit is required").refine(val => !isNaN(Number(val)) && Number(val) >= 25000, { message: "Credit Limit must be at least ₹25000" }),
+  creditDays: z.string().optional(),
 
+  transports: z.array(z.object({
+    name: z.string().min(1, "Transport name is required"),
+    address: z.string().optional(),
+    phone: z.string().optional(),
+  })),
 
   addresses: z.array(z.object({ address: addressSchema })).min(1, "At least one address is required"),
 });
@@ -66,8 +72,10 @@ const initialFormData: CustomerFormValues = {
   email: "",
   gstin: "",
   creditLimit: "",
+  creditDays: "",
   openingBalance: "",
   openingBalanceType: "DEBIT",
+  transports: [],
   addresses: [{ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }]
 };
 
@@ -94,8 +102,10 @@ const mapCustomerToFormData = (customer: any): CustomerFormValues => {
     email: customer.email || "",
     gstin: customer.gstin || "",
     creditLimit: customer.creditLimit != null ? String(customer.creditLimit) : "",
+    creditDays: customer.creditDays != null ? String(customer.creditDays) : "",
     openingBalance: customer.openingBalance != null ? String(customer.openingBalance) : "0",
     openingBalanceType: customer.openingBalanceType || "DEBIT",
+    transports: Array.isArray(customer.transports) ? customer.transports : [],
     addresses: addrs.length > 0 ? addrs : initialFormData.addresses,
   };
 };
@@ -148,6 +158,11 @@ const CustomerFormPage: React.FC = () => {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "addresses"
+  });
+
+  const { fields: transportFields, append: appendTransport, remove: removeTransport } = useFieldArray({
+    control,
+    name: "transports"
   });
 
   const handleRemoveAddress = (index: number) => {
@@ -221,8 +236,10 @@ const CustomerFormPage: React.FC = () => {
           _label: index === 0 ? "Billing Address" : `Address ${index + 1}`,
         })),
         creditLimit: Number(data.creditLimit) || 0,
+        creditDays: data.creditDays ? Number(data.creditDays) : null,
         openingBalance: Number(data.openingBalance || 0),
         openingBalanceType: data.openingBalanceType || "DEBIT",
+        transports: data.transports.length > 0 ? data.transports : null,
         status: data.isActive === "true" ? "Active" : "Inactive",
       };
 
@@ -374,16 +391,34 @@ const CustomerFormPage: React.FC = () => {
             <Controller name="creditLimit" control={control} render={({ field }) => (
               <CtrlText field={field} label="Credit Limit ₹" type="number" placeholder="30000" preventNegative error={errors.creditLimit?.message} />
             )} />
+            <Controller name="creditDays" control={control} render={({ field }) => (
+              <SelectInput
+                label="Credit Days"
+                searchable={false}
+                name={field.name}
+                value={field.value ?? ""}
+                options={[
+                  { value: "7", label: "7 Days" },
+                  { value: "14", label: "14 Days" },
+                  { value: "21", label: "21 Days" },
+                  { value: "30", label: "30 Days" },
+                ]}
+                defaultOptionLabel="Select Credit Days"
+                onChange={(e: any) => field.onChange(e.target.value)}
+                error={errors.creditDays?.message}
+              />
+            )} />
           </div>
+
+          {/* Transport Details */}
+         
 
           {/* Billing Address */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">
                 Billing Address
-                {fields.length === 1 && (
-                  <span className="text-ink-muted font-normal normal-case ml-1 text-xs">(Same address used for Shipping)</span>
-                )}
+          
               </h4>
               <CustomButton
                 type="button"
@@ -449,6 +484,57 @@ const CustomerFormPage: React.FC = () => {
                     pincodeError={fieldErrors?.pincode?.message}
                     required
                   />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Transport Details */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">Transport Details</h4>
+              <CustomButton
+                type="button"
+                text="Add Transport"
+                icon={FaPlus}
+                variant="secondary"
+                onClick={() => appendTransport({ name: "", address: "", phone: "" })}
+              />
+            </div>
+
+            {transportFields.length === 0 && (
+              <p className="text-xs text-ink-muted italic">No transport added yet. Click "Add Transport" to add one.</p>
+            )}
+
+            {transportFields.map((tf, index) => {
+              const fieldErrors = errors.transports?.[index];
+              return (
+                <div key={tf.id} className="p-4 border border-line rounded-md relative">
+                  <div className="flex items-center justify-between mb-3 border-b border-line pb-2">
+                    <h4 className="text-sm font-semibold text-ink uppercase">Transport {index + 1}</h4>
+                    <DeleteButton onClick={() => removeTransport(index)} />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
+                    <Controller name={`transports.${index}.name`} control={control} render={({ field }) => (
+                      <CtrlText field={field} label="Transport Name" placeholder="e.g. Sri Balaji Transport" required error={fieldErrors?.name?.message} />
+                    )} />
+                    <Controller name={`transports.${index}.address`} control={control} render={({ field }) => (
+                      <CtrlText field={field} label="Transport Address" placeholder="e.g. 12, Main Road, Coimbatore" error={fieldErrors?.address?.message} />
+                    )} />
+                    <Controller name={`transports.${index}.phone`} control={control} render={({ field }) => (
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-muted mb-1.5">Transport Phone</label>
+                        <SinglePhoneField
+                          name={field.name}
+                          value={field.value ?? ""}
+                          placeholder="98765 43210"
+                          onChange={(val) => field.onChange(val)}
+                          onBlur={field.onBlur}
+                          error={fieldErrors?.phone?.message}
+                        />
+                      </div>
+                    )} />
+                  </div>
                 </div>
               );
             })}
