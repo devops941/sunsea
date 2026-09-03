@@ -15,6 +15,7 @@ import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import EditButton from "../../../../components/ui/EditButton/EditButton";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useListCache } from "../../../../hooks/useListCache";
+import { usePermission } from "../../../../hooks/usePermission";
 
 
 const ITEMS_PER_PAGE = 15;
