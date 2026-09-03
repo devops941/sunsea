@@ -965,15 +965,27 @@ const DashboardPage: React.FC = () => {
                       : FaInfoCircle;
 
                     const content = (
-                      <div className="flex items-center justify-between gap-2.5 w-full">
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <IconComponent className={`text-xs mt-0.5 shrink-0 ${iconColor}`} />
-                          <p className="text-[11px] font-semibold text-ink leading-snug break-words">
-                            {a.message}
-                          </p>
+                      <div className="w-full">
+                        <div className="flex items-center justify-between gap-2.5">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <IconComponent className={`text-xs mt-0.5 shrink-0 ${iconColor}`} />
+                            <p className="text-[11px] font-semibold text-ink leading-snug break-words">
+                              {a.message}
+                            </p>
+                          </div>
+                          {a.link && (
+                            <FaChevronRight className="text-[9px] text-ink-subtle group-hover:text-ink group-hover:translate-x-0.5 transition-all shrink-0" />
+                          )}
                         </div>
-                        {a.link && (
-                          <FaChevronRight className="text-[9px] text-ink-subtle group-hover:text-ink group-hover:translate-x-0.5 transition-all shrink-0" />
+                        {a.details && a.details.length > 0 && (
+                          <div className="ml-5 mt-1.5 space-y-1">
+                            {a.details.map((d, di) => (
+                              <div key={di} className="flex items-center justify-between text-[10px] text-ink-subtle">
+                                <span className="truncate mr-2">{d.name}</span>
+                                <span className="font-semibold text-ink whitespace-nowrap">{d.amount}</span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     );
