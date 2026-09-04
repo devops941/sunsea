@@ -15,11 +15,26 @@ interface ShortcutPanelProps {
 }
 
 const CATEGORY_ACCENT: Record<ShortcutCategory, { badge: string; header: string }> = {
-  nav:     { badge: "bg-amber-950/70   text-amber-300   border-amber-700/50",   header: "text-amber-400" },
-  system:  { badge: "bg-rose-950/70    text-rose-300    border-rose-700/50",    header: "text-rose-400" },
-  create:  { badge: "bg-emerald-950/70 text-emerald-300 border-emerald-700/50", header: "text-emerald-400" },
-  reports: { badge: "bg-sky-950/70     text-sky-300     border-sky-700/50",     header: "text-sky-400" },
-  ctrl:    { badge: "bg-violet-950/70  text-violet-300  border-violet-700/50",  header: "text-violet-400" },
+  nav:     {
+    badge: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-700/50",
+    header: "text-amber-700 dark:text-amber-400",
+  },
+  system:  {
+    badge: "bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-700/50",
+    header: "text-rose-700 dark:text-rose-400",
+  },
+  create:  {
+    badge: "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-700/50",
+    header: "text-emerald-700 dark:text-emerald-400",
+  },
+  reports: {
+    badge: "bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-700/50",
+    header: "text-sky-700 dark:text-sky-400",
+  },
+  ctrl:    {
+    badge: "bg-violet-100 text-violet-900 border-violet-300 dark:bg-violet-950/70 dark:text-violet-300 dark:border-violet-700/50",
+    header: "text-violet-700 dark:text-violet-400",
+  },
 };
 
 /* Single shortcut row — ultra compact & perfectly aligned */
@@ -43,8 +58,11 @@ const ShortcutRow = ({
       className={`
         w-full flex items-center gap-2 px-1.5 py-[3px] text-left
         cursor-pointer transition-all duration-100 outline-none rounded
-        focus-visible:bg-indigo-900/40
-        ${isActive ? "bg-indigo-500/25" : "hover:bg-white/[0.04]"}
+        focus-visible:bg-indigo-100 dark:focus-visible:bg-indigo-900/40
+        ${isActive
+          ? "bg-indigo-100/80 text-indigo-900 dark:bg-indigo-500/25 dark:text-indigo-100"
+          : "hover:bg-slate-100/90 dark:hover:bg-white/[0.04]"
+        }
       `}
     >
       <span className={`
@@ -53,14 +71,16 @@ const ShortcutRow = ({
         font-extrabold font-mono tracking-tight border text-center whitespace-nowrap
         transition-all duration-100
         ${isActive
-          ? "bg-indigo-500 text-white border-indigo-300 shadow-[0_0_8px_rgba(99,102,241,0.8)] scale-[1.02]"
+          ? "bg-indigo-600 text-white border-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.6)] scale-[1.02]"
           : accent.badge
         }
       `}>
         {sc.keyLabel}
       </span>
       <span className={`text-[10px] leading-tight truncate flex-1 ${
-        isActive ? "text-indigo-100 font-bold" : "text-slate-300 font-medium"
+        isActive
+          ? "text-indigo-900 dark:text-indigo-100 font-bold"
+          : "text-slate-700 dark:text-slate-300 font-medium"
       }`}>
         {sc.label}
       </span>
@@ -72,7 +92,6 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
   activeKey, isOpen, onToggle, onOpenCalculator,
 }) => {
   const navigate        = useNavigate();
-  const location        = useLocation();
   const panelRef        = useRef<HTMLDivElement>(null);
   const focusedIndexRef = useRef<number>(-1);
   const { can, isSuperAdmin } = usePermission();
@@ -121,8 +140,6 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
     if (sc.action === "open-payroll") { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Payroll" } }));        return; }
   }, [navigate, onToggle, onOpenCalculator]);
 
-  const isDashboard = location.pathname === "/dashboard";
-
   return (
     <div
       className={`relative flex flex-row h-full shrink-0 transition-all duration-300 ease-in-out ${
@@ -138,11 +155,9 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
         className={`
           flex items-center justify-center w-[28px] shrink-0 h-full
           cursor-pointer select-none transition-all duration-200
-          border-l border-line-soft
-          ${isDashboard
-            ? "bg-slate-800/60 hover:bg-slate-700/80 text-slate-400 hover:text-white"
-            : "bg-indigo-950/70 hover:bg-indigo-900/80 text-indigo-300 hover:text-white"
-          }
+          border-l border-slate-200 dark:border-line-soft
+          bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900
+          dark:bg-[#131b2e] dark:hover:bg-indigo-950/90 dark:text-indigo-300 dark:hover:text-white
         `}
       >
         <span className="flex flex-col items-center gap-1">
@@ -164,20 +179,22 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
       <div
         ref={panelRef}
         className={`
-          flex-1 bg-[#181c2e] border-l border-line-soft
-          flex flex-col overflow-hidden
+          flex-1 bg-white dark:bg-[#131b2e] border-l border-slate-200 dark:border-line-soft
+          flex flex-col overflow-hidden shadow-xl dark:shadow-none
           transition-all duration-300 ease-in-out
           ${isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none w-0"}
         `}
         style={{ minWidth: isOpen ? 212 : 0 }}
       >
         {/* Header */}
-        <div className="px-2.5 py-1.5 border-b border-white/10 flex items-center gap-1.5 shrink-0 bg-[#12162a]">
-          <FaKeyboard className="text-indigo-400 text-[11px] shrink-0" />
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-300">
+        <div className="px-2.5 py-1.5 border-b border-slate-200 dark:border-white/10 flex items-center gap-1.5 shrink-0 bg-slate-50 dark:bg-[#0f172a]">
+          <FaKeyboard className="text-indigo-600 dark:text-indigo-400 text-[11px] shrink-0" />
+          <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-indigo-300">
             Shortcut Keys
           </span>
-          <span className="ml-auto text-[8px] font-bold text-slate-500 border border-slate-700 rounded px-1">F1</span>
+          <span className="ml-auto text-[8px] font-bold text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded px-1">
+            F1
+          </span>
         </div>
 
         {/* Sections — scrollable but scrollbar hidden */}
@@ -198,7 +215,7 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
                   <span className={`text-[8px] font-black uppercase tracking-widest ${accent.header}`}>
                     {CATEGORY_LABELS[cat]}
                   </span>
-                  <span className="text-[7.5px] text-slate-500 font-mono font-semibold">
+                  <span className="text-[7.5px] text-slate-400 dark:text-slate-500 font-mono font-semibold">
                     {items.length}
                   </span>
                 </div>
@@ -220,7 +237,7 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
                 </div>
 
                 {/* Thin divider */}
-                <div className="mx-1 mt-1 border-t border-white/[0.05]" />
+                <div className="mx-1 mt-1 border-t border-slate-100 dark:border-white/[0.05]" />
               </div>
             );
           })}
@@ -230,13 +247,15 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
             <button
               type="button"
               onClick={onOpenCalculator}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700/80 border border-slate-700/60 transition-colors cursor-pointer group"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:border-slate-700/60 transition-colors cursor-pointer group shadow-2xs dark:shadow-none"
             >
               <div className="flex items-center gap-2">
-                <FaCalculator className="text-[11px] text-teal-400 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-300 group-hover:text-white">Calculator</span>
+                <FaCalculator className="text-[11px] text-teal-600 dark:text-teal-400 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-white">
+                  Calculator
+                </span>
               </div>
-              <span className="text-[9px] font-black text-amber-400/90 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-mono">
+              <span className="text-[9px] font-black text-amber-800 bg-amber-100 border border-amber-300 dark:text-amber-400/90 dark:bg-amber-500/10 dark:border-amber-500/20 px-1.5 py-0.5 rounded font-mono">
                 Alt+C
               </span>
             </button>
