@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { useNavigate } from "react-router-dom";
 import { FaReceipt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -39,6 +40,8 @@ const ReceiptVoucherAddPage: React.FC = () => {
   const [rows, setRows] = useState<ReceiptRow[]>(() =>
     Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow)
   );
+
+  useFormShortcuts({});
 
   // Peek next Vch No so the operator sees "R-5" waiting for them
   useEffect(() => {

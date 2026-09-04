@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaEye, FaSyncAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -276,6 +277,8 @@ const ProductionOrderList: React.FC = () => {
     useEffect(() => {
         fetchCombinedData();
     }, [fetchCombinedData]);
+
+    usePageShortcuts({ onRefresh: () => fetchCombinedData(), onDelete: () => setShowDeleteModal(true) });
 
     useSocketSync("productionOrder", undefined, fetchCombinedData);
     useSocketSync("salesOrder", undefined, fetchCombinedData);

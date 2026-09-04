@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -57,6 +58,8 @@ const SupplierList: React.FC = () => {
         socketModule: "supplier",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
     const suppliers = useMemo(() => {
         if (!searchTerm) return allSuppliers;
@@ -146,6 +149,7 @@ const SupplierList: React.FC = () => {
                                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
                                 <input
                                     type="text"
+                                    data-search-input
                                     className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     placeholder="Search Supplier..."
                                     value={searchTerm}

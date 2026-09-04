@@ -3,6 +3,7 @@ import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
@@ -69,6 +70,8 @@ const InvoiceList: React.FC = () => {
         socketModule: "grnInvoice",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
     const filteredData = useMemo(() => {
         if (!searchTerm) return allInvoices;

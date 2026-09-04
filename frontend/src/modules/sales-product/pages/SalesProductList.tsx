@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -40,6 +41,8 @@ const SalesProductList: React.FC = () => {
         socketModule: "salesProduct",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
     const salesProducts = useMemo(() => {
         if (!searchTerm) return allSalesProducts;

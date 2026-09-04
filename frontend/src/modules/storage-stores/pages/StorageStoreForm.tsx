@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -81,6 +82,8 @@ const StorageStoreForm: React.FC = () => {
     const [pageLoading, setPageLoading] = useState(true);
     const [selectedRoleId, setSelectedRoleId] = useState("");
     const [dbStoreTypes, setDbStoreTypes] = useState<Array<{ label: string; value: string }>>([]);
+
+    useFormShortcuts({});
 
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
     const { roles, loadRoles } = useRoles();

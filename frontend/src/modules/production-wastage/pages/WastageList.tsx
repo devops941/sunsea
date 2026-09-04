@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -39,6 +40,8 @@ const WastageList: React.FC = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+
+  usePageShortcuts({ onRefresh: () => dispatch(fetchProductionWastages({ page: currentPage, limit: ITEMS_PER_PAGE })), onDelete: () => setShowDeleteModal(true) });
 
   useEffect(() => {
     dispatch(fetchProductionWastages({

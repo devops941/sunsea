@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { FaPlus, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -79,6 +80,8 @@ const PurchaseOrderListPage: React.FC = () => {
     socketModule: "purchaseOrder",
     fetcher,
   });
+
+  usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
   const purchaseOrders = useMemo(() => {
     return allPurchaseOrders.filter((po: any) => {

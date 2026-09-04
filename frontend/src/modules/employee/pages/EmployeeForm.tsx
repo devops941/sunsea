@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -255,6 +256,8 @@ const EmployeeForm: React.FC = () => {
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const photoInputRef = useRef<HTMLInputElement>(null);
   const usernameCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useFormShortcuts({});
 
   const fetchShifts = useCallback(() => {
     apiClient.get("/shifts").then((res) => {

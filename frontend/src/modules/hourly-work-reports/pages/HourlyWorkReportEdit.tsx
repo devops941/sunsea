@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaEraser, FaCheckCircle, FaInfoCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -43,6 +44,8 @@ const HourlyWorkReportEdit: React.FC = () => {
     const [isEditDisabled, setIsEditDisabled] = useState(false);
     const [showNewHighModal, setShowNewHighModal] = useState(false);
     const [newHighDetails, setNewHighDetails] = useState<any>(null);
+
+    useFormShortcuts({});
 
     useEffect(() => {
         if (locationState.state) {

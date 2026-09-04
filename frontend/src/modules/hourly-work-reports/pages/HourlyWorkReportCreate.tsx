@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Form } from 'react-bootstrap';
 
 import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaPlus } from "react-icons/fa";
@@ -115,6 +116,7 @@ const HourlyWorkReportCreate: React.FC = () => {
     const [showNewHighModal, setShowNewHighModal] = useState(false);
     const [newHighDetails, setNewHighDetails] = useState<any>(null);
 
+    useFormShortcuts({});
 
     // Is the form pre-filled from Daily Planning?
     const isPreFilled = useMemo(() => {

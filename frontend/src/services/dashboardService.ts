@@ -106,8 +106,8 @@ const dashboardService = {
     const res = await apiClient.get(`/dashboard/summary`);
     return res.data?.data as DashboardSummary;
   },
-  getAccountsSummary: async () => {
-    const res = await apiClient.get(`/dashboard/accounts-summary`);
+  getAccountsSummary: async (period: string = "year") => {
+    const res = await apiClient.get(`/dashboard/accounts-summary?period=${period}`);
     return res.data?.data as AccountsSummary;
   },
   getTvSummary: async (signal?: AbortSignal) => {

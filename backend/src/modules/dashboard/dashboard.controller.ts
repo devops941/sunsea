@@ -205,12 +205,28 @@ const dashboardController = {
     }
   },
 
-  getAccountsSummary: async (_req: Request, res: Response) => {
+  getAccountsSummary: async (req: Request, res: Response) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // ─── Period filter ────────────────────────────────────────────
+      const period = (req.query.period as string) || "year";
+      const now = new Date();
+      let periodStart: Date;
+      if (period === "day") {
+        periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (period === "week") {
+        periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (period === "month") {
+        periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else {
+        // year — current financial/calendar year from Jan 1
+        periodStart = new Date(now.getFullYear(), 0, 1);
+      }
+      const periodEnd = now;
 
       const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand", "BANK ACCOUNTS", "CASH IN HAND"];
 
@@ -242,10 +258,14 @@ const dashboardController = {
           }),
           tx.salesInvoice.findMany({
             select: { id: true, grandTotal: true, payments: true, status: true, invoiceDate: true, createdAt: true },
-            where: { status: { not: "CANCELLED" } },
+            where: {
+              status: { not: "CANCELLED" },
+              invoiceDate: { gte: periodStart, lte: periodEnd },
+            },
           }),
           (tx as any).grnInvoice.findMany({
-            select: { id: true, netAmount: true, subtotal: true, payments: true },
+            select: { id: true, netAmount: true, subtotal: true, payments: true, createdAt: true },
+            where: { createdAt: { gte: periodStart, lte: periodEnd } },
           }),
           tx.finishedGoodsStock.findMany({
             select: { onHandQty: true, product: { select: { rate: true } } },

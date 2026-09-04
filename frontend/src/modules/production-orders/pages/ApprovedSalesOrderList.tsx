@@ -3,6 +3,7 @@ import { Container, Row, Col, Alert, Modal } from "react-bootstrap";
 import { FaPlus, FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { productionOrderService } from "../../../services/productionOrderService";
@@ -22,6 +23,8 @@ const ApprovedSalesOrderList: React.FC = () => {
     const [selectedViewOrder, setSelectedViewOrder] = useState<SalesOrder | null>(null);
     const [orderProductionStages, setOrderProductionStages] = useState<Record<string, string>>({});
     const [loadingStages, setLoadingStages] = useState(false);
+
+    usePageShortcuts({ onRefresh: () => fetchOrders() });
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -121,6 +124,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                                         placeholder="Search orders..."
                                         value={searchTerm}
                                         onChange={handleSearch}
+                                        data-search-input
                                     />
                                 </div>
                             </div>

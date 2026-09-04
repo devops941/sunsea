@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Container, Row, Col, Modal } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -33,6 +34,8 @@ const UserList: React.FC = () => {
         fullName: "",
         isActive: "true",
     });
+
+    usePageShortcuts({ onRefresh: () => loadUsers() });
 
     useEffect(() => {
         loadUsers();
@@ -153,6 +156,7 @@ const UserList: React.FC = () => {
                                         placeholder="Search users..."
                                         value={searchTerm}
                                         onChange={handleSearch}
+                                        data-search-input
                                     />
                                 </div>
                                 {can("users.export") && (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useSelector } from "react-redux";
 import { FaSave, FaEraser, FaPlus, FaTrash, FaArrowLeft, FaTimes } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -110,6 +111,8 @@ const SupplierForm: React.FC = () => {
     ]);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    useFormShortcuts({});
 
     const populateForm = (supplier: any) => {
         setInitialSupplier(supplier);

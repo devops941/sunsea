@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -61,6 +62,8 @@ const StorageStoreList: React.FC = () => {
         socketModule: "store",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
     const filteredStores = useMemo(() => {
         return allStores.filter((item: any) => {

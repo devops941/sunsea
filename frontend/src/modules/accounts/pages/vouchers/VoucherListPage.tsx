@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useNavigate } from "react-router-dom";
 import {
   FaFileInvoiceDollar,
@@ -66,6 +67,8 @@ export const VoucherListPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+
+  usePageShortcuts({ onRefresh: () => refresh() });
 
   // Additional related socket triggers (payment, GRN, sales invoices can affect vouchers)
   useSocketSync("payment", undefined, refresh);
@@ -280,6 +283,7 @@ export const VoucherListPage: React.FC = () => {
         <div className="relative w-full max-w-[320px]">
           <input
             type="text"
+            data-search-input
             className="w-full pl-7 pr-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
             value={draftSearchTerm}
             onChange={(e) => setDraftSearchTerm(e.target.value)}

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAppSelector } from "../../../hooks/reduxHooks";
 import { toast } from "react-toastify";
 import { usePermission } from "../../../hooks/usePermission";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaTimes, FaPrint, FaDownload } from "react-icons/fa";
 import { FiClipboard } from "react-icons/fi";
 

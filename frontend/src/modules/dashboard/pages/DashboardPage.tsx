@@ -90,6 +90,30 @@ const DashboardPage: React.FC = () => {
     return "list";
   });
 
+  type DashPeriod = "day" | "week" | "month" | "year";
+  const [dashPeriod, setDashPeriod] = useState<DashPeriod>(() => {
+    try {
+      const saved = localStorage.getItem("dashboard_period");
+      if (saved && ["day", "week", "month", "year"].includes(saved)) {
+        return saved as DashPeriod;
+      }
+    } catch (e) {}
+    return "year";
+  });
+
+  const handleDashPeriodChange = (p: DashPeriod) => {
+    setDashPeriod(p);
+    try { localStorage.setItem("dashboard_period", p); } catch (e) {}
+  };
+
+  // Map dashboard period → SalesPurchaseTrendChart period key
+  const trendPeriodMap: Record<DashPeriod, "7d" | "30d" | "90d" | "12m"> = {
+    day: "7d",
+    week: "30d",
+    month: "90d",
+    year: "12m",
+  };
+
   const handleTopProductsChartTypeChange = (newType: "list" | "bar" | "pie") => {
     setTopProductsChartType(newType);
     try {
@@ -160,12 +184,12 @@ const DashboardPage: React.FC = () => {
   //  listeners keep it fresh in realtime as vouchers are posted.
   // ─────────────────────────────────────────────────────────────
   const accountsSummaryFetcher = useCallback(async (_signal: AbortSignal) => {
-    const summary = await dashboardService.getAccountsSummary();
+    const summary = await dashboardService.getAccountsSummary(dashPeriod);
     return { data: [summary], total: 1 };
-  }, []);
+  }, [dashPeriod]);
 
   const accountsSummaryCache = useListCache<AccountsSummary>({
-    cacheKey: "accounts:dashboard-summary",
+    cacheKey: `accounts:dashboard-summary:${dashPeriod}`,
     socketModule: "voucher",
     fetcher: accountsSummaryFetcher,
   });
@@ -419,7 +443,7 @@ const DashboardPage: React.FC = () => {
       .slice(0, 5);
   }, [salesOrders]);
 
-  // Customer Purchase Report — per-customer: which sales products purchased vs not purchased
+  // Customer Purchase Report — per-customer: which sales products purchased in last 3 months vs not purchased
   const customerPurchaseReport = useMemo(() => {
     const so = safe(salesOrders);
     const salesProducts = safe(allSalesProducts);
@@ -429,45 +453,114 @@ const DashboardPage: React.FC = () => {
       .filter(Boolean);
     const totalProducts = productNames.length;
 
-    // Build: { customerName → Set of purchased sales product names }
-    const customerProducts: Record<string, Set<string>> = {};
+    const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    // Map: customerName -> { productName -> { lastOrderDate, orderNo } }
+    const customerProductLastOrder: Record<string, Record<string, { lastOrderDate: Date; orderNo?: string }>> = {};
+
     for (const order of so) {
       const cName = order.customer?.firmName || "Unknown";
-      if (!customerProducts[cName]) customerProducts[cName] = new Set();
+      if (!customerProductLastOrder[cName]) customerProductLastOrder[cName] = {};
+      const orderDateVal = order.orderDate || order.createdAt;
+      const orderTime = orderDateVal ? new Date(orderDateVal) : new Date(0);
       const items = Array.isArray(order.items) ? order.items : [];
       for (const item of items) {
-        // Prefer salesProduct name; fall back to product name for legacy orders
         const pName =
           item.salesProduct?.salesProductName ||
           item.salesProductName ||
           "";
-        if (pName) customerProducts[cName].add(pName);
+        if (!pName) continue;
+
+        const existing = customerProductLastOrder[cName][pName];
+        if (!existing || orderTime.getTime() > existing.lastOrderDate.getTime()) {
+          customerProductLastOrder[cName][pName] = {
+            lastOrderDate: orderTime,
+            orderNo: order.orderNo,
+          };
+        }
       }
     }
 
-    // Build result for ALL customers (including those with 0 orders)
+    interface ProductPurchaseDetail {
+      name: string;
+      lastOrderDate?: Date;
+      daysAgo?: number;
+      isPurchasedWithin3Months: boolean;
+      hasEverPurchased: boolean;
+    }
+
+    interface CustomerReportItem {
+      name: string;
+      purchasedProducts: ProductPurchaseDetail[];
+      notPurchasedProducts: ProductPurchaseDetail[];
+    }
+
+    const processCustomer = (cName: string): CustomerReportItem => {
+      const productHistory = customerProductLastOrder[cName] || {};
+      const purchasedProducts: ProductPurchaseDetail[] = [];
+      const notPurchasedProducts: ProductPurchaseDetail[] = [];
+
+      for (const pName of productNames) {
+        const history = productHistory[pName];
+        if (history && !isNaN(history.lastOrderDate.getTime()) && history.lastOrderDate.getTime() > 0) {
+          const diffMs = now - history.lastOrderDate.getTime();
+          const daysAgo = Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+          const isWithin3Months = diffMs <= THREE_MONTHS_MS;
+
+          const detail: ProductPurchaseDetail = {
+            name: pName,
+            lastOrderDate: history.lastOrderDate,
+            daysAgo,
+            isPurchasedWithin3Months: isWithin3Months,
+            hasEverPurchased: true,
+          };
+
+          if (isWithin3Months) {
+            purchasedProducts.push(detail);
+          } else {
+            notPurchasedProducts.push(detail);
+          }
+        } else {
+          const detail: ProductPurchaseDetail = {
+            name: pName,
+            isPurchasedWithin3Months: false,
+            hasEverPurchased: false,
+          };
+          notPurchasedProducts.push(detail);
+        }
+      }
+
+      return {
+        name: cName,
+        purchasedProducts,
+        notPurchasedProducts,
+      };
+    };
+
     const seen = new Set<string>();
-    const result: Array<{ name: string; purchasedProducts: string[]; notPurchasedProducts: string[] }> = [];
+    const result: CustomerReportItem[] = [];
 
     // Customers from master
     for (const c of customers) {
       const cName = c.firmName || "";
       if (!cName) continue;
       seen.add(cName);
-      const purchased = customerProducts[cName] || new Set<string>();
-      const purchasedList = productNames.filter((p: string) => purchased.has(p));
-      const notPurchasedList = productNames.filter((p: string) => !purchased.has(p));
-      result.push({ name: cName, purchasedProducts: purchasedList, notPurchasedProducts: notPurchasedList });
-    }
-    // Customers from orders not in master (edge case)
-    for (const [cName, purchased] of Object.entries(customerProducts)) {
-      if (seen.has(cName)) continue;
-      const purchasedList = productNames.filter((p: string) => purchased.has(p));
-      const notPurchasedList = productNames.filter((p: string) => !purchased.has(p));
-      result.push({ name: cName, purchasedProducts: purchasedList, notPurchasedProducts: notPurchasedList });
+      result.push(processCustomer(cName));
     }
 
-    return { totalProducts, customers: result.sort((a, b) => b.purchasedProducts.length - a.purchasedProducts.length || a.name.localeCompare(b.name)) };
+    // Customers from orders not in master
+    for (const cName of Object.keys(customerProductLastOrder)) {
+      if (seen.has(cName)) continue;
+      result.push(processCustomer(cName));
+    }
+
+    return {
+      totalProducts,
+      customers: result.sort(
+        (a, b) => b.purchasedProducts.length - a.purchasedProducts.length || a.name.localeCompare(b.name)
+      ),
+    };
   }, [salesOrders, allSalesProducts, allCustomers]);
 
   /* ═══════════════ RENDER ═══════════════ */
@@ -505,6 +598,23 @@ const DashboardPage: React.FC = () => {
               <FaTv className="text-[11px]" /> TV Dashboard
             </button>
             
+            {/* Period filter toggle */}
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-0.5 gap-0.5 shadow-inner">
+              {(["day", "week", "month", "year"] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handleDashPeriodChange(p)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide transition-all duration-200 cursor-pointer ${
+                    dashPeriod === p
+                      ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/40"
+                      : "text-ink-muted hover:text-ink hover:bg-white/5"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -755,6 +865,7 @@ const DashboardPage: React.FC = () => {
                 productionOrders={productionOrders}
                 salesInvoices={salesInvoices}
                 purchaseInvoices={purchaseInvoices}
+                externalPeriod={trendPeriodMap[dashPeriod]}
               />
             </div>
           )}
@@ -1336,7 +1447,7 @@ const DashboardPage: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* In-Card Toggle: Purchased vs Not Purchased */}
+                  {/* In-Card Toggle: Purchased (≤3 Mo) vs Not Purchased */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {(() => {
                       const customerObj = customerPurchaseReport.customers.find(
@@ -1356,7 +1467,7 @@ const DashboardPage: React.FC = () => {
                             }`}
                           >
                             <FaCheckCircle className="text-[9px]" />
-                            <span>Purchased ({purchasedCount})</span>
+                            <span>Purchased (≤3 Mo) ({purchasedCount})</span>
                           </button>
                           <button
                             type="button"
@@ -1391,9 +1502,14 @@ const DashboardPage: React.FC = () => {
                   <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
                     <FaShoppingCart className="text-indigo-400 text-xs" /> Product Purchase Report
                   </div>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 border border-indigo-500/30">
-                    {customerPurchaseReport.totalProducts} Products · {customerPurchaseReport.customers.length} Customers
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" title="Purchased within last 90 days">
+                      3-Month Window
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 border border-indigo-500/30">
+                      {customerPurchaseReport.totalProducts} Products · {customerPurchaseReport.customers.length} Customers
+                    </span>
+                  </div>
                 </>
               )}
             </div>
@@ -1409,8 +1525,8 @@ const DashboardPage: React.FC = () => {
                 const rawList = isPurchased
                   ? customerObj?.purchasedProducts || []
                   : customerObj?.notPurchasedProducts || [];
-                const filtered = rawList.filter((p) =>
-                  p.toLowerCase().includes(customerProductSearch.toLowerCase())
+                const filtered = rawList.filter((item) =>
+                  item.name.toLowerCase().includes(customerProductSearch.toLowerCase())
                 );
 
                 return (
@@ -1460,39 +1576,65 @@ const DashboardPage: React.FC = () => {
                           </p>
                         </div>
                       ) : (
-                        filtered.map((productName, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-2 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors group"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                        filtered.map((item, idx) => {
+                          const isInactive = !item.isPurchasedWithin3Months && item.hasEverPurchased;
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-2 rounded-lg bg-card-2 border border-line-soft hover:bg-card transition-colors group gap-2"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className={`w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                                    isPurchased
+                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      : isInactive
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  }`}
+                                >
+                                  {idx + 1}
+                                </span>
+                                <div className="flex flex-col min-w-0">
+                                  <span
+                                    className="text-xs font-semibold text-ink truncate group-hover:text-white transition-colors"
+                                    title={item.name}
+                                  >
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[10px] text-ink-subtle flex items-center gap-1 mt-0.5">
+                                    {item.hasEverPurchased && item.lastOrderDate ? (
+                                      <>
+                                        <span>Last ordered:</span>
+                                        <span className="font-semibold text-ink-muted">
+                                          {item.lastOrderDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                        </span>
+                                        <span className="text-[9px]">({item.daysAgo}d ago)</span>
+                                        {isInactive && (
+                                          <span className="text-amber-400 font-bold ml-1">• Inactive for &gt;3 Mo</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span>Never ordered by customer</span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
                               <span
-                                className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                                className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${
                                   isPurchased
-                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                    : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                    : isInactive
+                                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                    : "bg-rose-500/15 text-rose-400 border-rose-500/30"
                                 }`}
                               >
-                                {idx + 1}
-                              </span>
-                              <span
-                                className="text-xs font-semibold text-ink truncate group-hover:text-white transition-colors"
-                                title={productName}
-                              >
-                                {productName}
+                                {isPurchased ? "Active (≤3 Mo)" : isInactive ? "Inactive (>3 Mo)" : "Never Bought"}
                               </span>
                             </div>
-                            <span
-                              className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${
-                                isPurchased
-                                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                  : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                              }`}
-                            >
-                              {isPurchased ? "Ordered" : "Not Ordered"}
-                            </span>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -1508,8 +1650,8 @@ const DashboardPage: React.FC = () => {
                     <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
                       <tr>
                         <th className="px-3 py-2 bg-card-2">Customer</th>
-                        <th className="px-3 py-2 bg-card-2 text-center">Purchased</th>
-                        <th className="px-3 py-2 bg-card-2 text-center">Not Purchased</th>
+                        <th className="px-3 py-2 bg-card-2 text-center" title="Purchased within the last 3 months (90 days)">Purchased (≤3 Mo)</th>
+                        <th className="px-3 py-2 bg-card-2 text-center" title="Not purchased in the last 3 months">Not Purchased</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line-soft">
@@ -1536,7 +1678,7 @@ const DashboardPage: React.FC = () => {
                                 onClick={() =>
                                   setSelectedCustomerReport({ customer: row.name, type: "purchased" })
                                 }
-                                title={`View ${row.purchasedProducts.length} purchased products for ${row.name}`}
+                                title={`View ${row.purchasedProducts.length} active products (purchased in last 3 months) for ${row.name}`}
                                 className="px-2.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-mono font-bold text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer shadow-sm"
                               >
                                 {row.purchasedProducts.length}
@@ -1552,7 +1694,7 @@ const DashboardPage: React.FC = () => {
                                 onClick={() =>
                                   setSelectedCustomerReport({ customer: row.name, type: "notPurchased" })
                                 }
-                                title={`View ${row.notPurchasedProducts.length} not purchased products for ${row.name}`}
+                                title={`View ${row.notPurchasedProducts.length} not purchased / inactive products for ${row.name}`}
                                 className="px-2.5 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-[11px] font-mono font-bold text-rose-400 hover:bg-rose-500 hover:text-white transition-all cursor-pointer shadow-sm"
                               >
                                 {row.notPurchasedProducts.length}

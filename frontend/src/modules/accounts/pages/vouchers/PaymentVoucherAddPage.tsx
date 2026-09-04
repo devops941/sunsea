@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { useNavigate } from "react-router-dom";
 import { FaMoneyBillWave, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -36,6 +37,8 @@ const PaymentVoucherAddPage: React.FC = () => {
   const [creditLedgerId, setCreditLedgerId] = useState("");
   const [mainNarration, setMainNarration] = useState("");
   const [nextVoucherNo, setNextVoucherNo] = useState<string>("");
+
+  useFormShortcuts({});
 
   // Fetch the next sequential voucher number so it can be shown Busy-style
   // ("Vch No. 5"). We re-fetch after a save happens (see handleSubmit) so

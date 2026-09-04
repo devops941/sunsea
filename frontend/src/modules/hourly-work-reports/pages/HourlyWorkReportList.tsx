@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useNavigate } from "react-router-dom";
@@ -50,6 +51,8 @@ const HourlyWorkReportList: React.FC = () => {
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedViewGroup, setSelectedViewGroup] = useState<any>(null);
+
+    usePageShortcuts({ onRefresh: () => dispatch(fetchHourlyProductions(undefined)), onDelete: () => setShowDeleteModal(true) });
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {

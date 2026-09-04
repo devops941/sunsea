@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Container, Row, Col, Modal } from "react-bootstrap";
 import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -28,6 +29,8 @@ const PermissionList: React.FC = () => {
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [permToDelete, setPermToDelete] = useState<number | null>(null);
+
+    usePageShortcuts({ onRefresh: () => loadPermissions(), onDelete: () => setShowDeleteModal(true) });
 
     const [formData, setFormData] = useState({
         id: "",
@@ -173,6 +176,7 @@ const PermissionList: React.FC = () => {
                                         placeholder="Search permissions..."
                                         value={searchTerm}
                                         onChange={handleSearch}
+                                        data-search-input
                                     />
                                 </div>
                                 <CustomButton

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import { useListCache } from "../../../hooks/useListCache";
 import { rawMaterialStockService } from "../../../services/rawMaterialStockService";
@@ -37,6 +38,7 @@ const WastageStockList: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [showView, setShowView] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
+
 
     const [categoryFilter, setCategoryFilter] = useState("");
     const [appliedCategory, setAppliedCategory] = useState("");
@@ -82,11 +84,13 @@ const WastageStockList: React.FC = () => {
         return { data: res.data || [], total: res.total || 0 };
     }, [debouncedSearch, appliedCategory, appliedStatus, currentPage]);
 
-    const { data, total, loading } = useListCache({
+    const { data, total, loading, refresh } = useListCache({
         cacheKey,
         socketModule: "rawMaterialStock",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh() });
 
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
 
@@ -169,6 +173,7 @@ const WastageStockList: React.FC = () => {
                                 placeholder="Search wastage stock..."
                                 value={searchTerm}
                                 onChange={handleSearch}
+                                data-search-input
                             />
                         </div>
                         <FilterPopover

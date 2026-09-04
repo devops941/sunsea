@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { FaExchangeAlt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService, type Voucher } from "../../../../services/voucherService";
@@ -36,6 +37,8 @@ const ContraVoucherAddPage: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [mainNarration, setMainNarration] = useState("");
   const [rows, setRows] = useState<ContraRow[]>(() => buildEmptyRows());
+
+  useFormShortcuts({});
 
   const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await accountService.fetchLedgers({ limit: 1000 });

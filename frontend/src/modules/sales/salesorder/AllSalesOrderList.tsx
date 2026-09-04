@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import { FaPlus, FaTimes, FaPrint, FaDownload } from "react-icons/fa";
 import { useAppSelector } from "../../../hooks/reduxHooks";

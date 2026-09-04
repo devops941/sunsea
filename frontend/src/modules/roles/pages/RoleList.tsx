@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Search } from "lucide-react";
 import { FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -44,6 +45,8 @@ const RoleList: React.FC = () => {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    usePageShortcuts({ onRefresh: () => loadRoles(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm), onDelete: () => setShowDeleteModal(true) });
 
     const [formData, setFormData] = useState({
         id: "",
@@ -288,6 +291,7 @@ const RoleList: React.FC = () => {
                                     placeholder="Search roles..."
                                     value={searchTerm}
                                     onChange={handleSearch}
+                                    data-search-input
                                 />
                             </div>
                             {can("roles.export") && (

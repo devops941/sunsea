@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 import { useListCache } from "../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -95,6 +96,8 @@ const MachineAssignmentList: React.FC = () => {
     socketModule: "machineOperationAssignment",
     fetcher,
   });
+
+  usePageShortcuts({ onRefresh: () => refresh() });
 
   const filteredAssignments = useMemo(() => {
     return allAssignments.filter((item: any) => {
@@ -209,6 +212,7 @@ const MachineAssignmentList: React.FC = () => {
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={handleSearch}
+                data-search-input
               />
             </div>
 

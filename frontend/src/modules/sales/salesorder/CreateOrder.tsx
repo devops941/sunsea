@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useParams } from "react-router-dom";
@@ -275,7 +276,7 @@ interface ItemRowProps {
     index: number;
     errors: any;
     salesProducts: any[];
-    salesProductOptions: { value: string; label: string }[];
+    salesProductOptions: { value: string; label: React.ReactNode; [key: string]: unknown }[];
     remove: (index: number) => void;
     canRemove: boolean;
     setValue: any;
@@ -470,6 +471,8 @@ const SalesOrderForm: React.FC = () => {
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
+
+    useFormShortcuts({});
 
     // ─── Load company info for inter-state ───────────────────────────
     useEffect(() => {

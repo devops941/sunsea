@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { useNavigate } from "react-router-dom";
 import { FaBookOpen, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -41,6 +42,8 @@ const JournalEntryAddPage: React.FC = () => {
   const [rows, setRows] = useState<JournalRow[]>(() =>
     Array.from({ length: INITIAL_ROW_COUNT }, (_, i) => makeEmptyRow(i))
   );
+
+  useFormShortcuts({});
 
   // Busy quirk: Journal doesn't preview the next Vch No in the entry screen
   // (unlike Payment / Receipt). The number is assigned server-side on save.

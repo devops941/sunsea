@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -46,6 +47,8 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
     const [plannedQty, setPlannedQty] = useState("");
 
     const [deletedDbPrograms, setDeletedDbPrograms] = useState<string[]>([]);
+
+    useFormShortcuts({});
 
     const { data: machines } = useAppSelector((state) => state.machines);
     const { data: shifts } = useAppSelector((state: any) => state.shifts || { data: [] });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -30,6 +31,8 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
     const [selectedOrders, setSelectedOrders] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useFormShortcuts({});
 
     useEffect(() => {
         const loadProductionOrders = async () => {

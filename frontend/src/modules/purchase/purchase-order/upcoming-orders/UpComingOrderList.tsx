@@ -4,6 +4,7 @@ import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 
 //import EditButton from "../../../../components/ui/EditButton/EditButton";
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
@@ -32,6 +33,8 @@ const UpcomingOrderList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+    usePageShortcuts({ onRefresh: () => fetchOrders(), onDelete: () => setShowDeleteModal(true) });
 
     // ─── Fetch only PENDING purchase orders (awaiting MD approval) ────────
     const fetchOrders = useCallback(async () => {
@@ -152,6 +155,7 @@ const UpcomingOrderList: React.FC = () => {
                                         placeholder="Search purchase orders..."
                                         value={searchTerm}
                                         onChange={handleSearch}
+                                        data-search-input
                                     />
                                 </div>
                             </div>
