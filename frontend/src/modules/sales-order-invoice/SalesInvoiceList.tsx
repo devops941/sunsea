@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { usePageShortcuts } from "../../hooks/usePageShortcuts";
 import { FaPlus, FaTrash, FaEye, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";

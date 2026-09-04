@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaPlus, FaMinus, FaInfoCircle, FaEraser } from "react-icons/fa";
 import { Search } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -131,6 +132,8 @@ const StockAdjustmentForm: React.FC = () => {
   const [pmiItems, setPmiItems] = useState<any[]>([]);
   const [selectedPO, setSelectedPO] = useState<any>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useFormShortcuts({});
 
   // Custom manual adjustment states
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("All Categories");

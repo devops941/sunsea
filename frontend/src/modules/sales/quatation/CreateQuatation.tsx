@@ -1,5 +1,6 @@
 // src/pages/sales/QuotationForm/QuotationForm.tsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -353,6 +354,8 @@ const QuotationForm: React.FC = () => {
         control,
         name: "items",
     });
+
+    useFormShortcuts({});
 
     const { loadCustomers, customers, loading: customersLoading } = useCustomers();
     const { loadProducts, products, loading: productsLoading } = useProducts();

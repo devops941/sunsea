@@ -17,6 +17,7 @@ interface SalesPurchaseTrendChartProps {
   productionOrders?: any[];
   salesInvoices?: any[];
   purchaseInvoices?: any[];
+  externalPeriod?: PeriodKey;
 }
 
 const trendChartConfig = {
@@ -56,8 +57,9 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
   purchaseOrders = [],
   salesInvoices = [],
   purchaseInvoices = [],
+  externalPeriod,
 }) => {
-  const [period, setPeriod] = useState<PeriodKey>(() => {
+  const [internalPeriod, setInternalPeriod] = useState<PeriodKey>(() => {
     try {
       const saved = localStorage.getItem("dashboard_trend_period");
       if (saved && ["7d", "30d", "90d", "12m"].includes(saved)) {
@@ -68,6 +70,9 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
     }
     return "7d";
   });
+
+  // When externalPeriod is provided (global dashboard filter), use it; otherwise use internal state
+  const period: PeriodKey = externalPeriod ?? internalPeriod;
 
   const [chartType, setChartType] = useState<ChartType>(() => {
     try {
@@ -82,7 +87,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
   });
 
   const handlePeriodChange = (newPeriod: PeriodKey) => {
-    setPeriod(newPeriod);
+    setInternalPeriod(newPeriod);
     try {
       localStorage.setItem("dashboard_trend_period", newPeriod);
     } catch (e) {}
@@ -235,17 +240,19 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
 
           {/* Left: Dropdown + 5 Distinct Chart Switch Icons */}
           <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Period Dropdown */}
-            <div className="flex items-center w-28 sm:w-32">
-              <SelectInput
-                hideLabel
-                noMargin
-                searchable={false}
-                value={period}
-                onChange={(e) => handlePeriodChange(e.target.value as PeriodKey)}
-                options={Object.entries(PERIODS).map(([k, v]) => ({ label: v, value: k }))}
-              />
-            </div>
+            {/* Period Dropdown — hidden when global dashboard filter controls the period */}
+            {!externalPeriod && (
+              <div className="flex items-center w-28 sm:w-32">
+                <SelectInput
+                  hideLabel
+                  noMargin
+                  searchable={false}
+                  value={period}
+                  onChange={(e) => handlePeriodChange(e.target.value as PeriodKey)}
+                  options={Object.entries(PERIODS).map(([k, v]) => ({ label: v, value: k }))}
+                />
+              </div>
+            )}
 
             {/* 5 Distinct Chart Type Switch Icons */}
             <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-0.5 shadow-inner">

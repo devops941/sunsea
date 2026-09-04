@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -47,6 +48,8 @@ const GoodsDispatchList: React.FC = () => {
 
   const hasActiveFilters = !!(filterStatus || filterDateFrom || filterDateTo);
   const activeFilterCount = [filterStatus, filterDateFrom, filterDateTo].filter(Boolean).length;
+
+  usePageShortcuts({ onRefresh: () => dispatch(fetchGoodsDispatches({ page: currentPage, limit: ITEMS_PER_PAGE })) });
 
   // Handle search debouncing
   useEffect(() => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -140,6 +141,8 @@ const RawMaterialForm: React.FC = () => {
     const [minimumStockUom, setMinimumStockUom] = useState("");
     const [reorderLevelUom, setReorderLevelUom] = useState("");
     const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
+
+    useFormShortcuts({});
 
     const { data: stores } = useAppSelector(state => state.stores);
     const fetchStoresData = useCallback(() => {

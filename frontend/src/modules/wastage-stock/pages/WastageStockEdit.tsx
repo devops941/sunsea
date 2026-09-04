@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -49,6 +50,8 @@ const WastageStockEdit: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [formData, setFormData] = useState(initialFormState);
+
+    useFormShortcuts({});
 
     useEffect(() => {
         if (location.state) {

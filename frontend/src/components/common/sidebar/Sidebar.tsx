@@ -101,6 +101,21 @@ const Sidebar = () => {
   }, [can]);
 
   const filteredSidebarItems = useMemo(() => {
+    const filterSubItems = (items: any[]): any[] => {
+      return items
+        .map((child) => {
+          if (child.permission && !can(child.permission)) return null;
+          if (child.permissionAny && !child.permissionAny.some((p: string) => can(p))) return null;
+          if (child.children) {
+            const subFiltered = filterSubItems(child.children);
+            if (subFiltered.length === 0 && child.children.length > 0) return null;
+            return { ...child, children: subFiltered };
+          }
+          return child;
+        })
+        .filter(Boolean);
+    };
+
     return sidebarItems
       .map((item) => {
         if (item.permission && !can(item.permission)) {
@@ -110,9 +125,7 @@ const Sidebar = () => {
           return null;
         }
         if (item.children) {
-          const filteredChildren = item.children.filter((child) =>
-            !child.permission || can(child.permission)
-          );
+          const filteredChildren = filterSubItems(item.children);
           if (filteredChildren.length === 0 && item.children.length > 0) {
             return null;
           }

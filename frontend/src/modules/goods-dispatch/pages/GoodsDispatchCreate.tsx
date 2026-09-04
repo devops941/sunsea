@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FaSave, FaArrowLeft, FaPlus } from "react-icons/fa";
@@ -56,6 +57,8 @@ const GoodsDispatchCreate: React.FC = () => {
     driverMobile: "",
     destinationStoreId: "",
   });
+
+  useFormShortcuts({});
 
   useEffect(() => {
     dispatch(fetchEligibleOrders({}));

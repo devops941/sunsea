@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaSave, FaExclamationTriangle } from "react-icons/fa";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -180,6 +181,8 @@ const SalesInvoiceForm: React.FC = () => {
 
   const [chargeRows, setChargeRows] = useState<ChargeRow[]>([]);
   const [invoiceStatus, setInvoiceStatus] = useState<string>("DRAFT");
+
+  useFormShortcuts({});
 
   useEffect(() => {
     dispatch(fetchCompany());

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { FaSave, FaPaperPlane, FaPlus, FaTrash, FaUser, FaMapMarkerAlt, FaBoxOpen, FaInfoCircle } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -171,6 +172,7 @@ const PurchaseOrderForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
 
+  useFormShortcuts({});
 
   const selectedSupplier = useMemo(() => (suppliers || []).find(
     (s) => String(s?.id) === String(formData.supplierId)

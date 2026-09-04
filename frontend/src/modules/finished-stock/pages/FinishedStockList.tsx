@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import { useListCache } from "../../../hooks/useListCache";
 import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
@@ -38,6 +39,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     const [currentPage, setCurrentPage] = useState(1);
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
+
 
     const [categoryFilter, setCategoryFilter] = useState("");
     const [appliedCategory, setAppliedCategory] = useState("");
@@ -86,11 +88,13 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
         return { data: list, total: tot };
     }, [activeStoreId, debouncedSearch, appliedCategory, currentPage]);
 
-    const { data, total, loading } = useListCache({
+    const { data, total, loading, refresh } = useListCache({
         cacheKey,
         socketModule: "finishedGoodsStock",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh() });
 
     // Re-fetch category options on category changes
     useSocketSync("category", undefined, fetchCategoriesData);
@@ -150,6 +154,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                                 placeholder="Search stock..."
                                 value={searchTerm}
                                 onChange={handleSearch}
+                                data-search-input
                             />
                         </div>
                         <FilterPopover

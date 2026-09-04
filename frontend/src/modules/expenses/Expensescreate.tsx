@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../components/form/TextInput/TextInput";
@@ -57,6 +58,8 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
   const [suppliers, setSuppliers] = useState<Array<{ label: string; value: string; id: number }>>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useFormShortcuts({});
 
   // Fetch suppliers list on mount
   useEffect(() => {

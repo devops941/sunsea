@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaPlus, FaCog } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -63,6 +64,8 @@ const ProductList: React.FC = () => {
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState<string | null>(null);
+
+    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
     const [isDeleting, setIsDeleting] = useState(false);
 
     // Capacity change modal

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { FaInfoCircle, FaHistory, FaLock, FaBroadcastTower } from "react-icons/fa";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
@@ -119,6 +120,8 @@ const EodStockList: React.FC = () => {
   // Keep a stable ref so the polling interval always calls the latest version
   const loadDataRef = useRef(loadData);
   useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
+
+  usePageShortcuts({ onRefresh: () => loadData() });
 
   // Re-fetch whenever filters / date / page change
   useEffect(() => { loadData(); }, [loadData]);

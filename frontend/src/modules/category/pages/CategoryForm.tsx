@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { z } from "zod";
 import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -73,6 +74,8 @@ const CategoryForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingCode, setIsFetchingCode] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
+
+  useFormShortcuts({});
 
   // ── Load existing data in edit mode ────────────────────────────────────────
   useEffect(() => {

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,8 @@ const initialFormState = {
 const FinishedStockCreate: React.FC = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState(initialFormState);
+
+    useFormShortcuts({});
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -37,6 +38,9 @@ const ShiftForm: React.FC = () => {
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [fetchingData, setFetchingData] = useState(isEdit);
+
+    useFormShortcuts({});
+
     useEffect(() => {
         dispatch(fetchShifts());
     }, [dispatch]);

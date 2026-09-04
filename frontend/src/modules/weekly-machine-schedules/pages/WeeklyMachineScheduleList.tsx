@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronRight as FaCaretRight, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -71,6 +72,8 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [isGroupDelete, setIsGroupDelete] = useState<boolean>(false);
+
+    usePageShortcuts({ onRefresh: () => dispatch(fetchWeeklyPrograms(undefined)), onDelete: () => setShowDeleteModal(true) });
 
 
     const getMondayDateStr = () => {

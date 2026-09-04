@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useSearchParams } from "react-router-dom";
 import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -42,6 +43,8 @@ const DepartmentList: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const [formErrors, setFormErrors] = useState<{ name?: string }>({});
+
+    usePageShortcuts({ onRefresh: () => loadDepartments(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm), onDelete: () => setShowDeleteModal(true) });
 
     const validateForm = () => {
         const errors: { name?: string } = {};
@@ -256,6 +259,7 @@ const DepartmentList: React.FC = () => {
                                     placeholder="Search departments..."
                                     value={searchTerm}
                                     onChange={handleSearch}
+                                    data-search-input
                                 />
                             </div>
                             {can("departments.export") && (

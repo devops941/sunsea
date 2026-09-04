@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave } from "react-icons/fa";
 import CustomButton from "../../../components/ui/Button/Button";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -91,6 +92,8 @@ const WastageForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
+
+  useFormShortcuts({});
 
   useEffect(() => {
     dispatch(fetchProductionOrders());

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { z } from "zod";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -116,6 +117,8 @@ const DailyPlanCreate: React.FC = () => {
   // ── Machine OEE Summary ──────────────────────────────────────────────────
   const [machineOeeSummary, setMachineOeeSummary] = useState<any>(null);
   const [loadingOee, setLoadingOee] = useState(false);
+
+  useFormShortcuts({});
 
   useEffect(() => {
     if (!productionDate || !machineId) {

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -70,6 +71,8 @@ const AllProductionOrderList: React.FC = () => {
     }, [fetchOrders]);
 
     useSocketSync("productionOrder", undefined, fetchOrders);
+
+    usePageShortcuts({ onRefresh: () => fetchOrders() });
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

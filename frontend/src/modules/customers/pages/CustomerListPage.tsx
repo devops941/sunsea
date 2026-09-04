@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { FaTimes, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -66,6 +67,7 @@ const CustomerListPage: React.FC = () => {
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+
   const activeFilterCount = [
     appliedFilters.status        !== "",
     appliedFilters.customerTypeId  !== "",
@@ -100,6 +102,8 @@ const CustomerListPage: React.FC = () => {
     fetcher,
     enabled: can("customers.view"),
   });
+
+  usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
   const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaSave, FaEraser, FaTimes, FaPlus, FaImage } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -88,6 +89,8 @@ const ProductForm: React.FC = () => {
     // Grade-based dynamic pricing: { "<gradeName>": "<rate>" }
     const [gradeRates, setGradeRates] = useState<Record<string, string>>({});
     const [categories, setCategories] = useState<any[]>([]);
+
+    useFormShortcuts({});
 
     const fetchStoresData = useCallback(() => {
         storeService.fetchAll({ storeCategory: "FINISHED_GOODS" }).then(res => {

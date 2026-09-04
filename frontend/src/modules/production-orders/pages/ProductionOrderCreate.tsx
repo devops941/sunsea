@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { FaSave, FaEraser, FaPlus } from "react-icons/fa";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -456,6 +457,8 @@ const ProductionOrderCreate: React.FC = () => {
     // ── Per-row raw material state ────────────────────────────────────────────────
     const [rowRmStates, setRowRmStates] = useState<Record<string, RowRawMaterialState>>({});
     const storeRmCacheRef = useRef<Record<string, { options: any[]; loading: boolean; promise?: Promise<any> }>>({});
+
+    useFormShortcuts({});
 
     // Helper: update a single row's state
     const updateRowState = (

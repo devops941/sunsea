@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { FaSearch } from "react-icons/fa";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { useUOM } from "../../../hooks/useUOM";
 
@@ -9,6 +10,8 @@ const UOMList: React.FC = () => {
     const { units, loading, error } = useUOM();
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+
+    usePageShortcuts({});
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -52,6 +55,7 @@ const UOMList: React.FC = () => {
                                     placeholder="Search by code, name, or category..."
                                     value={searchTerm}
                                     onChange={handleSearch}
+                                    data-search-input
                                 />
                             </div>
                         </div>

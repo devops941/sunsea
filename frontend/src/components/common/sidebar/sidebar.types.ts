@@ -3,6 +3,8 @@ import type { IconType } from "react-icons";
 export interface SidebarSubItem {
   title: string;
 
+  badge?: string; // Optional shortcut badge e.g. "Ctrl+1", "Ctrl+V"
+
   // Leaf menu-ku mattum path irukkum
   path?: string;
   activePaths?: string[]; // Add this to allow matching multiple paths for active state
@@ -10,6 +12,7 @@ export interface SidebarSubItem {
   icon?: IconType;
 
   permission?: string;
+  permissionAny?: string[];
 
   // Child -> Child support
   children?: SidebarSubItem[];

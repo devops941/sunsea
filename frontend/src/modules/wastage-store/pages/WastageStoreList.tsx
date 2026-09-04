@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import type { RawMaterial } from "../../../features/raw-materials/types";
 import { usePermission } from "../../../hooks/usePermission";
 import { useListCache } from "../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { storeService } from "../../../services/storeService";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -61,6 +62,8 @@ const WastageStoreList: React.FC = () => {
         socketModule: "rawMaterial",
         fetcher,
     });
+
+    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
     const filteredData = useMemo(() => {
         return allWastageItems.filter((item: any) => {

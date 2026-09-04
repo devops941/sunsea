@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Modal } from "react-bootstrap";
 import { FaPlus, FaFilePdf } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { usePageShortcuts } from "../../hooks/usePageShortcuts";
 
 import DataTable from "../../components/ui/table/DataTable";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
@@ -47,6 +48,8 @@ const ExpensesList: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+
+  usePageShortcuts({ onRefresh: () => fetchExpenseData(), onDelete: () => setShowDeleteModal(true) });
 
   const fetchExpenseData = useCallback(() => {
     loadExpenses({
