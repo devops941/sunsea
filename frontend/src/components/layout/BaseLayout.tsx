@@ -17,29 +17,21 @@ const BaseLayout = () => {
   const { user } = useAppSelector((state) => state.auth);
   const { data: company } = useAppSelector((state) => state.company);
 
-  // ── Shortcut panel: closed on /dashboard, open everywhere else ──
-  const isDashboard = location.pathname === '/dashboard';
+  // ── Shortcut panel: persistent in localStorage across all page navigation & reloads ──
   const [panelOpen, setPanelOpen] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('shortcut_panel_open');
       if (saved !== null) return saved === 'true';
     } catch (_) {}
-    return !isDashboard;
+    return true; // Default open on desktop
   });
-
-  // When route changes, apply the route-based default only if the user
-  // hasn't explicitly toggled the panel in this session.
-  const userToggledRef = { current: localStorage.getItem('shortcut_panel_open') !== null };
-  useEffect(() => {
-    if (!userToggledRef.current) {
-      setPanelOpen(!isDashboard);
-    }
-  }, [isDashboard]);
 
   const handleTogglePanel = useCallback(() => {
     setPanelOpen((prev) => {
       const next = !prev;
-      try { localStorage.setItem('shortcut_panel_open', String(next)); } catch (_) {}
+      try {
+        localStorage.setItem('shortcut_panel_open', String(next));
+      } catch (_) {}
       return next;
     });
   }, []);
