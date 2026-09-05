@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import BusyItemsTable from "../../../components/form/OrderItemsTable/BusyItemsTable";
+import type { BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
@@ -9,6 +11,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import AutocompleteInput from "../../../components/form/AutocompleteInput/AutocompleteInput";
+import type { AutocompleteOption } from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import TextArea from "../../../components/form/TextArea/TextArea";
@@ -34,6 +38,8 @@ const componentSchema = z.object({
 const orderItemSchema = z.object({
     salesProductId: z.string().min(1, "Sales product is required"),
     orderQuantity: z.string(),
+    unit: z.string().optional(),
+    unitPrice: z.string().optional(),
     components: z.array(componentSchema),
 });
 
@@ -85,7 +91,7 @@ type SalesOrderFormValues = {
     referredByCustomerId?: string | null;
     referredByName?: string | null;
     isInterState: boolean;
-    items: Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }>;
+    items: Array<{ salesProductId: string; orderQuantity: string; unit?: string; unitPrice?: string; components: ComponentItem[] }>;
     narration?: string;
 };
 
@@ -102,7 +108,7 @@ const defaultValues: SalesOrderFormValues = {
     referredByCustomerId: null,
     referredByName: null,
     isInterState: false,
-    items: [{ salesProductId: "", orderQuantity: "1", components: [] }],
+    items: [{ salesProductId: "", orderQuantity: "", unit: "Pcs.", unitPrice: "", components: [] }],
     narration: "",
 };
 
@@ -160,12 +166,14 @@ function getComponentProductStock(componentProduct: any): number {
 }
 
 /** Reconstruct form items from saved SalesOrder items and SalesProducts */
-function reconstructFormItems(orderItems: any[], salesProducts: any[]): Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }> {
+type FormItem = { salesProductId: string; orderQuantity: string; unit?: string; unitPrice?: string; components: ComponentItem[] };
+
+function reconstructFormItems(orderItems: any[], salesProducts: any[]): FormItem[] {
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
-        return [{ salesProductId: "", orderQuantity: "1", components: [] }];
+        return [{ salesProductId: "", orderQuantity: "", unit: "Pcs.", unitPrice: "", components: [] }];
     }
 
-    const result: Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }> = [];
+    const result: FormItem[] = [];
     const processedOrderItemIds = new Set<any>();
 
     // Group order items by salesProductId when available
@@ -217,6 +225,8 @@ function reconstructFormItems(orderItems: any[], salesProducts: any[]): Array<{ 
         result.push({
             salesProductId: spIdStr,
             orderQuantity: String(calcOrderQty),
+            unit: "Pcs.",
+            unitPrice: String(items[0]?.unitPrice ?? items[0]?.rate ?? ""),
             components,
         });
     });
@@ -266,45 +276,20 @@ function reconstructFormItems(orderItems: any[], salesProducts: any[]): Array<{ 
         }
     });
 
-    return result.length > 0 ? result : [{ salesProductId: "", orderQuantity: "1", components: [] }];
+    return result.length > 0 ? result : [{ salesProductId: "", orderQuantity: "", unit: "Pcs.", unitPrice: "", components: [] }];
 }
 
-// ─── Per-Item Row ─────────────────────────────────────────────────────────────
+// ─── Expanded Row Content ─────────────────────────────────────────────────────
 
-interface ItemRowProps {
-    control: any;
+const ExpandedComponents: React.FC<{
     index: number;
-    errors: any;
-    salesProducts: any[];
-    salesProductOptions: { value: string; label: React.ReactNode; [key: string]: unknown }[];
-    remove: (index: number) => void;
-    canRemove: boolean;
+    control: any;
     setValue: any;
-    isExpanded: boolean;
-    onToggleExpand: () => void;
-}
-
-const ItemRow: React.FC<ItemRowProps> = ({
-    control, index, errors, salesProducts, salesProductOptions, remove, canRemove, setValue, isExpanded, onToggleExpand,
-}) => {
+    salesProducts: any[];
+}> = ({ index, control, setValue, salesProducts }) => {
     const itemValue = useWatch({ control, name: `items.${index}` });
-    const allItems = useWatch({ control, name: "items" }) || [];
     const components: ComponentItem[] = itemValue?.components || [];
-    const orderQty = itemValue?.orderQuantity ?? "1";
-
-    const filteredOptions = useMemo(() => {
-        const selectedInOtherRows = new Set(
-            allItems
-                .filter((_: any, i: number) => i !== index)
-                .map((item: any) => String(item?.salesProductId))
-                .filter(Boolean)
-        );
-
-        return salesProductOptions.map(opt => ({
-            ...opt,
-            disabled: selectedInOtherRows.has(String(opt.value)),
-        }));
-    }, [salesProductOptions, allItems, index]);
+    const selectedSp = salesProducts.find(s => String(s.id) === itemValue?.salesProductId);
 
     const toggleIncluded = (compIdx: number) => {
         const updated = components.map((c, i) =>
@@ -313,128 +298,36 @@ const ItemRow: React.FC<ItemRowProps> = ({
         setValue(`items.${index}.components`, updated);
     };
 
-    const handleOrderQtyChange = (qty: string) => {
-        setValue(`items.${index}.orderQuantity`, qty);
-        const numQty = Math.max(1, Number(qty) || 1);
-        const updated = components.map(c => ({
-            ...c,
-            quantity: String(c.perUnit * numQty),
-        }));
-        setValue(`items.${index}.components`, updated);
-    };
-
-    const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const spId = e.target.value;
-        const sp = salesProducts.find(s => String(s.id) === spId);
-        setValue(`items.${index}.salesProductId`, spId);
-        setValue(`items.${index}.orderQuantity`, "1");
-        setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
-    };
-
-    const selectedSp = salesProducts.find(s => String(s.id) === itemValue?.salesProductId);
-    const liveStock = selectedSp ? computeSalesProductLiveStock(selectedSp) : null;
-    const hasComponents = components.length > 0;
-    const hasNoSalesProductionComponents = itemValue?.salesProductId &&
-        salesProducts.find(s => String(s.id) === itemValue.salesProductId)?.components?.length > 0 &&
-        components.length === 0;
+    if (components.length === 0) return null;
 
     return (
-        <>
-            <tr className="border-b border-line-soft bg-card hover:bg-card-2/40">
-                <td className="py-2 pl-3 pr-1 text-sm text-ink-subtle font-medium w-8">{index + 1}</td>
-                <td className="py-1 px-1">
-                    <SelectInput
-                        hideLabel
-                        label=""
-                        name={`items.${index}.salesProductId`}
-                        value={itemValue?.salesProductId || ""}
-                        options={filteredOptions}
-                        onChange={handleProductChange}
-                        defaultOptionLabel="Select sales product"
-                        error={(errors.items as any)?.[index]?.salesProductId?.message}
-                        searchable
-                    />
-                </td>
-                <td className="py-1 px-1 w-28">
-                    <TextInput
-                        name={`items.${index}.orderQuantity`}
-                        type="number"
-                        value={orderQty}
-                        min="1"
-                        preventNegative
-                        onChange={e => handleOrderQtyChange(e.target.value)}
-                    />
-                </td>
-                <td className="py-1 px-1 w-10 text-center">
-                    {hasComponents && (
-                        <button
-                            type="button"
-                            onClick={onToggleExpand}
-                            className="p-1 rounded text-ink-subtle hover:text-primary hover:bg-primary/10 transition-colors"
-                            title={isExpanded ? "Hide components" : "View components"}
+        <div className="px-4 py-2">
+            <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
+                <div className="grid grid-cols-[auto_1fr_auto_80px_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
+                    <div className="w-4" />
+                    <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component Product</span>
+                    <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+                    <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Live Stock</span>
+                    <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
+                </div>
+                {components.map((comp, compIdx) => {
+                    const spComp = selectedSp?.components?.find((c: any) => String(c.componentProductId) === String(comp.componentProductId));
+                    const compStock = spComp ? getComponentProductStock(spComp.componentProduct) : null;
+                    return (
+                        <div
+                            key={comp.componentProductId}
+                            className={`grid grid-cols-[auto_1fr_auto_80px_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
                         >
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                    )}
-                </td>
-                <td className="py-1 px-1 w-10 text-center">
-                    <DeleteButton
-                        onClick={() => remove(index)}
-                        disabled={!canRemove}
-                      
-                    />
-                </td>
-            </tr>
-            {hasComponents && isExpanded && (
-                <tr className="bg-card-2/50">
-                    <td colSpan={5} className="px-3 py-2">
-                        <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
-                            <div className="grid grid-cols-[auto_1fr_auto_80px_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
-                                <div className="w-4" />
-                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component Product</span>
-                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
-                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Live Stock</span>
-                                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
-                            </div>
-                            {components.map((comp, compIdx) => {
-                                const spComp = selectedSp?.components?.find((c: any) => String(c.componentProductId) === String(comp.componentProductId));
-                                const compStock = spComp ? getComponentProductStock(spComp.componentProduct) : null;
-                                return (
-                                    <div
-                                        key={comp.componentProductId}
-                                        className={`grid grid-cols-[auto_1fr_auto_80px_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={comp.included}
-                                            onChange={() => toggleIncluded(compIdx)}
-                                            className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
-                                        />
-                                        <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
-                                            {comp.productName}
-                                        </span>
-                                        <span className="text-[11px] text-ink-subtle text-center w-12">×{comp.perUnit}</span>
-                                        <span className="text-xs font-semibold text-center text-ink-subtle">
-                                            {compStock != null ? `${compStock} pcs` : "—"}
-                                        </span>
-                                        <span className="text-xs text-ink font-medium text-center">
-                                            {comp.quantity}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                            <input type="checkbox" checked={comp.included} onChange={() => toggleIncluded(compIdx)} className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+                            <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>{comp.productName}</span>
+                            <span className="text-[11px] text-ink-subtle text-center w-12">×{comp.perUnit}</span>
+                            <span className="text-xs font-semibold text-center text-ink-subtle">{compStock != null ? `${compStock} pcs` : "—"}</span>
+                            <span className="text-xs text-ink font-medium text-center">{comp.quantity}</span>
                         </div>
-                    </td>
-                </tr>
-            )}
-            {hasNoSalesProductionComponents && (
-                <tr>
-                    <td colSpan={5} className="px-8 py-1">
-                        <p className="text-xs text-amber-500 m-0">This product has no "Sales Production" type components.</p>
-                    </td>
-                </tr>
-            )}
-        </>
+                    );
+                })}
+            </div>
+        </div>
     );
 };
 
@@ -463,6 +356,7 @@ const SalesOrderForm: React.FC = () => {
         handleSubmit,
         watch,
         setValue,
+        getValues,
         reset,
         formState: { errors },
     } = useForm<SalesOrderFormValues>({
@@ -539,23 +433,41 @@ const SalesOrderForm: React.FC = () => {
 
     // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {
-        loadCustomers();
+        loadCustomers({ limit: 1000 });
         if (can("employees.view")) loadEmployees({ limit: 500 });
     }, [loadCustomers, loadEmployees, can]);
 
     // ─── Options ─────────────────────────────────────────────────────
     const customerOptions = useMemo(() =>
+        customers.map(d => ({
+            value: String(d.id),
+            label: d.displayName || d.firmName || String(d.id),
+        })),
+        [customers]
+    );
+
+    const customerAutocompleteOptions = useMemo(() =>
         customers.map(d => {
             const name = d.displayName || d.firmName;
-            const type = d.customerType?.name;
-            const grade = d.customerGrade?.name;
-            const location = d.billingCity || d.billingState;
-            const tags = [
-                type ? `(${type})` : null,
-                grade ? `[${grade.charAt(0).toUpperCase()}]` : null,
-                location || null,
-            ].filter(Boolean).join(" · ");
-            return { value: String(d.id), label: tags ? `${name} ${tags}` : name };
+            const group = d.customerType?.name || "—";
+            const grade = d.customerGrade?.name || "—";
+            const bal = Number(d.balanceAmount ?? d.netBalance ?? d.openingBalance ?? 0);
+            const bType = (d.balanceType || d.openingBalanceType || "").toString().toUpperCase();
+            const isDr = bType.startsWith("D");
+            const balLabel = `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
+
+            return {
+                value: String(d.id),
+                label: name,
+                selectedLabel: `${name} · ${group} · ${grade} · ${balLabel}`,
+                info: (
+                    <div className="flex items-center gap-3 text-[11px]">
+                        <span className="text-ink-subtle">{group}</span>
+                        <span className="text-ink-subtle">{grade}</span>
+                        <span className={`font-semibold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>{balLabel}</span>
+                    </div>
+                ),
+            };
         }),
         [customers]
     );
@@ -653,6 +565,115 @@ const SalesOrderForm: React.FC = () => {
         setValue("isInterState", computedIsInterState, { shouldValidate: true });
     }, [computedIsInterState, setValue]);
 
+    // ─── Autocomplete options for Excel-style cell ─────────────────
+    const watchedItems = watch("items");
+    const autocompleteOptions: AutocompleteOption[] = useMemo(() =>
+        salesProducts.map(sp => {
+            const stock = computeSalesProductLiveStock(sp);
+            return {
+                value: String(sp.id),
+                label: sp.salesProductName || sp.salesProductCode || String(sp.id),
+                info: (
+                    <span className={`text-[11px] font-semibold ${stock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        {stock} pcs
+                    </span>
+                ),
+            };
+        }),
+        [salesProducts]
+    );
+
+    // ─── Helper: get product rate ──────────────────────────────────
+    const getProductRate = useCallback((sp: any): string => {
+        if (!sp) return "";
+        if (sp.rate) return String(sp.rate);
+        const comp = (sp.components || []).find((c: any) => c.componentProduct?.rate);
+        return comp ? String(comp.componentProduct.rate) : "";
+    }, []);
+
+    // ─── Order item columns for BusyItemsTable ────────────────────
+    const orderItemColumns: BusyColumn<any>[] = useMemo(() => [
+        {
+            key: "salesProductId",
+            header: "Item",
+            width: "1fr",
+            render: (_row: any, index: number) => {
+                const itemValue = watchedItems?.[index];
+                const allItems = watchedItems || [];
+                const selectedInOtherRows = new Set(
+                    allItems.filter((_: any, i: number) => i !== index).map((item: any) => String(item?.salesProductId)).filter(Boolean)
+                );
+                const opts = autocompleteOptions.map(o => ({
+                    ...o,
+                    disabled: selectedInOtherRows.has(o.value),
+                }));
+                return (
+                    <AutocompleteInput
+                        inline
+                        name={`items.${index}.salesProductId`}
+                        value={itemValue?.salesProductId || ""}
+                        options={opts}
+                        placeholder="Type to search..."
+                        error={(errors.items as any)?.[index]?.salesProductId?.message}
+                        onChange={(spId) => {
+                            const sp = salesProducts.find(s => String(s.id) === spId);
+                            setValue(`items.${index}.salesProductId`, spId);
+                            setValue(`items.${index}.orderQuantity`, "");
+                            setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
+                            // Auto-focus Qty cell so user can type quantity immediately
+                            setTimeout(() => {
+                                const qtyCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                            }, 50);
+                        }}
+                    />
+                );
+            },
+        },
+        {
+            key: "orderQuantity",
+            header: "Qty",
+            width: "100px",
+            align: "center" as const,
+            render: (_row: any, index: number) => {
+                const itemValue = watchedItems?.[index];
+                const orderQty = itemValue?.orderQuantity ?? "";
+                return (
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        value={orderQty}
+                        onChange={e => {
+                            const raw = e.target.value.replace(/[^0-9]/g, "");
+                            const qty = raw || "";
+                            setValue(`items.${index}.orderQuantity`, qty);
+                            const numQty = Math.max(1, Number(qty) || 1);
+                            const comps = itemValue?.components || [];
+                            const updated = comps.map((c: any) => ({ ...c, quantity: String(c.perUnit * numQty) }));
+                            setValue(`items.${index}.components`, updated);
+                        }}
+                        placeholder="0"
+                        className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0"
+                    />
+                );
+            },
+        },
+    ], [watchedItems, autocompleteOptions, salesProducts, errors.items, setValue, getProductRate]);
+
+    // ─── Remove empty rows before submit ───────────────────────────
+    const cleanEmptyRows = useCallback(() => {
+        const currentItems = getValues("items");
+        const emptyIndices = currentItems
+            .map((item, i) => (!item.salesProductId ? i : -1))
+            .filter(i => i >= 0)
+            .reverse();
+        emptyIndices.forEach(i => remove(i));
+        if (currentItems.length === emptyIndices.length) {
+            append({ salesProductId: "", orderQuantity: "", unit: "Pcs.", unitPrice: "", components: [] });
+        }
+    }, [getValues, remove, append]);
+
     // ─── Submit ──────────────────────────────────────────────────────
     const onSubmit = async (data: SalesOrderFormValues, action: "draft" | "quotation" | "order") => {
         setIsSubmitting(true);
@@ -733,31 +754,30 @@ const SalesOrderForm: React.FC = () => {
                     <BackButton text="Back to List" />
                 </div>
 
-                <form className="p-5 space-y-5" noValidate>
+                <form className="px-5 py-3 space-y-3" noValidate>
                     {/* ── Main Fields ── */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
-                        <div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
+                        <div className="sm:col-span-2">
                             <Controller name="customerId" control={control} render={({ field }) => (
-                                <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required searchable onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} error={errors.customerId?.message} />
-                            )} />
-                        </div>
-
-                        <div>
-                            <Controller name="mobile" control={control} render={({ field }) => (
-                                <SelectInput label="Mobile Number" name={field.name} value={field.value ?? ""} options={mobileOptions} defaultOptionLabel={mobileOptions.length > 0 ? "Select Mobile Number" : "No mobile numbers found"} onChange={field.onChange} disabled={!selectedCustomerId} />
+                                <AutocompleteInput horizontal label="Customer" name={field.name} value={field.value} options={customerAutocompleteOptions} required onChange={(val) => field.onChange({ target: { name: field.name, value: val } })} placeholder="Type to search customer..." disabled={isEditMode} error={errors.customerId?.message} />
                             )} />
                         </div>
 
                         <div>
                             <Controller name="orderDate" control={control} render={({ field }) => (
-                                <DateInput label="Order Date" name={field.name} value={field.value} required disabled onChange={field.onChange} />
+                                <AutocompleteInput horizontal label="Order Date" name={field.name} value={field.value} options={[]} required onChange={() => {}} placeholder={field.value} disabled />
                             )} />
-                            <Err message={errors.orderDate?.message} />
+                        </div>
+
+                        <div>
+                            <Controller name="mobile" control={control} render={({ field }) => (
+                                <AutocompleteInput horizontal label="Mobile" name={field.name} value={field.value ?? ""} options={mobileOptions.map(o => ({ value: o.value, label: o.selectedLabel || o.label }))} onChange={(val) => field.onChange({ target: { name: field.name, value: val } })} placeholder={mobileOptions.length > 0 ? "Select Mobile" : "No mobile numbers"} disabled={!selectedCustomerId} />
+                            )} />
                         </div>
 
                         <div>
                             <Controller name="orderSource" control={control} render={({ field }) => (
-                                <SelectInput label="Order Source" name={field.name} value={field.value ?? ""} options={ORDER_SOURCE_OPTIONS} defaultOptionLabel="Select Order Source" onChange={field.onChange} required error={errors.orderSource?.message} />
+                                <AutocompleteInput horizontal label="Order Source" name={field.name} value={field.value ?? ""} options={ORDER_SOURCE_OPTIONS} required onChange={(val) => field.onChange({ target: { name: field.name, value: val } })} placeholder="Type to search..." error={errors.orderSource?.message} />
                             )} />
                         </div>
 
@@ -765,15 +785,15 @@ const SalesOrderForm: React.FC = () => {
                         {ORDER_SOURCE_NEEDS_EMPLOYEE.includes(orderSource ?? "") && (
                             <div>
                                 <Controller name="sourceEmployeeId" control={control} render={({ field }) => (
-                                    <SelectInput
-                                        label="Responsible Employee"
+                                    <AutocompleteInput
+                                        horizontal
+                                        label="Employee"
                                         name={field.name}
                                         value={field.value ?? ""}
                                         options={employeeOptions}
-                                        defaultOptionLabel="Select Employee"
-                                        onChange={field.onChange}
-                                        searchable
                                         required
+                                        onChange={(val) => field.onChange({ target: { name: field.name, value: val } })}
+                                        placeholder="Type to search..."
                                     />
                                 )} />
                                 <Err message={errors.sourceEmployeeId?.message} />
@@ -786,7 +806,8 @@ const SalesOrderForm: React.FC = () => {
                                 <div>
                                     <Controller name="referredByCustomerId" control={control} render={({ field }) => (
                                         <SelectInput
-                                            label="Referred By Customer"
+                                            horizontal
+                                            label="Referred By"
                                             name={field.name}
                                             value={field.value ?? ""}
                                             options={customerOptions}
@@ -798,7 +819,7 @@ const SalesOrderForm: React.FC = () => {
                                 </div>
                                 <div>
                                     <Controller name="referredByName" control={control} render={({ field }) => (
-                                        <TextInput label="Referral Name" name={field.name} value={field.value ?? ""} placeholder="Or enter referral name" onChange={field.onChange} onBlur={field.onBlur} />
+                                        <TextInput horizontal label="Referral Name" name={field.name} value={field.value ?? ""} placeholder="Or enter referral name" onChange={field.onChange} onBlur={field.onBlur} />
                                     )} />
                                     <Err message={errors.referredByName?.message} />
                                 </div>
@@ -809,7 +830,7 @@ const SalesOrderForm: React.FC = () => {
                         {ORDER_SOURCE_NEEDS_DEALER.includes(orderSource ?? "") && (
                             <div>
                                 <Controller name="referredByName" control={control} render={({ field }) => (
-                                    <TextInput label="Dealer / Agent Name" name={field.name} value={field.value ?? ""} placeholder="Enter dealer or agent name" onChange={field.onChange} onBlur={field.onBlur} required />
+                                    <TextInput horizontal label="Dealer / Agent" name={field.name} value={field.value ?? ""} placeholder="Enter dealer or agent name" onChange={field.onChange} onBlur={field.onBlur} required />
                                 )} />
                                 <Err message={errors.referredByName?.message} />
                             </div>
@@ -820,45 +841,28 @@ const SalesOrderForm: React.FC = () => {
                     <div className="lg:max-w-[1024px]">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-semibold text-ink">Order Items</span>
-                            <CustomButton
-                                text="Add Sales Product"
-                                variant="secondary"
-                                onClick={() => append({ salesProductId: "", orderQuantity: "1", components: [] })}
-                            />
                         </div>
 
                         {typeof errors.items?.message === "string" && <Err message={errors.items.message} />}
 
-                        <div className="border border-line-soft rounded-xl overflow-hidden bg-card">
-                            <table className="min-w-full text-sm">
-                                <thead>
-                                    <tr className="bg-card-2 border-b border-line-soft">
-                                        <th className="py-2 pl-3 pr-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-8">#</th>
-                                        <th className="py-2 px-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide">Sales Product</th>
-                                        <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Order Qty</th>
-                                        <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
-                                        <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {fields.map((field, index) => (
-                                        <ItemRow
-                                            key={field.id}
-                                            control={control}
-                                            index={index}
-                                            errors={errors}
-                                            salesProducts={salesProducts}
-                                            salesProductOptions={salesProductOptions}
-                                            remove={remove}
-                                            canRemove={fields.length > 1}
-                                            setValue={setValue}
-                                            isExpanded={expandedItemIndex === index}
-                                            onToggleExpand={() => setExpandedItemIndex(expandedItemIndex === index ? null : index)}
-                                        />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <BusyItemsTable
+                            columns={orderItemColumns}
+                            rows={fields}
+                            onAdd={() => append({ salesProductId: "", orderQuantity: "", unit: "Pcs.", unitPrice: "", components: [] })}
+                            onRemove={(i) => remove(i)}
+                            editable={false}
+                            expandable
+                            canExpand={(_row, i) => Boolean(watchedItems?.[i]?.salesProductId)}
+                            expandedIndex={expandedItemIndex}
+                            onExpandToggle={(i) => setExpandedItemIndex(expandedItemIndex === i ? null : i)}
+                            renderExpandedRow={(_row, i) => (
+                                <ExpandedComponents index={i} control={control} setValue={setValue} salesProducts={salesProducts} />
+                            )}
+                            showTotals={[
+                                { colKey: "orderQuantity", value: (watchedItems || []).reduce((s: number, it: any) => s + (Number(it?.orderQuantity) || 0), 0) },
+                            ]}
+                            visibleRows={10}
+                        />
                     </div>
 
                     {/* ── Narration ── */}
@@ -873,8 +877,8 @@ const SalesOrderForm: React.FC = () => {
                 {/* ── Actions ── */}
                 <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
                     <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
-                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
-                    <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
+                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))(); }} disabled={isSubmitting} />
+                    <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))(); }} disabled={isSubmitting} />
                 </div>
             </div>
         </div>

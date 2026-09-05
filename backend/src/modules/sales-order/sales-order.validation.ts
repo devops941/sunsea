@@ -134,6 +134,7 @@ const salesOrderBodyShape = z.object({
     // Order-level discount (from the quotation form)
     orderDiscountType: DiscountTypeEnum.optional().nullable(),
     orderDiscountValue: z.coerce.number().min(0).optional().nullable(),
+    billSundry: z.any().optional().nullable(),
     items: z.array(salesOrderItemInputSchema).min(1, "At least one item is required"),
 });
 

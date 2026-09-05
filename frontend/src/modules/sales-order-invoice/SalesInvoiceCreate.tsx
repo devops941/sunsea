@@ -2,19 +2,19 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaSave, FaExclamationTriangle } from "react-icons/fa";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 
 import TextInput from "../../components/form/TextInput/TextInput";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
+import AutocompleteInput from "../../components/form/AutocompleteInput/AutocompleteInput";
 import CustomButton from "../../components/ui/Button/Button";
 import BackButton from "../../components/ui/BackButton/BackButton";
-import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
+import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../components/form/OrderItemsTable/BusyItemsTable";
+import type { BusyColumn, SundryRow } from "../../components/form/OrderItemsTable/BusyItemsTable";
 import {
   type ChargeRow,
-  DEFAULT_CHARGE_OPTIONS as CHARGE_OPTIONS,
   parseChargeRowsFromNarration,
   serializeChargeRowsToNarration,
   computeChargeTotals,
@@ -173,13 +173,14 @@ const SalesInvoiceForm: React.FC = () => {
   const [billingAddress, setBillingAddress] = useState({ line1: "", city: "", state: "", pincode: "" });
   const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
   const [selectedShippingIdx, setSelectedShippingIdx] = useState<number>(0);
-  const [newShippingAddress, setNewShippingAddress] = useState({ line1: "", city: "", state: "", pincode: "" });
+  const [newShippingAddress, _setNewShippingAddress] = useState({ line1: "", city: "", state: "", pincode: "" });
   const [addingNewAddress, setAddingNewAddress] = useState(false);
   const [editInvoiceSalesOrder, setEditInvoiceSalesOrder] = useState<any>(null);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
 
   const [chargeRows, setChargeRows] = useState<ChargeRow[]>([]);
+  const [sundryRows, setSundryRows] = useState<SundryRow[]>([]);
   const [invoiceStatus, setInvoiceStatus] = useState<string>("DRAFT");
 
   useFormShortcuts({});
@@ -202,7 +203,56 @@ const SalesInvoiceForm: React.FC = () => {
         setInvoiceStatus(invoice.status || "DRAFT");
         setCustomerId(invoice.customerId || "");
         setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
-        if (invoice.salesOrder) setEditInvoiceSalesOrder(invoice.salesOrder);
+        if (invoice.salesOrder) {
+          setEditInvoiceSalesOrder(invoice.salesOrder);
+        }
+        // Fetch full sales order to get addresses, bill sundry, and correct item mapping
+        if (invoice.salesOrderId) {
+          salesOrderService.fetchById(invoice.salesOrderId).then((fullOrder: any) => {
+            if (!fullOrder) return;
+            setEditInvoiceSalesOrder(fullOrder);
+            const cust = fullOrder.customer;
+            const addresses = cust?.addresses || [];
+            setCustomerAddresses(addresses);
+            const defaultAddr = addresses[0]?.address || {};
+            setBillingAddress({
+              line1: fullOrder.billingAddressLine1 || cust?.billingAddressLine1 || defaultAddr.addressLine1 || "",
+              city: fullOrder.billingCity || cust?.billingCity || defaultAddr.city || "",
+              state: fullOrder.billingState || cust?.billingState || defaultAddr.state || "",
+              pincode: fullOrder.billingPincode || cust?.billingPincode || defaultAddr.pincode || "",
+            });
+            setSelectedShippingIdx(0);
+            // Re-map lines from sales order to show sales product names
+            const mapped = mapOrderToLines(fullOrder);
+            if (mapped.length > 0) {
+              // Preserve invoice quantities/rates over order defaults
+              const invoiceItems = invoice.items || [];
+              mapped.forEach((line: any) => {
+                const matchingInvoiceItems = invoiceItems.filter((ii: any) => String(ii.salesProductId) === line.itemId);
+                if (matchingInvoiceItems.length > 0) {
+                  const totalQty = matchingInvoiceItems.reduce((s: number, ii: any) => s + Number(ii.quantity || 0), 0);
+                  const totalAmount = matchingInvoiceItems.reduce((s: number, ii: any) => s + (Number(ii.unitPrice || 0) * Number(ii.quantity || 0)), 0);
+                  const sp = salesProducts.find((s: any) => String(s.id) === line.itemId);
+                  const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
+                  const firstComp = spComps[0];
+                  const perUnit = Number(firstComp?.quantity || 1);
+                  const orderQty = Math.max(1, Math.round(totalQty / perUnit));
+                  const unitPrice = orderQty > 0 ? Math.round((totalAmount / orderQty) * 100) / 100 : 0;
+                  line.qty = orderQty;
+                  line.rate = unitPrice;
+                  line.amount = orderQty * unitPrice;
+                  line.taxAmount = (line.amount * line.taxPercent) / 100;
+                  line.total = line.amount + line.taxAmount;
+                }
+              });
+              setLines(mapped);
+            }
+            // Load bill sundry from full order if not already loaded from invoice
+            if (sundryRows.length === 0 && Array.isArray(fullOrder.billSundry) && fullOrder.billSundry.length > 0) {
+              setSundryRows(fullOrder.billSundry);
+            }
+          }).catch(() => {});
+        }
         if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate.split("T")[0]);
         setNotes(invoice.notes || "");
         setPreviewInvoiceNo(invoice.invoiceNo || "");
@@ -223,6 +273,13 @@ const SalesInvoiceForm: React.FC = () => {
           })));
         }
         setChargeRows(parseChargeRowsFromNarration((invoice as any).narration));
+
+        // Load bill sundry from invoice or its sales order
+        if (Array.isArray((invoice as any).billSundry) && (invoice as any).billSundry.length > 0) {
+          setSundryRows((invoice as any).billSundry);
+        } else if (invoice.salesOrder && Array.isArray((invoice.salesOrder as any).billSundry)) {
+          setSundryRows((invoice.salesOrder as any).billSundry);
+        }
       })
       .catch(() => {
         toast.error("Failed to load sales invoice details");
@@ -459,6 +516,13 @@ const SalesInvoiceForm: React.FC = () => {
       if (mapped.length > 0) setLines(mapped);
       setChargeRows(parseChargeRowsFromNarration((fullOrder as any).narration));
 
+      // Load bill sundry from sales order
+      if (Array.isArray((fullOrder as any).billSundry) && (fullOrder as any).billSundry.length > 0) {
+        setSundryRows((fullOrder as any).billSundry);
+      } else {
+        setSundryRows([]);
+      }
+
       // Detect excluded components: compare order items vs sales product components
       const orderItems: any[] = fullOrder.items || [];
       const orderProductIds = new Set(orderItems.map((oi: any) => String(oi.productId)));
@@ -672,6 +736,7 @@ const SalesInvoiceForm: React.FC = () => {
         totalDiscount: totals.totalDiscount,
         taxTotal: totals.taxTotal,
         grandTotal: totals.grandTotal,
+        billSundry: sundryRows.length > 0 ? sundryRows : null,
         payments: [],
       };
 
@@ -691,35 +756,53 @@ const SalesInvoiceForm: React.FC = () => {
   };
 
   // ---- Customer / product select options ----
-  const customerOptions = useMemo(() => [
-    { value: "", label: "-- Select Customer --" },
-    ...customers.map((c) => ({ value: c.id, label: c.name })),
-  ], [customers]);
+  const customerAutocompleteOptions = useMemo(() =>
+    customersRaw.map((c: any) => {
+      const name = c.displayName || c.firmName || String(c.id);
+      const group = c.customerType?.name || "—";
+      const grade = c.customerGrade?.name || "—";
+      const bal = Number(c.balanceAmount ?? c.netBalance ?? c.openingBalance ?? 0);
+      const bType = (c.balanceType || c.openingBalanceType || "").toString().toUpperCase();
+      const isDr = bType.startsWith("D");
+      const balLabel = `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
 
-  const salesOrderOptions = useMemo(() => {
+      return {
+        value: String(c.id),
+        label: name,
+        selectedLabel: `${name} · ${group} · ${grade} · ${balLabel}`,
+        info: (
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="text-ink-subtle">{group}</span>
+            <span className="text-ink-subtle">{grade}</span>
+            <span className={`font-semibold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>{balLabel}</span>
+          </div>
+        ),
+      };
+    }),
+    [customersRaw]
+  );
+
+  const salesOrderAutocompleteOptions = useMemo(() => {
     const filtered = salesOrders.filter(
       (so) => String(so.customerId || so.customer?.id || "") === String(customerId)
     );
     if (isEditMode && editInvoiceSalesOrder) {
       const exists = filtered.some((so) => String(so.id) === String(editInvoiceSalesOrder.id));
-      if (!exists) filtered.push({ id: editInvoiceSalesOrder.id, orderNo: editInvoiceSalesOrder.orderNo });
+      if (!exists) filtered.push(editInvoiceSalesOrder);
     }
-    return [
-      { value: "", label: customerId ? "-- Select Sales Order --" : "-- Select Customer First --" },
-      ...filtered.map((so) => {
-        const dateStr = so.orderDate || so.createdAt;
-        const formattedDate = dateStr
-          ? new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
-          : "";
-        const formattedAmt = so.netAmount !== undefined
-          ? `₹${Number(so.netAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-          : "";
-        const label = formattedAmt
-          ? `${so.orderNo}${formattedDate ? ` (${formattedDate})` : ""} — ${formattedAmt}`
-          : `${so.orderNo}${formattedDate ? ` (${formattedDate})` : ""}`;
-        return { value: so.id.toString(), label };
-      }),
-    ];
+    return filtered.map((so) => {
+      const dateStr = so.orderDate || so.createdAt;
+      const formattedDate = dateStr
+        ? new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+        : "";
+      const formattedAmt = so.netAmount !== undefined
+        ? `₹${Number(so.netAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+        : "";
+      const label = formattedAmt
+        ? `${so.orderNo}${formattedDate ? ` (${formattedDate})` : ""} — ${formattedAmt}`
+        : `${so.orderNo}${formattedDate ? ` (${formattedDate})` : ""}`;
+      return { value: so.id.toString(), label };
+    });
   }, [salesOrders, customerId, isEditMode, editInvoiceSalesOrder]);
 
   const productOptions = useMemo(() => [
@@ -728,6 +811,229 @@ const SalesInvoiceForm: React.FC = () => {
   ], [items]);
 
   // ---- Derived (non-hook) values ----
+  // ── Invoice item columns for BusyItemsTable ──
+  const invoiceColumns: BusyColumn<InvoiceLineItem>[] = useMemo(() => [
+    {
+      key: "itemName",
+      header: selectedSalesOrderId ? "Sales Product" : "Product",
+      width: "1fr",
+      render: (row: InvoiceLineItem) => {
+        if (selectedSalesOrderId) {
+          return (
+            <span className="flex items-center gap-1">
+              <span className="text-ink font-medium text-[13px] truncate">{row.itemName || "—"}</span>
+            </span>
+          );
+        }
+        return (
+          <SelectInput hideLabel label="" name={`item-${row.id}`} value={row.itemId} disabled={isLocked} options={productOptions} searchable
+            onChange={(e) => updateLine(row.id, "itemId", (e as any).target ? (e as any).target.value : String(e))} />
+        );
+      },
+    },
+    {
+      key: "qty",
+      header: "Qty",
+      width: "80px",
+      align: "center" as const,
+      render: (row: InvoiceLineItem) => (
+        <div>
+          <input type="text" inputMode="numeric" value={String(row.qty)} disabled={isLocked}
+            onChange={(e) => updateLine(row.id, "qty", Number(e.target.value))}
+            className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full" placeholder="0" />
+          {row.itemId && row.qty > (stockMap.get(row.itemId) || 0) && (
+            <div className="text-red-500 text-[10px] font-medium whitespace-nowrap">Avail: {Math.round((stockMap.get(row.itemId) || 0) * 100) / 100}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "rate",
+      header: "Unit Price",
+      width: "100px",
+      align: "right" as const,
+      render: (row: InvoiceLineItem) => (
+        <input type="text" inputMode="decimal" value={String(row.rate)} disabled={isLocked}
+          onChange={(e) => updateLine(row.id, "rate", Number(e.target.value))}
+          className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full" placeholder="0" />
+      ),
+    },
+    {
+      key: "weight",
+      header: "Weight (kg)",
+      width: "90px",
+      align: "center" as const,
+      render: (row: InvoiceLineItem) => (
+        <input type="text" inputMode="decimal" value={String(row.weight || 0)} disabled={isLocked}
+          onChange={(e) => updateLine(row.id, "weight", Number(e.target.value))}
+          className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full" placeholder="0" />
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      width: "110px",
+      align: "right" as const,
+      render: (row: InvoiceLineItem) => {
+        if (row.amount <= 0) return <span className="text-[13px] text-ink-subtle">—</span>;
+        return (
+          <div className="text-right">
+            <span className="text-emerald-500 text-[13px] font-bold">₹{row.total.toFixed(2)}</span>
+            {row.taxAmount > 0 && (<span className="block text-[10px] text-ink-subtle">(+₹{row.taxAmount.toFixed(2)})</span>)}
+          </div>
+        );
+      },
+    },
+  ], [selectedSalesOrderId, salesProducts, isLocked, productOptions, stockMap, lines, updateLine]);
+
+  // ── Expanded components renderer for BusyItemsTable ──
+  const renderExpandedComponents = useCallback((row: InvoiceLineItem, _index: number) => {
+    const sp = selectedSalesOrderId ? salesProducts.find((s: any) => String(s.id) === row.itemId) : null;
+    const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
+    if (spComps.length === 0) return null;
+
+    return (
+      <div className="px-4 py-2">
+        <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
+          <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
+            <div className="w-4" />
+            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
+          </div>
+          {spComps.map((comp: any) => {
+            const compId = String(comp.componentProductId);
+            const compPerUnit = Number(comp.quantity || 1);
+            const isExcluded = excludedComponents[row.id]?.has(compId) || false;
+            const compQty = isExcluded ? 0 : compPerUnit * row.qty;
+            return (
+              <div key={compId} className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${isExcluded ? "bg-card-2 opacity-60" : "bg-card"}`}>
+                <input type="checkbox" checked={!isExcluded}
+                  onChange={() => {
+                    setExcludedComponents(prev => {
+                      const lineSet = new Set(prev[row.id] || []);
+                      if (lineSet.has(compId)) lineSet.delete(compId);
+                      else lineSet.add(compId);
+                      const newExcluded = { ...prev, [row.id]: lineSet };
+                      setLines(prevLines => prevLines.map(l => {
+                        if (l.id !== row.id) return l;
+                        let w = 0;
+                        let ratePerUnit = 0;
+                        spComps.forEach((c: any) => {
+                          if (!lineSet.has(String(c.componentProductId))) {
+                            w += Number(c.componentProduct?.weightPerPiece || 0) * Number(c.quantity || 1);
+                            ratePerUnit += Number(c.componentProduct?.rate || 0) * Number(c.quantity || 1);
+                          }
+                        });
+                        const newRate = ratePerUnit;
+                        const newAmount = newRate * l.qty;
+                        const taxableAmount = newAmount - (l.discountAmount || 0);
+                        const newTaxAmount = (taxableAmount * l.taxPercent) / 100;
+                        return { ...l, weight: w * l.qty, rate: newRate, amount: newAmount, taxAmount: newTaxAmount, total: taxableAmount + newTaxAmount };
+                      }));
+                      return newExcluded;
+                    });
+                  }}
+                  className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+                <span className={`text-xs ${isExcluded ? "line-through text-ink-subtle" : "text-ink font-medium"}`}>
+                  {comp.componentProduct?.productName || comp.componentProduct?.productCode || `Product #${compId}`}
+                </span>
+                <span className="text-[11px] text-ink-subtle text-center w-12">x{compPerUnit}</span>
+                <span className="text-xs text-ink font-medium text-center">{isExcluded ? "0" : compQty}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }, [selectedSalesOrderId, salesProducts, excludedComponents, lines]);
+
+  // ── Bill Sundry columns for BusyItemsTable ──
+  const sundryColumns: BusyColumn<SundryRow>[] = useMemo(() => {
+    const usedTypes = new Set(sundryRows.map(r => r.type));
+    return [
+      {
+        key: "type",
+        header: "Bill Sundry",
+        width: "1fr",
+        render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => (
+          <select
+            value={row.type}
+            onChange={e => update({ type: e.target.value })}
+            style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 13, color: "var(--color-ink)", cursor: "pointer" }}
+          >
+            {DEFAULT_SUNDRY_OPTIONS.map(o => (
+              <option key={o.value} value={o.value} disabled={o.value !== row.type && usedTypes.has(o.value)}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        key: "rate",
+        header: "@",
+        width: "100px",
+        align: "right" as const,
+        render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
+          const hasRate = row.type.startsWith("BILL_TAX") || row.type.startsWith("DISCOUNT");
+          if (!hasRate) return null;
+          return (
+            <div className="flex items-center gap-0.5 w-full justify-end">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={row.rate}
+                onChange={e => {
+                  const rate = e.target.value.replace(/[^0-9.]/g, "");
+                  const rateNum = Number(rate) || 0;
+                  const calcAmount = (totals.subTotal * rateNum / 100).toFixed(2);
+                  update({ rate, amount: rateNum > 0 ? calcAmount : "" });
+                }}
+                placeholder="0.000"
+                className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right"
+              />
+              <span className="text-[11px] text-ink-subtle">%</span>
+            </div>
+          );
+        },
+      },
+      {
+        key: "amount",
+        header: "Amount (₹)",
+        width: "120px",
+        align: "right" as const,
+        render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
+          const isNeg = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === row.type)?.sign === -1;
+          return (
+            <input
+              type="text"
+              inputMode="decimal"
+              value={row.amount}
+              onChange={e => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
+              placeholder="0.00"
+              className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right font-semibold"
+              style={{ color: isNeg ? "#ef4444" : "var(--color-ink)" }}
+            />
+          );
+        },
+      },
+    ];
+  }, [sundryRows, totals.subTotal]);
+
+  const sundryEmptyRow: SundryRow = useMemo(() => {
+    const usedTypes = new Set(sundryRows.map(r => r.type));
+    const next = DEFAULT_SUNDRY_OPTIONS.find(o => !usedTypes.has(o.value))?.value ?? DEFAULT_SUNDRY_OPTIONS[0]?.value ?? "";
+    return { id: `${Date.now()}-${Math.random()}`, type: next, rate: "", amount: "" };
+  }, [sundryRows]);
+
+  // ── Find expanded line index for BusyItemsTable ──
+  const expandedLineIndex = useMemo(() => {
+    if (!expandedLineId) return null;
+    const idx = lines.findIndex(l => l.id === expandedLineId);
+    return idx >= 0 ? idx : null;
+  }, [expandedLineId, lines]);
+
   if (loading) return <CommonLoader text="Loading Invoice Form..." fullScreen={false} />;
 
   const isStockNotEnough = lines.some((l) => l.itemId && l.qty > (stockMap.get(l.itemId) || 0));
@@ -745,10 +1051,10 @@ const SalesInvoiceForm: React.FC = () => {
           <BackButton text="Back to List" />
         </div>
 
-        <form className="p-5 space-y-5 " noValidate>
-          <div className="flex flex-col lg:flex-row gap-5 ">
-          {/* ── Left: Form (75%) ── */}
-          <div className="w-full lg:w-3/4 space-y-5">
+        <form className="p-5 space-y-5" noValidate>
+          <div className="flex flex-col gap-5">
+          {/* ── Full-width Form ── */}
+          <div className="w-full space-y-5">
 
           {/* Credit limit warning */}
           {limitExceeded !== false && (
@@ -756,43 +1062,41 @@ const SalesInvoiceForm: React.FC = () => {
               <FaExclamationTriangle className="text-red-500 mt-0.5 flex-shrink-0 text-xs" />
               <p className="text-red-500 text-xs">
                 Credit exceeded by <span className="font-bold">₹{(limitExceeded as any).exceededBy.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-               
               </p>
             </div>
           )}
 
           {/* ── Form Fields ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
-            <SelectInput
+            <AutocompleteInput
               label="Customer"
               name="customerId"
               required
               value={customerId}
               disabled={isLocked}
               error={errors.customerId}
-              options={customerOptions}
-              searchable
-              onChange={(e) => {
-                const newCustId = (e as any).target ? (e as any).target.value : String(e);
-                setCustomerId(newCustId);
-                if (newCustId) loadCustomerOrders(newCustId);
+              options={customerAutocompleteOptions}
+              placeholder="Type to search customer..."
+              onChange={(val) => {
+                setCustomerId(val);
+                if (val) loadCustomerOrders(val);
                 if (selectedSalesOrderId) {
                   const selOrder = salesOrders.find((o) => String(o.id) === String(selectedSalesOrderId));
                   if (selOrder) {
                     const orderCustId = String(selOrder.customerId || selOrder.customer?.id || "");
-                    if (orderCustId !== newCustId) { setSelectedSalesOrderId(""); setLines([emptyLine()]); }
+                    if (orderCustId !== val) { setSelectedSalesOrderId(""); setLines([emptyLine()]); }
                   }
                 }
               }}
             />
-            <SelectInput
+            <AutocompleteInput
               label="Sales Order"
               name="selectedSalesOrderId"
               value={selectedSalesOrderId}
               disabled={isEditMode || !customerId}
-              searchable
-              options={salesOrderOptions}
-              onChange={(e) => handleSalesOrderChange((e as any).target ? (e as any).target.value : String(e))}
+              options={salesOrderAutocompleteOptions}
+              placeholder={customerId ? "Type to search order..." : "Select customer first"}
+              onChange={(val) => handleSalesOrderChange(val)}
             />
             <DatePickerCalendar
               label="Invoice Date"
@@ -805,181 +1109,154 @@ const SalesInvoiceForm: React.FC = () => {
             />
           </div>
 
+          {/* ── Addresses ── */}
+          {(billingAddress.line1 || billingAddress.city) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-3 border border-line-soft rounded-lg bg-card">
+                <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
+                <p className="text-xs text-ink-subtle mt-1">
+                  {[billingAddress.line1, billingAddress.city, billingAddress.state, billingAddress.pincode].filter(Boolean).join(", ")}
+                </p>
+              </div>
+              <div className="p-3 border border-line-soft rounded-lg bg-card">
+                <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
+                {customerAddresses.length > 0 ? (
+                  <div className="space-y-1 mt-1">
+                    {customerAddresses.map((a: any, idx: number) => {
+                      const addr = a.address || a;
+                      const addrLabel = [addr.addressLine1, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
+                      return (
+                        <label key={idx} className={`flex items-start gap-1.5 cursor-pointer text-xs p-1.5 rounded ${selectedShippingIdx === idx ? "bg-primary/10 text-primary" : "text-ink-subtle hover:bg-card-2"}`}>
+                          <input type="radio" name="shippingAddr" checked={selectedShippingIdx === idx} onChange={() => setSelectedShippingIdx(idx)} className="mt-0.5 w-3 h-3 accent-blue-600" />
+                          <span>{a.label || `Address ${idx + 1}`}: {addrLabel}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-ink-subtle mt-1">Same as billing</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Line Items ── */}
           {errors.lines && (
             <div className="text-red-500 text-xs mb-2 bg-red-500/10 p-2 rounded-md border border-red-500/20">{errors.lines}</div>
           )}
 
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-ink">Invoice Items</span>
-            {!isEditMode && (
-              <CustomButton text="+ Add Item" type="button" size="sm" variant="secondary" onClick={() => setLines((prev) => [...prev, emptyLine()])} />
-            )}
-          </div>
-
-          <div className="border border-line-soft rounded-xl overflow-visible bg-card shadow-xs">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-card-2 border-b border-line-soft">
-                  <th className="py-2 pl-3 pr-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-8">#</th>
-                  <th className="py-2 px-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide">{selectedSalesOrderId ? "Sales Product" : "Product"}</th>
-                  <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">Qty</th>
-                  <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Unit Price</th>
-                  <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">GST %</th>
-                  <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-24">Weight (kg)</th>
-                  <th className="py-2 px-1 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Total</th>
-                  <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line, index) => {
-                  const sp = selectedSalesOrderId ? salesProducts.find((s: any) => String(s.id) === line.itemId) : null;
-                  const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
-                  const hasComps = spComps.length > 0;
-                  const isExpanded = expandedLineId === line.id;
-
-                  return (
-                  <React.Fragment key={line.id}>
-                  <tr className="border-b border-line-soft last:border-b-0 bg-card hover:bg-card-2/40">
-                    <td className="py-2 pl-3 pr-1 text-ink-subtle font-medium">{index + 1}</td>
-                    <td className="py-1 px-1">
-                      {selectedSalesOrderId ? (
-                        <span className="flex items-center gap-1 py-1">
-                          {hasComps && (
-                            <button type="button" onClick={() => setExpandedLineId(isExpanded ? null : line.id)}
-                              className="p-0.5 rounded text-ink-subtle hover:text-primary transition-colors flex-shrink-0">
-                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            </button>
-                          )}
-                          <span className="text-ink font-medium text-sm">{line.itemName || "—"}</span>
-                        </span>
-                      ) : (
-                        <SelectInput hideLabel label="" name={`item-${line.id}`} value={line.itemId} disabled={isLocked} options={productOptions} searchable
-                          onChange={(e) => updateLine(line.id, "itemId", (e as any).target ? (e as any).target.value : String(e))} />
-                      )}
-                    </td>
-                    <td className="py-1 px-1 w-20">
-                      <TextInput name={`qty-${line.id}`} type="number" min="0" preventNegative value={String(line.qty)} disabled={isLocked}
-                        onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))} placeholder="0" />
-                      {line.itemId && line.qty > (stockMap.get(line.itemId) || 0) && (
-                        <div className="text-red-500 text-[10px] font-medium whitespace-nowrap">Avail: {Math.round((stockMap.get(line.itemId) || 0) * 100) / 100}</div>
-                      )}
-                    </td>
-                    <td className="py-1 px-1 w-28">
-                      <TextInput name={`rate-${line.id}`} type="number" min="0" preventNegative value={String(line.rate)} disabled={isLocked}
-                        onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))} placeholder="0" />
-                    </td>
-                    <td className="py-1 px-1 w-20">
-                      <TextInput name={`tax-${line.id}`} type="number" value={String(line.taxPercent)} disabled={isLocked} min={0} max={100} step={0.01} placeholder="0"
-                        onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))} />
-                    </td>
-                    <td className="py-1 px-1 w-24">
-                      <TextInput name={`weight-${line.id}`} type="number" min="0" step="0.01" value={String(line.weight || 0)} disabled={isLocked}
-                        onChange={(e) => updateLine(line.id, "weight", Number(e.target.value))} placeholder="0" />
-                    </td>
-                    <td className="py-2 px-1 text-right font-bold whitespace-nowrap">
-                      {line.amount > 0 ? (
-                        <div>
-                          <span className="text-emerald-500 text-sm">₹{line.total.toFixed(2)}</span>
-                          {line.taxAmount > 0 && (<span className="block text-[10px] text-ink-subtle">(+₹{line.taxAmount.toFixed(2)})</span>)}
-                        </div>
-                      ) : "—"}
-                    </td>
-                    <td className="py-1 px-1 w-10 text-center">
-                      <DeleteButton onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((l) => l.id !== line.id) : prev)}
-                        disabled={lines.length <= 1 || isEditMode} disabledMessage={lines.length <= 1 ? "At least one item." : undefined} />
-                    </td>
-                  </tr>
-                  {hasComps && isExpanded && (
-                    <tr className="bg-card-2/50">
-                      <td></td>
-                      <td colSpan={7} className="px-3 py-2">
-                        <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
-                          <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
-                            <div className="w-4" />
-                            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
-                            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
-                            <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
-                          </div>
-                          {spComps.map((comp: any) => {
-                            const compId = String(comp.componentProductId);
-                            const compPerUnit = Number(comp.quantity || 1);
-                            const isExcluded = excludedComponents[line.id]?.has(compId) || false;
-                            const compQty = isExcluded ? 0 : compPerUnit * line.qty;
-                            return (
-                              <div key={compId} className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${isExcluded ? "bg-card-2 opacity-60" : "bg-card"}`}>
-                                <input type="checkbox" checked={!isExcluded}
-                                  onChange={() => {
-                                    setExcludedComponents(prev => {
-                                      const lineSet = new Set(prev[line.id] || []);
-                                      if (lineSet.has(compId)) lineSet.delete(compId);
-                                      else lineSet.add(compId);
-                                      const newExcluded = { ...prev, [line.id]: lineSet };
-                                      // Recalculate weight and rate based on included components
-                                      setLines(prevLines => prevLines.map(l => {
-                                        if (l.id !== line.id) return l;
-                                        let w = 0;
-                                        let ratePerUnit = 0;
-                                        spComps.forEach((c: any) => {
-                                          if (!lineSet.has(String(c.componentProductId))) {
-                                            w += Number(c.componentProduct?.weightPerPiece || 0) * Number(c.quantity || 1);
-                                            ratePerUnit += Number(c.componentProduct?.rate || 0) * Number(c.quantity || 1);
-                                          }
-                                        });
-                                        const newRate = ratePerUnit;
-                                        const newAmount = newRate * l.qty;
-                                        const taxableAmount = newAmount - (l.discountAmount || 0);
-                                        const newTaxAmount = (taxableAmount * l.taxPercent) / 100;
-                                        return { ...l, weight: w * l.qty, rate: newRate, amount: newAmount, taxAmount: newTaxAmount, total: taxableAmount + newTaxAmount };
-                                      }));
-                                      return newExcluded;
-                                    });
-                                  }}
-                                  className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
-                                <span className={`text-xs ${isExcluded ? "line-through text-ink-subtle" : "text-ink font-medium"}`}>
-                                  {comp.componentProduct?.productName || comp.componentProduct?.productCode || `Product #${compId}`}
-                                </span>
-                                <span className="text-[11px] text-ink-subtle text-center w-12">x{compPerUnit}</span>
-                                <span className="text-xs text-ink font-medium text-center">{isExcluded ? "0" : compQty}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Discount + Extra Charge (inline) ── */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-bold text-ink uppercase tracking-wide">Discount (%)</span>
-            <div className="w-24">
-              <TextInput name="discountValue" type="number" min="0" max="100" step="1" placeholder="0" value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)} disabled={isLocked} />
-            </div>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-bold text-ink uppercase tracking-wide">Extra Charge</span>
-            <div className="w-48">
-              <SelectInput hideLabel label="" name="chargeType" value={chargeRows[0]?.type || ""} options={CHARGE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-                onChange={(e) => {
-                  const val = (e as any).target ? (e as any).target.value : String(e);
-                  if (!val) { setChargeRows([]); return; }
-                  setChargeRows(prev => prev.length > 0 ? [{ ...prev[0], type: val }] : [{ id: crypto.randomUUID(), type: val, amount: "" }]);
-                }}
-                disabled={isLocked} />
-            </div>
-            {chargeRows.length > 0 && chargeRows[0]?.type && (
-              <div className="w-28">
-                <TextInput name="chargeAmount" type="number" min="0" placeholder="0" value={chargeRows[0]?.amount || ""}
-                  onChange={(e) => setChargeRows(prev => [{ ...prev[0], amount: e.target.value }])} disabled={isLocked} />
+          {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
+          <div className="flex gap-4">
+            <div className="w-[65%]">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold text-ink">Invoice Items</span>
               </div>
-            )}
+              <BusyItemsTable
+                columns={invoiceColumns}
+                rows={lines}
+                onAdd={() => setLines((prev) => [...prev, emptyLine()])}
+                onRemove={(i) => setLines((prev) => prev.length > 1 ? prev.filter((_, j) => j !== i) : prev)}
+                editable={!isEditMode && lines.length > 1}
+                expandable={Boolean(selectedSalesOrderId)}
+                canExpand={(row) => {
+                  const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
+                  const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
+                  return spComps.length > 0;
+                }}
+                expandedIndex={expandedLineIndex}
+                onExpandToggle={(i) => {
+                  const lineId = lines[i]?.id;
+                  setExpandedLineId(expandedLineId === lineId ? null : lineId);
+                }}
+                renderExpandedRow={renderExpandedComponents}
+                showTotals={[
+                  { colKey: "qty", value: lines.reduce((s, l) => s + l.qty, 0) },
+                  { colKey: "total", value: `₹${totals.subTotal.toFixed(2)}` },
+                ]}
+                visibleRows={10}
+              />
+            </div>
+            <div className="w-[35%]">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold text-ink">Bill Sundry</span>
+              </div>
+              <BusyItemsTable
+                columns={sundryColumns}
+                rows={sundryRows}
+                onChange={setSundryRows}
+                emptyRow={sundryEmptyRow}
+                editable={false}
+                visibleRows={5}
+                showTotals={[
+                  {
+                    colKey: "amount",
+                    value: (() => {
+                      const t = sundryRows.reduce((s, r) => {
+                        const a = Number(r.amount) || 0;
+                        const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
+                        return s + (o?.sign === -1 ? -a : a);
+                      }, 0);
+                      return t !== 0 ? `${t > 0 ? "+" : "-"} ₹${Math.abs(t).toFixed(2)}` : "0.00";
+                    })(),
+                  },
+                ]}
+              />
+              {/* ── Full Amount ── */}
+              <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
+                <div className="text-right">
+                  <span className="text-base font-bold text-blue-600">
+                    ₹{(() => {
+                      const sundryTotal = sundryRows.reduce((s, r) => {
+                        const a = Number(r.amount) || 0;
+                        const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
+                        return s + (o?.sign === -1 ? -a : a);
+                      }, 0);
+                      return (totals.grandTotal + sundryTotal).toFixed(2);
+                    })()}
+                  </span>
+                </div>
+              </div>
+
+              {/* ── Customer Balance Summary ── */}
+              {customerId && (() => {
+                const cust = customersRaw.find((c: any) => String(c.id) === customerId);
+                if (!cust) return null;
+                const openBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
+                const bType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
+                const isDr = bType.startsWith("D");
+                const openLabel = isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "";
+                const sundryTotal = sundryRows.reduce((s, r) => {
+                  const a = Number(r.amount) || 0;
+                  const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
+                  return s + (o?.sign === -1 ? -a : a);
+                }, 0);
+                const invoiceAmt = (totals.grandTotal + sundryTotal) || 0;
+                const closingRaw = isDr ? openBal + invoiceAmt : openBal - invoiceAmt;
+                const closingAbs = Math.abs(closingRaw);
+                const closingType = closingRaw > 0 ? (isDr ? "Dr" : "Cr") : closingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+
+                return (
+                  <div className="mt-3 border border-line-soft rounded-lg overflow-hidden text-xs">
+                    <div className="flex justify-between px-3 py-2 border-b border-line-soft bg-card-2">
+                      <span className="font-semibold text-ink-muted">Opening Balance</span>
+                      <span className={`font-bold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>
+                        ₹{openBal.toLocaleString("en-IN")} {openLabel}
+                      </span>
+                    </div>
+                    <div className="flex justify-between px-3 py-2 border-b border-line-soft">
+                      <span className="font-semibold text-ink-muted">Invoice Amount</span>
+                      <span className="font-bold text-blue-500">₹{invoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between px-3 py-2 bg-card-2">
+                      <span className="font-bold text-ink">Closing Balance</span>
+                      <span className={`font-bold ${closingType === "Dr" ? "text-rose-500" : "text-emerald-500"}`}>
+                        ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
 
           {/* ── Notes ── */}
@@ -988,101 +1265,9 @@ const SalesInvoiceForm: React.FC = () => {
               onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." />
           </div>
 
+          </div>{/* end full-width column */}
 
-          </div>{/* end left column */}
-
-          {/* ── Right: Bill Summary (25%) ── */}
-          <div className="w-full lg:w-1/4">
-            <div className="border border-line rounded-xl p-4 bg-card-2 lg:sticky lg:top-4">
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between text-ink-subtle">
-                  <span>Subtotal</span>
-                  <span className="text-ink font-medium">₹{totals.subTotal.toFixed(2)}</span>
-                </div>
-
-                {totals.totalDiscount > 0 && (
-                  <>
-                    <div className="flex justify-between text-red-600 font-medium">
-                      <span>Discount {totals.discountLabel ? `(${totals.discountLabel})` : ""}</span>
-                      <span>- ₹{totals.totalDiscount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-ink-subtle text-xs">
-                      <span>Taxable Amount</span>
-                      <span className="text-ink font-medium">₹{(totals.subTotal - totals.totalDiscount).toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-
-                {isInterState ? (
-                  <div className="flex justify-between text-ink-subtle">
-                    <span>IGST</span>
-                    <span className="text-ink font-medium">+ ₹{totals.igst.toFixed(2)}</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between text-ink-subtle">
-                      <span>CGST</span>
-                      <span className="text-ink font-medium">+ ₹{totals.cgst.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-ink-subtle">
-                      <span>SGST</span>
-                      <span className="text-ink font-medium">+ ₹{totals.sgst.toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-
-                {chargeRows.filter((r) => Number(r.amount) > 0).map((row) => {
-                  const opt = CHARGE_OPTIONS.find((o) => o.value === row.type);
-                  const isAdd = opt?.sign === 1;
-                  return (
-                    <div key={row.id} className={`flex justify-between text-xs ${isAdd ? "text-emerald-600" : "text-red-600"}`}>
-                      <span>{opt?.label ?? row.type}</span>
-                      <span>{isAdd ? "+ " : "- "}₹{Number(row.amount).toFixed(2)}</span>
-                    </div>
-                  );
-                })}
-
-                <div className="flex justify-between pt-2 border-t border-line mt-2 text-ink">
-                  <span className="text-base font-bold">Net Amount</span>
-                  <span className="text-base font-bold text-blue-600">₹{totals.grandTotal.toFixed(2)}</span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* ── Addresses (outside the bill box) ── */}
-            {(billingAddress.line1 || billingAddress.city) && (
-              <div className="mt-3 p-3 border border-line-soft rounded-lg bg-card">
-                <div className="mb-2">
-                  <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
-                  <p className="text-xs text-ink-subtle mt-0.5">
-                    {[billingAddress.line1, billingAddress.city, billingAddress.state, billingAddress.pincode].filter(Boolean).join(", ")}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
-                  {customerAddresses.length > 0 ? (
-                    <div className="space-y-1 mt-1">
-                      {customerAddresses.map((a: any, idx: number) => {
-                        const addr = a.address || a;
-                        const label = [addr.addressLine1, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
-                        return (
-                          <label key={idx} className={`flex items-start gap-1.5 cursor-pointer text-xs p-1.5 rounded ${selectedShippingIdx === idx ? "bg-primary/10 text-primary" : "text-ink-subtle hover:bg-card-2"}`}>
-                            <input type="radio" name="shippingAddr" checked={selectedShippingIdx === idx} onChange={() => setSelectedShippingIdx(idx)} className="mt-0.5 w-3 h-3 accent-blue-600" />
-                            <span>{a.label || `Address ${idx + 1}`}: {label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-ink-subtle mt-0.5">Same as billing</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>{/* end right column */}
-
-          </div>{/* end flex row */}
+          </div>{/* end flex column */}
 
         </form>
 

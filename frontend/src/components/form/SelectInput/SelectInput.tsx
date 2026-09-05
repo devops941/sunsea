@@ -51,6 +51,16 @@ const SelectInput: React.FC<SelectInputProps> = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<any>(null);
   const portalRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (!isOpen || highlightedIndex < 0 || !listRef.current) return;
+    const items = listRef.current.children;
+    const offset = defaultOptionLabel && !searchTerm ? 1 : 0; // account for default option element
+    const el = items[highlightedIndex + offset] as HTMLElement | undefined;
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, isOpen]);
 
   // Calculate dropdown position for portal rendering (auto-flip upwards if near bottom of viewport)
   const updateDropdownPosition = useCallback(() => {
@@ -324,7 +334,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
           {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
           {isOpen && createPortal(
             <div data-select-portal="true" ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink" style={dropdownStyle}>
-              <div className="overflow-y-auto min-h-0 flex-1">
+              <div ref={listRef} className="overflow-y-auto min-h-0 flex-1">
                 {defaultOptionLabel && !searchTerm && (
                   <div
                     onClick={() => handleSelect("")}
