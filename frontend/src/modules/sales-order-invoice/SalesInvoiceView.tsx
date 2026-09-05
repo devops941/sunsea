@@ -9,6 +9,7 @@ import { useSocketSync } from "../../hooks/useSocketSync";
 import CustomButton from "../../components/ui/Button/Button";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
 import { fetchCompany } from "../../features/company/companySlice";
+import { customerService } from "../../services/customerService";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -79,6 +80,7 @@ const SalesInvoiceView: React.FC = () => {
     const [invoicesList, setInvoicesList] = useState<any[]>([]);
     const [loadingList, setLoadingList] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [customerBalance, setCustomerBalance] = useState<{ amount: number; type: string } | null>(null);
 
     const { data: company } = useSelector((state: any) => state.company);
 
@@ -127,6 +129,18 @@ const SalesInvoiceView: React.FC = () => {
         loadDetail(id.toString());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [idParam]);
+
+    // Fetch customer balance when invoice loads
+    useEffect(() => {
+        if (!invoice?.customerId) { setCustomerBalance(null); return; }
+        customerService.fetchById(invoice.customerId)
+            .then((cust: any) => {
+                const bal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
+                const bType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
+                setCustomerBalance({ amount: bal, type: bType.startsWith("D") ? "Dr" : bType.startsWith("C") ? "Cr" : "" });
+            })
+            .catch(() => setCustomerBalance(null));
+    }, [invoice?.customerId, invoice?.id]);
 
     // Auto-navigate to first invoice only when there is no id at all
     useEffect(() => {
@@ -215,14 +229,35 @@ const SalesInvoiceView: React.FC = () => {
         TDS: { label: "TDS", sign: -1 },
     };
     const viewChargeRows = useMemo(() => {
-        if (!invoice?.narration) return [];
-        try {
-            const parsed = JSON.parse(invoice.narration);
-            return (parsed?.__chargeRows__ || [])
-                .filter((r: any) => Number(r.amount) > 0)
-                .map((r: any) => ({ label: CHARGE_META[r.type]?.label || r.type, sign: CHARGE_META[r.type]?.sign ?? 1, amount: Number(r.amount) }));
-        } catch { return []; }
-    }, [invoice?.narration]);
+        const rows: any[] = [];
+        // From narration
+        if (invoice?.narration) {
+            try {
+                const parsed = JSON.parse(invoice.narration);
+                (parsed?.__chargeRows__ || [])
+                    .filter((r: any) => Number(r.amount) > 0)
+                    .forEach((r: any) => rows.push({ label: CHARGE_META[r.type]?.label || r.type, sign: CHARGE_META[r.type]?.sign ?? 1, amount: Number(r.amount) }));
+            } catch {}
+        }
+        // From billSundry
+        const sundry = invoice?.billSundry;
+        if (Array.isArray(sundry)) {
+            sundry.filter((r: any) => Number(r.amount) > 0).forEach((r: any) => {
+                const typeStr = String(r.type || "").toUpperCase();
+                const isDeduction = typeStr.includes("DISCOUNT") || typeStr.includes("MINUS");
+                const cleanLabel = (r.type || "Sundry")
+                    .replace(/_/g, " ")
+                    .replace(/\b(MINUS|PLUS|minus|plus)\b/gi, "")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase());
+                rows.push({ label: cleanLabel || "Sundry", sign: isDeduction ? -1 : 1, amount: Number(r.amount) });
+            });
+        }
+        return rows;
+    }, [invoice?.narration, invoice?.billSundry]);
+
+    const totalWeight = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + Number(i.weight || 0), 0), [itemsWithTax]);
 
     // Tax summary grouped by rate
     const taxSummary = useMemo(() => {
@@ -376,11 +411,13 @@ const SalesInvoiceView: React.FC = () => {
                                 background: #fff !important;
                             }
                             @media print {
-                                @page { size: A4 portrait; margin: 8mm; }
+                                @page { size: A4 portrait; margin: 10mm; }
                                 html, body {
                                     background: #fff !important;
                                     height: auto;
                                     overflow: visible !important;
+                                    margin: 0 !important;
+                                    padding: 0 !important;
                                 }
                                 body * { visibility: hidden !important; }
                                 #printable-invoice-card,
@@ -393,94 +430,120 @@ const SalesInvoiceView: React.FC = () => {
                                     position: absolute;
                                     left: 0; top: 0;
                                     width: 100%;
-                                    min-height: auto !important;
+                                    height: 100%;
                                     box-shadow: none !important;
                                     margin: 0 !important;
+                                    padding: 4mm !important;
+                                    font-size: 12px !important;
+                                    border-width: 1.5px !important;
                                 }
-                                .no-print { display: none !important; }
+                                #printable-invoice-card table {
+                                    font-size: 11px !important;
+                                }
+                                #printable-invoice-card td,
+                                #printable-invoice-card th {
+                                    padding: 2px 4px !important;
+                                }
+                                .no-print { display: none !important; visibility: hidden !important; }
+                                .wt-hide { display: none !important; visibility: hidden !important; }
                             }
                         `}</style>
 
                         {/* GST Tax Invoice Card — always white bg, black text */}
                         <div
                             id="printable-invoice-card"
-                            className="font-[Arial,sans-serif] border-[1.5px] w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium p-4"
+                            className="font-[Arial,sans-serif] border-[2px] w-full min-h-[100mm] flex flex-col justify-between box-border text-[13px] shadow-lg font-medium p-6"
                         >
                             <div>
                                 {/* Top bar */}
-                                <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
-                                    <div>GSTIN : {company?.gstin || "-"}</div>
-                                    <div className="italic">Triplicate Copy</div>
-                                </div>
+                               
 
                                 {/* Header */}
-                                <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
-                                    <div className="text-sm uppercase font-bold tracking-[2px]">Tax Invoice</div>
-                                    <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
-                                        {company?.legalName || company?.companyName || "Company Name"}
-                                    </h1>
-                                    <div className="text-[13px] mt-1">
-                                        {company?.addressLine1}
-                                        {company?.city && `, ${company.city}`}
-                                        {company?.state && `, ${company.state}`}
-                                        {company?.pincode && ` - ${company.pincode}`}
-                                    </div>
+                                <div className="text-center border-b-[2px] border-black px-3 py-3">
+                                    <div className="text-base uppercase font-bold tracking-[3px]">Tax Invoice</div>
                                 </div>
 
                                 {/* Invoice meta block */}
-                                <div className="flex border-b-[1.5px] border-black">
-                                    <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
+                                <div className="flex border-b-[2px] border-black">
+                                    <div className="flex-1 border-r-[2px] border-black p-3 space-y-1.5">
                                         <MetaRow label="Invoice No." value={invoice.invoiceNo} />
                                         <MetaRow label="Dated" value={formatDate(invoice.invoiceDate)} />
-                                        <MetaRow label="Place of Supply" value={getCustomerAddress(invoice.customer)?.state || "-"} />
-                                        <MetaRow label="Due Date" value={invoice.dueDate ? formatDate(invoice.dueDate) : "-"} />
-                                        <MetaRow label="Reverse Charge" value="N" />
-                                        <MetaRow label="GR/RR No" value="" />
+                                        <MetaRow label="Due Date" value={invoice.dueDate ? formatDate(invoice.dueDate) : "—"} />
                                     </div>
-                                    <div className="flex-1 p-2 space-y-1">
-
-                                        <MetaRow label="Transport" value={invoice.transportName || "—"} />
-                                        <MetaRow label="Vehicle No" value="—" />
-                                        <MetaRow label="Station" value="—" />
-                                        <MetaRow label="E-way Bill no" value="—" />
+                                    <div className="flex-1 p-3 space-y-1.5">
+                                        <MetaRow label="Transport" value={(invoice.transport as any)?.name || invoice.transportName || "—"} />
                                         {invoice.salesOrder?.orderNo && (
                                             <MetaRow label="Ref. Order No." value={invoice.salesOrder.orderNo} />
+                                        )}
+                                        {invoice.numberOfBundle && (
+                                            <MetaRow label="No. of Bundle" value={String(invoice.numberOfBundle)} />
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Billed To / Shipped To */}
                                 {(() => {
-                                    const addr = getCustomerAddress(invoice.customer);
-                                    const custName = invoice.customer?.displayName || invoice.customer?.firmName || "N/A";
-                                    const mobile = invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer);
+                                    const cust = invoice.customer;
+                                    const so = invoice.salesOrder;
+                                    const custName = cust?.displayName || cust?.firmName || "N/A";
+                                    const mobile = so?.mobile || getMobileFromCustomer(cust);
+
+                                    // Billing: from sales order or customer
+                                    const billingAddr = {
+                                        line1: so?.billingAddressLine1 || cust?.billingAddressLine1 || "",
+                                        city: so?.billingCity || cust?.billingCity || "",
+                                        state: so?.billingState || cust?.billingState || "",
+                                        pincode: so?.billingPincode || cust?.billingPincode || "",
+                                    };
+                                    // Fallback to customer addresses if empty
+                                    if (!billingAddr.line1) {
+                                        const addr = getCustomerAddress(cust);
+                                        if (addr) {
+                                            billingAddr.line1 = addr.addressLine1;
+                                            billingAddr.city = addr.city;
+                                            billingAddr.state = addr.state;
+                                            billingAddr.pincode = addr.pincode;
+                                        }
+                                    }
+
+                                    // Shipping: from invoice → sales order → customer addresses → billing fallback
+                                    const shippingAddr = {
+                                        line1: invoice.shippingAddressLine1 || so?.shippingAddressLine1 || "",
+                                        city: invoice.shippingCity || so?.shippingCity || "",
+                                        state: invoice.shippingState || so?.shippingState || "",
+                                        pincode: invoice.shippingPincode || so?.shippingPincode || "",
+                                    };
+                                    if (!shippingAddr.line1 && Array.isArray(cust?.addresses) && cust.addresses.length > 1) {
+                                        const secondAddr = cust.addresses[1]?.address || cust.addresses[1];
+                                        shippingAddr.line1 = secondAddr?.addressLine1 || secondAddr?.line1 || "";
+                                        shippingAddr.city = secondAddr?.city || "";
+                                        shippingAddr.state = secondAddr?.state || "";
+                                        shippingAddr.pincode = secondAddr?.pincode || "";
+                                    }
+                                    if (!shippingAddr.line1) {
+                                        shippingAddr.line1 = billingAddr.line1;
+                                        shippingAddr.city = billingAddr.city;
+                                        shippingAddr.state = billingAddr.state;
+                                        shippingAddr.pincode = billingAddr.pincode;
+                                    }
+
+                                    const formatAddr = (a: { line1: string; city: string; state: string; pincode: string }) =>
+                                        [a.line1, a.city, a.state ? `${a.state}${a.pincode ? ` - ${a.pincode}` : ""}` : a.pincode].filter(Boolean).join(", ");
+
                                     return (
-                                        <div className="flex border-b-[1.5px] border-black">
-                                            <div className="flex-1 border-r-[1.5px] border-black p-2">
-                                                <div className="font-bold mb-1">Billed to :</div>
+                                        <div className="flex border-b-[2px] border-black">
+                                            <div className="flex-1 border-r-[2px] border-black p-3">
+                                                <div className="font-bold mb-1.5 text-[12px] uppercase tracking-wide">Billed to :</div>
                                                 <div className="font-semibold">{custName}</div>
-                                                {addr && (
-                                                    <div className="font-semibold">
-                                                        {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ""}<br />
-                                                        {addr.city}{addr.state ? `, ${addr.state}` : ""}{addr.pincode ? ` - ${addr.pincode}` : ""}
-                                                    </div>
-                                                )}
-                                                {invoice.customer?.gstin && (
-                                                    <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
-                                                )}
+                                                <div className="font-semibold">{formatAddr(billingAddr)}</div>
                                                 {mobile && (
                                                     <div className="mt-1 font-semibold">Mobile: {mobile}</div>
                                                 )}
                                             </div>
-                                            <div className="flex-1 p-2">
-                                                <div className="font-bold mb-1">Shipped to :</div>
+                                            <div className="flex-1 p-3">
+                                                <div className="font-bold mb-1.5 text-[12px] uppercase tracking-wide">Shipped to :</div>
                                                 <div className="font-semibold">{custName}</div>
-                                                {addr && (
-                                                    <div className="font-semibold">
-                                                        {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ""}<br />
-                                                        {addr.city}{addr.state ? `, ${addr.state}` : ""}{addr.pincode ? ` - ${addr.pincode}` : ""}
-                                                    </div>
-                                                )}
+                                                <div className="font-semibold">{formatAddr(shippingAddr)}</div>
                                             </div>
                                         </div>
                                     );
@@ -493,22 +556,9 @@ const SalesInvoiceView: React.FC = () => {
                                             <Th w="35px">S.N.</Th>
                                             <Th>Description of Goods</Th>
                                             <Th w="55px" align="right">Qty.</Th>
-                                            <Th w="45px">Unit</Th>
+                                            <th className="border border-black px-2 py-1 text-[11px] font-bold uppercase bg-gray-100 wt-hide" style={{ width: "65px", textAlign: "right" }}>Weight(KG)</th>
                                             <Th w="60px" align="right">Price</Th>
-                                            {isInterState ? (
-                                                <>
-                                                    <Th w="50px">IGST Rate</Th>
-                                                    <Th w="65px" align="right">IGST Amt</Th>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Th w="50px">CGST Rate</Th>
-                                                    <Th w="65px" align="right">CGST Amt</Th>
-                                                    <Th w="50px">SGST Rate</Th>
-                                                    <Th w="65px" align="right">SGST Amt</Th>
-                                                </>
-                                            )}
-                                            <Th w="70px" align="right">Amount(Rs.)</Th>
+                                            <Th w="80px" align="right">Amount(Rs.)</Th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -517,51 +567,24 @@ const SalesInvoiceView: React.FC = () => {
                                                 <Td align="center">{idx + 1}.</Td>
                                                 <Td>{item.description || item.product?.productName || "N/A"}</Td>
                                                 <Td align="right">{item.qty}</Td>
-                                                <Td align="center">{item.unit}</Td>
+                                                <td className="border border-black px-2 py-1 text-right wt-hide">{Number(item.weight || 0).toFixed(1)}</td>
                                                 <Td align="right">{item.rate.toFixed(2)}</Td>
-                                                {isInterState ? (
-                                                    <>
-                                                        <Td align="center">{item.igstRate}%</Td>
-                                                        <Td align="right">{item.igstAmount.toFixed(2)}</Td>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Td align="center">{item.cgstRate}%</Td>
-                                                        <Td align="right">{item.cgstAmount.toFixed(2)}</Td>
-                                                        <Td align="center">{item.sgstRate}%</Td>
-                                                        <Td align="right">{item.sgstAmount.toFixed(2)}</Td>
-                                                    </>
-                                                )}
                                                 <Td align="right">{item.amount.toFixed(2)}</Td>
                                             </tr>
                                         ))}
-                                        {/* Clean empty rows filling out A4 sheet */}
-                                        {Array.from({ length: Math.max(0, 10 - itemsWithTax.length) }).map((_, idx) => (
-                                            <tr key={`empty-${idx}`} style={{ height: "26px" }}>
+                                        {Array.from({ length: Math.max(0, 8 - itemsWithTax.length) }).map((_, idx) => (
+                                            <tr key={`empty-${idx}`} style={{ height: "24px" }}>
                                                 <Td align="center"></Td>
                                                 <Td></Td>
                                                 <Td align="right"></Td>
-                                                <Td align="center"></Td>
+                                                <td className="border border-black px-2 py-1 wt-hide"></td>
                                                 <Td align="right"></Td>
-                                                {isInterState ? (
-                                                    <>
-                                                        <Td align="center"></Td>
-                                                        <Td align="right"></Td>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Td align="center"></Td>
-                                                        <Td align="right"></Td>
-                                                        <Td align="center"></Td>
-                                                        <Td align="right"></Td>
-                                                    </>
-                                                )}
                                                 <Td align="right"></Td>
                                             </tr>
                                         ))}
                                         {(!invoice.items || invoice.items.length === 0) && (
                                             <tr>
-                                                <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
+                                                <td colSpan={6} className="border border-black px-2 py-4 text-center text-slate-500">
                                                     No items found for this invoice.
                                                 </td>
                                             </tr>
@@ -569,109 +592,110 @@ const SalesInvoiceView: React.FC = () => {
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">Sub Total</td>
+                                            <td colSpan={3} className="border border-black px-2 py-1 text-right font-bold">Total</td>
+                                            <td className="border border-black px-2 py-1 text-right font-bold wt-hide">{totalWeight.toFixed(1)}</td>
+                                            <td className="border border-black px-2 py-1"></td>
                                             <td className="border border-black px-2 py-1 text-right font-bold">{formatMoney(totalTaxable)}</td>
                                         </tr>
                                         {invoiceDiscount > 0 && (
                                             <>
                                                 <tr>
-                                                    <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right text-[13px] text-red-600">
+                                                    <td colSpan={4} className="border border-black px-2 py-1 text-right text-[13px] text-red-600">
                                                         Discount {invDiscountValue > 0 ? `(${invDiscountValue}${invDiscountType === "PERCENT" ? "%" : " Flat"})` : ""} (-)
                                                     </td>
+                                                    <td className="border border-black px-2 py-1 wt-hide"></td>
                                                     <td className="border border-black px-2 py-1 text-right text-[13px] text-red-600">- {formatMoney(invoiceDiscount)}</td>
                                                 </tr>
                                                 <tr>
-                                                    <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right text-[13px]">Taxable Amount</td>
+                                                    <td colSpan={4} className="border border-black px-2 py-1 text-right text-[13px]">Taxable Amount</td>
+                                                    <td className="border border-black px-2 py-1 wt-hide"></td>
                                                     <td className="border border-black px-2 py-1 text-right text-[13px]">{formatMoney(totalTaxable - invoiceDiscount)}</td>
                                                 </tr>
                                             </>
                                         )}
                                         {totalTax > 0 && (isInterState ? (
                                             <tr>
-                                                <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right text-[13px]">IGST</td>
+                                                <td colSpan={4} className="border border-black px-2 py-1 text-right text-[13px]">IGST</td>
+                                                <td className="border border-black px-2 py-1 wt-hide"></td>
                                                 <td className="border border-black px-2 py-1 text-right text-[13px]">+ {formatMoney(totalIgst)}</td>
                                             </tr>
                                         ) : (
                                             <>
                                                 <tr>
-                                                    <td colSpan={9} className="border border-black px-2 py-1 text-right text-[13px]">CGST</td>
+                                                    <td colSpan={4} className="border border-black px-2 py-1 text-right text-[13px]">CGST</td>
+                                                    <td className="border border-black px-2 py-1 wt-hide"></td>
                                                     <td className="border border-black px-2 py-1 text-right text-[13px]">+ {formatMoney(totalCgst)}</td>
                                                 </tr>
                                                 <tr>
-                                                    <td colSpan={9} className="border border-black px-2 py-1 text-right text-[13px]">SGST</td>
+                                                    <td colSpan={4} className="border border-black px-2 py-1 text-right text-[13px]">SGST</td>
+                                                    <td className="border border-black px-2 py-1 wt-hide"></td>
                                                     <td className="border border-black px-2 py-1 text-right text-[13px]">+ {formatMoney(totalSgst)}</td>
                                                 </tr>
                                             </>
                                         ))}
                                         {viewChargeRows.map((cr: any, idx: number) => (
                                             <tr key={idx}>
-                                                <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right text-[13px]">
-                                                    {cr.label} {cr.sign === 1 ? "(+)" : "(-)"}
+                                                <td colSpan={4} className="border border-black px-2 py-1 text-right text-[11px]">
+                                                    {cr.label}
                                                 </td>
-                                                <td className="border border-black px-2 py-1 text-right text-[13px]">
-                                                    {cr.sign === 1 ? "+" : "-"}&nbsp;{formatMoney(cr.amount)}
+                                                <td className="border border-black px-2 py-1 wt-hide"></td>
+                                                <td className="border border-black px-2 py-1 text-right text-[11px]">
+                                                    {cr.sign === 1 ? "+" : "-"} {formatMoney(cr.amount)}
                                                 </td>
                                             </tr>
                                         ))}
                                         <tr>
-                                            <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
+                                            <td colSpan={4} className="border border-black px-2 py-1 text-right font-bold">Grand Total</td>
+                                            <td className="border border-black px-2 py-1 wt-hide"></td>
                                             <td className="border border-black px-2 py-1 text-right font-bold">{formatMoney(grandTotal)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>
 
-                                {/* Tax Summary */}
-                                {taxSummary.length > 0 && (
-                                    <table className="w-full border-collapse text-[13px] mt-2">
-                                        <thead>
-                                            <tr>
-                                                <Th w="60px">Tax Rate</Th>
-                                                <Th align="right">Taxable Amt.</Th>
-                                                {isInterState ? (
-                                                    <Th align="right">IGST Amt.</Th>
-                                                ) : (
-                                                    <>
-                                                        <Th align="right">CGST Amt.</Th>
-                                                        <Th align="right">SGST Amt.</Th>
-                                                    </>
-                                                )}
-                                                <Th align="right">Total Tax</Th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {taxSummary.map((row, i) => (
-                                                <tr key={i}>
-                                                    <Td align="center">{row.taxRate}%</Td>
-                                                    <Td align="right">{row.taxableAmt.toFixed(2)}</Td>
-                                                    {isInterState ? (
-                                                        <Td align="right">{row.igstAmt.toFixed(2)}</Td>
-                                                    ) : (
-                                                        <>
-                                                            <Td align="right">{row.cgstAmt.toFixed(2)}</Td>
-                                                            <Td align="right">{row.sgstAmt.toFixed(2)}</Td>
-                                                        </>
-                                                    )}
-                                                    <Td align="right">{row.totalTax.toFixed(2)}</Td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-
                                 {/* Amount in words */}
-                                <div className="px-2 py-2 border-t border-black text-[14px] font-medium">
-                                    Rupees {amountInWords}
+                                <div className="px-3 py-2.5 border-t-[2px] border-black text-[13px]">
+                                    <span className="font-bold">Amount in Words:</span> Rupees {amountInWords}
                                 </div>
+
+                                {/* Customer Balance */}
+                                {customerBalance && (
+                                    <div className="border-t border-black">
+                                        {(() => {
+                                            const isDr = customerBalance.type === "Dr";
+                                            const invoiceAmt = grandTotal;
+                                            const closingRaw = isDr ? customerBalance.amount + invoiceAmt : customerBalance.amount - invoiceAmt;
+                                            const closingAbs = Math.abs(closingRaw);
+                                            const closingType = closingRaw > 0 ? (isDr ? "Dr" : "Cr") : closingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+                                            return (
+                                                <table className="w-full text-[13px]">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td className="px-2 py-1 text-right">Opening Balance</td>
+                                                            <td className="px-2 py-1 text-right w-[120px]">
+                                                                ₹{customerBalance.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {customerBalance.type}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="px-2 py-1 text-right">Invoice Amount</td>
+                                                            <td className="px-2 py-1 text-right">
+                                                                ₹{invoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="px-2 py-1 text-right font-bold text-[14px]">Closing Balance</td>
+                                                            <td className="px-2 py-1 text-right font-bold text-[15px]">
+                                                                ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
                             </div>
 
                             <div>
-                                {/* Bank details */}
-                                <div className="px-2 py-2 border-t border-black text-[13px]">
-                                    <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
-                                    &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
-                                    A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
-                                </div>
-
                                 {/* Notes */}
                                 {invoice.notes && (
                                     <div className="px-2 py-2 border-t border-black text-[13px]">
@@ -680,16 +704,14 @@ const SalesInvoiceView: React.FC = () => {
                                 )}
 
                                 {/* Footer: Terms + Signature */}
-                                <div className="flex border-t-[1.5px] border-black text-[13px]">
-                                    <div className="flex-1 border-r border-black p-2">
-                                        <div className="font-bold mb-1">Terms &amp; Conditions</div>
-                                        <div>E &amp; O.E.</div>
-                                        <div>1. Goods once sold will not be taken back.</div>
-                                        <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                <div className="flex border-t-[2px] border-black text-[13px]">
+                                    <div className="flex-1 border-r border-black p-3">
+                                        <div className="font-bold text-[12px] uppercase tracking-wide">Receiver's Signature :</div>
+                                        <div className="mt-10"></div>
                                     </div>
-                                    <div className="flex-1 p-2 flex flex-col justify-between">
-                                        <div className="font-bold">Receiver's Signature :</div>
-                                        <div className="text-right font-bold mt-6">
+                                    <div className="flex-1 p-3 flex flex-col justify-between">
+                                        <div></div>
+                                        <div className="text-right font-bold mt-10">
                                             For {company?.legalName || company?.companyName || "Company"}
                                         </div>
                                     </div>
