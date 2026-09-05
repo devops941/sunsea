@@ -12,6 +12,25 @@ import {
 
 const ZERO = new Prisma.Decimal(0);
 
+// ─── Bill Sundry helper ──────────────────────────────────────────────────────
+
+const SUNDRY_SIGN: Record<string, number> = {
+    BILL_TAX_MINUS: -1, BILL_TAX_PLUS: 1,
+    DISCOUNT_MINUS: -1, DISCOUNT_PLUS: 1,
+    LORRY_FREIGHT_MINUS: -1, LORRY_FREIGHT_PLUS: 1,
+    OTHERS_MINUS: -1, OTHERS_PLUS: 1,
+    ROUND_OFF_MINUS: -1, ROUND_OFF_PLUS: 1,
+};
+
+function calcBillSundryTotal(billSundry: any): Prisma.Decimal {
+    if (!Array.isArray(billSundry) || billSundry.length === 0) return ZERO;
+    return billSundry.reduce((sum: Prisma.Decimal, row: any) => {
+        const amount = new Prisma.Decimal(Number(row.amount) || 0);
+        const sign = SUNDRY_SIGN[row.type] ?? 1;
+        return sign === -1 ? sum.sub(amount) : sum.add(amount);
+    }, ZERO);
+}
+
 // ─── Prisma include shape ──────────────────────────────────────────────────────
 
 /** Include for GST orders (sales_orders → sales_order_items) */
@@ -200,7 +219,8 @@ class SalesOrderService {
         const createTaxable      = createSubtotal.sub(createDiscount);
         const createDiscRatio    = createSubtotal.gt(ZERO) ? createTaxable.div(createSubtotal) : new Prisma.Decimal(1);
         const createAdjustedTax  = createTotalTax.mul(createDiscRatio);
-        const createNetAmount    = createTaxable.add(createAdjustedTax);
+        const createBillSundry   = calcBillSundryTotal((data as any).billSundry);
+        const createNetAmount    = createTaxable.add(createAdjustedTax).add(createBillSundry);
 
         const gstOrder = await prisma.salesOrder.create({
             data: {
@@ -227,6 +247,7 @@ class SalesOrderService {
                 totalDiscount: createDiscount,
                 orderDiscountType:  (data as any).orderDiscountType ?? null,
                 orderDiscountValue: (data as any).orderDiscountValue || null,
+                billSundry: (data as any).billSundry ?? null,
                 // @ts-ignore
                 sourceSalesOrderId: (data as any).sourceSalesOrderId ? Number((data as any).sourceSalesOrderId) : null,
                 totalTax:  createTotalTax,
@@ -454,11 +475,13 @@ class SalesOrderService {
             const updDiscRatio   = updSubtotal.gt(ZERO) ? updTaxable.div(updSubtotal) : new Prisma.Decimal(1);
             const updAdjustedTax = updTotalTax.mul(updDiscRatio);
 
+            const updBillSundry = calcBillSundryTotal((data as any).billSundry ?? (existing as any).billSundry);
             updateData.subtotal  = updSubtotal;
-            updateData.netAmount = updTaxable.add(updAdjustedTax);
+            updateData.netAmount = updTaxable.add(updAdjustedTax).add(updBillSundry);
             updateData.totalDiscount = updDiscount;
             if ((data as any).orderDiscountType  !== undefined) updateData.orderDiscountType  = (data as any).orderDiscountType;
             if ((data as any).orderDiscountValue !== undefined) updateData.orderDiscountValue = (data as any).orderDiscountValue || null;
+            if ((data as any).billSundry !== undefined) updateData.billSundry = (data as any).billSundry ?? null;
             updateData.totalCgst = updTotalCgst;
             updateData.totalSgst = updTotalSgst;
             updateData.totalIgst = updTotalIgst;

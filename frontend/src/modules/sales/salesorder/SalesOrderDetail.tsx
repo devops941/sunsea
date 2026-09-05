@@ -8,6 +8,7 @@ import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { salesProductService } from "../../../services/salesProductService";
 import { parseChargeRowsFromNarration, DEFAULT_CHARGE_OPTIONS as CHARGE_OPTIONS } from "../../../components/sales/AdditionalChargesTable";
+import { DEFAULT_SUNDRY_OPTIONS } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -417,7 +418,17 @@ const SalesOrderDetail: React.FC = () => {
     const calcSgst = useInvoiceTotals ? invoiceSgst : Number(order?.totalSgst || 0);
     const calcIgst = useInvoiceTotals ? invoiceIgst : Number(order?.totalIgst || 0);
     const calcTotalTax = useInvoiceTotals ? invoiceTotalTax : Number(order?.totalTax || 0);
-    const calcNetAmount = useInvoiceTotals ? Number(linkedInvoice.grandTotal || 0) : Number(order?.netAmount || 0);
+    const baseNetAmount = useInvoiceTotals ? Number(linkedInvoice.grandTotal || 0) : Number(order?.netAmount || 0);
+    const billSundryTotal = useMemo(() => {
+        const raw = (order as any)?.billSundry;
+        if (!Array.isArray(raw) || raw.length === 0) return 0;
+        return raw.reduce((sum: number, r: any) => {
+            const amt = Number(r.amount) || 0;
+            const opt = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === r.type);
+            return sum + ((opt?.sign ?? 1) === -1 ? -amt : amt);
+        }, 0);
+    }, [order]);
+    const calcNetAmount = baseNetAmount + billSundryTotal;
     const hasGst = calcTotalTax > 0;
 
     // Parse extra charges from narration (use invoice narration if invoiced)
@@ -428,6 +439,12 @@ const SalesOrderDetail: React.FC = () => {
         if (!order) return [];
         return parseChargeRowsFromNarration((order as any).narration);
     }, [order, useInvoiceTotals, linkedInvoice]);
+
+    const billSundryRows = useMemo(() => {
+        const raw = (order as any)?.billSundry;
+        if (!Array.isArray(raw) || raw.length === 0) return [];
+        return raw.filter((r: any) => Number(r.amount) > 0);
+    }, [order]);
 
     const hasAnyPricing = calcSubtotal > 0 || calcNetAmount > 0;
 
@@ -759,6 +776,22 @@ const SalesOrderDetail: React.FC = () => {
                                                 </div>
                                             );
                                         })}
+
+                                        {billSundryRows.length > 0 && (
+                                            <>
+                                                <div className="text-[10px] font-bold text-ink-subtle uppercase tracking-wide pt-2 border-t border-line-soft mt-2">Bill Sundry</div>
+                                                {billSundryRows.map((row: any) => {
+                                                    const opt = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === row.type);
+                                                    const isAdd = (opt?.sign ?? 1) === 1;
+                                                    return (
+                                                        <div key={row.id} className={`flex justify-between text-xs ${isAdd ? "text-emerald-600" : "text-red-600"}`}>
+                                                            <span>{opt?.label ?? row.type}{row.rate ? ` @ ${row.rate}%` : ""}</span>
+                                                            <span>{isAdd ? "+ " : "- "}{formatMoney(Number(row.amount))}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </>
+                                        )}
 
                                         <div className="flex justify-between pt-3 border-t border-line mt-2 text-ink items-center">
                                             <span className="text-base font-bold">Net Amount</span>

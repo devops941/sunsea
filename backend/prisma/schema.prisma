@@ -1219,6 +1219,7 @@ model SalesOrder {
   sourceEmployeeId     BigInt?          @map("source_employee_id")
   referredByCustomerId String?          @map("referred_by_customer_id") @db.Uuid
   referredByName       String?          @map("referred_by_name") @db.VarChar(100)
+  billSundry           Json?            @map("bill_sundry")
   salesInvoices        SalesInvoice[]
   items                SalesOrderItem[]
   createdByUser        User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
