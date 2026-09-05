@@ -124,7 +124,20 @@ class SalesInvoiceService {
         }
       } catch { /* ignore bad JSON */ }
     }
-    const grandTotal = taxableAmount + taxTotal + chargeAdditions - chargeDeductions;
+    // Bill sundry (additions/deductions)
+    let billSundryTotal = 0;
+    const billSundryData = (data as any).billSundry;
+    if (Array.isArray(billSundryData)) {
+      for (const row of billSundryData) {
+        const amt = Number(row.amount) || 0;
+        if (amt <= 0) continue;
+        const typeStr = String(row.type || "").toUpperCase();
+        if (typeStr.includes("DISCOUNT") || typeStr.includes("MINUS")) billSundryTotal -= amt;
+        else billSundryTotal += amt;
+      }
+    }
+
+    const grandTotal = taxableAmount + taxTotal + chargeAdditions - chargeDeductions + billSundryTotal;
 
     const computedStatus = "CONFIRMED";
 
@@ -157,6 +170,9 @@ class SalesInvoiceService {
           storeId: data.storeId,
           notes: data.notes,
           narration: (data as any).narration || null,
+          transport: (data as any).transport || null,
+          numberOfBundle: (data as any).numberOfBundle != null ? Number((data as any).numberOfBundle) : null,
+          billSundry: Array.isArray(billSundryData) && billSundryData.length > 0 ? billSundryData : undefined,
           salesOrderId: data.salesOrderId || null,
           subTotal,
           discountType: d.discountType || null,
@@ -652,7 +668,20 @@ class SalesInvoiceService {
           }
         } catch { /* ignore bad JSON */ }
       }
-      const grandTotal = updTaxableAmount + taxTotal + updChargeAdditions - updChargeDeductions;
+      // Bill sundry (additions/deductions)
+      let updBillSundryTotal = 0;
+      const updBillSundryData = (data as any).billSundry;
+      if (Array.isArray(updBillSundryData)) {
+        for (const row of updBillSundryData) {
+          const amt = Number(row.amount) || 0;
+          if (amt <= 0) continue;
+          const typeStr = String(row.type || "").toUpperCase();
+          if (typeStr.includes("DISCOUNT") || typeStr.includes("MINUS")) updBillSundryTotal -= amt;
+          else updBillSundryTotal += amt;
+        }
+      }
+
+      const grandTotal = updTaxableAmount + taxTotal + updChargeAdditions - updChargeDeductions + updBillSundryTotal;
 
       const computedStatus = "CONFIRMED";
 
@@ -667,6 +696,9 @@ class SalesInvoiceService {
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
           notes: data.notes,
           narration: (data as any).narration || null,
+          transport: (data as any).transport || null,
+          numberOfBundle: (data as any).numberOfBundle != null ? Number((data as any).numberOfBundle) : null,
+          billSundry: Array.isArray(updBillSundryData) && updBillSundryData.length > 0 ? updBillSundryData : undefined,
           salesOrderId: data.salesOrderId || null,
           subTotal,
           discountType: du.discountType || null,

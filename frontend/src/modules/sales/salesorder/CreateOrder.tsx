@@ -746,7 +746,7 @@ const SalesOrderForm: React.FC = () => {
         <div className="max-w-[1400px] xl:mr-auto">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-line">
                     <h2 className="text-lg font-bold text-ink flex items-start">
                         {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("orderNo")}</span>
@@ -754,7 +754,7 @@ const SalesOrderForm: React.FC = () => {
                     <BackButton text="Back to List" />
                 </div>
 
-                <form className="px-5 py-3 space-y-3" noValidate>
+                <form className="px-5 py-2 space-y-2" noValidate>
                     {/* ── Main Fields ── */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
                         <div className="sm:col-span-2">
@@ -838,8 +838,8 @@ const SalesOrderForm: React.FC = () => {
                     </div>
 
                     {/* ── Order Items ── */}
-                    <div className="lg:max-w-[1024px]">
-                        <div className="flex justify-between items-center mb-2">
+                    <div>
+                        <div className="flex justify-between items-center mb-1">
                             <span className="text-sm font-semibold text-ink">Order Items</span>
                         </div>
 
@@ -866,7 +866,7 @@ const SalesOrderForm: React.FC = () => {
                     </div>
 
                     {/* ── Narration ── */}
-                    <div className="w-full sm:w-1/2 mt-3">
+                    <div className="w-full sm:w-1/2">
                         <Controller name="narration" control={control} render={({ field }) => (
                             <TextArea label="Narration" name="narration" value={field.value ?? ""} placeholder="Enter narration..." rows={2} onChange={field.onChange} />
                         )} />
@@ -875,7 +875,7 @@ const SalesOrderForm: React.FC = () => {
                 </form>
 
                 {/* ── Actions ── */}
-                <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+                <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
                     <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
                     <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))(); }} disabled={isSubmitting} />
                     <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))(); }} disabled={isSubmitting} />

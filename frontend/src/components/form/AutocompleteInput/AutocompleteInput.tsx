@@ -85,7 +85,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     const base: React.CSSProperties = {
       position: "fixed",
       left: rect.left,
-      width: rect.width,
+      width: inline ? Math.max(rect.width, 280) : rect.width,
       zIndex: 100000,
     };
 
@@ -132,13 +132,25 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!open) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        updatePosition();
-        setOpen(true);
+      if (inline) {
+        // Inline mode: only Enter/F2 opens dropdown, arrows move between table cells
+        if (e.key === "Enter" || e.key === "F2") {
+          e.preventDefault();
+          e.stopPropagation();
+          updatePosition();
+          setOpen(true);
+        }
+      } else {
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          updatePosition();
+          setOpen(true);
+        }
       }
       return;
     }
+    // Dropdown is open — prevent events from reaching the table
+    e.stopPropagation();
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setHighlightIdx((i) => Math.min(i + 1, filtered.length - 1));
@@ -156,7 +168,11 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   };
 
   return (
-    <div className={`group ${inline ? "relative w-full" : horizontal ? "flex items-start gap-3" : ""}`} ref={wrapperRef}>
+    <div
+      className={`group ${inline ? "relative w-full" : horizontal ? "flex items-start gap-3" : ""}`}
+      ref={wrapperRef}
+      {...(inline ? { "data-autocomplete": true, ...(open ? { "data-dropdown-open": true } : {}) } : {})}
+    >
       {!inline && label && (
         <label
           htmlFor={name}
@@ -167,7 +183,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             transition-colors duration-250
             ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
-            ${horizontal ? "shrink-0 w-[140px] mb-0 pt-[10px]" : "mb-2"}
+            ${horizontal ? "shrink-0 mb-0 pt-[10px]" : "mb-2"}
           `}
         >
           <span>{label}</span>
@@ -177,6 +193,37 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
       <div className={`flex flex-col ${inline ? "" : horizontal ? "flex-1" : ""}`}>
         <div className="relative">
+          {/* Inline: show rich display when not focused and has value */}
+          {inline && !isFocused && value && selectedOption ? (
+            <div
+              tabIndex={0}
+              className="w-full text-[13px] truncate cursor-text h-full flex items-center justify-between gap-2 outline-none text-ink"
+              onClick={() => {
+                setIsFocused(true);
+                setSearch("");
+                setTimeout(() => inputRef.current?.focus(), 0);
+              }}
+              onFocus={() => {
+                setIsFocused(true);
+                setSearch("");
+                setTimeout(() => inputRef.current?.focus(), 0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "F2") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsFocused(true);
+                  setSearch("");
+                  updatePosition();
+                  setOpen(true);
+                  setTimeout(() => inputRef.current?.focus(), 0);
+                }
+              }}
+            >
+              <span className="truncate">{selectedOption.label}</span>
+              {selectedOption.info && <div className="shrink-0">{selectedOption.info}</div>}
+            </div>
+          ) : (
           <input
             ref={inputRef}
             id={name}
@@ -189,8 +236,15 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               if (disabled) return;
               setIsFocused(true);
               setSearch("");
-              updatePosition();
-              setOpen(true);
+              if (inline) {
+                if (!value) {
+                  updatePosition();
+                  setOpen(true);
+                }
+              } else {
+                updatePosition();
+                setOpen(true);
+              }
             }}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -217,6 +271,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               ${disabled ? "bg-card-2/60 cursor-not-allowed text-ink font-bold opacity-85" : ""}
             `}
           />
+          )}
         </div>
 
         {error && (
@@ -229,7 +284,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
         createPortal(
           <div
             ref={listRef}
-            className="bg-card border border-line-soft rounded-lg shadow-xl flex flex-col py-1 overflow-y-auto text-ink"
+            className="bg-card border border-line-soft rounded-lg shadow-2xl flex flex-col py-1 overflow-y-auto text-ink ring-1 ring-black/10"
             style={dropdownStyle}
           >
             {filtered.length === 0 ? (
