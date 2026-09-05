@@ -1620,6 +1620,10 @@ model SalesInvoice {
   transport      Json?                 @map("transport")
   numberOfBundle Int?                  @map("number_of_bundle")
   billSundry     Json?                 @map("bill_sundry")
+  shippingAddressLine1 String?         @map("shipping_address_line1") @db.VarChar(255)
+  shippingCity         String?         @map("shipping_city") @db.VarChar(100)
+  shippingState        String?         @map("shipping_state") @db.VarChar(100)
+  shippingPincode      String?         @map("shipping_pincode") @db.VarChar(20)
   items          SalesInvoiceItem[]
   paymentRecords SalesInvoicePayment[]
   customer       Customer              @relation(fields: [customerId], references: [id])

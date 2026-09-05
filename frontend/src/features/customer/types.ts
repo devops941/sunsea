@@ -50,6 +50,7 @@ export interface Customer {
   shippingCountry?: string | null;
   stateCode?: string;
   creditLimit?: number | string | null;
+  creditDays?: number | null;
   openingBalance?: number | string | null;
   openingBalanceType?: string | null;
   priceList?: string | null;

@@ -160,6 +160,7 @@ const SalesInvoiceForm: React.FC = () => {
 
   const [customerId, setCustomerId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [dueDate, setDueDate] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<InvoiceLineItem[]>([emptyLine()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -230,30 +231,51 @@ const SalesInvoiceForm: React.FC = () => {
               pincode: fullOrder.billingPincode || cust?.billingPincode || defaultAddr.pincode || "",
             });
             setSelectedShippingIdx(0);
-            // Re-map lines from sales order to show sales product names
-            const mapped = mapOrderToLines(fullOrder);
-            if (mapped.length > 0) {
-              // Preserve invoice quantities/rates over order defaults
-              const invoiceItems = invoice.items || [];
-              mapped.forEach((line: any) => {
-                const matchingInvoiceItems = invoiceItems.filter((ii: any) => String(ii.salesProductId) === line.itemId);
-                if (matchingInvoiceItems.length > 0) {
-                  const totalQty = matchingInvoiceItems.reduce((s: number, ii: any) => s + Number(ii.quantity || 0), 0);
-                  const totalAmount = matchingInvoiceItems.reduce((s: number, ii: any) => s + (Number(ii.unitPrice || 0) * Number(ii.quantity || 0)), 0);
-                  const sp = salesProducts.find((s: any) => String(s.id) === line.itemId);
-                  const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
-                  const firstComp = spComps[0];
-                  const perUnit = Number(firstComp?.quantity || 1);
-                  const orderQty = Math.max(1, Math.round(totalQty / perUnit));
-                  const unitPrice = orderQty > 0 ? Math.round((totalAmount / orderQty) * 100) / 100 : 0;
-                  line.qty = orderQty;
-                  line.rate = unitPrice;
-                  line.amount = orderQty * unitPrice;
-                  line.taxAmount = (line.amount * line.taxPercent) / 100;
-                  line.total = line.amount + line.taxAmount;
-                }
+            // Build lines from invoice items grouped by salesProductId
+            const invoiceItems: any[] = invoice.items || [];
+            const orderItems: any[] = fullOrder.items || [];
+            if (invoiceItems.length > 0) {
+              const grouped = new Map<string, any[]>();
+              invoiceItems.forEach((ii: any) => {
+                const spId = ii.salesProductId ? String(ii.salesProductId) : String(ii.productId);
+                if (!grouped.has(spId)) grouped.set(spId, []);
+                grouped.get(spId)!.push(ii);
               });
-              setLines(mapped);
+              const rebuilt: any[] = [];
+              grouped.forEach((items, spId) => {
+                // Find sales product name from order items or product relation
+                const orderItem = orderItems.find((oi: any) => String(oi.salesProductId) === spId);
+                const spFromOrder = orderItem?.salesProduct;
+                const spName = spFromOrder?.salesProductName || spFromOrder?.salesProductCode
+                  || items[0]?.product?.productName || items[0]?.description || `Product #${spId}`;
+                const totalQty = items.reduce((s: number, ii: any) => s + Number(ii.quantity || 0), 0);
+                const totalAmount = items.reduce((s: number, ii: any) => s + (Number(ii.unitPrice || 0) * Number(ii.quantity || 0)), 0);
+                const totalWeight = items.reduce((s: number, ii: any) => s + Number(ii.weight || 0), 0);
+                // Calculate order qty from component perUnit
+                const compDef = orderItems.find((oi: any) => String(oi.salesProductId) === spId);
+                const perUnit = compDef ? Number(compDef.quantity || totalQty) / Math.max(1, totalQty) : 1;
+                const orderQty = perUnit > 0 ? Math.max(1, Math.round(totalQty / (items.length > 1 ? Number(items[0]?.quantity || totalQty) / Math.max(1, totalQty) : 1))) : totalQty;
+                const unitPrice = orderQty > 0 ? Math.round((totalAmount / orderQty) * 100) / 100 : 0;
+                const taxPercent = Number(items[0]?.igstRate) > 0
+                  ? Number(items[0]?.igstRate)
+                  : (Number(items[0]?.cgstRate || 0) + Number(items[0]?.sgstRate || 0));
+                const amount = orderQty * unitPrice;
+                const taxAmount = (amount * taxPercent) / 100;
+                rebuilt.push({
+                  id: crypto.randomUUID(),
+                  itemId: spId,
+                  itemName: spName,
+                  qty: orderQty,
+                  rate: unitPrice,
+                  weight: totalWeight,
+                  discountAmount: 0,
+                  taxPercent,
+                  amount,
+                  taxAmount,
+                  total: amount + taxAmount,
+                });
+              });
+              if (rebuilt.length > 0) setLines(rebuilt);
             }
             // Load bill sundry from full order if not already loaded from invoice
             if (sundryRows.length === 0 && Array.isArray(fullOrder.billSundry) && fullOrder.billSundry.length > 0) {
@@ -262,6 +284,7 @@ const SalesInvoiceForm: React.FC = () => {
           }).catch(() => {});
         }
         if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate.split("T")[0]);
+        if (invoice.dueDate) setDueDate(invoice.dueDate.split("T")[0]);
         setNotes(invoice.notes || "");
         setPreviewInvoiceNo(invoice.invoiceNo || "");
 
@@ -515,6 +538,16 @@ const SalesInvoiceForm: React.FC = () => {
     setSelectedSalesOrderId(soId);
     if (!soId) { setLines([emptyLine()]); return; }
     try {
+      // Refresh stock data to get latest values
+      const freshStock = await finishedGoodsStockService.fetchAll().catch(() => []);
+      const freshList: any[] = Array.isArray(freshStock) ? freshStock : (freshStock as any).data || [];
+      const freshMap = new Map<string, number>();
+      freshList.forEach((fg: any) => {
+        const prodId = (fg.productItemId || fg.productId)?.toString();
+        if (prodId) freshMap.set(prodId, (freshMap.get(prodId) || 0) + Number(fg.onHandQty || 0));
+      });
+      setStockMap(freshMap);
+
       const fullOrder = await salesOrderService.fetchById(soId);
       if (!fullOrder) return;
       if (fullOrder.customerId) setCustomerId(fullOrder.customerId.toString());
@@ -625,6 +658,20 @@ const SalesInvoiceForm: React.FC = () => {
     return company.state.toLowerCase().trim() !== selectedCustomer.billingState.toLowerCase().trim();
   }, [company, customersRaw, customerId]);
 
+  // ---- Auto-calculate due date from customer creditDays ----
+  useEffect(() => {
+    if (!customerId || !invoiceDate) return;
+    const cust = customersRaw.find((c: any) => String(c.id) === customerId);
+    const creditDays = Number(cust?.creditDays) || 0;
+    if (creditDays > 0) {
+      const invDate = new Date(invoiceDate);
+      invDate.setDate(invDate.getDate() + creditDays);
+      setDueDate(invDate.toISOString().split("T")[0]);
+    } else {
+      setDueDate("");
+    }
+  }, [customerId, invoiceDate, customersRaw]);
+
   // ---- Totals ----
   const totals = useMemo(() => {
     const subTotal = lines.reduce((sum, l) => sum + l.qty * l.rate, 0);
@@ -688,9 +735,8 @@ const SalesInvoiceForm: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  // isLocked: confirmed (non-draft) edit-mode invoices are read-only
-  // DRAFT invoices in edit mode stay fully editable
-  const isLocked = isEditMode && invoiceStatus !== "DRAFT";
+  // isLocked: only PAID invoices are read-only
+  const isLocked = isEditMode && invoiceStatus === "PAID";
 
   // ---- Submit ----
   const handleSubmit = async (e: React.SyntheticEvent, _asDraft: boolean = false) => {
@@ -704,6 +750,7 @@ const SalesInvoiceForm: React.FC = () => {
         invoiceNo: previewInvoiceNo,
         customerId,
         invoiceDate,
+        dueDate: dueDate || null,
         notes,
         narration: (() => {
           const base = JSON.parse(serializeChargeRowsToNarration(chargeRows));
@@ -848,7 +895,20 @@ const SalesInvoiceForm: React.FC = () => {
       width: "1fr",
       render: (row: InvoiceLineItem) => {
         if (selectedSalesOrderId) {
-          const liveStock = stockMap.get(row.itemId) ?? 0;
+          // Compute live stock from component products
+          const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
+          let liveStock = stockMap.get(row.itemId) ?? 0;
+          if (sp) {
+            const comps = (sp.components || []).filter((c: any) => c?.componentProduct?.productType === "SALES_PRODUCTION");
+            if (comps.length > 0) {
+              const possible = comps.map((c: any) => {
+                const compStock = stockMap.get(String(c.componentProductId)) ?? 0;
+                const perUnit = Number(c.quantity || 1);
+                return perUnit > 0 ? Math.floor(compStock / perUnit) : 0;
+              });
+              liveStock = Math.max(0, Math.min(...possible));
+            }
+          }
           return (
             <div className="flex items-center justify-between w-full gap-2 text-[13px]">
               <span className="text-ink font-medium truncate">{row.itemName || "—"}</span>
@@ -1135,8 +1195,8 @@ const SalesInvoiceForm: React.FC = () => {
             />
           </div>
 
-          {/* ── Row 2: Invoice Date, Transport, No. of Bundle ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1">
+          {/* ── Row 2: Invoice Date, Due Date, Transport, No. of Bundle ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
             <DatePickerCalendar
               label="Invoice Date"
               name="invoiceDate"
@@ -1145,6 +1205,14 @@ const SalesInvoiceForm: React.FC = () => {
               onChange={(e) => setInvoiceDate(e.target.value)}
               required
               error={errors.invoiceDate}
+              horizontal
+            />
+            <DatePickerCalendar
+              label="Due Date"
+              name="dueDate"
+              value={dueDate}
+              disabled={isLocked}
+              onChange={(e) => setDueDate(e.target.value)}
               horizontal
             />
             <AutocompleteInput
@@ -1238,6 +1306,7 @@ const SalesInvoiceForm: React.FC = () => {
                 renderExpandedRow={renderExpandedComponents}
                 showTotals={[
                   { colKey: "qty", value: lines.reduce((s, l) => s + l.qty, 0) },
+                  { colKey: "weight", value: lines.reduce((s, l) => s + (l.weight || 0), 0).toFixed(1) },
                   { colKey: "total", value: `₹${totals.subTotal.toFixed(2)}` },
                 ]}
                 visibleRows={10}
@@ -1307,7 +1376,7 @@ const SalesInvoiceForm: React.FC = () => {
                     <div className="flex justify-between px-3 py-2 border-b border-line-soft bg-card-2">
                       <span className="font-semibold text-ink-muted">Opening Balance</span>
                       <span className={`font-bold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>
-                        ₹{openBal.toLocaleString("en-IN")} {openLabel}
+                        ₹{openBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openLabel}
                       </span>
                     </div>
                     <div className="flex justify-between px-3 py-2 border-b border-line-soft">
