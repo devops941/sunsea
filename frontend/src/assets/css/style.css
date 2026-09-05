@@ -730,6 +730,8 @@ ul {
 
     #print-only-estimate-section,
     #print-only-estimate-section *,
+    #print-only-quotation-section,
+    #print-only-quotation-section *,
     #printable-invoice-card,
     #printable-invoice-card *,
     #printable-po-invoice-card,
@@ -740,13 +742,14 @@ ul {
     }
 
     #print-only-estimate-section,
+    #print-only-quotation-section,
     #printable-invoice-card,
     #printable-po-invoice-card,
     #printable-grn-invoice-card {
         position: absolute !important;
-        left: 0 !important;
+        left: 2px !important;
         top: 0 !important;
-        width: 100% !important;
+        width: calc(100% - 4px) !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;

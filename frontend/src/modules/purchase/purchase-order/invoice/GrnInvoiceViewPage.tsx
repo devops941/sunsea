@@ -216,6 +216,8 @@ const GrnInvoiceViewPage: React.FC = () => {
         return Array.from(map.values());
     }, [itemsWithTax]);
 
+    const hasTax = useMemo(() => (totalCgst + totalSgst + totalIgst) > 0, [totalCgst, totalSgst, totalIgst]);
+
     const amountInWords = useMemo(() => numberToWords(grandTotal), [grandTotal]);
 
     const handleDownloadPdf = async () => {
@@ -238,22 +240,11 @@ const GrnInvoiceViewPage: React.FC = () => {
             const availableHeight = pageHeight - 2 * margin;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            const renderHeight = imgHeight < availableHeight ? availableHeight : imgHeight;
+            const renderHeight = Math.min(imgHeight, availableHeight);
 
-            let heightLeft = renderHeight;
-            let position = margin;
+            pdf.addImage(imgData, "PNG", margin, margin, imgWidth, renderHeight);
 
-            pdf.addImage(imgData, "PNG", margin, position, imgWidth, renderHeight);
-            heightLeft -= availableHeight;
-
-            while (heightLeft > 0) {
-                position -= availableHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-                heightLeft -= availableHeight;
-            }
-
-            pdf.save(`GRN-Invoice-${selectedItem?.invoiceNo || selectedItem?.grnNumber || "invoice"}.pdf`);
+            pdf.save(`Purchase-Invoice-${selectedItem?.invoiceNo || selectedItem?.grnNumber || "invoice"}.pdf`);
         } catch (err) {
             console.error(err);
             toast.error("Failed to generate PDF");
@@ -339,7 +330,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     <FaArrowLeft className="text-xs" /> Back
                                 </button>
                                 <h2 className="text-xl font-bold text-gray-800 m-0">
-                                    GRN Invoice #{selectedItem.invoiceNo || selectedItem.grnNumber}
+                                    Purchase Invoice #{selectedItem.invoiceNo || selectedItem.grnNumber}
                                 </h2>
                             </div>
                             <div className="flex items-center gap-3">
@@ -366,10 +357,12 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     left: 0;
                                     top: 0;
                                     width: 100%;
-                                    min-height: auto !important;
+                                    height: 277mm;
                                     background: #fff !important;
                                     box-shadow: none !important;
                                     margin: 0 !important;
+                                    border-width: 1px !important;
+                                    font-size: 13px !important;
                                 }
                                 .no-print {
                                     display: none !important;
@@ -378,49 +371,36 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     height: auto;
                                     overflow: visible !important;
                                 }
+                                table { page-break-inside: avoid; }
                             }
                         `}</style>
 
                         {/* GST Tax Invoice Card */}
                         <div
                             id="printable-grn-invoice-card"
-                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full flex flex-col box-border text-[14px] shadow-lg font-medium"
                         >
                             {/* Top bar */}
-                            <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
-                                <div>GSTIN : {company?.gstin || "-"}</div>
-                                <div className="italic">Triplicate Copy</div>
-                            </div>
+                            {hasTax && (
+                                <div className="flex justify-between items-center px-4 py-2 border-b-[1.5px] border-black text-[13px] font-semibold">
+                                    <div>GSTIN : {company?.gstin || "-"}</div>
+                                    <div className="italic">Triplicate Copy</div>
+                                </div>
+                            )}
 
                             {/* Header */}
-                            <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
-                                <div className="text-sm uppercase font-bold tracking-[2px]">GRN Invoice</div>
-                                <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
-                                    {company?.legalName || company?.companyName || "Company Name"}
-                                </h1>
-                                <div className="text-[13px] mt-1">
-                                    {company?.addressLine1}
-                                    {company?.city && `, ${company.city}`}
-                                    {company?.state && `, ${company.state}`}
-                                    {company?.pincode && ` - ${company.pincode}`}
-                                </div>
+                            <div className="text-center border-b-[1.5px] border-black px-4 py-4">
+                                <div className="text-xl uppercase font-extrabold tracking-[3px]">Purchase Invoice</div>
                             </div>
 
                             {/* Invoice meta block */}
                             <div className="flex border-b-[1.5px] border-black">
-                                <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
+                                <div className="flex-1 border-r-[1.5px] border-black px-4 py-3 space-y-1.5">
                                     <MetaRow label="GRN No." value={selectedItem.grnNumber} />
                                     <MetaRow label="Dated" value={formatDate(selectedItem.grnDate)} />
-                                    <MetaRow label="Place of Supply" value={selectedItem.billingState || "-"} />
                                     <MetaRow label="Due Date" value={formatDate(selectedItem.billDueDate)} />
-                                    <MetaRow label="Reverse Charge" value="N" />
-                                    <MetaRow label="Challan No." value={selectedItem.challanNo || "—"} />
                                 </div>
-                                <div className="flex-1 p-2 space-y-1">
-                                    <MetaRow label="Transport" value={selectedItem.transport || "—"} />
-                                    <MetaRow label="Vehicle No" value="—" />
-                                    <MetaRow label="Station" value="—" />
-                                    <MetaRow label="E-way Bill no" value={selectedItem.eWayBill || "—"} />
+                                <div className="flex-1 px-4 py-3 space-y-1.5">
                                     <MetaRow label="Invoice No." value={selectedItem.invoiceNo || "—"} />
                                     {selectedItem.purchaseOrder?.poNumber && (
                                         <MetaRow label="Ref. PO No." value={selectedItem.purchaseOrder.poNumber} />
@@ -430,28 +410,28 @@ const GrnInvoiceViewPage: React.FC = () => {
 
                             {/* Billed From / Shipped To */}
                             <div className="flex border-b-[1.5px] border-black">
-                                <div className="flex-1 border-r-[1.5px] border-black p-2">
-                                    <div className="font-bold mb-1">Billed from (Supplier) :</div>
-                                    <div className="font-semibold">
+                                <div className="flex-1 border-r-[1.5px] border-black px-4 py-3">
+                                    <div className="font-bold mb-1.5 text-[14px]">Billed from (Supplier) :</div>
+                                    <div className="font-semibold text-[14px]">
                                         {selectedItem.supplier?.displayName || selectedItem.supplier?.legalName || "N/A"}
                                     </div>
-                                    <div className="font-semibold">
+                                    <div className="font-semibold text-[13px] mt-0.5">
                                         {selectedItem.billingAddressLine1}<br />
                                         {selectedItem.billingCity}, {selectedItem.billingState} - {selectedItem.billingPincode}
                                     </div>
-                                    {selectedItem.supplier?.gstin && (
-                                        <div className="mt-1">GSTIN / UIN : {selectedItem.supplier.gstin}</div>
+                                    {hasTax && selectedItem.supplier?.gstin && (
+                                        <div className="mt-1.5 text-[13px]">GSTIN / UIN : {selectedItem.supplier.gstin}</div>
                                     )}
                                     {selectedItem.supplier?.phone && (
-                                        <div className="mt-1 font-semibold">Phone: {selectedItem.supplier.phone}</div>
+                                        <div className="mt-1 font-semibold text-[13px]">Phone: {selectedItem.supplier.phone}</div>
                                     )}
                                 </div>
-                                <div className="flex-1 p-2">
-                                    <div className="font-bold mb-1">Shipped to (Store) :</div>
-                                    <div className="font-semibold">
+                                <div className="flex-1 px-4 py-3">
+                                    <div className="font-bold mb-1.5 text-[14px]">Shipped to (Store) :</div>
+                                    <div className="font-semibold text-[14px]">
                                         {selectedItem.store?.storeName || "N/A"}
                                     </div>
-                                    <div className="font-semibold">
+                                    <div className="font-semibold text-[13px] mt-0.5">
                                         {selectedItem.shippingAddressLine1 || selectedItem.billingAddressLine1}<br />
                                         {selectedItem.shippingCity || selectedItem.billingCity}, {selectedItem.shippingState || selectedItem.billingState} - {selectedItem.shippingPincode || selectedItem.billingPincode}
                                     </div>
@@ -459,7 +439,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                             </div>
 
                             {/* Items Table */}
-                            <table className="w-full border-collapse text-[13px]">
+                            <table className="w-full border-collapse text-[13.5px]">
                                 <thead>
                                     <tr>
                                         <Th w="35px">S.N.</Th>
@@ -467,7 +447,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                         <Th w="55px" align="right">Qty.</Th>
                                         <Th w="45px">Unit</Th>
                                         <Th w="60px" align="right">Price</Th>
-                                        {isInterState ? (
+                                        {hasTax && (isInterState ? (
                                             <>
                                                 <Th w="50px">IGST Rate</Th>
                                                 <Th w="65px" align="right">IGST Amt</Th>
@@ -479,7 +459,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                                 <Th w="50px">SGST Rate</Th>
                                                 <Th w="65px" align="right">SGST Amt</Th>
                                             </>
-                                        )}
+                                        ))}
                                         <Th w="70px" align="right">Amount(Rs.)</Th>
                                     </tr>
                                 </thead>
@@ -491,7 +471,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                             <Td align="right">{item.qty}</Td>
                                             <Td align="center">{item.unit}</Td>
                                             <Td align="right">{formatMoney(item.rate)}</Td>
-                                            {isInterState ? (
+                                            {hasTax && (isInterState ? (
                                                 <>
                                                     <Td align="center">{item.igstRate}%</Td>
                                                     <Td align="right">{formatMoney(item.igstAmount)}</Td>
@@ -503,13 +483,13 @@ const GrnInvoiceViewPage: React.FC = () => {
                                                     <Td align="center">{item.sgstRate}%</Td>
                                                     <Td align="right">{formatMoney(item.sgstAmount)}</Td>
                                                 </>
-                                            )}
+                                            ))}
                                             <Td align="right">{formatMoney(item.amount)}</Td>
                                         </tr>
                                     ))}
                                     {(!selectedItem.items || selectedItem.items.length === 0) && (
                                         <tr>
-                                            <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
+                                            <td colSpan={!hasTax ? 5 : isInterState ? 7 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
                                                 No items found for this invoice.
                                             </td>
                                         </tr>
@@ -517,7 +497,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">
+                                        <td colSpan={!hasTax ? 5 : isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">
                                             Grand Total
                                         </td>
                                         <td className="border border-black px-2 py-1 text-right font-bold font-mono">
@@ -527,9 +507,9 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 </tfoot>
                             </table>
 
-                            {/* Tax Summary */}
-                            {taxSummary.length > 0 && (
-                                <table className="w-full border-collapse text-[13px] mt-2">
+                            {/* Tax Summary — only shown when tax exists */}
+                            {hasTax && taxSummary.length > 0 && (
+                                <table className="w-full border-collapse text-[13.5px] mt-1">
                                     <thead>
                                         <tr>
                                             <Th w="60px">Tax Rate</Th>
@@ -565,37 +545,40 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 </table>
                             )}
 
-                            {/* Amount in words */}
-                            <div className="px-2 py-2 border-t border-black text-[14px] font-semibold">
-                                Rupees {amountInWords}
-                            </div>
-
-                            {/* Bank details */}
-                            <div className="px-2 py-2 border-t border-black text-[13px]">
-                                <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
-                                &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
-                                A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
-                            </div>
-
-                            {/* Remarks / Notes */}
-                            {selectedItem.remarks && (
-                                <div className="px-2 py-2 border-t border-black text-[13px] print:block">
-                                    <span className="font-bold">Remarks / Notes :</span> {selectedItem.remarks}
+                            {/* Bottom section — pushed to bottom of page */}
+                            <div className="mt-auto">
+                                {/* Amount in words */}
+                                <div className="px-4 py-2 border-t-[1.5px] border-black text-[14px] font-bold">
+                                    Rupees {amountInWords}
                                 </div>
-                            )}
 
-                            {/* Footer: Terms + Signature */}
-                            <div className="flex border-t-[1.5px] border-black text-[13px]">
-                                <div className="flex-1 border-r border-black p-2">
-                                    <div className="font-bold mb-1">Terms &amp; Conditions</div>
-                                    <div>E &amp; O.E.</div>
-                                    <div>1. Goods once sold will not be taken back.</div>
-                                    <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                {/* Bank details */}
+                                <div className="px-4 py-2 border-t-[1.5px] border-black text-[13px]">
+                                    <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
+                                    &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
+                                    A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
                                 </div>
-                                <div className="flex-1 p-2 flex flex-col justify-between">
-                                    <div className="font-bold">Receiver's Signature :</div>
-                                    <div className="text-right font-bold mt-6">
-                                        For {company?.legalName || company?.companyName || "Company"}
+
+                                {/* Remarks / Notes */}
+                                {selectedItem.remarks && (
+                                    <div className="px-4 py-2 border-t-[1.5px] border-black text-[13px] print:block">
+                                        <span className="font-bold">Remarks / Notes :</span> {selectedItem.remarks}
+                                    </div>
+                                )}
+
+                                {/* Footer: Terms + Signature */}
+                                <div className="flex border-t-[1.5px] border-black text-[13px]">
+                                    <div className="flex-1 border-r-[1.5px] border-black px-4 py-3">
+                                        <div className="font-bold mb-1">Terms &amp; Conditions</div>
+                                        <div>E &amp; O.E.</div>
+                                        <div>1. Goods once sold will not be taken back.</div>
+                                        <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                    </div>
+                                    <div className="flex-1 px-4 py-3 flex flex-col justify-between">
+                                        <div className="font-bold">Receiver's Signature :</div>
+                                        <div className="text-right font-bold mt-8">
+                                            For {company?.legalName || company?.companyName || "Company"}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -655,15 +638,15 @@ const GrnInvoiceViewPage: React.FC = () => {
 
 // ─── Small table helpers ─────────────────────────────────────────────
 const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-    <div className="flex text-[13px]">
-        <span className="w-[110px] font-bold">{label}</span>
+    <div className="flex text-[14px]">
+        <span className="w-[120px] font-bold">{label}</span>
         <span>: {value}</span>
     </div>
 );
 
 const Th: React.FC<{ children?: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
     <th
-        className={`border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-${align}`}
+        className={`border border-black px-2.5 py-1.5 font-bold bg-[#f5f5f5] text-${align}`}
         style={w ? { width: w } : undefined}
     >
         {children}
@@ -671,7 +654,7 @@ const Th: React.FC<{ children?: React.ReactNode; w?: string; align?: "left" | "c
 );
 
 const Td: React.FC<{ children?: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
-    <td className={`border border-black px-2 py-1 align-middle text-${align}`}>{children}</td>
+    <td className={`border border-black px-2.5 py-1.5 align-middle text-${align}`}>{children}</td>
 );
 
 export default GrnInvoiceViewPage;
