@@ -182,6 +182,11 @@ const SalesInvoiceForm: React.FC = () => {
   const [chargeRows, setChargeRows] = useState<ChargeRow[]>([]);
   const [sundryRows, setSundryRows] = useState<SundryRow[]>([]);
   const [invoiceStatus, setInvoiceStatus] = useState<string>("DRAFT");
+  const [customerTransports, setCustomerTransports] = useState<any[]>([]);
+  
+  const [selectedTransport, setSelectedTransport] = useState<any>(null);
+  
+  const [numberOfBundle, setNumberOfBundle] = useState<string>("");
 
   useFormShortcuts({});
 
@@ -203,6 +208,8 @@ const SalesInvoiceForm: React.FC = () => {
         setInvoiceStatus(invoice.status || "DRAFT");
         setCustomerId(invoice.customerId || "");
         setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
+        if (invoice.transport) setSelectedTransport(invoice.transport);
+        if (invoice.numberOfBundle != null) setNumberOfBundle(String(invoice.numberOfBundle));
         if (invoice.salesOrder) {
           setEditInvoiceSalesOrder(invoice.salesOrder);
         }
@@ -214,6 +221,7 @@ const SalesInvoiceForm: React.FC = () => {
             const cust = fullOrder.customer;
             const addresses = cust?.addresses || [];
             setCustomerAddresses(addresses);
+            setCustomerTransports(cust?.transports || []);
             const defaultAddr = addresses[0]?.address || {};
             setBillingAddress({
               line1: fullOrder.billingAddressLine1 || cust?.billingAddressLine1 || defaultAddr.addressLine1 || "",
@@ -550,6 +558,7 @@ const SalesInvoiceForm: React.FC = () => {
       const cust = o.customer;
       const addresses = cust?.addresses || [];
       setCustomerAddresses(addresses);
+      setCustomerTransports(cust?.transports || []);
       const defaultAddr = addresses[0]?.address || {};
       setBillingAddress({
         line1: o.billingAddressLine1 || defaultAddr.addressLine1 || "",
@@ -730,13 +739,11 @@ const SalesInvoiceForm: React.FC = () => {
             total: l.total,
             excludedComponents: excludedComponents[l.id] ? Array.from(excludedComponents[l.id]) : [],
           })),
-        subTotal: totals.subTotal,
         discountType: Number(discountValue) > 0 ? discountType : null,
         discountValue: Number(discountValue) || 0,
-        totalDiscount: totals.totalDiscount,
-        taxTotal: totals.taxTotal,
-        grandTotal: totals.grandTotal,
         billSundry: sundryRows.length > 0 ? sundryRows : null,
+        transport: selectedTransport || null,
+        numberOfBundle: numberOfBundle ? Number(numberOfBundle) : null,
         payments: [],
       };
 
@@ -841,10 +848,14 @@ const SalesInvoiceForm: React.FC = () => {
       width: "1fr",
       render: (row: InvoiceLineItem) => {
         if (selectedSalesOrderId) {
+          const liveStock = stockMap.get(row.itemId) ?? 0;
           return (
-            <span className="flex items-center gap-1">
-              <span className="text-ink font-medium text-[13px] truncate">{row.itemName || "—"}</span>
-            </span>
+            <div className="flex items-center justify-between w-full gap-2 text-[13px]">
+              <span className="text-ink font-medium truncate">{row.itemName || "—"}</span>
+              <span className={`text-[11px] font-semibold shrink-0 ${liveStock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                {liveStock} pcs
+              </span>
+            </div>
           );
         }
         return (
@@ -1073,10 +1084,10 @@ const SalesInvoiceForm: React.FC = () => {
           <BackButton text="Back to List" />
         </div>
 
-        <form className="p-5 space-y-5" noValidate>
-          <div className="flex flex-col gap-5">
+        <form className="px-5 py-3 space-y-2" noValidate>
+          <div className="flex flex-col gap-2">
           {/* ── Full-width Form ── */}
-          <div className="w-full space-y-5">
+          <div className="w-full space-y-2">
 
           {/* Credit limit warning */}
           {limitExceeded !== false && (
@@ -1088,9 +1099,10 @@ const SalesInvoiceForm: React.FC = () => {
             </div>
           )}
 
-          {/* ── Form Fields ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
+          {/* ── Row 1: Customer & Sales Order ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
             <AutocompleteInput
+              horizontal
               label="Customer"
               name="customerId"
               required
@@ -1112,6 +1124,7 @@ const SalesInvoiceForm: React.FC = () => {
               }}
             />
             <AutocompleteInput
+              horizontal
               label="Sales Order"
               name="selectedSalesOrderId"
               value={selectedSalesOrderId}
@@ -1120,6 +1133,10 @@ const SalesInvoiceForm: React.FC = () => {
               placeholder={customerId ? "Type to search order..." : "Select customer first"}
               onChange={(val) => handleSalesOrderChange(val)}
             />
+          </div>
+
+          {/* ── Row 2: Invoice Date, Transport, No. of Bundle ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1">
             <DatePickerCalendar
               label="Invoice Date"
               name="invoiceDate"
@@ -1128,19 +1145,47 @@ const SalesInvoiceForm: React.FC = () => {
               onChange={(e) => setInvoiceDate(e.target.value)}
               required
               error={errors.invoiceDate}
+              horizontal
+            />
+            <AutocompleteInput
+              horizontal
+              label="Transport"
+              name="transport"
+              value={selectedTransport ? String(customerTransports.findIndex((t: any) => t.name === selectedTransport.name)) : ""}
+              options={customerTransports.map((t: any, idx: number) => ({
+                value: String(idx),
+                label: t.name || `Transport ${idx + 1}`,
+                info: t.phone ? <span className="text-[11px] text-ink-subtle">{t.phone}</span> : undefined,
+              }))}
+              placeholder={customerTransports.length > 0 ? "Select transport..." : "No transports"}
+              disabled={isLocked || customerTransports.length === 0}
+              onChange={(val) => {
+                const idx = Number(val);
+                setSelectedTransport(customerTransports[idx] || null);
+              }}
+            />
+            <TextInput
+              horizontal
+              label="No. of Bundle"
+              name="numberOfBundle"
+              type="number"
+              value={numberOfBundle}
+              placeholder="Enter"
+              disabled={isLocked}
+              onChange={(e) => setNumberOfBundle(e.target.value)}
             />
           </div>
 
           {/* ── Addresses ── */}
           {(billingAddress.line1 || billingAddress.city) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-3 border border-line-soft rounded-lg bg-card">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-2 border border-line-soft rounded-lg bg-card">
                 <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
                 <p className="text-xs text-ink-subtle mt-1">
                   {[billingAddress.line1, billingAddress.city, billingAddress.state, billingAddress.pincode].filter(Boolean).join(", ")}
                 </p>
               </div>
-              <div className="p-3 border border-line-soft rounded-lg bg-card">
+              <div className="p-2 border border-line-soft rounded-lg bg-card">
                 <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
                 {customerAddresses.length > 0 ? (
                   <div className="space-y-1 mt-1">
@@ -1168,9 +1213,9 @@ const SalesInvoiceForm: React.FC = () => {
           )}
 
           {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <div className="w-[65%]">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-semibold text-ink">Invoice Items</span>
               </div>
               <BusyItemsTable
@@ -1199,7 +1244,7 @@ const SalesInvoiceForm: React.FC = () => {
               />
             </div>
             <div className="w-[35%]">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-semibold text-ink">Bill Sundry</span>
               </div>
               <BusyItemsTable
@@ -1294,7 +1339,7 @@ const SalesInvoiceForm: React.FC = () => {
         </form>
 
         {/* ── Actions ── */}
-        <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+        <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
           <CustomButton text="Cancel" type="button" variant="secondary" onClick={() => navigate(-1)} />
           <CustomButton text={saving ? "Saving..." : isEditMode ? "Update Invoice" : "Confirm Invoice"}
             icon={FaSave} type="button" disabled={saving || isStockNotEnough} variant="primary" onClick={(e) => handleSubmit(e, false)} />

@@ -1003,8 +1003,17 @@ const QuotationForm: React.FC = () => {
                 const hasOrder = !!selectedPrevOrderId || isEditMode;
 
                 if (hasOrder && itemValue?.salesProductId) {
-                    const spName = salesProducts.find((s: any) => String(s.id) === itemValue?.salesProductId)?.salesProductName || "—";
-                    return <span className="text-[13px] text-ink font-medium truncate">{spName}</span>;
+                    const sp = salesProducts.find((s: any) => String(s.id) === itemValue?.salesProductId);
+                    const spName = sp?.salesProductName || "—";
+                    const stock = sp ? computeSalesProductLiveStock(sp) : 0;
+                    return (
+                        <div className="flex items-center justify-between w-full gap-2 text-[13px]">
+                            <span className="text-ink font-medium truncate">{spName}</span>
+                            <span className={`text-[11px] font-semibold shrink-0 ${stock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                {stock} pcs
+                            </span>
+                        </div>
+                    );
                 }
 
                 const allItems = watchedItems || [];
@@ -1264,7 +1273,7 @@ const QuotationForm: React.FC = () => {
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
 
                 {/* Page Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-line">
                     <h2 className="text-lg font-bold text-ink flex items-start">
                         {isEditMode ? "Edit Quotation" : "Create Quotation"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("quotationNo")}</span>
@@ -1272,10 +1281,10 @@ const QuotationForm: React.FC = () => {
                     <BackButton text="Back to List" />
                 </div>
 
-                <form className="p-5 space-y-5" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
-                    <div className="flex flex-col lg:flex-row gap-5">
-                        {/* ── Left: Form (75%) ── */}
-                        <div className="w-full lg:w-3/4 space-y-5">
+                <form className="px-5 py-2 space-y-2" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
+                    <div className="flex flex-col lg:flex-row gap-2">
+                        {/* ── Left: Form ── */}
+                        <div className="w-full space-y-2">
                             {/* ── Rejection banner (edit mode only) ── */}
                             {isEditMode && rejectionReason && (
                                 <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2">
@@ -1288,7 +1297,7 @@ const QuotationForm: React.FC = () => {
                             )}
 
                             {/* ── Order Info ── */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
                                 <Controller
                                     name="quotationDate"
                                     control={control}
@@ -1339,9 +1348,9 @@ const QuotationForm: React.FC = () => {
                             )}
 
                             {/* ── Quotation Items (65%) + Bill Sundry (35%) ── */}
-                            <div className="flex gap-4">
+                            <div className="flex gap-3">
                                 <div className="w-[65%]">
-                                    <div className="flex justify-between items-center mb-2">
+                                    <div className="flex justify-between items-center mb-1">
                                         <span className="text-sm font-semibold text-ink">Quotation Items</span>
                                     </div>
                                     <BusyItemsTable
@@ -1363,7 +1372,7 @@ const QuotationForm: React.FC = () => {
                                     />
                                 </div>
                                 <div className="w-[35%]">
-                                    <div className="flex justify-between items-center mb-2">
+                                    <div className="flex justify-between items-center mb-1">
                                         <span className="text-sm font-semibold text-ink">Bill Sundry</span>
                                     </div>
                                     <BusyItemsTable
@@ -1413,7 +1422,7 @@ const QuotationForm: React.FC = () => {
                 </form>
 
                 {/* ── Form Actions ── */}
-                <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+                <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
                     <CustomButton
                         text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
                         variant="secondary"

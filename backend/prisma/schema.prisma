@@ -1617,6 +1617,9 @@ model SalesInvoice {
   storeId        String?               @map("store_id") @db.VarChar(20)
   payments       Json?                 @default("[]") @map("payments")
   narration      String?               @db.VarChar(2000)
+  transport      Json?                 @map("transport")
+  numberOfBundle Int?                  @map("number_of_bundle")
+  billSundry     Json?                 @map("bill_sundry")
   items          SalesInvoiceItem[]
   paymentRecords SalesInvoicePayment[]
   customer       Customer              @relation(fields: [customerId], references: [id])
