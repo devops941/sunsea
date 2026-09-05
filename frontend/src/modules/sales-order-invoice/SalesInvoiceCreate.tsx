@@ -807,8 +807,30 @@ const SalesInvoiceForm: React.FC = () => {
 
   const productOptions = useMemo(() => [
     { value: "", label: "-- Select Product --" },
-    ...items.map((i) => ({ value: i.id, label: i.name })),
-  ], [items]);
+    ...items.map((i) => {
+      const liveStock = stockMap.get(i.id) ?? 0;
+      const badge = (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
+          liveStock > 0
+            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+            : "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+        }`}>
+          {liveStock} pcs
+        </span>
+      );
+      return {
+        value: i.id,
+        selectedLabel: i.name,
+        badge,
+        label: (
+          <div className="flex items-center justify-between w-full gap-2">
+            <span className="truncate">{i.name}</span>
+            {badge}
+          </div>
+        ),
+      };
+    }),
+  ], [items, stockMap]);
 
   // ---- Derived (non-hook) values ----
   // ── Invoice item columns for BusyItemsTable ──

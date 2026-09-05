@@ -774,6 +774,19 @@ const QuotationList: React.FC = () => {
                 </div>
             )}
 
+            {/* Print-Only Quotation Section */}
+            {estimateOrder && (
+                <div id="print-only-quotation-section" className="hidden print:block">
+                    <DocumentPrintLayout subtitle="Quotation" title="QUOTATION">
+                        <SalesOrderEstimateContent
+                            estimateOrder={estimateOrder}
+                            formatDate={formatDate}
+                            isEditable={false}
+                        />
+                    </DocumentPrintLayout>
+                </div>
+            )}
+
             {/* Off-screen section for PDF generation */}
             {estimateOrder && (
                 <div
