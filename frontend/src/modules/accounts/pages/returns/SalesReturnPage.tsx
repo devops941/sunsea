@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUndo, FaPlus, FaTimes } from "react-icons/fa";
+import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import { returnService, type SalesReturn } from "../../../../services/returnService";
@@ -18,6 +18,11 @@ import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import DataTable, { type DataTableColumn } from "../../../../components/ui/table/DataTable";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { usePermission } from "../../../../hooks/usePermission";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../../hooks/useTableKeyboardNav";
+
+type SortOrder = "default" | "asc" | "desc";
+const SORT_STORAGE_KEY = "sunsea_sales_return_sort";
 
 interface FilterState {
   customerGradeId: string;
@@ -31,6 +36,7 @@ const DEFAULT_FILTERS: FilterState = {
 
 export const SalesReturnPage: React.FC = () => {
   const navigate = useNavigate();
+  const tableRef = useRef<HTMLDivElement>(null);
   const { can } = usePermission();
   const [selectedViewReturn, setSelectedViewReturn] = useState<SalesReturn | null>(null);
 
@@ -38,6 +44,44 @@ export const SalesReturnPage: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [draftFilters, setDraftFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchTerm, setSearchTerm] = useState<string>("");
+
+  // ── Alphabetical / Column Sorting with localStorage persistence ──────────
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_STORAGE_KEY);
+      if (saved === "asc" || saved === "desc") return saved;
+    } catch (_) {}
+    return "default";
+  });
+
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder((prev) => {
+      let next: SortOrder = "default";
+      if (prev === "default") next = "asc";
+      else if (prev === "asc") next = "desc";
+      else next = "default";
+      try {
+        localStorage.setItem(SORT_STORAGE_KEY, next);
+      } catch (_) {}
+      return next;
+    });
+  }, []);
+
+  // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
+  useEffect(() => {
+    const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+        e.preventDefault();
+        toggleSortOrder();
+      }
+    };
+    window.addEventListener("keydown", handleSortShortcut);
+    return () => window.removeEventListener("keydown", handleSortShortcut);
+  }, [toggleSortOrder]);
 
   const cacheKey = `accounts:sales-returns`;
 
@@ -79,30 +123,74 @@ export const SalesReturnPage: React.FC = () => {
     setAppliedFilters((prev) => ({ ...prev, [key]: "" }));
   };
 
-  const filteredReturns = returns.filter((r) => {
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchesSearch =
-        r.returnNo?.toLowerCase().includes(term) ||
-        r.customer?.firmName?.toLowerCase().includes(term) ||
-        r.reason?.toLowerCase().includes(term) ||
-        r.status?.toLowerCase().includes(term);
-      if (!matchesSearch) return false;
-    }
+  const filteredReturns = useMemo(() => {
+    return returns.filter((r) => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchesSearch =
+          r.returnNo?.toLowerCase().includes(term) ||
+          r.customer?.firmName?.toLowerCase().includes(term) ||
+          r.customer?.displayName?.toLowerCase().includes(term) ||
+          r.reason?.toLowerCase().includes(term) ||
+          r.status?.toLowerCase().includes(term);
+        if (!matchesSearch) return false;
+      }
 
-    if (appliedFilters.customerGradeId) {
-      const gradeId = Number(appliedFilters.customerGradeId);
-      const matchGrade =
-        r.customer?.customerGradeId === gradeId ||
-        r.customer?.customerGrade?.id === gradeId;
-      if (!matchGrade) return false;
-    }
+      if (appliedFilters.customerGradeId) {
+        const gradeId = Number(appliedFilters.customerGradeId);
+        const matchGrade =
+          r.customer?.customerGradeId === gradeId ||
+          r.customer?.customerGrade?.id === gradeId;
+        if (!matchGrade) return false;
+      }
 
-    if (appliedFilters.status) {
-      if (r.status !== appliedFilters.status) return false;
-    }
+      if (appliedFilters.status) {
+        if (r.status !== appliedFilters.status) return false;
+      }
 
-    return true;
+      return true;
+    });
+  }, [returns, searchTerm, appliedFilters]);
+
+  // Client-side sorted returns based on sortOrder
+  const sortedReturns = useMemo(() => {
+    if (!filteredReturns || !Array.isArray(filteredReturns)) return [];
+    if (sortOrder === "default") return filteredReturns;
+
+    return [...filteredReturns].sort((a: any, b: any) => {
+      const nameA = (a.customer?.firmName || a.customer?.displayName || a.returnNo || "").trim().toLowerCase();
+      const nameB = (b.customer?.firmName || b.customer?.displayName || b.returnNo || "").trim().toLowerCase();
+      if (sortOrder === "asc") {
+        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+      } else {
+        return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+      }
+    });
+  }, [filteredReturns, sortOrder]);
+
+  // ── Table keyboard navigation (Arrow keys, Enter to view, E to edit) ────
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: sortedReturns.length,
+    onEnter: (i) => {
+      const item = sortedReturns[i];
+      if (item) setSelectedViewReturn(item);
+    },
+    onEdit: (i) => {
+      const item = sortedReturns[i];
+      if (item) navigate(`/sales-returns/edit/${item.id}`);
+    },
+    containerRef: tableRef,
+  });
+
+  // ── Page Shortcuts (F5 refresh, F6 sort, Ins new, Ctrl+Shift+E export) ──
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onSort: () => toggleSortOrder(),
+    onNew: () => navigate("/sales-returns/create"),
+    onExport: () => {
+      const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+      exportBtn?.click();
+    },
   });
 
   const fetchSalesReturnsForExport = useCallback(async () => {
@@ -165,12 +253,41 @@ export const SalesReturnPage: React.FC = () => {
       ),
     },
     {
-      header: "CUSTOMER",
+      header: (
+        <button
+          type="button"
+          onClick={toggleSortOrder}
+          className="flex items-center gap-1.5 hover:text-ink transition-colors cursor-pointer group/sort text-left uppercase tracking-wider text-[11px] font-bold"
+          title="Click to sort by customer name (or press F6 / Alt+S)"
+        >
+          <span>CUSTOMER</span>
+          <span
+            className={`p-0.5 rounded transition-transform ${
+              sortOrder === "asc" || sortOrder === "desc"
+                ? "bg-primary/20 text-primary scale-110"
+                : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+            }`}
+          >
+            {sortOrder === "asc" ? (
+              <FaArrowUp size={10} />
+            ) : sortOrder === "desc" ? (
+              <FaArrowDown size={10} />
+            ) : (
+              <FaSort size={10} />
+            )}
+          </span>
+          {sortOrder !== "default" && (
+            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+              {sortOrder === "asc" ? "A-Z" : "Z-A"}
+            </span>
+          )}
+        </button>
+      ),
       render: (item) => {
         const gradeName = item.customer?.customerGrade?.name || item.customer?.grade;
         return (
           <div className="flex flex-col">
-            <span className="font-semibold text-ink">{item.customer?.firmName || "—"}</span>
+            <span className="font-semibold text-ink">{item.customer?.firmName || item.customer?.displayName || "—"}</span>
             {gradeName && (
               <span className="text-[11px] text-ink-subtle">Grade: {gradeName}</span>
             )}
@@ -216,7 +333,6 @@ export const SalesReturnPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
           <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
-           
             Sales Returns 
           </h2>
 
@@ -318,20 +434,38 @@ export const SalesReturnPage: React.FC = () => {
           </div>
         )}
 
-        {/* Table */}
-        <DataTable
-          columns={columns}
-          data={filteredReturns}
-          rowKey={(item) => item.id}
-          loading={loading}
-          emptyMessage="No sales return records found."
-        />
+        {/* Table with Keyboard Navigation */}
+        <div
+          ref={tableRef}
+          tabIndex={0}
+          data-table-nav
+          className="p-0 outline-none"
+        >
+          <DataTable
+            columns={columns}
+            data={sortedReturns}
+            rowKey={(item) => item.id}
+            loading={loading}
+            emptyMessage="No sales return records found."
+            rowClassName={(_row, index) =>
+              index === focusedIndex ? "bg-primary/8" : ""
+            }
+            onRowClick={(item, index) => {
+              setFocusedIndex(index);
+              tableRef.current?.focus({ preventScroll: true });
+              setSelectedViewReturn(item);
+            }}
+          />
+        </div>
       </div>
 
       {/* Sales Return Detail Modal */}
       <CommonViewModal
         show={Boolean(selectedViewReturn)}
-        onHide={() => setSelectedViewReturn(null)}
+        onHide={() => {
+          setSelectedViewReturn(null);
+          setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+        }}
         modalTitle="Sales Return Details"
         avatarText={selectedViewReturn?.returnNo ? "SR" : ""}
         headerTitle={selectedViewReturn?.returnNo || ""}
@@ -445,3 +579,4 @@ export const SalesReturnPage: React.FC = () => {
 };
 
 export default SalesReturnPage;
+

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -49,7 +50,10 @@ const GoodsDispatchList: React.FC = () => {
   const hasActiveFilters = !!(filterStatus || filterDateFrom || filterDateTo);
   const activeFilterCount = [filterStatus, filterDateFrom, filterDateTo].filter(Boolean).length;
 
-  usePageShortcuts({ onRefresh: () => dispatch(fetchGoodsDispatches({ page: currentPage, limit: ITEMS_PER_PAGE })) });
+  usePageShortcuts({
+    onRefresh: () => dispatch(fetchGoodsDispatches({ page: currentPage, limit: ITEMS_PER_PAGE })),
+    onNew: () => can("goods-dispatch.create") && navigate("/production/goods-dispatch/create"),
+  });
 
   // Handle search debouncing
   useEffect(() => {
@@ -137,6 +141,21 @@ const GoodsDispatchList: React.FC = () => {
   // Stats computed from current filtered data on current page (showing what's on screen)
   // Or we could compute from allData if we had it. For now use meta totals.
   // const totalCount = meta?.total || 0;
+
+  const displayDispatches = dispatches || [];
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: displayDispatches.length,
+    onEnter: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/detail/${item.id}`); },
+    onEdit: (i) => {
+      const item = displayDispatches[i];
+      if (!item) return;
+      if (item.status === "PENDING_GATE_APPROVAL" && can("goods-dispatch.edit")) navigate(`/production/goods-dispatch/gate-approval/${item.id}`);
+      else if (item.status === "PENDING_STORE_RECEIPT" && can("goods-dispatch.edit")) navigate(`/production/goods-dispatch/store-approval/${item.id}`);
+    },
+    containerRef: tableRef,
+  });
 
   const columns: DataTableColumn<any>[] = [
     {
@@ -284,11 +303,14 @@ const GoodsDispatchList: React.FC = () => {
         )}
 
         {/* Data Table */}
+        <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
         <DataTable
           columns={columns}
-          data={dispatches || []}
+          data={displayDispatches}
           loading={loading}
           rowKey={(item) => item.id.toString()}
+          rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+          onRowClick={(item, i) => { setFocusedIndex(i); navigate(`/production/goods-dispatch/detail/${item.id}`); }}
           emptyMessage="No dispatches found"
           pagination={meta && meta.totalPages > 1 ? {
             currentPage,
@@ -296,6 +318,7 @@ const GoodsDispatchList: React.FC = () => {
             onPageChange: handlePageChange
           } : undefined}
         />
+        </div>
       </div>
     </div>
   );

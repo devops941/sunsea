@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FaSave, FaPaperPlane } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { emailConfigService } from "../../../services/emailConfigService";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { usePermission } from "../../../hooks/usePermission";
 import { useDetailCache, invalidateDetailCache } from "../../../hooks/useDetailCache";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 
 interface EmailConfigForm {
   smtpHost: string;
@@ -32,6 +36,7 @@ const encryptionOptions = [
 ];
 
 const EmailConfigPage: React.FC = () => {
+  const navigate = useNavigate();
   const initialConfigData: EmailConfigForm = {
     smtpHost: "",
     smtpPort: "",
@@ -49,15 +54,21 @@ const EmailConfigPage: React.FC = () => {
   };
 
   const [configData, setConfigData] = useState<EmailConfigForm>(initialConfigData);
+  const [originalConfigData, setOriginalConfigData] = useState<EmailConfigForm>(initialConfigData);
   const [emailData, setEmailData] = useState<EmailForm>(initialEmailData);
 
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const [configErrors, setConfigErrors] = useState<Record<string, string>>({});
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
   const { can } = usePermission();
   const canEditEmail = can("email-config.edit");
+
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     return await emailConfigService.getConfig();
@@ -73,7 +84,7 @@ const EmailConfigPage: React.FC = () => {
   useEffect(() => {
     if (!fetchedConfig || populated.current) return;
     populated.current = true;
-    setConfigData({
+    const loadedData: EmailConfigForm = {
       smtpHost: fetchedConfig.smtpHost || "",
       smtpPort: fetchedConfig.smtpPort ? String(fetchedConfig.smtpPort) : "",
       smtpUsername: fetchedConfig.smtpUsername || "",
@@ -81,8 +92,41 @@ const EmailConfigPage: React.FC = () => {
       fromEmail: fetchedConfig.fromEmail || "",
       fromName: fetchedConfig.fromName || "",
       encryption: fetchedConfig.encryption || "TLS",
-    });
+    };
+    setConfigData(loadedData);
+    setOriginalConfigData(loadedData);
   }, [fetchedConfig]);
+
+  // Auto-focus first input when loaded
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        const firstInput = formRef.current?.querySelector<HTMLElement>(
+          'input[name="smtpHost"], input[data-nav]:not([disabled])'
+        );
+        firstInput?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
+  const isDirty = useMemo(() => {
+    return (
+      configData.smtpHost.trim() !== originalConfigData.smtpHost.trim() ||
+      configData.smtpPort.trim() !== originalConfigData.smtpPort.trim() ||
+      configData.smtpUsername.trim() !== originalConfigData.smtpUsername.trim() ||
+      (configData.smtpPassword !== "••••••••••••••••••••" && configData.smtpPassword.trim() !== originalConfigData.smtpPassword.trim()) ||
+      configData.fromEmail.trim() !== originalConfigData.fromEmail.trim() ||
+      configData.fromName.trim() !== originalConfigData.fromName.trim() ||
+      configData.encryption !== originalConfigData.encryption
+    );
+  }, [configData, originalConfigData]);
+
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
 
   const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -106,31 +150,41 @@ const EmailConfigPage: React.FC = () => {
     }
   };
 
-  const validateConfig = (): boolean => {
+  const validateConfig = useCallback((): boolean => {
     const errors: Record<string, string> = {};
-    if (!configData.smtpHost) errors.smtpHost = "SMTP Host is required";
-    if (!configData.smtpPort) errors.smtpPort = "SMTP Port is required";
-    if (!configData.smtpUsername) errors.smtpUsername = "SMTP Username is required";
-    if (!configData.smtpPassword) errors.smtpPassword = "SMTP Password is required";
-    if (!configData.fromEmail) errors.fromEmail = "From Email is required";
-    if (!configData.fromName) errors.fromName = "From Name is required";
+    if (!configData.smtpHost.trim()) errors.smtpHost = "SMTP Host is required";
+    if (!configData.smtpPort.trim()) errors.smtpPort = "SMTP Port is required";
+    if (!configData.smtpUsername.trim()) errors.smtpUsername = "SMTP Username is required";
+    if (!configData.smtpPassword.trim()) errors.smtpPassword = "SMTP Password is required";
+    if (!configData.fromEmail.trim()) errors.fromEmail = "From Email is required";
+    if (!configData.fromName.trim()) errors.fromName = "From Name is required";
 
     setConfigErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+
+    if (Object.keys(errors).length > 0) {
+      const fieldOrder = ["smtpHost", "smtpPort", "smtpUsername", "smtpPassword", "fromEmail", "fromName"];
+      const firstError = fieldOrder.find((f) => errors[f]);
+      if (firstError) {
+        const el = formRef.current?.querySelector<HTMLElement>(`[name="${firstError}"]`);
+        el?.focus();
+      }
+      return false;
+    }
+    return true;
+  }, [configData]);
 
   const validateEmail = (): boolean => {
     const errors: Record<string, string> = {};
-    if (!emailData.recipientEmail) errors.recipientEmail = "Recipient Email is required";
-    if (!emailData.subject) errors.subject = "Subject is required";
-    if (!emailData.message) errors.message = "Message is required";
+    if (!emailData.recipientEmail.trim()) errors.recipientEmail = "Recipient Email is required";
+    if (!emailData.subject.trim()) errors.subject = "Subject is required";
+    if (!emailData.message.trim()) errors.message = "Message is required";
 
     setEmailErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveConfig = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!canEditEmail) {
       toast.error("You do not have permission to edit email configuration.");
       return;
@@ -144,14 +198,91 @@ const EmailConfigPage: React.FC = () => {
     try {
       await emailConfigService.saveConfig(configData);
       toast.success("Email configuration saved successfully!");
-      setConfigData((prev) => ({ ...prev, smtpPassword: "••••••••••••••••••••" }));
+      const updatedData = { ...configData, smtpPassword: "••••••••••••••••••••" };
+      setConfigData(updatedData);
+      setOriginalConfigData(updatedData);
       invalidateDetailCache("emailConfig:smtp");
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to save configuration");
     } finally {
       setSaving(false);
     }
-  };
+  }, [canEditEmail, validateConfig, configData]);
+
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
+        lastFocusedElementRef.current.focus();
+      } else {
+        const firstInput = formRef.current?.querySelector<HTMLElement>(
+          'input[name="smtpHost"], input[data-nav]:not([disabled])'
+        );
+        firstInput?.focus();
+      }
+    }, 50);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    navigate('/dashboard');
+  }, [navigate]);
+
+  const handleSaveFromModal = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      if (!validateConfig()) {
+        toast.error("Required fields fill pannunga — please fill all required fields.");
+        return;
+      }
+      handleSaveConfig();
+    }, 150);
+  }, [validateConfig, handleSaveConfig]);
+
+  // Global F2/F9 save shortcut
+  useFormShortcuts({
+    onSave: () => {
+      if (!saveConfirmOpen) {
+        handleSaveConfig();
+      }
+    },
+  });
+
+  // Ctrl+S shortcut support
+  useEffect(() => {
+    if (saveConfirmOpen) return;
+    const handleCtrlS = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSaveConfig();
+      }
+    };
+    window.addEventListener("keydown", handleCtrlS, { capture: true });
+    return () => window.removeEventListener("keydown", handleCtrlS, { capture: true });
+  }, [saveConfirmOpen, handleSaveConfig]);
+
+  // Esc key Discard confirmation
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal]")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (saveConfirmOpenRef.current) {
+        handleResume();
+      } else if (isDirtyRef.current) {
+        lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate('/dashboard');
+      }
+    };
+    window.addEventListener("keydown", handleEsc, { capture: true });
+    return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+  }, [handleResume, navigate]);
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,7 +306,7 @@ const EmailConfigPage: React.FC = () => {
 
   return (
     <div className="max-w-[1024px] xl:mr-auto">
-      <form onSubmit={handleSaveConfig} noValidate>
+      <form ref={formRef} onSubmit={handleSaveConfig} onKeyDown={handleFormKeyDown} noValidate>
         <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
           {/* Page Header */}
@@ -326,6 +457,24 @@ const EmailConfigPage: React.FC = () => {
 
         </div>
       </form>
+
+      {/* Discard Changes Confirm Modal */}
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved email configuration will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaSave}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
   );
 };

@@ -89,13 +89,15 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
 
   return (
     <div ref={filterBtnRef} className="relative">
-      <CustomButton
-        text={activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filters"}
-        variant="secondary"
-        icon={FaFilter}
-        onClick={handleToggle}
-        className={hasActiveFilters ? "!bg-green-600 hover:!bg-green-700 !text-white !border-green-600" : ""}
-      />
+      <span data-filter-trigger>
+        <CustomButton
+          text={activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filters"}
+          variant="secondary"
+          icon={FaFilter}
+          onClick={handleToggle}
+          className={hasActiveFilters ? "!bg-green-600 hover:!bg-green-700 !text-white !border-green-600" : ""}
+        />
+      </span>
 
       {show && createPortal(
         <div

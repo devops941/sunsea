@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaPlus } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { useListCache } from "../../../hooks/useListCache";
+import { useListCache, invalidateCacheByPrefix } from "../../../hooks/useListCache";
 import { machineService } from "../../../services/machineService";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -21,9 +22,13 @@ import { usePermission } from "../../../hooks/usePermission";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 const ITEMS_PER_PAGE = 15;
+const SORT_STORAGE_KEY = "sunsea_machine_sort_name";
+
+type SortOrder = "default" | "asc" | "desc";
 
 const MachineList: React.FC = () => {
     const navigate = useNavigate();
+    const tableRef = useRef<HTMLDivElement>(null);
     const { employees, loadEmployees } = useEmployees();
     const { can } = usePermission();
     const canCreateMachine = can("machines.create");
@@ -41,6 +46,40 @@ const MachineList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
 
+    // ── Alphabetical sort with localStorage persistence ───────────────────────
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            let next: SortOrder = "default";
+            if (prev === "default") next = "asc";
+            else if (prev === "asc") next = "desc";
+            else next = "default";
+            try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+            return next;
+        });
+    }, []);
+
+    // F6 / Alt+S direct listener
+    useEffect(() => {
+        const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+                e.preventDefault();
+                toggleSortOrder();
+            }
+        };
+        window.addEventListener("keydown", handleSortShortcut);
+        return () => window.removeEventListener("keydown", handleSortShortcut);
+    }, [toggleSortOrder]);
+
     const fetchMachinesForExport = useCallback(async () => {
         const res = await machineService.getAll({ limit: 100000 });
         return Array.isArray(res) ? res : (res?.machines || res?.data || []);
@@ -48,8 +87,8 @@ const MachineList: React.FC = () => {
 
     const fetcher = useCallback(async (_signal: AbortSignal) => {
         const res = await machineService.getAll({ limit: 10000 });
-        const list = Array.isArray(res) ? res : (res.machines || res.data || []);
-        return { data: list, total: list.length };
+        const list = Array.isArray(res) ? res : (res?.machines || res?.data || []);
+        return { data: Array.isArray(list) ? list : [], total: res?.total ?? (Array.isArray(list) ? list.length : 0) };
     }, []);
 
     const { data: machines, loading, refresh } = useListCache<any>({
@@ -58,8 +97,18 @@ const MachineList: React.FC = () => {
         fetcher,
     });
 
-    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onSort: () => toggleSortOrder(),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => canCreateMachine && navigate("/machines/create"),
+        onExport: () => {
+            const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+            exportBtn?.click();
+        },
+    });
 
+    // Client-side filtered data
     const filteredData = useMemo(() => {
         if (!searchTerm) return machines;
         const term = searchTerm.toLowerCase();
@@ -71,9 +120,29 @@ const MachineList: React.FC = () => {
         );
     }, [machines, searchTerm]);
 
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    // Client-side sorted data
+    const sortedData = useMemo(() => {
+        if (sortOrder === "default") return filteredData;
+        return [...filteredData].sort((a: any, b: any) => {
+            const nameA = (a.machineName || "").trim().toLowerCase();
+            const nameB = (b.machineName || "").trim().toLowerCase();
+            return sortOrder === "asc"
+                ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
+                : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+        });
+    }, [filteredData, sortOrder]);
+
+    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedData = sortedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    // ── Table keyboard navigation ─────────────────────────────────────────────
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: paginatedData.length,
+        onEnter: (i) => { const m = paginatedData[i]; if (m) { setSelectedMachine(m); setShowViewModal(true); } },
+        onEdit: (i) => { const m = paginatedData[i]; if (m && canEditMachine) handleOpenEdit(m); },
+        containerRef: tableRef,
+    });
 
     useEffect(() => {
         if (can("employees.view")) {
@@ -85,6 +154,12 @@ const MachineList: React.FC = () => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
+
+    const handleCloseViewModal = useCallback(() => {
+        setShowViewModal(false);
+        setSelectedMachine(null);
+        setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+    }, []);
 
     const handleOpenEdit = useCallback((item: any) => {
         navigate(`/machines/edit/${item.machineId}`, { state: item });
@@ -100,6 +175,7 @@ const MachineList: React.FC = () => {
             setIsDeleting(true);
             try {
                 await machineService.delete(itemToDelete);
+                invalidateCacheByPrefix("machines:");
                 toast.success("Machine deleted successfully!");
                 refresh();
             } catch (err: any) {
@@ -135,15 +211,12 @@ const MachineList: React.FC = () => {
         };
     }, [employees]);
 
-
     return (
         <div>
             <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-base font-bold text-ink">
-                            Machine Management
-                        </h2>
+                        <h2 className="text-base font-bold text-ink">Machine Management</h2>
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         <div className="relative w-full md:w-64">
@@ -158,29 +231,35 @@ const MachineList: React.FC = () => {
                             />
                         </div>
                         {canExportMachine && (
-                            <ExportCSVButton
-                                fetchData={fetchMachinesForExport}
-                                columns={csvColumns}
-                                filename={csvFilename}
-                                text="Export"
-                            />
+                            <ExportCSVButton fetchData={fetchMachinesForExport} columns={csvColumns} filename={csvFilename} text="Export" />
                         )}
                         {canCreateMachine && (
-                            <CustomButton
-                                text="Add Machine"
-                                icon={FaPlus}
-                                onClick={() => navigate("/machines/create")}
-                            />
+                            <CustomButton text="Add Machine" icon={FaPlus} onClick={() => navigate("/machines/create")} />
                         )}
                     </div>
                 </div>
 
-                <div className="p-0 overflow-hidden rounded-b-2xl">
+                {/* Table — data-table-nav lets F3-exit restore focus here */}
+                <div
+                    ref={tableRef}
+                    tabIndex={0}
+                    data-table-nav
+                    className="p-0 overflow-hidden rounded-b-2xl outline-none"
+                >
                     <DataTable
                         data={paginatedData}
                         rowKey={(item) => item.machineId}
                         loading={loading}
                         emptyMessage="No machines found."
+                        rowClassName={(_row, index) =>
+                            index === focusedIndex ? "bg-primary/8" : ""
+                        }
+                        onRowClick={(item, index) => {
+                            setFocusedIndex(index);
+                            tableRef.current?.focus({ preventScroll: true });
+                            setSelectedMachine(item);
+                            setShowViewModal(true);
+                        }}
                         pagination={
                             totalPages > 1
                                 ? { currentPage, totalPages, onPageChange: setCurrentPage }
@@ -196,7 +275,31 @@ const MachineList: React.FC = () => {
                                 ),
                             },
                             { header: "MACHINE ID", accessor: "machineId", width: "110px" },
-                            { header: "MACHINE NAME", accessor: "machineName", width: "160px" },
+                            {
+                                header: "MACHINE NAME",
+                                accessor: "machineName",
+                                width: "160px",
+                                headerNode: (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                                        title="Sort Alphabetically (F6)"
+                                        className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                    >
+                                        <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                            Machine Name
+                                        </span>
+                                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                                            {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                                        </span>
+                                        {sortOrder !== "default" && (
+                                            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                                {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                            </span>
+                                        )}
+                                    </button>
+                                ),
+                            },
                             {
                                 header: "TECH TYPE", width: "150px", render: (item) => {
                                     const val = item.technologyType || "—";
@@ -239,24 +342,24 @@ const MachineList: React.FC = () => {
                         ]}
                     />
                 </div>
-
-                <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
-                    onConfirm={handleDeleteConfirm}
-                    title="Confirm Delete"
-                    message="Are you sure you want to delete this machine? This action cannot be undone."
-                    confirmText={isDeleting ? "Deleting..." : "Delete"}
-                    confirmVariant="danger"
-                    isDangerous={true}
-                />
-
-                <MachineViewModal
-                    show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
-                    machine={selectedMachine}
-                />
             </div>
+
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Confirm Delete"
+                message="Are you sure you want to delete this machine? This action cannot be undone."
+                confirmText={isDeleting ? "Deleting..." : "Delete"}
+                confirmVariant="danger"
+                isDangerous={true}
+            />
+
+            <MachineViewModal
+                show={showViewModal}
+                onHide={handleCloseViewModal}
+                machine={selectedMachine}
+            />
         </div>
     );
 };

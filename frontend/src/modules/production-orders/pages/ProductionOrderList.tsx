@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaEye, FaSyncAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -278,7 +279,11 @@ const ProductionOrderList: React.FC = () => {
         fetchCombinedData();
     }, [fetchCombinedData]);
 
-    usePageShortcuts({ onRefresh: () => fetchCombinedData(), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => fetchCombinedData(),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => can("production_orders.create") && navigate("/production-orders/create"),
+    });
 
     useSocketSync("productionOrder", undefined, fetchCombinedData);
     useSocketSync("salesOrder", undefined, fetchCombinedData);
@@ -429,6 +434,23 @@ const ProductionOrderList: React.FC = () => {
     };
 
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+    const tableRef = useRef<HTMLDivElement>(null);
+
+    const handleOpenViewItem = useCallback((item: any) => {
+        if (!item.primaryPO) return;
+        setSelectedItem(item.primaryPO);
+        setFullOrder(null);
+        setShowViewModal(true);
+        fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
+    }, [fetchOrderDetails]);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: combinedData.length,
+        onEnter: (i) => { const item = combinedData[i]; if (item) handleOpenViewItem(item); },
+        onEdit: (i) => { const item = combinedData[i]; if (item?.primaryPO && can("production_orders.edit")) handleOpenEdit(item.primaryPO); },
+        containerRef: tableRef,
+    });
 
     const columns = useMemo(() => [
         {
@@ -705,18 +727,22 @@ const ProductionOrderList: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <DataTable
-                    columns={columns}
-                    data={combinedData}
-                    rowKey={(item) => item.id}
-                    loading={loading}
-                    emptyMessage="No orders found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page)
-                    }}
-                />
+                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
+                    <DataTable
+                        columns={columns}
+                        data={combinedData}
+                        rowKey={(item) => item.id}
+                        loading={loading}
+                        emptyMessage="No orders found."
+                        rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                        onRowClick={(item, i) => { setFocusedIndex(i); handleOpenViewItem(item); }}
+                        pagination={{
+                            currentPage,
+                            totalPages,
+                            onPageChange: (page) => setCurrentPage(page)
+                        }}
+                    />
+                </div>
             </div>
 
             {/* VIEW PO MODAL */}

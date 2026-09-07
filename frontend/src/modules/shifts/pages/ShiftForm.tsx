@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { FaSave, FaEraser } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -8,8 +9,10 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { createShift, updateShift, fetchShifts } from "../../../features/shifts/shiftSlice";
 import { shiftService } from "../../../services/shiftService";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 import type { RootState, AppDispatch } from "../../../app/store";
 const initialFormState = {
     id: 0,
@@ -39,7 +42,20 @@ const ShiftForm: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [fetchingData, setFetchingData] = useState(isEdit);
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({
+        onSave: () => handleSubmitRef.current(),
+        onDelete: () => { if (!isEdit) { setFormData(prev => ({ ...initialFormState, shiftCode: prev.shiftCode })); setErrors({}); setIsDirty(false); } },
+    });
 
     useEffect(() => {
         dispatch(fetchShifts());
@@ -75,6 +91,7 @@ const ShiftForm: React.FC = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        setIsDirty(true);
         if (errors[name as keyof FormErrors]) {
             setErrors(prev => ({ ...prev, [name]: undefined }));
         }
@@ -114,6 +131,8 @@ const ShiftForm: React.FC = () => {
                 await dispatch(createShift(payload)).unwrap();
                 toast.success("Shift created successfully!");
             }
+            invalidateCacheByPrefix("shifts:");
+            setIsDirty(false);
             navigate("/shifts");
         } catch (err: any) {
             toast.error(err || `Failed to ${isEdit ? "update" : "create"} shift`);
@@ -121,6 +140,60 @@ const ShiftForm: React.FC = () => {
             setIsSubmitting(false);
         }
     };
+
+    // Sync handleSubmit ref on every render
+    handleSubmitRef.current = () => handleSubmit(new Event("submit") as any);
+
+    // Sync dirty/modal refs via useEffect to avoid stale closure on Escape
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    // Escape key — prompt discard if dirty
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/shifts");
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
+
+    // F5 — reload shift data
+    useEffect(() => {
+        const handleF5 = () => {
+            if (isEdit && id) {
+                shiftService.fetchById(Number(id))
+                    .then((shift) => {
+                        setFormData({
+                            id: shift.id,
+                            shiftCode: shift.shiftCode || "",
+                            shiftName: shift.shiftName || "",
+                            startTime: shift.startTime || "",
+                            endTime: shift.endTime || "",
+                            breakDuration: shift.breakDuration !== null && shift.breakDuration !== undefined ? String(shift.breakDuration) : "",
+                            gracePeriod: shift.gracePeriod !== null && shift.gracePeriod !== undefined ? String(shift.gracePeriod) : "",
+                            isActive: shift.isActive ?? true,
+                        });
+                        setIsDirty(false);
+                    })
+                    .catch(() => {});
+            }
+        };
+        window.addEventListener("fkey-refresh", handleF5);
+        return () => window.removeEventListener("fkey-refresh", handleF5);
+    }, [isEdit, id]);
+
     if (fetchingData) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -130,7 +203,7 @@ const ShiftForm: React.FC = () => {
     }
     return (
         <div className="max-w-[1024px] xl:mr-auto">
-            <form onSubmit={handleSubmit} noValidate>
+            <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
                         <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Shift" : "Create Shift"}</h2>
@@ -168,6 +241,7 @@ const ShiftForm: React.FC = () => {
                                 horizontal
                                 onChange={(val) => {
                                     setFormData(prev => ({ ...prev, startTime: val }));
+                                    setIsDirty(true);
                                     if (errors.startTime) setErrors(prev => ({ ...prev, startTime: undefined }));
                                 }}
                                 error={errors.startTime}
@@ -180,6 +254,7 @@ const ShiftForm: React.FC = () => {
                                 horizontal
                                 onChange={(val) => {
                                     setFormData(prev => ({ ...prev, endTime: val }));
+                                    setIsDirty(true);
                                     if (errors.endTime) setErrors(prev => ({ ...prev, endTime: undefined }));
                                 }}
                                 error={errors.endTime}
@@ -215,7 +290,7 @@ const ShiftForm: React.FC = () => {
                                 text="Clear"
                                 icon={FaEraser}
                                 variant="secondary"
-                                onClick={() => { setFormData({ ...initialFormState, shiftCode: formData.shiftCode }); setErrors({}); }}
+                                onClick={() => { setFormData({ ...initialFormState, shiftCode: formData.shiftCode }); setErrors({}); setIsDirty(false); }}
                                 disabled={loading}
                             />
                         )}
@@ -228,6 +303,25 @@ const ShiftForm: React.FC = () => {
                     </div>
                 </div>
             </form>
+
+            <CommonConfirmModal
+                show={saveConfirmOpen}
+                onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+                onConfirm={() => {
+                    setSaveConfirmOpen(false);
+                    setTimeout(() => {
+                        handleSubmitRef.current();
+                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                    }, 150);
+                }}
+                title="Unsaved Changes"
+                message="You have unsaved changes. Do you want to save before leaving?"
+                confirmText="Save"
+                cancelText="Discard"
+                confirmVariant="primary"
+                confirmIcon={FaCheck}
+                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/shifts"); }}
+            />
         </div>
     );
 };

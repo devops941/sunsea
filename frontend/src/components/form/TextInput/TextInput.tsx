@@ -118,6 +118,7 @@ const TextInput: React.FC<TextInputProps> = ({
               onPaste={handlePaste}
               disabled={disabled}
               rows={rows}
+              data-nav
               className={`
                 w-full min-h-[35px] px-4 py-[5px] text-sm font-semibold
                 border rounded-[5px] outline-none
@@ -148,6 +149,7 @@ const TextInput: React.FC<TextInputProps> = ({
               step={step}
               disabled={disabled}
               autoComplete="off"
+              data-nav
               className={`
                 w-full h-10 px-4
                 border rounded-[5px] outline-none

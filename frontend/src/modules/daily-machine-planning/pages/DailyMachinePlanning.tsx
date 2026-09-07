@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { Container, Row, Col, Card, Modal, Button, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -186,6 +187,11 @@ const DailyMachinePlanning: React.FC = () => {
   useSocketSync("weeklyProgram", undefined, fetchWeeklyPrograms);
   useSocketSync("hourlyProduction", undefined, fetchWeeklyPrograms);
   useSocketSync("productionOrder", undefined, fetchWeeklyPrograms);
+
+  usePageShortcuts({
+    onRefresh: () => fetchWeeklyPrograms(),
+    onNew: () => handleOpenAddRun(),
+  });
 
   // Filter programs based on Search Term and Status Filter
   const filteredPrograms = useMemo(() => {

@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { FaSave, FaEraser } from "react-icons/fa";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -10,6 +12,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createRawMaterial, updateRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
@@ -75,6 +78,18 @@ const WastageStoreForm: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openingStockUom, setOpeningStockUom] = useState("");
     const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
     const { data: stores } = useAppSelector(state => state.stores);
 
@@ -132,6 +147,7 @@ const WastageStoreForm: React.FC = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        setIsDirty(true);
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
@@ -155,6 +171,31 @@ const WastageStoreForm: React.FC = () => {
         }
         setErrors({});
     };
+
+    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/wastage-store");
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -209,6 +250,7 @@ const WastageStoreForm: React.FC = () => {
                 toast.success("Wastage product created successfully!");
             }
 
+            setIsDirty(false);
             navigate("/wastage-store");
         } catch (err: any) {
             toast.error(typeof err === 'string' ? err : err?.message || (isEditMode ? "Failed to update wastage product" : "Failed to create wastage product"));
@@ -226,7 +268,7 @@ const WastageStoreForm: React.FC = () => {
                     <BackButton text="Back to List" to="/wastage-store" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1" noValidate>
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex flex-col flex-1" noValidate>
                     <div className="px-6 py-4 flex-1 overflow-y-auto">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Row 1: Wastage ID | Material Name | Category */}
@@ -344,6 +386,24 @@ const WastageStoreForm: React.FC = () => {
                     </div>
                 </form>
             </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+            onConfirm={() => {
+                setSaveConfirmOpen(false);
+                setTimeout(() => {
+                    handleSubmitRef.current();
+                    setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                }, 150);
+            }}
+            title="Unsaved Changes"
+            message="You have unsaved changes. Do you want to save before leaving?"
+            confirmText="Save"
+            cancelText="Discard"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/wastage-store"); }}
+        />
         </div>
     );
 };

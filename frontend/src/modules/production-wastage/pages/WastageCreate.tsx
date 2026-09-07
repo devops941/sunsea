@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { FaSave } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaCheck } from "react-icons/fa";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -93,7 +95,34 @@ const WastageForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
 
-  useFormShortcuts({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const isDirtyRef = useRef(false);
+  const saveConfirmOpenRef = useRef(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const handleSubmitRef = useRef<() => void>(() => {});
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  handleSubmitRef.current = () => { formRef.current?.requestSubmit(); };
+
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+  useFormShortcuts({ onSave: () => handleSubmitRef.current() });
+
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+      e.preventDefault(); e.stopPropagation();
+      if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
+      if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
+      else { navigate("/production-wastages"); }
+    };
+    window.addEventListener("keydown", handleEscape, { capture: true });
+    return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+  }, [navigate]);
 
   useEffect(() => {
     dispatch(fetchProductionOrders());
@@ -223,6 +252,7 @@ const WastageForm: React.FC = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-white p-4 md:p-6">
       <div className=" mx-auto">
         {/* Page Header */}
@@ -244,7 +274,7 @@ const WastageForm: React.FC = () => {
 
         {/* Form Card */}
         <div className="bg-white overflow-hidden">
-          <form onSubmit={handleSubmit} noValidate>
+          <form ref={formRef} onSubmit={handleSubmit} onInput={() => setIsDirty(true)} onKeyDown={handleFormKeyDown} noValidate>
             
             {/* Section 1: Wastage Details */}
             <div className=" border-b border-slate-100">
@@ -508,6 +538,19 @@ const WastageForm: React.FC = () => {
         </div>
       </div>
     </div>
+    <CommonConfirmModal
+      show={saveConfirmOpen}
+      onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+      onConfirm={() => { setSaveConfirmOpen(false); setTimeout(() => handleSubmitRef.current(), 150); }}
+      title="Unsaved Changes"
+      message="You have unsaved changes. Do you want to save before leaving?"
+      confirmText="Save"
+      cancelText="Discard"
+      confirmVariant="primary"
+      confirmIcon={FaCheck}
+      onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/production-wastages"); }}
+    />
+    </>
   );
 };
 

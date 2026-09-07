@@ -16,33 +16,32 @@ interface ShortcutPanelProps {
 
 const CATEGORY_ACCENT: Record<ShortcutCategory, { badge: string; header: string }> = {
   nav:     {
-    badge: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-700/50",
+    badge: "bg-transparent text-amber-700 dark:text-amber-400 border border-amber-400/80 dark:border-amber-500/60",
     header: "text-amber-700 dark:text-amber-400",
   },
   system:  {
-    badge: "bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-700/50",
+    badge: "bg-transparent text-rose-700 dark:text-rose-400 border border-rose-400/80 dark:border-rose-500/60",
     header: "text-rose-700 dark:text-rose-400",
   },
   create:  {
-    badge: "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-700/50",
+    badge: "bg-transparent text-emerald-700 dark:text-emerald-400 border border-emerald-400/80 dark:border-emerald-500/60",
     header: "text-emerald-700 dark:text-emerald-400",
   },
   reports: {
-    badge: "bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-700/50",
+    badge: "bg-transparent text-sky-700 dark:text-sky-400 border border-sky-400/80 dark:border-sky-500/60",
     header: "text-sky-700 dark:text-sky-400",
   },
   ctrl:    {
-    badge: "bg-violet-100 text-violet-900 border-violet-300 dark:bg-violet-950/70 dark:text-violet-300 dark:border-violet-700/50",
+    badge: "bg-transparent text-violet-700 dark:text-violet-400 border border-violet-400/80 dark:border-violet-500/60",
     header: "text-violet-700 dark:text-violet-400",
   },
 };
 
-/* Single shortcut row — ultra compact & perfectly aligned */
+/* Single shortcut row — clean, readable & perfectly aligned */
 const ShortcutRow = ({
-  sc, isActive, globalIdx, focusedIndexRef, onClickFn,
+  sc, globalIdx, focusedIndexRef, onClickFn,
 }: {
   sc: (typeof SHORTCUTS)[number];
-  isActive: boolean;
   globalIdx: number;
   focusedIndexRef: { current: number };
   onClickFn: (sc: (typeof SHORTCUTS)[number]) => void;
@@ -53,35 +52,17 @@ const ShortcutRow = ({
       data-shortcut-btn
       data-idx={globalIdx}
       type="button"
-      onClick={() => onClickFn(sc)}
+      onClick={(e) => {
+        e.currentTarget.blur();
+        onClickFn(sc);
+      }}
       onFocus={() => { focusedIndexRef.current = globalIdx; }}
-      className={`
-        w-full flex items-center gap-2 px-1.5 py-[3px] text-left
-        cursor-pointer transition-all duration-100 outline-none rounded
-        focus-visible:bg-indigo-100 dark:focus-visible:bg-indigo-900/40
-        ${isActive
-          ? "bg-indigo-100/80 text-indigo-900 dark:bg-indigo-500/25 dark:text-indigo-100"
-          : "hover:bg-slate-100/90 dark:hover:bg-white/[0.04]"
-        }
-      `}
+      className="w-full flex items-center gap-2 px-2 py-1 text-left cursor-pointer transition-colors duration-100 outline-none rounded-md hover:bg-slate-100/90 dark:hover:bg-white/[0.04] focus:outline-none"
     >
-      <span className={`
-        inline-flex items-center justify-center shrink-0
-        w-[64px] min-w-[64px] px-1 py-[2px] rounded text-[7.5px]
-        font-extrabold font-mono tracking-tight border text-center whitespace-nowrap
-        transition-all duration-100
-        ${isActive
-          ? "bg-indigo-600 text-white border-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.6)] scale-[1.02]"
-          : accent.badge
-        }
-      `}>
+      <span className={`inline-flex items-center justify-center shrink-0 w-[84px] min-w-[84px] px-1 py-[3px] rounded-md text-[9.5px] font-bold font-mono tracking-tight text-center whitespace-nowrap transition-colors duration-100 ${accent.badge}`}>
         {sc.keyLabel}
       </span>
-      <span className={`text-[10px] leading-tight truncate flex-1 ${
-        isActive
-          ? "text-indigo-900 dark:text-indigo-100 font-bold"
-          : "text-slate-700 dark:text-slate-300 font-medium"
-      }`}>
+      <span className="text-[11.5px] leading-tight truncate flex-1 text-slate-800 dark:text-slate-200 font-semibold">
         {sc.label}
       </span>
     </button>
@@ -128,22 +109,26 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
     if (sc.action === "delete")      { window.dispatchEvent(new CustomEvent("fkey-delete"));      return; }
     if (sc.action === "refresh")     { window.dispatchEvent(new CustomEvent("fkey-refresh"));     return; }
     if (sc.action === "new")         { window.dispatchEvent(new CustomEvent("fkey-new"));         return; }
+    if (sc.action === "edit")        { window.dispatchEvent(new CustomEvent("fkey-edit"));        return; }
     if (sc.action === "export")      { window.dispatchEvent(new CustomEvent("fkey-export"));      return; }
     if (sc.action === "search")      {
       document.querySelector<HTMLElement>("[data-search-input]")?.focus();
       return;
     }
-    // Navigation menu actions
-    if (sc.action === "open-admin")   { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Administration" } })); return; }
-    if (sc.action === "open-trans")   { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Transactions" } }));   return; }
-    if (sc.action === "open-display") { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Display" } }));        return; }
-    if (sc.action === "open-payroll") { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Payroll" } }));        return; }
+    // Navigation menu actions (toggle open/close)
+    if (sc.action === "open-admin")      { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Administration" } })); return; }
+    if (sc.action === "open-trans")      { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Transactions" } }));   return; }
+    if (sc.action === "open-production") { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Production" } }));     return; }
+    if (sc.action === "open-inventory")  { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Inventory" } }));      return; }
+    if (sc.action === "open-display")    { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Display" } }));        return; }
+    if (sc.action === "open-payroll")    { window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Payroll" } }));        return; }
   }, [navigate, onToggle, onOpenCalculator]);
 
   return (
     <div
+      data-shortcut-panel
       className={`relative flex flex-row h-full shrink-0 transition-all duration-300 ease-in-out ${
-        isOpen ? "w-[240px]" : "w-[28px]"
+        isOpen ? "w-[275px]" : "w-[28px]"
       }`}
       style={{ zIndex: 30 }}
     >
@@ -184,15 +169,15 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
           transition-all duration-300 ease-in-out
           ${isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none w-0"}
         `}
-        style={{ minWidth: isOpen ? 212 : 0 }}
+        style={{ minWidth: isOpen ? 232 : 0 }}
       >
         {/* Header */}
         <div className="px-2.5 py-1.5 border-b border-slate-200 dark:border-white/10 flex items-center gap-1.5 shrink-0 bg-slate-50 dark:bg-[#0f172a]">
           <FaKeyboard className="text-indigo-600 dark:text-indigo-400 text-[11px] shrink-0" />
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-indigo-300">
+          <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-indigo-300">
             Shortcut Keys
           </span>
-          <span className="ml-auto text-[8px] font-bold text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded px-1">
+          <span className="ml-auto text-[9px] font-bold text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 bg-transparent rounded px-1.5 py-0.5">
             F1
           </span>
         </div>
@@ -211,23 +196,22 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
             return (
               <div key={cat} className="shrink-0 mb-1">
                 {/* Section label */}
-                <div className="px-1.5 pt-1.5 pb-0.5 flex items-center justify-between">
-                  <span className={`text-[8px] font-black uppercase tracking-widest ${accent.header}`}>
+                <div className="px-2 pt-1.5 pb-0.5 flex items-center justify-between">
+                  <span className={`text-[9.5px] font-black uppercase tracking-wider ${accent.header}`}>
                     {CATEGORY_LABELS[cat]}
                   </span>
-                  <span className="text-[7.5px] text-slate-400 dark:text-slate-500 font-mono font-semibold">
+                  <span className="text-[8.5px] text-slate-400 dark:text-slate-500 font-mono font-semibold">
                     {items.length}
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-[1px]">
+                <div className="flex flex-col gap-[2px]">
                   {items.map((sc) => {
                     const globalIdx = allItems.findIndex((x) => x.id === sc.id);
                     return (
                       <ShortcutRow
                         key={sc.id}
                         sc={sc}
-                        isActive={activeKey === sc.keyLabel}
                         globalIdx={globalIdx}
                         focusedIndexRef={focusedIndexRef}
                         onClickFn={handleClick}
@@ -243,19 +227,19 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
           })}
 
           {/* Footer: calculator button */}
-          <div className="mt-auto pt-1 px-1 flex flex-col gap-1 pb-1">
+          <div className="mt-auto pt-1.5 px-1 flex flex-col gap-1 pb-1">
             <button
               type="button"
               onClick={onOpenCalculator}
               className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:border-slate-700/60 transition-colors cursor-pointer group shadow-2xs dark:shadow-none"
             >
               <div className="flex items-center gap-2">
-                <FaCalculator className="text-[11px] text-teal-600 dark:text-teal-400 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-white">
+                <FaCalculator className="text-[12px] text-teal-600 dark:text-teal-400 shrink-0" />
+                <span className="text-[11.5px] font-bold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-white">
                   Calculator
                 </span>
               </div>
-              <span className="text-[9px] font-black text-amber-800 bg-amber-100 border border-amber-300 dark:text-amber-400/90 dark:bg-amber-500/10 dark:border-amber-500/20 px-1.5 py-0.5 rounded font-mono">
+              <span className="text-[10px] font-bold text-amber-700 border border-amber-400/80 dark:text-amber-400 dark:border-amber-500/60 bg-transparent px-2 py-0.5 rounded-md font-mono">
                 Alt+C
               </span>
             </button>

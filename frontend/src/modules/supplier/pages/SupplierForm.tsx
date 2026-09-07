@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useSelector } from "react-redux";
-import { FaSave, FaEraser, FaPlus, FaTrash, FaArrowLeft, FaTimes } from "react-icons/fa";
+import { FaSave, FaEraser, FaPlus, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -9,11 +10,12 @@ import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSuppliers } from "../../../hooks/useSuppliers";
 import { supplierService } from "../../../services/supplierService";
 import type { SupplierAddress } from "../../../features/supplier/types";
 
-import IndiaPhoneInput, { type PhoneEntry, validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneInput/PhoneInput";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
@@ -60,6 +62,30 @@ const supplierFormSchema = z.object({
     status: z.enum(["Active", "Backup", "Inactive", "Blacklisted"]),
 });
 
+const INITIAL_FORM = {
+    companyId: "",
+    supplierCode: "",
+    createdByOn: "",
+    legalName: "",
+    displayName: "",
+    contactPerson: "",
+    mobile: "",
+    email: "",
+    gstin: "",
+    pan: "",
+    gstRegType: "Registered",
+    billingAddressLine1: "",
+    billingAddressLine2: "",
+    billingAddressCity: "",
+    billingAddressState: "",
+    billingAddressPincode: "",
+    billingAddressCountry: "India",
+    stateCode: "TN",
+    openingBalance: 0,
+    openingBalanceType: "CREDIT",
+    status: "Active",
+};
+
 const SupplierForm: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
@@ -69,50 +95,101 @@ const SupplierForm: React.FC = () => {
     const user = useSelector((state: any) => state.auth.user);
     const { socket } = useSocket();
 
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [phones, setPhones] = useState<PhoneEntry[]>([]);
     const [initialSupplier, setInitialSupplier] = useState<any>(null);
+    const [isDirty, setIsDirty] = useState(false);
 
-    const [formData, setFormData] = useState({
-        companyId: "",
-        supplierCode: "",
-        createdByOn: "",
-        legalName: "",
-        displayName: "",
-        contactPerson: "",
-        mobile: "",
-        email: "",
-        gstin: "",
-        pan: "",
-        gstRegType: "Registered",
-        billingAddressLine1: "",
-        billingAddressLine2: "",
-        billingAddressCity: "",
-        billingAddressState: "",
-        billingAddressPincode: "",
-        billingAddressCountry: "India",
-        stateCode: "TN",
-        openingBalance: 0,
-        openingBalanceType: "CREDIT",
-        status: "Active",
-    });
+    // Discard-changes modal
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    const [formData, setFormData] = useState(INITIAL_FORM);
 
     const [addresses, setAddresses] = useState<SupplierAddress[]>([
-        {
-            address: {
-                addressLine1: "",
-                addressLine2: "",
-                city: "",
-                state: "",
-                pincode: "",
-            }
-        }
+        { address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }
     ]);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    useFormShortcuts({});
+    // ── F2/F9 Save + F8 Clear ─────────────────────────────────────────────────
+    useFormShortcuts({
+        onSave: () => { handleSubmit(new Event("submit") as any); },
+        onDelete: () => { if (!isEdit) handleClear(); },
+    });
+
+    // ── F5 Refresh ────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const handleRefresh = async () => {
+            if (isEdit && id) {
+                try {
+                    setIsLoadingData(true);
+                    const supplier = await supplierService.fetchById(id);
+                    populateForm(supplier);
+                    setIsDirty(false);
+                    toast.info("Supplier details refreshed");
+                } catch {
+                    toast.error("Failed to reload supplier details");
+                } finally {
+                    setIsLoadingData(false);
+                }
+            } else if (!isEdit) {
+                handleClear();
+                toast.info("Form reset");
+            }
+        };
+        window.addEventListener("fkey-refresh", handleRefresh);
+        return () => window.removeEventListener("fkey-refresh", handleRefresh);
+    }, [id, isEdit]);
+
+    // ── Escape: dirty-check back navigation ──────────────────────────────────
+    const isDirtyRef = useRef(isDirty);
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+    const saveConfirmOpenRef = useRef(saveConfirmOpen);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    const openDiscardModal = useCallback(() => {
+        lastFocusedRef.current = document.activeElement as HTMLElement | null;
+        setSaveConfirmOpen(true);
+    }, []);
+
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            if (lastFocusedRef.current && typeof lastFocusedRef.current.focus === "function") {
+                lastFocusedRef.current.focus();
+            }
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        navigate("/suppliers");
+    }, [navigate]);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (saveConfirmOpenRef.current) {
+                handleResume();
+            } else if (isDirtyRef.current) {
+                openDiscardModal();
+            } else {
+                navigate("/suppliers");
+            }
+        };
+        window.addEventListener("keydown", handleEsc, { capture: true });
+        return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+    }, [handleResume, openDiscardModal, navigate]);
 
     const populateForm = (supplier: any) => {
         setInitialSupplier(supplier);
@@ -145,15 +222,7 @@ const SupplierForm: React.FC = () => {
         if (supplier.addresses && supplier.addresses.length > 0) {
             setAddresses(supplier.addresses);
         } else {
-            setAddresses([{
-                address: {
-                    addressLine1: "",
-                    addressLine2: "",
-                    city: "",
-                    state: "",
-                    pincode: "",
-                }
-            }]);
+            setAddresses([{ address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }]);
         }
 
         if (Array.isArray(supplier.mobile) && supplier.mobile.length > 0) {
@@ -165,6 +234,8 @@ const SupplierForm: React.FC = () => {
         } else {
             setPhones([]);
         }
+
+        setIsDirty(false);
     };
 
     useEffect(() => {
@@ -188,11 +259,7 @@ const SupplierForm: React.FC = () => {
                 try {
                     const nextCode = await supplierService.fetchNextCode();
                     if (nextCode) {
-                        setFormData(prev => ({
-                            ...prev,
-                            supplierCode: nextCode,
-                            createdByOn: user?.username || "",
-                        }));
+                        setFormData(prev => ({ ...prev, supplierCode: nextCode, createdByOn: user?.username || "" }));
                     }
                 } catch (err) {
                     console.error("Failed to fetch next code:", err);
@@ -205,63 +272,24 @@ const SupplierForm: React.FC = () => {
 
     useEffect(() => {
         if (!socket) return;
-
         const handleUpdated = (data: any) => {
-            if (isEdit && data.id === Number(id)) {
-                populateForm(data);
-            }
+            if (isEdit && data.id === Number(id)) { populateForm(data); }
         };
-
         socket.on("supplier:updated", handleUpdated);
-        return () => {
-            socket.off("supplier:updated", handleUpdated);
-        };
+        return () => { socket.off("supplier:updated", handleUpdated); };
     }, [socket, isEdit, id]);
 
     const handleClear = () => {
         if (isEdit) {
-            if (initialSupplier) {
-                populateForm(initialSupplier);
-            }
+            if (initialSupplier) { populateForm(initialSupplier); }
         } else {
-            setFormData({
-                companyId: "",
-                supplierCode: "",
-                createdByOn: user?.username || "",
-                legalName: "",
-                displayName: "",
-                contactPerson: "",
-                mobile: "",
-                email: "",
-                gstin: "",
-                pan: "",
-                gstRegType: "Registered",
-                billingAddressLine1: "",
-                billingAddressLine2: "",
-                billingAddressCity: "",
-                billingAddressState: "",
-                billingAddressPincode: "",
-                billingAddressCountry: "India",
-                stateCode: "TN",
-                openingBalance: 0,
-                openingBalanceType: "CREDIT",
-                status: "Active",
-            });
-            setAddresses([{
-                address: {
-                    addressLine1: "",
-                    addressLine2: "",
-                    city: "",
-                    state: "",
-                    pincode: "",
-                }
-            }]);
+            setFormData({ ...INITIAL_FORM, createdByOn: user?.username || "" });
+            setAddresses([{ address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }]);
             setPhones([]);
             setErrors({});
+            setIsDirty(false);
             supplierService.fetchNextCode().then(nextCode => {
-                if (nextCode) {
-                    setFormData(prev => ({ ...prev, supplierCode: nextCode }));
-                }
+                if (nextCode) { setFormData(prev => ({ ...prev, supplierCode: nextCode })); }
             });
         }
     };
@@ -283,9 +311,7 @@ const SupplierForm: React.FC = () => {
                     const extractedPan = uppercaseVal.slice(2, 12);
                     if (/^[A-Z]{5}\d{4}[A-Z]$/.test(extractedPan)) {
                         updated.pan = extractedPan;
-                        if (errors.pan) {
-                            setErrors(ePrev => ({ ...ePrev, pan: "" }));
-                        }
+                        if (errors.pan) { setErrors(ePrev => ({ ...ePrev, pan: "" })); }
                     }
                 }
                 return updated;
@@ -293,40 +319,24 @@ const SupplierForm: React.FC = () => {
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: "" }));
-        }
+        if (errors[name]) { setErrors(prev => ({ ...prev, [name]: "" })); }
+        setIsDirty(true);
     };
 
     const addShippingAddress = () => {
-        setAddresses(prev => [...prev, {
-            address: {
-                addressLine1: "",
-                addressLine2: "",
-                city: "",
-                state: "",
-                pincode: "",
-            }
-        }]);
+        setAddresses(prev => [...prev, { address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }]);
+        setIsDirty(true);
     };
 
     const handleShippingAddressChange = (index: number, field: string, value: string) => {
         setAddresses(prev => {
             const updated = [...prev];
-            updated[index] = {
-                ...updated[index],
-                address: {
-                    ...updated[index].address,
-                    [field]: value
-                }
-            };
+            updated[index] = { ...updated[index], address: { ...updated[index].address, [field]: value } };
             return updated;
         });
-
         const errorKey = `addresses.${index}.address.${field}`;
-        if (errors[errorKey]) {
-            setErrors(prev => ({ ...prev, [errorKey]: "" }));
-        }
+        if (errors[errorKey]) { setErrors(prev => ({ ...prev, [errorKey]: "" })); }
+        setIsDirty(true);
     };
 
     const toggleSameAsBilling = (index: number, isSame: boolean) => {
@@ -344,7 +354,6 @@ const SupplierForm: React.FC = () => {
             };
             return updated;
         });
-
         if (isSame) {
             setErrors(prev => {
                 const newErrors = { ...prev };
@@ -355,10 +364,12 @@ const SupplierForm: React.FC = () => {
                 return newErrors;
             });
         }
+        setIsDirty(true);
     };
 
     const removeShippingAddress = (index: number) => {
         setAddresses(prev => prev.filter((_, i) => i !== index));
+        setIsDirty(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -367,12 +378,7 @@ const SupplierForm: React.FC = () => {
         setIsSubmitting(true);
 
         const primaryMobile = phones && phones.length > 0 ? phones[0].number : "";
-
-        const dataToValidate = {
-            ...formData,
-            mobile: primaryMobile,
-            addresses: addresses,
-        };
+        const dataToValidate = { ...formData, mobile: primaryMobile, addresses };
 
         try {
             supplierFormSchema.parse(dataToValidate);
@@ -381,8 +387,7 @@ const SupplierForm: React.FC = () => {
             if (error instanceof z.ZodError) {
                 const formattedErrors: Record<string, string> = {};
                 error.issues.forEach((issue) => {
-                    const pathKey = issue.path.join(".");
-                    formattedErrors[pathKey] = issue.message;
+                    formattedErrors[issue.path.join(".")] = issue.message;
                 });
                 setErrors(formattedErrors);
                 toast.error("Please fill all required fields correctly.");
@@ -409,11 +414,7 @@ const SupplierForm: React.FC = () => {
             billingCountry: formData.billingAddressCountry || "India",
             stateCode: formData.stateCode,
             status: formData.status,
-            addresses: addresses.map((addr) => {
-                const copy = { ...addr };
-                delete copy.id;
-                return copy;
-            }),
+            addresses: addresses.map((addr) => { const copy = { ...addr }; delete copy.id; return copy; }),
         };
 
         if (!isEdit) {
@@ -429,6 +430,7 @@ const SupplierForm: React.FC = () => {
                 await addSupplier(payload);
                 toast.success("Supplier created successfully!");
             }
+            setIsDirty(false);
             navigate("/suppliers");
         } catch (err: any) {
             const apiErrors = err?.errors || err?.response?.data?.errors;
@@ -475,7 +477,7 @@ const SupplierForm: React.FC = () => {
                     <BackButton text="Back" />
                 </div>
 
-                <form onSubmit={handleSubmit} noValidate>
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
                     <div className="px-5 py-3 space-y-3">
 
                         {/* ── Section 1: Supplier Details ── */}
@@ -501,6 +503,7 @@ const SupplierForm: React.FC = () => {
                                     value={phones}
                                     onChange={(e) => {
                                         setPhones(e.target.value);
+                                        setIsDirty(true);
                                         if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: "" }));
                                     }}
                                     maxNumbers={5}
@@ -514,33 +517,36 @@ const SupplierForm: React.FC = () => {
                             <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Billing Address <span className="text-rose-500">*</span></h3>
                             </div>
-                                <AddressForm
-                                    addressValue={formData.billingAddressLine1}
-                                    onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
-                                    addressError={errors.billingAddressLine1}
-                                    countryValue={formData.billingAddressCountry}
-                                    onCountryChange={(v) => {
-                                        setFormData(prev => ({ ...prev, billingAddressCountry: v, billingAddressState: "", billingAddressCity: "" }));
-                                        setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
-                                    }}
-                                    countryError={errors.billingAddressCountry}
-                                    stateValue={formData.billingAddressState}
-                                    onStateChange={(v) => {
-                                        setFormData(prev => ({ ...prev, billingAddressState: v, billingAddressCity: "" }));
-                                        setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "" }));
-                                    }}
-                                    stateError={errors.billingAddressState}
-                                    cityValue={formData.billingAddressCity}
-                                    onCityChange={(v) => {
-                                        setFormData(prev => ({ ...prev, billingAddressCity: v }));
-                                        setErrors(prev => ({ ...prev, billingAddressCity: "" }));
-                                    }}
-                                    cityError={errors.billingAddressCity}
-                                    pincodeValue={formData.billingAddressPincode}
-                                    onPincodeChange={(v) => handleChange({ target: { name: "billingAddressPincode", value: v } })}
-                                    pincodeError={errors.billingAddressPincode}
-                                    required
-                                />
+                            <AddressForm
+                                addressValue={formData.billingAddressLine1}
+                                onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
+                                addressError={errors.billingAddressLine1}
+                                countryValue={formData.billingAddressCountry}
+                                onCountryChange={(v) => {
+                                    setFormData(prev => ({ ...prev, billingAddressCountry: v, billingAddressState: "", billingAddressCity: "" }));
+                                    setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
+                                    setIsDirty(true);
+                                }}
+                                countryError={errors.billingAddressCountry}
+                                stateValue={formData.billingAddressState}
+                                onStateChange={(v) => {
+                                    setFormData(prev => ({ ...prev, billingAddressState: v, billingAddressCity: "" }));
+                                    setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "" }));
+                                    setIsDirty(true);
+                                }}
+                                stateError={errors.billingAddressState}
+                                cityValue={formData.billingAddressCity}
+                                onCityChange={(v) => {
+                                    setFormData(prev => ({ ...prev, billingAddressCity: v }));
+                                    setErrors(prev => ({ ...prev, billingAddressCity: "" }));
+                                    setIsDirty(true);
+                                }}
+                                cityError={errors.billingAddressCity}
+                                pincodeValue={formData.billingAddressPincode}
+                                onPincodeChange={(v) => handleChange({ target: { name: "billingAddressPincode", value: v } })}
+                                pincodeError={errors.billingAddressPincode}
+                                required
+                            />
                         </div>
 
                         {/* ── Section 3: Delivery / Plant Addresses ── */}
@@ -636,6 +642,30 @@ const SupplierForm: React.FC = () => {
                     </div>
                 </form>
             </div>
+
+            {/* Discard Changes Modal */}
+            <CommonConfirmModal
+                isOpen={saveConfirmOpen}
+                onClose={handleResume}
+                onCancel={handleDiscard}
+                onConfirm={() => {
+                    setSaveConfirmOpen(false);
+                    setTimeout(() => {
+                        handleSubmit(new Event("submit") as any);
+                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                    }, 150);
+                }}
+                title="Discard Changes?"
+                message="Are you sure you want to leave? Any unsaved supplier details will be lost."
+                warningText="Save to keep your changes, or Discard to leave."
+                cancelText="Discard"
+                cancelVariant="danger"
+                confirmText="Save"
+                confirmVariant="primary"
+                confirmIcon={FaCheck}
+                isDangerous={false}
+                defaultFocusCancel={false}
+            />
         </div>
     );
 };

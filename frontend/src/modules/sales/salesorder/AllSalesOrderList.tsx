@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 
-import { FaPlus, FaTimes, FaPrint, FaDownload } from "react-icons/fa";
+import { FaPlus, FaTimes, FaPrint, FaDownload, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useAppSelector } from "../../../hooks/reduxHooks";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -107,6 +108,9 @@ function groupItemsBySalesProduct(orderItems: any[], salesProducts: any[]) {
 }
 
 const CACHE_PREFIX = "salesOrders:";
+const SORT_STORAGE_KEY = "sunsea_salesorder_sort_customer";
+
+type SortOrder = "default" | "asc" | "desc";
 
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
@@ -118,6 +122,26 @@ const AllSalesOrderList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
+
+    // ── Alphabetical Sorting with localStorage persistence ──────────────────
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved as SortOrder;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            let next: SortOrder = "default";
+            if (prev === "default") next = "asc";
+            else if (prev === "asc") next = "desc";
+            else next = "default";
+            try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+            return next;
+        });
+    }, []);
 
     const [showEstimateModal, setShowEstimateModal] = useState(false);
     const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
@@ -185,8 +209,8 @@ const AllSalesOrderList: React.FC = () => {
             const availableHeight = pageHeight - 2 * margin;
 
             if (imgHeight <= availableHeight) {
-                // Single page — fill the available area inside the margins
-                pdf.addImage(imgData, "PNG", margin, margin, imgWidth, availableHeight);
+                // Single page — use actual image height, not page height (avoids vertical stretching)
+                pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
             } else {
                 // Multi-page — slice across pages
                 let heightLeft = imgHeight;
@@ -306,6 +330,18 @@ const AllSalesOrderList: React.FC = () => {
         enabled: can("sales-orders.view"),
     });
 
+    // Client-side sort on the current page
+    const sortedData = useMemo(() => {
+        if (!data || !Array.isArray(data)) return [];
+        if (sortOrder === "default") return data;
+        return [...data].sort((a: any, b: any) => {
+            const nameA = (a.customer?.displayName || a.customer?.firmName || a.customerName || "").trim().toLowerCase();
+            const nameB = (b.customer?.displayName || b.customer?.firmName || b.customerName || "").trim().toLowerCase();
+            if (sortOrder === "asc") return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+            return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+        });
+    }, [data, sortOrder]);
+
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -381,6 +417,27 @@ const AllSalesOrderList: React.FC = () => {
             csvFilename: `Sales_Orders_List_${new Date().toISOString().split("T")[0]}.csv`,
         };
     }, []);
+
+    const tableRef = useRef<HTMLDivElement>(null);
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: sortedData.length,
+        onEnter: (i) => { const item = sortedData[i]; if (item) handleOpenView(item.id); },
+        onEdit: (i) => { const item = sortedData[i]; if (item && item.status === "DRAFT") handleOpenEdit(item); },
+        containerRef: tableRef,
+    });
+
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onNew: () => can("sales-orders.create") && handleOpenAdd(),
+        onSort: () => toggleSortOrder(),
+        onDelete: () => {
+            if (!can("sales-orders.delete")) return;
+            const focused = sortedData[focusedIndex];
+            if (focused && focused.status === "DRAFT") {
+                triggerDelete(focused.id);
+            }
+        },
+    });
 
     return (
         <div>
@@ -477,11 +534,14 @@ const AllSalesOrderList: React.FC = () => {
                 </div>
 
                 {/* Table */}
+                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
                 <DataTable
-                    data={data}
+                    data={sortedData}
                     rowKey={(item) => item.id}
                     loading={loading}
                     emptyMessage="No sales orders found."
+                    rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                    onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item.id); }}
                     pagination={{
                         currentPage,
                         totalPages,
@@ -497,6 +557,26 @@ const AllSalesOrderList: React.FC = () => {
                         { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
                         {
                             header: "CUSTOMER",
+                            headerNode: (
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                                    title={`Sort by Customer: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
+                                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                >
+                                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                        CUSTOMER
+                                    </span>
+                                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                                        {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                                    </span>
+                                    {sortOrder !== "default" && (
+                                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                            {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                        </span>
+                                    )}
+                                </button>
+                            ),
                             render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
                         },
                         { header: "DISPATCH", render: (item) => item?.dispatchType },
@@ -527,10 +607,32 @@ const AllSalesOrderList: React.FC = () => {
                         },
                     ]}
                 />
+                </div>
             </div>
 
             {/* Sales Order Estimate Modal (Tailwind CSS - On-Screen Only) */}
             {showEstimateModal && (
+                <>
+                {/* Print-isolation: when modal is open, hide everything except the estimate */}
+                <style>{`
+                    @media print {
+                        @page { size: A4 portrait; margin: 8mm; }
+                        body * { visibility: hidden !important; }
+                        #print-only-estimate-section,
+                        #print-only-estimate-section * {
+                            visibility: visible !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                        #print-only-estimate-section {
+                            position: fixed !important;
+                            top: 0 !important;
+                            left: 0 !important;
+                            width: 100% !important;
+                            display: block !important;
+                        }
+                    }
+                `}</style>
                 <div className="fixed inset-0 z-50 overflow-y-auto no-print">
                     {/* Backdrop */}
                     <div
@@ -608,6 +710,7 @@ const AllSalesOrderList: React.FC = () => {
                         </div>
                     </div>
                 </div>
+                </>
             )}
 
             {/* Print-Only Estimate Section */}

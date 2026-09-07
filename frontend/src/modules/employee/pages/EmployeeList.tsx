@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaPlus } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -21,6 +22,9 @@ import { employeeService } from "../../../services/employeeService";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 
 const ITEMS_PER_PAGE = 15;
+const SORT_STORAGE_KEY = "sunsea_employee_sort_name";
+
+type SortOrder = "default" | "asc" | "desc";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active" },
@@ -31,6 +35,7 @@ const STATUS_OPTIONS = [
 
 const Employeelist: React.FC = () => {
   const navigate = useNavigate();
+  const tableRef = useRef<HTMLDivElement>(null);
   const { can } = usePermission();
   const canView = can("employees.view");
   const canCreate = can("employees.create");
@@ -41,12 +46,46 @@ const Employeelist: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // ── Alphabetical sort with localStorage persistence ───────────────────────
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_STORAGE_KEY);
+      if (saved === "asc" || saved === "desc") return saved;
+    } catch (_) {}
+    return "default";
+  });
+
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder((prev) => {
+      let next: SortOrder = "default";
+      if (prev === "default") next = "asc";
+      else if (prev === "asc") next = "desc";
+      else next = "default";
+      try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+      return next;
+    });
+  }, []);
+
+  // F6 / Alt+S direct listener
+  useEffect(() => {
+    const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+        e.preventDefault();
+        toggleSortOrder();
+      }
+    };
+    window.addEventListener("keydown", handleSortShortcut);
+    return () => window.removeEventListener("keydown", handleSortShortcut);
+  }, [toggleSortOrder]);
+
   // Draft filter state (inside popover)
   const [draftRoleId, setDraftRoleId] = useState("");
   const [draftDeptId, setDraftDeptId] = useState("");
   const [draftStatus, setDraftStatus] = useState("");
 
-  // Applied filter state (sent to API)
+  // Applied filter state
   const [appliedRoleId, setAppliedRoleId] = useState("");
   const [appliedDeptId, setAppliedDeptId] = useState("");
   const [appliedStatus, setAppliedStatus] = useState("");
@@ -58,8 +97,6 @@ const Employeelist: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
 
   const fetchEmployeesForExport = useCallback(async () => {
     const res = await employeeService.fetchAll({ limit: 100000 });
@@ -94,6 +131,18 @@ const Employeelist: React.FC = () => {
     fetcher,
   });
 
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onSort: () => toggleSortOrder(),
+    onDelete: () => setShowDeleteModal(true),
+    onNew: () => canCreate && navigate("/employees/create"),
+    onExport: () => {
+      const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+      exportBtn?.click();
+    },
+  });
+
+  // Client-side filtered employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp: any) => {
       const matchesSearch = !searchTerm ||
@@ -107,9 +156,29 @@ const Employeelist: React.FC = () => {
     });
   }, [employees, searchTerm, appliedRoleId, appliedDeptId, appliedStatus]);
 
-  const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
+  // Client-side sorted employees
+  const sortedEmployees = useMemo(() => {
+    if (sortOrder === "default") return filteredEmployees;
+    return [...filteredEmployees].sort((a: any, b: any) => {
+      const nameA = (a.fullName || "").trim().toLowerCase();
+      const nameB = (b.fullName || "").trim().toLowerCase();
+      return sortOrder === "asc"
+        ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
+        : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [filteredEmployees, sortOrder]);
+
+  const totalPages = Math.ceil(sortedEmployees.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedEmployees = sortedEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // ── Table keyboard navigation ─────────────────────────────────────────────
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: paginatedEmployees.length,
+    onEnter: (i) => { const emp = paginatedEmployees[i]; if (emp && canView) handleView(emp); },
+    onEdit: (i) => { const emp = paginatedEmployees[i]; if (emp && canEdit) handleEdit(emp); },
+    containerRef: tableRef,
+  });
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -183,8 +252,6 @@ const Employeelist: React.FC = () => {
     };
   }, []);
 
-
-
   const columns: DataTableColumn<any>[] = [
     {
       header: "#",
@@ -195,7 +262,30 @@ const Employeelist: React.FC = () => {
       ),
     },
     { header: "Employee Code", accessor: "empCode", width: "120px" },
-    { header: "Employee Name", accessor: "fullName" },
+    {
+      header: "Employee Name",
+      accessor: "fullName",
+      headerNode: (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+          title="Sort Alphabetically (F6)"
+          className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+        >
+          <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+            Employee Name
+          </span>
+          <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+            {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+          </span>
+          {sortOrder !== "default" && (
+            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+              {sortOrder === "asc" ? "A-Z" : "Z-A"}
+            </span>
+          )}
+        </button>
+      ),
+    },
     { header: "Mobile", width: "130px", render: (emp) => emp.mobile || "—" },
     { header: "Role", width: "130px", render: (emp) => emp.role?.name || emp.user?.role?.name || "—" },
     {
@@ -214,12 +304,7 @@ const Employeelist: React.FC = () => {
         const isActive = emp.user.status === "active";
         return (
           <div className="flex flex-col items-center gap-0.5">
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${isActive
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                }`}
-            >
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>
               {isActive ? "Enabled" : emp.user.status?.toUpperCase() || "Disabled"}
             </span>
@@ -287,66 +372,49 @@ const Employeelist: React.FC = () => {
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">Role</label>
-                  <SelectInput
-                    name="draftRoleId"
-                    value={draftRoleId}
-                    onChange={(e) => setDraftRoleId(e.target.value)}
-                    options={roles}
-                    defaultOptionLabel="All Roles"
-                    noMargin
-                  />
+                  <SelectInput name="draftRoleId" value={draftRoleId} onChange={(e) => setDraftRoleId(e.target.value)} options={roles} defaultOptionLabel="All Roles" noMargin />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">Department</label>
-                  <SelectInput
-                    name="draftDeptId"
-                    value={draftDeptId}
-                    onChange={(e) => setDraftDeptId(e.target.value)}
-                    options={departments}
-                    defaultOptionLabel="All Departments"
-                    noMargin
-                  />
+                  <SelectInput name="draftDeptId" value={draftDeptId} onChange={(e) => setDraftDeptId(e.target.value)} options={departments} defaultOptionLabel="All Departments" noMargin />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">Status</label>
-                  <SelectInput
-                    name="draftStatus"
-                    value={draftStatus}
-                    onChange={(e) => setDraftStatus(e.target.value)}
-                    options={STATUS_OPTIONS}
-                    defaultOptionLabel="All Statuses"
-                    noMargin
-                  />
+                  <SelectInput name="draftStatus" value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} options={STATUS_OPTIONS} defaultOptionLabel="All Statuses" noMargin />
                 </div>
               </div>
             </FilterPopover>
 
             {canExport && (
-              <ExportCSVButton
-                fetchData={fetchEmployeesForExport}
-                columns={csvColumns}
-                filename={csvFilename}
-                text="Export"
-              />
+              <ExportCSVButton fetchData={fetchEmployeesForExport} columns={csvColumns} filename={csvFilename} text="Export" />
             )}
 
             {canCreate && (
-              <CustomButton
-                text="Add Employee"
-                icon={FaPlus}
-                onClick={() => navigate("/employees/create")}
-              />
+              <CustomButton text="Add Employee" icon={FaPlus} onClick={() => navigate("/employees/create")} />
             )}
           </div>
         </div>
 
-        {/* Table */}
-        <div className="p-0 overflow-hidden rounded-b-2xl">
+        {/* Table — data-table-nav lets F3-exit restore focus here */}
+        <div
+          ref={tableRef}
+          tabIndex={0}
+          data-table-nav
+          className="p-0 overflow-hidden rounded-b-2xl outline-none"
+        >
           <DataTable
             data={paginatedEmployees}
             rowKey={(emp) => emp.id}
             loading={loading}
             emptyMessage="No employees found."
+            rowClassName={(_row, index) =>
+              index === focusedIndex ? "bg-primary/8" : ""
+            }
+            onRowClick={(emp, index) => {
+              setFocusedIndex(index);
+              tableRef.current?.focus({ preventScroll: true });
+              if (canView) handleView(emp);
+            }}
             pagination={
               totalPages > 1
                 ? { currentPage, totalPages, onPageChange: setCurrentPage }

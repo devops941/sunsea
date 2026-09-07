@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
-import { FaPlus, FaWhatsapp } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaWhatsapp, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -29,6 +30,8 @@ import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import { FiClipboard } from "react-icons/fi";
 
 const ITEMS_PER_PAGE = 15;
+const SORT_STORAGE_KEY = "sunsea_po_sort_supplier";
+type SortOrder = "default" | "asc" | "desc";
 
 
 const PurchaseOrderListPage: React.FC = () => {
@@ -41,6 +44,23 @@ const PurchaseOrderListPage: React.FC = () => {
   const canDelete = can("purchaseOrders.delete");
   const canExport = can("purchaseOrders.export");
   const canSendWhatsappEmail = can("purchaseOrders.whatsapp-email") || can("purchaseOrders.whatsapp_email");
+
+  // ── Alphabetical sort by Supplier (localStorage-persisted) ─────────────
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_STORAGE_KEY);
+      if (saved === "asc" || saved === "desc") return saved as SortOrder;
+    } catch (_) {}
+    return "default";
+  });
+
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder((prev) => {
+      const next: SortOrder = prev === "default" ? "asc" : prev === "asc" ? "desc" : "default";
+      try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+      return next;
+    });
+  }, []);
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -81,8 +101,6 @@ const PurchaseOrderListPage: React.FC = () => {
     fetcher,
   });
 
-  usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
-
   const purchaseOrders = useMemo(() => {
     return allPurchaseOrders.filter((po: any) => {
       const matchesSearch = !searchTerm ||
@@ -95,14 +113,46 @@ const PurchaseOrderListPage: React.FC = () => {
     });
   }, [allPurchaseOrders, searchTerm, statusFilter, fromDate, toDate]);
 
-  const totalPages = Math.ceil(purchaseOrders.length / ITEMS_PER_PAGE);
-  const paginatedPOs = purchaseOrders.slice(
+  const sortedPOs = useMemo(() => {
+    if (sortOrder === "default") return purchaseOrders;
+    return [...purchaseOrders].sort((a: any, b: any) => {
+      const nameA = (a.supplier?.supplierName || a.supplier?.legalName || "").trim().toLowerCase();
+      const nameB = (b.supplier?.supplierName || b.supplier?.legalName || "").trim().toLowerCase();
+      if (sortOrder === "asc") return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+      return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [purchaseOrders, sortOrder]);
+
+  const totalPages = Math.ceil(sortedPOs.length / ITEMS_PER_PAGE);
+  const paginatedPOs = sortedPOs.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
+
+  const tableRef = useRef<HTMLDivElement>(null);
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: paginatedPOs.length,
+    onEnter: (i) => { const item = paginatedPOs[i]; if (item) handleView(item as PurchaseOrder); },
+    onEdit: (i) => {
+      const item = paginatedPOs[i];
+      if (item && item.status !== "COMPLETED" && item.status !== "CANCELLED") handleEdit(item as PurchaseOrder);
+    },
+    containerRef: tableRef,
+  });
+
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onNew: () => canCreate && navigate("/purchase-orders/create"),
+    onSort: () => toggleSortOrder(),
+    onDelete: () => {
+      if (!canDelete) return;
+      const focused = paginatedPOs[focusedIndex];
+      if (focused && focused.status === "DRAFT") triggerDelete(focused.id);
+    },
+  });
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -346,11 +396,14 @@ const PurchaseOrderListPage: React.FC = () => {
         </div >
 
         {/* Table */}
-        < DataTable
+        <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
+        <DataTable
           data={paginatedPOs}
           rowKey={(item) => item.id}
           loading={loading}
           emptyMessage="No purchase orders found."
+          rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+          onRowClick={(item, i) => { setFocusedIndex(i); handleView(item as PurchaseOrder); }}
           pagination={{
             currentPage,
             totalPages,
@@ -373,6 +426,24 @@ const PurchaseOrderListPage: React.FC = () => {
               },
               {
                 header: "SUPPLIER",
+                headerNode: (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                    title={`Sort by Supplier: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
+                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                  >
+                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>SUPPLIER</span>
+                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                      {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                    </span>
+                    {sortOrder !== "default" && (
+                      <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                        {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                      </span>
+                    )}
+                  </button>
+                ),
                 render: (item) => item.supplier?.supplierName || "N/A",
               },
               {
@@ -421,6 +492,7 @@ const PurchaseOrderListPage: React.FC = () => {
               },
             ]}
         />
+        </div>
 
         {/* Modals */}
         < PurchaseOrderViewModal

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { FaSave, FaEraser } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -12,7 +13,10 @@ import { createMachine, updateMachine } from "../../../features/machines/machine
 import { machineService } from "../../../services/machineService";
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 const machineSchema = z.object({
     machineId: z.string().min(1, "Machine ID is required").max(20, "Maximum 20 characters allowed"),
@@ -49,8 +53,22 @@ const MachineForm: React.FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(isEdit);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+    const isDirtyRef = useRef(isDirty);
+    const saveConfirmOpenRef = useRef(saveConfirmOpen);
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useFormShortcuts({
+        onSave: () => handleSubmit(new Event("submit") as any),
+        onDelete: () => { if (!isEdit) { setFormData(initialFormState); setErrors({}); setIsDirty(false); } },
+    });
 
     const fetchRoles = useCallback(() => {
         machineOperationAssignmentService.getRoles().then(res => {
@@ -144,6 +162,7 @@ const MachineForm: React.FC = () => {
         }
         setFormData(prev => ({ ...prev, [name]: finalValue }));
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }));
+        setIsDirty(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -202,6 +221,8 @@ const MachineForm: React.FC = () => {
                 await dispatch(createMachine(payload as any)).unwrap();
                 toast.success("Machine created successfully!");
             }
+            invalidateCacheByPrefix("machines:");
+            setIsDirty(false);
             navigate("/machines");
         } catch (err: any) {
             toast.error(err || `Failed to ${isEdit ? "update" : "create"} machine`);
@@ -209,6 +230,64 @@ const MachineForm: React.FC = () => {
             setIsSubmitting(false);
         }
     };
+
+    // ── Escape: dirty-check back navigation ──────────────────────────────────
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 50);
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement | null;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/machines");
+            }
+        };
+        window.addEventListener("keydown", handleEsc, { capture: true });
+        return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+    }, [navigate]);
+
+    // ── F5 Refresh ────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const handleRefresh = async () => {
+            if (isEdit && id) {
+                try {
+                    setLoading(true);
+                    const machine = await machineService.getById(id);
+                    if (machine) {
+                        setFormData({
+                            machineId: machine.machineId || "",
+                            machineName: machine.machineName || "",
+                            technologyType: machine.technologyType || "",
+                            machineType: machine.machineType || "",
+                            targetTemperature: machine.targetTemperature != null ? String(machine.targetTemperature) : "",
+                            operatorId: machine.operatorId || "",
+                            isActive: machine.isActive ?? true,
+                        });
+                        setIsDirty(false);
+                        toast.info("Machine details refreshed");
+                    }
+                } catch {
+                    toast.error("Failed to reload machine details");
+                } finally {
+                    setLoading(false);
+                }
+            } else if (!isEdit) {
+                setFormData(initialFormState);
+                setErrors({});
+                setIsDirty(false);
+                toast.info("Form reset");
+            }
+        };
+        window.addEventListener("fkey-refresh", handleRefresh);
+        return () => window.removeEventListener("fkey-refresh", handleRefresh);
+    }, [id, isEdit]);
 
     if (loading) {
         return (
@@ -219,151 +298,177 @@ const MachineForm: React.FC = () => {
     }
 
     return (
-        <div className="max-w-[1024px] xl:mr-auto">
-            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-                    <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
-                    <BackButton text="Back to List" to="/machines" />
-                </div>
+        <>
+            <div className="max-w-[1024px] xl:mr-auto">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                        <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
+                        <BackButton text="Back to List" to="/machines" />
+                    </div>
 
-                <form onSubmit={handleSubmit} className="p-5 lg:p-6 space-y-4" noValidate>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
-                        <TextInput
-                            label="Machine ID"
-                            name="machineId"
-                            value={formData.machineId}
-                            placeholder="e.g. MAC-01"
-                            required
-                            horizontal
-                            disabled={isEdit}
-                            error={errors.machineId}
-                            onChange={handleChange}
-                        />
-                        <TextInput
-                            label="Machine Name"
-                            name="machineName"
-                            value={formData.machineName}
-                            placeholder="e.g. Extruder A"
-                            required
-                            horizontal
-                            error={errors.machineName}
-                            onChange={handleChange}
-                        />
-                        <SelectInput
-                            label="Technology Type"
-                            name="technologyType"
-                            value={formData.technologyType}
-                            defaultOptionLabel="Select Technology"
-                            options={[
-                                { label: 'Injection Moulding', value: 'INJECTION_MOULDING' },
-                                { label: 'Extrusion', value: 'EXTRUSION' },
-                                { label: 'Blow Moulding', value: 'BLOW_MOULDING' },
-                                { label: 'Rotational Moulding', value: 'ROTATIONAL_MOULDING' },
-                                { label: 'Thermoforming', value: 'THERMOFORMING' },
-                                { label: 'Compression Moulding', value: 'COMPRESSION_MOULDING' },
-                                { label: 'Printing', value: 'PRINTING' },
-                                { label: 'Granulation', value: 'GRANULATION' },
-                                { label: 'Mixing', value: 'MIXING' },
-                                { label: 'Recycling', value: 'RECYCLING' },
-                            ]}
-                            required
-                            horizontal
-                            error={errors.technologyType}
-                            onChange={handleChange}
-                        />
-                        <SelectInput
-                            label="Machine Type"
-                            name="machineType"
-                            value={formData.machineType}
-                            defaultOptionLabel="Select Type"
-                            options={[
-                                { label: 'Production', value: 'PRODUCTION' },
-                                { label: 'Utility', value: 'UTILITY' },
-                            ]}
-                            required
-                            horizontal
-                            error={errors.machineType}
-                            onChange={handleChange}
-                        />
-                        <SelectInput
-                            label="Incharge Role"
-                            name="inchargeRoleId"
-                            value={inchargeRoleId}
-                            defaultOptionLabel="-- Select Role First --"
-                            options={roles.map(r => ({ label: r.name, value: String(r.id) }))}
-                            onChange={(e) => {
-                                setInchargeRoleId(e.target.value);
-                                setFormData(prev => ({ ...prev, operatorId: "" }));
-                                if (errors.inchargeRoleId) setErrors(prev => ({ ...prev, inchargeRoleId: "" }));
-                            }}
-                            required
-                            horizontal
-                            error={errors.inchargeRoleId}
-                        />
-                        <SelectInput
-                            label="Machine Incharge"
-                            name="operatorId"
-                            value={formData.operatorId}
-                            defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Incharge --"}
-                            required
-                            horizontal
-                            disabled={!inchargeRoleId}
-                            options={employees.map(emp => {
-                                const roleName = emp.user?.role?.name || emp.role?.name;
-                                return {
-                                    label: `${emp.fullName} (${emp.empCode})${roleName ? ` - ${roleName}` : ""}`,
-                                    value: emp.id,
-                                };
-                            })}
-                            error={errors.operatorId}
-                            onChange={handleChange}
-                        />
-                        <TextInput
-                            label="Target Temp (°C)"
-                            name="targetTemperature"
-                            type="number"
-                            value={formData.targetTemperature}
-                            placeholder="e.g. 220"
-                            horizontal
-                            error={errors.targetTemperature}
-                            onChange={handleChange}
-                        />
-                        <SelectInput
-                            label="Active Status"
-                            name="isActive"
-                            value={formData.isActive ? "true" : "false"}
-                            defaultOptionLabel="Select Status"
-                            options={[
-                                { label: 'Active', value: 'true' },
-                                { label: 'Inactive', value: 'false' },
-                            ]}
-                            horizontal
-                            error={errors.isActive}
-                            onChange={handleChange}
+                    <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="p-5 lg:p-6 space-y-4" noValidate>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
+                            <TextInput
+                                label="Machine ID"
+                                name="machineId"
+                                value={formData.machineId}
+                                placeholder="e.g. MAC-01"
+                                required
+                                horizontal
+                                disabled={isEdit}
+                                error={errors.machineId}
+                                onChange={handleChange}
+                            />
+                            <TextInput
+                                label="Machine Name"
+                                name="machineName"
+                                value={formData.machineName}
+                                placeholder="e.g. Extruder A"
+                                required
+                                horizontal
+                                error={errors.machineName}
+                                onChange={handleChange}
+                            />
+                            <SelectInput
+                                label="Technology Type"
+                                name="technologyType"
+                                value={formData.technologyType}
+                                defaultOptionLabel="Select Technology"
+                                options={[
+                                    { label: 'Injection Moulding', value: 'INJECTION_MOULDING' },
+                                    { label: 'Extrusion', value: 'EXTRUSION' },
+                                    { label: 'Blow Moulding', value: 'BLOW_MOULDING' },
+                                    { label: 'Rotational Moulding', value: 'ROTATIONAL_MOULDING' },
+                                    { label: 'Thermoforming', value: 'THERMOFORMING' },
+                                    { label: 'Compression Moulding', value: 'COMPRESSION_MOULDING' },
+                                    { label: 'Printing', value: 'PRINTING' },
+                                    { label: 'Granulation', value: 'GRANULATION' },
+                                    { label: 'Mixing', value: 'MIXING' },
+                                    { label: 'Recycling', value: 'RECYCLING' },
+                                ]}
+                                required
+                                horizontal
+                                error={errors.technologyType}
+                                onChange={handleChange}
+                            />
+                            <SelectInput
+                                label="Machine Type"
+                                name="machineType"
+                                value={formData.machineType}
+                                defaultOptionLabel="Select Type"
+                                options={[
+                                    { label: 'Production', value: 'PRODUCTION' },
+                                    { label: 'Utility', value: 'UTILITY' },
+                                ]}
+                                required
+                                horizontal
+                                error={errors.machineType}
+                                onChange={handleChange}
+                            />
+                            <SelectInput
+                                label="Incharge Role"
+                                name="inchargeRoleId"
+                                value={inchargeRoleId}
+                                defaultOptionLabel="-- Select Role First --"
+                                options={roles.map(r => ({ label: r.name, value: String(r.id) }))}
+                                onChange={(e) => {
+                                    setInchargeRoleId(e.target.value);
+                                    setFormData(prev => ({ ...prev, operatorId: "" }));
+                                    if (errors.inchargeRoleId) setErrors(prev => ({ ...prev, inchargeRoleId: "" }));
+                                }}
+                                required
+                                horizontal
+                                error={errors.inchargeRoleId}
+                            />
+                            <SelectInput
+                                label="Machine Incharge"
+                                name="operatorId"
+                                value={formData.operatorId}
+                                defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Incharge --"}
+                                required
+                                horizontal
+                                disabled={!inchargeRoleId}
+                                options={employees.map(emp => {
+                                    const roleName = emp.user?.role?.name || emp.role?.name;
+                                    return {
+                                        label: `${emp.fullName} (${emp.empCode})${roleName ? ` - ${roleName}` : ""}`,
+                                        value: emp.id,
+                                    };
+                                })}
+                                error={errors.operatorId}
+                                onChange={handleChange}
+                            />
+                            <TextInput
+                                label="Target Temp (°C)"
+                                name="targetTemperature"
+                                type="number"
+                                value={formData.targetTemperature}
+                                placeholder="e.g. 220"
+                                horizontal
+                                error={errors.targetTemperature}
+                                onChange={handleChange}
+                            />
+                            <SelectInput
+                                label="Active Status"
+                                name="isActive"
+                                value={formData.isActive ? "true" : "false"}
+                                defaultOptionLabel="Select Status"
+                                options={[
+                                    { label: 'Active', value: 'true' },
+                                    { label: 'Inactive', value: 'false' },
+                                ]}
+                                horizontal
+                                error={errors.isActive}
+                                onChange={handleChange}
+                            />
+                        </div>
+                    </form>
+
+                    <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+                        {!isEdit && (
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                variant="secondary"
+                                onClick={() => { setFormData(initialFormState); setErrors({}); }}
+                                disabled={isSubmitting}
+                            />
+                        )}
+                        <CustomButton
+                            text={isSubmitting ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update Machine" : "Save Machine")}
+                            icon={FaSave}
+                            type="submit"
+                            disabled={isSubmitting}
+                            onClick={handleSubmit}
                         />
                     </div>
-                </form>
-
-                <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
-                    {!isEdit && (
-                        <CustomButton
-                            text="Clear"
-                            icon={FaEraser}
-                            variant="secondary"
-                            onClick={() => { setFormData(initialFormState); setErrors({}); }}
-                            disabled={isSubmitting}
-                        />
-                    )}
-                    <CustomButton
-                        text={isSubmitting ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update Machine" : "Save Machine")}
-                        icon={FaSave}
-                        type="submit"
-                        disabled={isSubmitting}
-                        onClick={handleSubmit}
-                    />
                 </div>
             </div>
-        </div>
+
+            {/* Discard Changes Modal */}
+            <CommonConfirmModal
+                isOpen={saveConfirmOpen}
+                onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+                onCancel={() => { setSaveConfirmOpen(false); navigate("/machines"); }}
+                onConfirm={() => {
+                    setSaveConfirmOpen(false);
+                    setTimeout(() => {
+                        handleSubmit(new Event("submit") as any);
+                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                    }, 150);
+                }}
+                title="Discard Changes?"
+                message="Are you sure you want to leave? Any unsaved machine details will be lost."
+                warningText="Save to keep your changes, or Discard to leave."
+                cancelText="Discard"
+                cancelVariant="danger"
+                confirmText="Save"
+                confirmVariant="primary"
+                confirmIcon={FaCheck}
+                isDangerous={false}
+                defaultFocusCancel={false}
+            />
+        </>
     );
 };
 

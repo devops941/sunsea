@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAppSelector } from "../../../hooks/reduxHooks";
 import { toast } from "react-toastify";
 import { usePermission } from "../../../hooks/usePermission";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaTimes, FaPrint, FaDownload } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaTimes, FaPrint, FaDownload, FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { FiClipboard } from "react-icons/fi";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -33,6 +34,8 @@ import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
 import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 
 const ITEMS_PER_PAGE = 15;
+type SortOrder = "default" | "asc" | "desc";
+const SORT_STORAGE_KEY = "sunsea_quotation_sort_name";
 
 // ─── Group raw order items by Sales Product, aggregating amounts ──────────────
 function groupQuotationItems(orderItems: any[], salesProducts: any[]) {
@@ -117,7 +120,12 @@ const QUOTATION_CACHE_PREFIX = "quotations:";
 
 const QuotationList: React.FC = () => {
     const navigate  = useNavigate();
+    const tableRef  = useRef<HTMLDivElement>(null);
     const { can }   = usePermission();
+    const canCreate = can("quotations.create");
+    const canEdit   = can("quotations.edit");
+    const canDelete = can("quotations.delete");
+    const canExport = can("quotations.export");
     const canSendWhatsappEmail = can("quotations.whatsapp-email") || can("quotations.whatsapp_email");
     const company   = useAppSelector((state) => state.company.data);
 
@@ -127,6 +135,44 @@ const QuotationList: React.FC = () => {
     const [searchTerm, setSearchTerm]   = useState(initialSearch);
     const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
+
+    // ── Alphabetical Sorting with localStorage persistence ───────────────────
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            let next: SortOrder = "default";
+            if (prev === "default") next = "asc";
+            else if (prev === "asc") next = "desc";
+            else next = "default";
+            try {
+                localStorage.setItem(SORT_STORAGE_KEY, next);
+            } catch (_) {}
+            return next;
+        });
+    }, []);
+
+    // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
+    useEffect(() => {
+        const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+                return;
+            }
+            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+                e.preventDefault();
+                toggleSortOrder();
+            }
+        };
+        window.addEventListener("keydown", handleSortShortcut);
+        return () => window.removeEventListener("keydown", handleSortShortcut);
+    }, [toggleSortOrder]);
 
     // ─── Delete ──────────────────────────────────────────────────────────────
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -232,9 +278,6 @@ const QuotationList: React.FC = () => {
             dispatchType: dispatchType || undefined,
             orderSource: orderSource || undefined,
             quotationOnly: true,
-            status: [
-                "QUOTED",
-            ] as SalesOrderStatus[],
         });
         return { data: response.data || [], total: response.total ?? 0 };
     }, [currentPage, debouncedSearch, fromDate, toDate, customerGradeId, customerTypeId, dispatchType, orderSource]);
@@ -245,6 +288,22 @@ const QuotationList: React.FC = () => {
         fetcher,
         enabled: can("quotations.view"),
     });
+
+    // Client-side sorted quotations based on persistent sortOrder
+    const quotations = useMemo(() => {
+        if (!data || !Array.isArray(data)) return [];
+        if (sortOrder === "default") return data;
+
+        return [...data].sort((a: any, b: any) => {
+            const nameA = (a.customer?.displayName || a.customer?.firmName || a.customerName || "").trim().toLowerCase();
+            const nameB = (b.customer?.displayName || b.customer?.firmName || b.customerName || "").trim().toLowerCase();
+            if (sortOrder === "asc") {
+                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+            } else {
+                return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+            }
+        });
+    }, [data, sortOrder]);
 
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 
@@ -263,12 +322,67 @@ const QuotationList: React.FC = () => {
         navigate(`/quatation-order/edit/${item.id}`, { state: item });
     }, [navigate]);
 
+    const handleCloseEstimateModal = useCallback(() => {
+        setShowEstimateModal(false);
+        setEstimateOrder(null);
+        setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+    }, []);
+
+    const handleCloseDeleteModal = useCallback(() => {
+        setShowDeleteModal(false);
+        setItemToDelete(null);
+        setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+    }, []);
+
+    const handleCloseEmailModal = useCallback(() => {
+        setShowEmailModal(false);
+        setEmailOrder(null);
+        setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+    }, []);
+
+    const handleCloseWhatsappModal = useCallback(() => {
+        setShowWhatsappModal(false);
+        setWhatsappOrder(null);
+        setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+    }, []);
+
+    // ── Table keyboard navigation ─────────────────────────────────────────────
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: quotations?.length ?? 0,
+        onEnter: (i) => {
+            const item = quotations?.[i];
+            if (item) handleOpenView(item);
+        },
+        onEdit: (i) => {
+            const item = quotations?.[i];
+            if (item && item.status !== "CONFIRMED" && canEdit) handleOpenEdit(item);
+        },
+        containerRef: tableRef,
+    });
+
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onSort: () => toggleSortOrder(),
+        onDelete: () => {
+            if (!canDelete) return;
+            const focused = quotations[focusedIndex];
+            if (focused && focused.status !== "CONFIRMED") {
+                setItemToDelete(focused.id);
+                setShowDeleteModal(true);
+            }
+        },
+        onNew: () => canCreate && navigate("/quatation-order/create"),
+        onExport: () => {
+            const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+            exportBtn?.click();
+        },
+    });
+
     const fetchQuotationsForExport = useCallback(async () => {
         const res = await salesOrderService.fetchAll({
             page: 1,
             pageSize: 100000,
             quotationOnly: true,
-            status: ["QUOTED"] as SalesOrderStatus[],
         });
         return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
     }, []);
@@ -602,7 +716,7 @@ const QuotationList: React.FC = () => {
                             </div>
                         </FilterPopover>
 
-                        {can("quotations.export") && (
+                        {canExport && (
                             <ExportCSVButton
                                 fetchData={fetchQuotationsForExport}
                                 columns={csvColumns}
@@ -611,103 +725,227 @@ const QuotationList: React.FC = () => {
                             />
                         )}
 
-                        {can("quotations.create") && (
+                        {canCreate && (
                             <CustomButton
                                 text="Create Quotation"
+                                icon={FaPlus}
                                 onClick={() => navigate("/quatation-order/create")}
                             />
                         )}
                     </div>
                 </div>
 
-                {/* Table */}
-                <DataTable
-                    data={data}
-                    rowKey={(item) => item.id}
-                    loading={loading}
-                    emptyMessage="No quotations found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page),
-                    }}
-                    columns={[
-                        {
-                            header: "#",
-                            width: "60px",
-                            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
-                        },
-                        { header: "ORDER NO",   accessor: "orderNo" },
-                        { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
-                        {
-                            header: "CUSTOMER",
-                            render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
-                        },
-                        {
-                            header: "NET AMOUNT",
-                            render: (item) => {
-                                // Recompute netAmount: GST must apply on taxable (post-discount) amount
-                                const subtotal     = Number(item.subtotal     ?? 0);
-                                const discount     = Number(item.totalDiscount ?? 0);
-                                const totalTax     = Number(item.totalTax     ?? 0);
-                                const taxable      = Math.max(0, subtotal - discount);
-                                const discRatio    = subtotal > 0 ? taxable / subtotal : 1;
-                                const adjustedTax  = totalTax * discRatio;
-                                const correctNet   = taxable + adjustedTax;
-                                return formatCurrency(correctNet > 0 ? correctNet : item.netAmount);
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div className="flex items-center gap-2 px-6 py-2 border-b border-line flex-wrap">
+                        <span className="text-xs text-ink-subtle">Active filters:</span>
+
+                        {fromDate && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                From: {fromDate}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setFromDate(""); setDraftFromDate(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {toDate && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                To: {toDate}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setToDate(""); setDraftToDate(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {customerTypeId && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Type: {customerTypes.find((t) => String(t.id) === customerTypeId)?.name || customerTypeId}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setCustomerTypeId(""); setDraftCustomerTypeId(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {customerGradeId && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Grade: {customerGrades.find((g) => String(g.id) === customerGradeId)?.name || customerGradeId}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setCustomerGradeId(""); setDraftCustomerGradeId(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {dispatchType && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Dispatch: {DISPATCH_TYPE_OPTIONS.find((d) => d.value === dispatchType)?.label || dispatchType}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setDispatchType(""); setDraftDispatchType(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {orderSource && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Source: {ORDER_SOURCE_OPTIONS.find((s) => s.value === orderSource)?.label || orderSource}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setOrderSource(""); setDraftOrderSource(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Table — data-table-nav lets F3-exit restore focus here */}
+                <div
+                    ref={tableRef}
+                    tabIndex={0}
+                    data-table-nav
+                    className="p-0 outline-none"
+                >
+                    <DataTable
+                        data={quotations}
+                        rowKey={(item) => item.id}
+                        loading={loading}
+                        emptyMessage="No quotations found."
+                        rowClassName={(_row, index) =>
+                            index === focusedIndex ? "bg-primary/8" : ""
+                        }
+                        onRowClick={(item, index) => {
+                            setFocusedIndex(index);
+                            tableRef.current?.focus({ preventScroll: true });
+                            handleOpenView(item);
+                        }}
+                        pagination={{
+                            currentPage,
+                            totalPages,
+                            onPageChange: (page) => setCurrentPage(page),
+                        }}
+                        columns={[
+                            {
+                                header: "#",
+                                width: "60px",
+                                render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
                             },
-                        },
-                        { header: "STATUS",     render: (item) => <StatusBadge status={item.status || "PENDING"} /> },
-                        {
-                            header: "ACTIONS",
-                            width: "300px",
-                            align: "center",
-                            render: (item) => {
-                                const isEditable = item.status !== "CONFIRMED";
-                                const isDeletable = item.status !== "CONFIRMED";
-                                return (
-                                    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                                        <ViewButton onClick={() => handleOpenView(item)} />
-
-                                        {/* Estimate preview */}
-                                        <IconButton
-                                            icon={FiClipboard}
-                                            variant="info"
-                                            title="Preview / Print Estimate"
-                                            onClick={() => handleOpenEstimate(item.id)}
-                                        />
-
-                                        {isEditable && can("quotations.edit") && (
-                                            <EditButton onClick={() => handleOpenEdit(item)} />
+                            { header: "ORDER NO",   accessor: "orderNo" },
+                            { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
+                            {
+                                header: "CUSTOMER",
+                                headerNode: (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSortOrder();
+                                        }}
+                                        title={`Sort by Customer: ${
+                                            sortOrder === "default"
+                                                ? "Default Order"
+                                                : sortOrder === "asc"
+                                                ? "A to Z (Ascending)"
+                                                : "Z to A (Descending)"
+                                        } (Click or press F6)`}
+                                        className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                    >
+                                        <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                            CUSTOMER
+                                        </span>
+                                        <span
+                                            className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
+                                                sortOrder === "asc" || sortOrder === "desc"
+                                                    ? "bg-primary/20 text-primary scale-110"
+                                                    : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+                                            }`}
+                                        >
+                                            {sortOrder === "asc" ? (
+                                                <FaArrowUp size={10} />
+                                            ) : sortOrder === "desc" ? (
+                                                <FaArrowDown size={10} />
+                                            ) : (
+                                                <FaSort size={10} />
+                                            )}
+                                        </span>
+                                        {sortOrder !== "default" && (
+                                            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                                {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                            </span>
                                         )}
-
-                                        {/* Email */}
-                                        {canSendWhatsappEmail && (
-                                            <EmailButton
-                                                disabled={sendingEmail}
-                                                onClick={() => handleOpenEmailModal(item)}
-                                            />
-                                        )}
-
-                                        {/* WhatsApp */}
-                                        {canSendWhatsappEmail && (
-                                            <WhatsappButton
-                                                disabled={sendingWhatsapp}
-                                                onClick={() => handleOpenWhatsappModal(item)}
-                                            />
-                                        )}
-
-                                        {isDeletable && can("quotations.delete") && (
-                                            <DeleteButton
-                                                onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }}
-                                            />
-                                        )}
-                                    </div>
-                                );
+                                    </button>
+                                ),
+                                render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
                             },
-                        },
-                    ]}
-                />
+                            {
+                                header: "NET AMOUNT",
+                                render: (item) => {
+                                    // Recompute netAmount: GST must apply on taxable (post-discount) amount
+                                    const subtotal     = Number(item.subtotal     ?? 0);
+                                    const discount     = Number(item.totalDiscount ?? 0);
+                                    const totalTax     = Number(item.totalTax     ?? 0);
+                                    const taxable      = Math.max(0, subtotal - discount);
+                                    const discRatio    = subtotal > 0 ? taxable / subtotal : 1;
+                                    const adjustedTax  = totalTax * discRatio;
+                                    const correctNet   = taxable + adjustedTax;
+                                    return formatCurrency(correctNet > 0 ? correctNet : item.netAmount);
+                                },
+                            },
+                            { header: "STATUS",     render: (item) => <StatusBadge status={item.status || "PENDING"} /> },
+                            {
+                                header: "ACTIONS",
+                                width: "300px",
+                                align: "center",
+                                render: (item) => {
+                                    const isEditable = item.status !== "CONFIRMED";
+                                    const isDeletable = item.status !== "CONFIRMED";
+                                    return (
+                                        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                            <ViewButton onClick={() => handleOpenView(item)} />
+
+                                            {/* Estimate preview */}
+                                            <IconButton
+                                                icon={FiClipboard}
+                                                variant="info"
+                                                title="Preview / Print Estimate"
+                                                onClick={() => handleOpenEstimate(item.id)}
+                                            />
+
+                                            {isEditable && canEdit && (
+                                                <EditButton onClick={() => handleOpenEdit(item)} />
+                                            )}
+
+                                            {/* Email */}
+                                            {canSendWhatsappEmail && (
+                                                <EmailButton
+                                                    disabled={sendingEmail}
+                                                    onClick={() => handleOpenEmailModal(item)}
+                                                />
+                                            )}
+
+                                            {/* WhatsApp */}
+                                            {canSendWhatsappEmail && (
+                                                <WhatsappButton
+                                                    disabled={sendingWhatsapp}
+                                                    onClick={() => handleOpenWhatsappModal(item)}
+                                                />
+                                            )}
+
+                                            {isDeletable && canDelete && (
+                                                <DeleteButton
+                                                    onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }}
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                },
+                            },
+                        ]}
+                    />
+                </div>
             </div>
 
             {/* ── Estimate Preview Modal ── */}
@@ -715,7 +953,7 @@ const QuotationList: React.FC = () => {
                 <div className="fixed inset-0 z-50 overflow-y-auto no-print">
                     <div
                         className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
-                        onClick={() => setShowEstimateModal(false)}
+                        onClick={handleCloseEstimateModal}
                     />
                     <div className="flex min-h-full items-end justify-center p-4 sm:items-center sm:p-0">
                         <div className="relative transform overflow-hidden rounded-2xl bg-card text-left shadow-xl sm:my-8 sm:w-full sm:max-w-4xl">
@@ -723,7 +961,7 @@ const QuotationList: React.FC = () => {
                             <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
                                 <h3 className="text-lg font-bold text-ink">Quotation Preview</h3>
                                 <button
-                                    onClick={() => setShowEstimateModal(false)}
+                                    onClick={handleCloseEstimateModal}
                                     className="rounded-lg p-1 text-ink-subtle hover:bg-card-2 hover:text-ink-muted transition-colors"
                                 >
                                     <FaTimes size={18} />
@@ -806,7 +1044,7 @@ const QuotationList: React.FC = () => {
             {/* Delete Modal */}
             <CommonConfirmModal
                 show={showDeleteModal}
-                onHide={() => setShowDeleteModal(false)}
+                onHide={handleCloseDeleteModal}
                 onConfirm={handleDeleteConfirm}
                 title="Confirm Delete Quotation"
                 message="Are you sure you want to delete this quotation? This action cannot be undone."
@@ -820,7 +1058,7 @@ const QuotationList: React.FC = () => {
             {/* Email Modal */}
             <CommonConfirmModal
                 show={showEmailModal}
-                onHide={() => setShowEmailModal(false)}
+                onHide={handleCloseEmailModal}
                 onConfirm={handleSendEmail}
                 title="Send Quotation Email"
                 message={`Send quotation PDF to: ${recipientEmail}`}
@@ -835,7 +1073,7 @@ const QuotationList: React.FC = () => {
             {/* WhatsApp Modal */}
             <CommonConfirmModal
                 show={showWhatsappModal}
-                onHide={() => setShowWhatsappModal(false)}
+                onHide={handleCloseWhatsappModal}
                 onConfirm={handleSendWhatsapp}
                 title="Send WhatsApp Quotation"
                 message={

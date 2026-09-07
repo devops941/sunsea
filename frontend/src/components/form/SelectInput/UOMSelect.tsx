@@ -44,6 +44,18 @@ const SortableMultiValue = (props: MultiValueProps<any>) => {
   );
 };
 
+const NavInput = (props: any) => {
+  return (
+    <components.Input
+      {...props}
+      innerProps={{
+        ...props.innerProps,
+        "data-nav": "true",
+      }}
+    />
+  );
+};
+
 const CustomSingleSelect = ({
   value,
   onChange,
@@ -60,10 +72,27 @@ const CustomSingleSelect = ({
   error?: boolean;
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
   const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const portalRef = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Scroll highlighted item into view
+  React.useEffect(() => {
+    if (!isOpen || highlightedIndex < 0 || !listRef.current) return;
+    const items = listRef.current.children;
+    const el = items[highlightedIndex + 1] as HTMLElement | undefined;
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, isOpen]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      const idx = options.findIndex((u) => u.code === value);
+      setHighlightedIndex(idx >= 0 ? idx : -1);
+    }
+  }, [isOpen, value, options]);
 
   const updateDropdownPosition = React.useCallback(() => {
     if (triggerRef.current) {
@@ -126,6 +155,45 @@ const CustomSingleSelect = ({
     };
   }, [isOpen, updateDropdownPosition]);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
+        e.preventDefault();
+        updateDropdownPosition();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev + 1 < options.length ? prev + 1 : prev));
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > -1 ? prev - 1 : prev));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < options.length) {
+          onChange(options[highlightedIndex].code);
+          setIsOpen(false);
+        } else if (highlightedIndex === -1) {
+          onChange("");
+          setIsOpen(false);
+        }
+        break;
+      case "Tab":
+        setIsOpen(false);
+        break;
+      case "Escape":
+        e.preventDefault();
+        setIsOpen(false);
+        break;
+    }
+  };
+
   const selectedOpt = options.find((u) => u.code === value);
   const displayLabel = selectedOpt
     ? (selectedOpt.code.toLowerCase() === 'ea' ? 'pcs' : `${selectedOpt.label} (${selectedOpt.code})`)
@@ -135,6 +203,7 @@ const CustomSingleSelect = ({
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
+        data-nav
         ref={triggerRef}
         disabled={disabled}
         onClick={() => {
@@ -143,6 +212,7 @@ const CustomSingleSelect = ({
             setIsOpen(!isOpen);
           }
         }}
+        onKeyDown={handleKeyDown}
         className={`
           w-full h-10 pl-4 pr-10
           border rounded-md outline-none
@@ -172,7 +242,7 @@ const CustomSingleSelect = ({
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)',
           }}
         >
-          <div className="overflow-y-auto py-1 min-h-0 flex-1">
+          <div ref={listRef} className="overflow-y-auto py-1 min-h-0 flex-1">
             <div
               onClick={() => {
                 onChange("");
@@ -181,12 +251,17 @@ const CustomSingleSelect = ({
               className={`
                 px-4 py-2.5 text-sm cursor-pointer
                 transition-colors duration-150
-                ${!value ? "bg-primary/15 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
+                ${highlightedIndex === -1
+                  ? "bg-primary/20 text-primary font-semibold"
+                  : !value
+                  ? "bg-primary/15 text-primary font-semibold"
+                  : "text-ink-muted hover:bg-card-2"
+                }
               `}
             >
               {placeholder}
             </div>
-            {options.map((u) => (
+            {options.map((u, idx) => (
               <div
                 key={u.code}
                 onClick={() => {
@@ -196,7 +271,9 @@ const CustomSingleSelect = ({
                 className={`
                   px-4 py-2.5 text-sm cursor-pointer
                   transition-colors duration-150
-                  ${value === u.code
+                  ${idx === highlightedIndex
+                    ? "bg-primary/20 text-primary font-semibold"
+                    : value === u.code
                     ? "bg-primary/15 text-primary font-semibold"
                     : "text-ink hover:bg-card-2"
                   }
@@ -429,13 +506,13 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   <Select
                     isMulti
                     menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                    closeMenuOnSelect={false}
+                    closeMenuOnSelect={true}
                     blurInputOnSelect={false}
                     isDisabled={disabled}
                     options={options}
                     value={selectedOptions}
                     placeholder={placeholder}
-                    components={{ MultiValue: SortableMultiValue }}
+                    components={{ MultiValue: SortableMultiValue, Input: NavInput }}
                     {...({
                       onReorder: (dragIndex: number, hoverIndex: number) => {
                         const newValues = [...currentValueArray];
@@ -511,13 +588,13 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                 <Select
                   isMulti
                   menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                  closeMenuOnSelect={false}
+                  closeMenuOnSelect={true}
                   blurInputOnSelect={false}
                   isDisabled={disabled}
                   options={options}
                   value={selectedOptions}
                   placeholder={placeholder}
-                  components={{ MultiValue: SortableMultiValue }}
+                  components={{ MultiValue: SortableMultiValue, Input: NavInput }}
                   {...({
                     onReorder: (dragIndex: number, hoverIndex: number) => {
                       const newValues = [...currentValueArray];

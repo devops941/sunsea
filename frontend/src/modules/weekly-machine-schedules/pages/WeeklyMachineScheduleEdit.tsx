@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createWeeklyProgram, fetchWeeklyPrograms } from "../../../features/weekly-programs/weeklyProgramSlice";
@@ -47,8 +49,37 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
     const [plannedQty, setPlannedQty] = useState("");
 
     const [deletedDbPrograms, setDeletedDbPrograms] = useState<string[]>([]);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useFormShortcuts({ onSave: () => formRef.current?.requestSubmit() });
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (saveConfirmOpenRef.current) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/weekly-machine-schedules");
+            }
+        };
+        document.addEventListener("keydown", handleEscape, true);
+        return () => document.removeEventListener("keydown", handleEscape, true);
+    }, [navigate]);
 
     const { data: machines } = useAppSelector((state) => state.machines);
     const { data: shifts } = useAppSelector((state: any) => state.shifts || { data: [] });
@@ -288,6 +319,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
     const remainingToPlan = currentPo ? Math.max(0, Number(currentPo.targetQty) - otherAllocated) : 0;
 
     return (
+        <>
         <div className="inner-container">
             <Container fluid>
                 <div className="page-header mb-4">
@@ -313,7 +345,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                             <h5 className="mb-0 fw-bold" style={{ color: "var(--color-primary)" }}>Assignment Context</h5>
                         </Card.Header>
                         <Card.Body className="p-4">
-                            <form onSubmit={handleSubmit}>
+                            <form ref={formRef} onSubmit={handleSubmit} onInput={() => setIsDirty(true)} onKeyDown={handleFormKeyDown}>
                                 <Row className="g-4 mb-4">
                                     <Col md={6}>
                                         <TextInput
@@ -418,6 +450,17 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                 )}
             </Container>
         </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onConfirm={() => { setSaveConfirmOpen(false); navigate("/weekly-machine-schedules"); }}
+            title="Discard Changes?"
+            message="You have unsaved changes. Are you sure you want to leave without saving?"
+            confirmText="Discard"
+            confirmVariant="danger"
+            onCancel={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+        />
+        </>
     );
 };
 

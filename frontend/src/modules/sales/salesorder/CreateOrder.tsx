@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import { FaCheck } from "react-icons/fa";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BusyItemsTable from "../../../components/form/OrderItemsTable/BusyItemsTable";
@@ -351,6 +354,13 @@ const SalesOrderForm: React.FC = () => {
     const justResetRef = React.useRef(false);
     const editValuesRef = React.useRef<SalesOrderFormValues | null>(null);
 
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleSaveRef = useRef<() => void>(() => {});
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
     const {
         control,
         handleSubmit,
@@ -358,7 +368,7 @@ const SalesOrderForm: React.FC = () => {
         setValue,
         getValues,
         reset,
-        formState: { errors },
+        formState: { errors, isDirty },
     } = useForm<SalesOrderFormValues>({
         resolver: zodResolver(salesOrderSchema),
         defaultValues,
@@ -366,7 +376,29 @@ const SalesOrderForm: React.FC = () => {
 
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-    useFormShortcuts({});
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useFormShortcuts({ onSave: () => handleSaveRef.current() });
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (saveConfirmOpenRef.current) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/sales-order");
+            }
+        };
+        document.addEventListener("keydown", handleEscape, true);
+        return () => document.removeEventListener("keydown", handleEscape, true);
+    }, [navigate]);
 
     // ─── Load company info for inter-state ───────────────────────────
     useEffect(() => {
@@ -741,8 +773,17 @@ const SalesOrderForm: React.FC = () => {
         }
     };
 
+    // ─── Wire save shortcut (after cleanEmptyRows / onSubmit are defined) ──
+    handleSaveRef.current = () => {
+        if (!isSubmitting) {
+            cleanEmptyRows();
+            handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))();
+        }
+    };
+
     // ─── Render ──────────────────────────────────────────────────────
     return (
+        <>
         <div className="max-w-[1400px] xl:mr-auto">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
                 {/* Header */}
@@ -754,7 +795,7 @@ const SalesOrderForm: React.FC = () => {
                     <BackButton text="Back to List" />
                 </div>
 
-                <form className="px-5 py-2 space-y-2" noValidate>
+                <form ref={formRef} onKeyDown={handleFormKeyDown} data-escape-guarded className="px-5 py-3 space-y-3" noValidate>
                     {/* ── Main Fields ── */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
                         <div className="sm:col-span-2">
@@ -882,6 +923,22 @@ const SalesOrderForm: React.FC = () => {
                 </div>
             </div>
         </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onConfirm={() => { setSaveConfirmOpen(false); handleSaveRef.current(); }}
+            onCancel={() => { setSaveConfirmOpen(false); navigate("/sales-order"); }}
+            title="Discard Changes?"
+            message="Are you sure you want to leave? Any unsaved order details will be lost."
+            warningText="Save to keep your changes, or Discard to leave."
+            cancelText="Discard"
+            cancelVariant="danger"
+            confirmText="Save"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            isDangerous={false}
+        />
+        </>
     );
 };
 

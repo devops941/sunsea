@@ -62,6 +62,7 @@ const TextArea: React.FC<TextAreaProps> = ({
         <textarea
           id={name}
           name={name}
+          data-nav
           value={value}
           placeholder={placeholder}
           onChange={onChange}

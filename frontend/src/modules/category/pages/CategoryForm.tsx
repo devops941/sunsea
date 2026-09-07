@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { z } from "zod";
-import { FaSave, FaEraser } from "react-icons/fa";
+import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
@@ -10,6 +11,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import { createCategory, updateCategory } from "../../../features/categories/categorySlice";
 import { categoryService } from "../../../services/categoryService";
@@ -74,8 +76,18 @@ const CategoryForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingCode, setIsFetchingCode] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
-  useFormShortcuts({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleSubmitRef = useRef<() => void>(() => {});
+  const isDirtyRef = useRef(false);
+  const saveConfirmOpenRef = useRef(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+  useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
   // ── Load existing data in edit mode ────────────────────────────────────────
   useEffect(() => {
@@ -134,6 +146,7 @@ const CategoryForm: React.FC = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setIsDirty(true);
     if (errors[name as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
@@ -149,6 +162,7 @@ const CategoryForm: React.FC = () => {
         setErrors((prev) => ({ ...prev, [name]: undefined }));
       }
     }
+    setIsDirty(true);
   };
 
   const handleClear = () => {
@@ -176,6 +190,32 @@ const CategoryForm: React.FC = () => {
     setErrors({});
     return true;
   };
+
+  // Sync handleSubmit ref so shortcuts always call latest version
+  handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (saveConfirmOpenRef.current) {
+        setSaveConfirmOpen(false);
+        setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+      } else if (isDirtyRef.current) {
+        lastFocusedRef.current = document.activeElement as HTMLElement;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate("/categories");
+      }
+    };
+    window.addEventListener("keydown", handleEscape, { capture: true });
+    return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,6 +249,7 @@ const CategoryForm: React.FC = () => {
         ).unwrap();
         toast.success("Category created successfully!");
       }
+      setIsDirty(false);
       navigate("/categories");
     } catch (err: any) {
       toast.error(err || "Failed to save category");
@@ -236,7 +277,7 @@ const CategoryForm: React.FC = () => {
           <BackButton text="Back to List" to="/categories" />
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 lg:p-6 space-y-4" noValidate>
+        <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="p-5 lg:p-6 space-y-4" noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-8 xl:gap-x-10 gap-y-3 md:gap-y-4 lg:gap-y-5">
             {/* Type — pick first so code auto-generates */}
             <SelectInput
@@ -323,6 +364,25 @@ const CategoryForm: React.FC = () => {
           />
         </div>
       </div>
+
+      <CommonConfirmModal
+        show={saveConfirmOpen}
+        onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+        onConfirm={() => {
+          setSaveConfirmOpen(false);
+          setTimeout(() => {
+            handleSubmitRef.current();
+            setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+          }, 150);
+        }}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Do you want to save before leaving?"
+        confirmText="Save"
+        cancelText="Discard"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/categories"); }}
+      />
     </div>
   );
 };

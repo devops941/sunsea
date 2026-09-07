@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaPlus, FaTrash, FaArrowLeft, FaBoxOpen, FaFileInvoice, FaMapMarkerAlt, FaTruck, FaUser, FaCreditCard, FaHashtag } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
@@ -24,7 +24,9 @@ import { fetchStores } from "../../../../features/stores/storeSlice";
 import { useSelector } from "react-redux";
 import FileUpload from "../../../../components/form/FileUpload/FileUpload";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
-import { getUomMultiplier } from "../pages/PurchaseOrderForm";
+import { getUomMultiplier } from "../utils/uomUtils";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../../hooks/useFormKeyboardNav";
 
 
 
@@ -893,6 +895,64 @@ const InvoiceDetailPage: React.FC = () => {
 
     const isPOSelected = !!form.poId && !!selectedPO;
 
+    // ── Keyboard navigation ───────────────────────────────────────────────────────
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    const focusFirstField = useCallback(() => {
+        const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+        first?.focus();
+    }, []);
+
+    const handleF8 = useCallback(() => {
+        if (isEditMode) return;
+        setForm({
+            poId: "",
+            grnNumber: form.grnNumber,
+            invoiceNo: "",
+            grnDate: new Date().toISOString().split("T")[0],
+            supplierId: "",
+            storeId: "",
+            billingAddressLine1: "",
+            billingCountry: "India",
+            billingCity: "",
+            billingState: "",
+            billingPincode: "",
+            sameAsBilling: false,
+            shippingAddressLine1: "",
+            shippingCountry: "India",
+            shippingCity: "",
+            shippingState: "",
+            shippingPincode: "",
+            receiveDate: "",
+            billDueDate: "",
+            challanNo: "",
+            transport: "",
+            eWayBill: "",
+            invoiceImage: null,
+            remarks: "",
+            contactName: "",
+            mobileNumber: "",
+            email: "",
+            gstNumber: "",
+            supplierAddress: "",
+            discountType: "flat",
+            discountValue: 0,
+            roundingAdjust: 0,
+            paymentStatus: "Unpaid",
+            paymentMethod: "",
+            referenceNumber: "",
+            paymentDate: "",
+            updateStock: true,
+        });
+        setItems([]);
+        setErrors({});
+        setPayments([]);
+        setTimeout(() => focusFirstField(), 100);
+    }, [isEditMode, form.grnNumber, focusFirstField]);
+
+    useFormShortcuts({ onDelete: handleF8 });
+
     if (loadingPOs) {
         return <CommonLoader text="Loading..." fullScreen={false} />;
     }
@@ -920,7 +980,7 @@ const InvoiceDetailPage: React.FC = () => {
                     <BackButton text="Back to List" />
                 </div>
 
-                <form onSubmit={handleSubmit} noValidate>
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
                     <div className="px-5 py-3 space-y-3">
 
                         {/* ── Section 1: GRN Details ── */}

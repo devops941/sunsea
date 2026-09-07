@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import {
   FaPlus,
 } from "react-icons/fa";
@@ -251,7 +252,11 @@ const StockAdjustmentList: React.FC = () => {
     fetcher,
   });
 
-  usePageShortcuts({ onRefresh: () => refresh() });
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onNew: () => can("stock-adjustments.create") && navigate("/inventory/stock-adjustments/create"),
+    onSort: () => document.querySelector<HTMLElement>("[data-filter-trigger] button")?.click(),
+  });
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -307,6 +312,15 @@ const StockAdjustmentList: React.FC = () => {
   );
 
   const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
+
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: (data || []).length,
+    onEnter: (i) => { const item = (data || [])[i]; if (item) navigate(`/inventory/stock-adjustments/view/${item.id}`); },
+    onEdit: () => {},
+    containerRef: tableRef,
+  });
 
   return (
     <div>
@@ -420,11 +434,14 @@ const StockAdjustmentList: React.FC = () => {
         </div>
 
         {/* Table */}
+        <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
         <DataTable
           data={data || []}
           rowKey={(item) => item.id}
           loading={loading}
           emptyMessage="No stock adjustments found."
+          rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+          onRowClick={(item, i) => { setFocusedIndex(i); navigate(`/inventory/stock-adjustments/view/${item.id}`); }}
           pagination={
             totalPages > 1
               ? { currentPage, totalPages, onPageChange: (page) => setCurrentPage(page) }
@@ -601,6 +618,7 @@ const StockAdjustmentList: React.FC = () => {
             },
           ]}
         />
+        </div>
 
         <CommonConfirmModal
           isOpen={!!deleteId}

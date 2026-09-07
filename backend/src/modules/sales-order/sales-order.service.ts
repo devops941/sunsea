@@ -183,14 +183,14 @@ class SalesOrderService {
         const existingCheck = await prisma.salesOrder.findUnique({ where: { orderNo: data.orderNo } });
         if (existingCheck) throw new ApiError(409, `Order No "${data.orderNo}" already exists`);
 
-                const isQuotation = data.items.some((i: any) => i.quotationUnitPrice !== undefined && i.quotationUnitPrice !== null);
-                const lineItems = await this.computeLineTotals(
-                        data.items.map(i => ({
-                            productId: BigInt(i.productId),
-                            quantity: new Prisma.Decimal(i.quantity),
-                            unitPrice: isQuotation ? undefined : (i as any).unitPrice,
-                            quotationUnitPrice: isQuotation ? (i as any).quotationUnitPrice : undefined,
-                        })),
+        const isQuotation = data.status === "QUOTED" || Boolean((data as any).isQuotation) || data.items.some((i: any) => i.quotationUnitPrice !== undefined && i.quotationUnitPrice !== null);
+        const lineItems = await this.computeLineTotals(
+            data.items.map(i => ({
+                productId: BigInt(i.productId),
+                quantity: new Prisma.Decimal(i.quantity),
+                unitPrice: isQuotation ? undefined : (i as any).unitPrice,
+                quotationUnitPrice: isQuotation ? (i as any).quotationUnitPrice : undefined,
+            })),
             (customer as any).customerGrade?.name ?? null,
         );
 
@@ -307,21 +307,45 @@ class SalesOrderService {
             } }
             : {};
 
+        const conditions: any[] = [];
+
+        if ((query as any).quotationOnly) {
+            conditions.push({
+                OR: [
+                    { items: { some: { quotationUnitPrice: { not: null } } } },
+                    { status: "QUOTED" },
+                ],
+            });
+        }
+
         const customerFilter: any = {};
         if (query.customerId) customerFilter.id = query.customerId;
         if (query.customerGradeId) customerFilter.customerGradeId = Number(query.customerGradeId);
         if ((query as any).customerTypeId) customerFilter.customerTypeId = Number((query as any).customerTypeId);
 
-        const gstWhere = {
-            ...((query as any).quotationOnly && { items: { some: { quotationUnitPrice: { not: null } } } }),
-            ...(Object.keys(customerFilter).length > 0 && { customer: customerFilter }),
-            ...(query.status?.length && { status: { in: query.status as SalesOrderStatus[] } }),
-            ...(query.orderType     && { orderType: query.orderType }),
-            ...((query as any).orderSource     && { orderSource: (query as any).orderSource }),
-            ...((query as any).sourceEmployeeId && { sourceEmployeeId: BigInt((query as any).sourceEmployeeId) }),
-            ...searchFilter,
-            ...dateFilter,
-        };
+        if (Object.keys(customerFilter).length > 0) {
+            conditions.push({ customer: customerFilter });
+        }
+        if (query.status?.length) {
+            conditions.push({ status: { in: query.status as SalesOrderStatus[] } });
+        }
+        if (query.orderType) {
+            conditions.push({ orderType: query.orderType });
+        }
+        if ((query as any).orderSource) {
+            conditions.push({ orderSource: (query as any).orderSource });
+        }
+        if ((query as any).sourceEmployeeId) {
+            conditions.push({ sourceEmployeeId: BigInt((query as any).sourceEmployeeId) });
+        }
+        if (searchFilter && Object.keys(searchFilter).length > 0) {
+            conditions.push(searchFilter);
+        }
+        if (dateFilter && Object.keys(dateFilter).length > 0) {
+            conditions.push(dateFilter);
+        }
+
+        const gstWhere = conditions.length > 0 ? { AND: conditions } : {};
 
         const gstOrderBy = { [query.sortBy]: query.sortOrder };
 
@@ -425,7 +449,7 @@ class SalesOrderService {
             this.assertNoDuplicateProducts(data.items);
             await this.assertProductsExist(data.items.map(i => BigInt(i.productId)));
 
-            const isQuotation = data.items.some((item: any) => item.quotationUnitPrice !== undefined && item.quotationUnitPrice !== null);
+            const isQuotation = data.status === "QUOTED" || existingStatus === "QUOTED" || Boolean((data as any).isQuotation) || data.items.some((item: any) => item.quotationUnitPrice !== undefined && item.quotationUnitPrice !== null);
 
             // Preserve original unitPrice from existing items (only needed for quotations)
             const existingUnitPrices = isQuotation

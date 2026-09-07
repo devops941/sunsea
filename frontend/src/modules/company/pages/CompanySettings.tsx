@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FaSave, FaInfoCircle, FaMapMarkerAlt, FaPhoneAlt } from 'react-icons/fa';
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -6,16 +6,17 @@ import { useDispatch, useSelector } from 'react-redux';
 import TextInput from "../../../components/form/TextInput/TextInput";
 import ImageUpload from "../../../components/form/ImageUpload/ImageUpload";
 import Button from "../../../components/ui/Button/Button";
-// import BackButton from "../../../components/ui/BackButton/BackButton";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
-import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { validatePhoneEntries } from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
 import { usePermission } from "../../../hooks/usePermission";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import ThemeToggle from "../../../components/common/ThemeToggle";
 import { fetchCompany, updateCompany } from '../../../features/company/companySlice';
 import type { UpdateCompanyDto } from '../../../features/company/types';
-import { validatePhoneEntries } from "../../../components/ui/PhoneInput/PhoneInput";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 
 const CompanySettings: React.FC = () => {
   const location = useLocation();
@@ -26,11 +27,18 @@ const CompanySettings: React.FC = () => {
   const { data: company, loading } = useSelector((state: RootState) => state.company);
 
   const [phones, setPhones] = useState<any[]>([]);
+  const [originalPhones, setOriginalPhones] = useState<any[]>([]);
 
   const isEditMode = location.pathname.includes('edit') || location.pathname.includes('settings') || !!(company && company.isOnboarded);
 
   const [formData, setFormData] = useState<UpdateCompanyDto>({});
+  const [originalFormData, setOriginalFormData] = useState<UpdateCompanyDto>({});
   const [errors, setErrors] = useState<any>({});
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     dispatch(fetchCompany());
@@ -44,9 +52,11 @@ const CompanySettings: React.FC = () => {
       } catch {
         parsedPhones = [];
       }
-      setPhones(Array.isArray(parsedPhones) ? parsedPhones : []);
+      const phoneArr = Array.isArray(parsedPhones) ? parsedPhones : [];
+      setPhones(phoneArr);
+      setOriginalPhones(phoneArr);
 
-      setFormData({
+      const initialData: UpdateCompanyDto = {
         companyCode: company.companyCode || `CMP-${Math.floor(10000 + Math.random() * 90000)}`,
         legalName: company.legalName || company.companyName || "",
         shortName: company.shortName || "",
@@ -64,9 +74,47 @@ const CompanySettings: React.FC = () => {
         zipcode: company.zipcode || "",
         country: company.country || "India",
         isActive: company.isActive,
-      });
+      };
+
+      setFormData(initialData);
+      setOriginalFormData(initialData);
     }
   }, [company]);
+
+  // Auto-focus first input field when data is loaded
+  useEffect(() => {
+    if (company && !loading) {
+      const timer = setTimeout(() => {
+        const firstInput = formRef.current?.querySelector<HTMLElement>(
+          'input[name="legalName"], input[data-nav]:not([disabled])'
+        );
+        firstInput?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [company, loading]);
+
+  const isDirty = useMemo(() => {
+    if (!originalFormData.legalName && !originalFormData.email) return false;
+    const formKeys: (keyof UpdateCompanyDto)[] = [
+      "legalName", "shortName", "gstin", "currencyCode", "phone",
+      "email", "website", "addressLine1", "city", "state", "zipcode", "country"
+    ];
+
+    const fieldsChanged = formKeys.some(
+      (k) => (formData[k] || "") !== (originalFormData[k] || "")
+    );
+    const phonesChanged = JSON.stringify(phones) !== JSON.stringify(originalPhones);
+    const filesChanged = !!(formData as any).logoFile || !!(formData as any).faviconFile;
+
+    return fieldsChanged || phonesChanged || filesChanged;
+  }, [formData, originalFormData, phones, originalPhones]);
+
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -105,7 +153,7 @@ const CompanySettings: React.FC = () => {
     setErrors((prev: any) => ({ ...prev, city: undefined }));
   };
 
-  const validate = (): boolean => {
+  const validate = useCallback((): boolean => {
     const newErrors: any = {};
     if (!formData.companyCode?.trim()) newErrors.companyCode = "Company code is required";
     if (!formData.legalName?.trim()) newErrors.legalName = "Legal name is required";
@@ -120,11 +168,20 @@ const CompanySettings: React.FC = () => {
     if (phoneErr) newErrors.mobile = phoneErr;
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (Object.keys(newErrors).length > 0) {
+      const fieldOrder = ["legalName", "email", "addressLine1", "city", "state", "zipcode", "country", "mobile"];
+      const firstError = fieldOrder.find((f) => newErrors[f]);
+      if (firstError) {
+        const el = formRef.current?.querySelector<HTMLElement>(`[name="${firstError}"]`);
+        el?.focus();
+      }
+      return false;
+    }
+    return true;
+  }, [formData, phones]);
+
+  const submitForm = useCallback(async () => {
     if (!canEdit) {
       toast.error("You do not have permission to edit company settings.");
       return;
@@ -161,7 +218,87 @@ const CompanySettings: React.FC = () => {
     } catch (err: any) {
       toast.error(err?.message || err || "Failed to update company");
     }
+  }, [canEdit, validate, company, formData, phones, dispatch, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitForm();
   };
+
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
+        lastFocusedElementRef.current.focus();
+      } else {
+        const firstInput = formRef.current?.querySelector<HTMLElement>(
+          'input[name="legalName"], input[data-nav]:not([disabled])'
+        );
+        firstInput?.focus();
+      }
+    }, 50);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    navigate('/dashboard');
+  }, [navigate]);
+
+  const handleSaveFromModal = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      if (!validate()) {
+        toast.error("Required fields fill pannunga — please fill all required fields.");
+        return;
+      }
+      submitForm();
+    }, 150);
+  }, [validate, submitForm]);
+
+  // Global F2/F9 save shortcut
+  useFormShortcuts({
+    onSave: () => {
+      if (!saveConfirmOpen) {
+        submitForm();
+      }
+    },
+  });
+
+  // Ctrl+S shortcut support
+  useEffect(() => {
+    if (saveConfirmOpen) return;
+    const handleCtrlS = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        e.stopPropagation();
+        submitForm();
+      }
+    };
+    window.addEventListener("keydown", handleCtrlS, { capture: true });
+    return () => window.removeEventListener("keydown", handleCtrlS, { capture: true });
+  }, [saveConfirmOpen, submitForm]);
+
+  // Esc key Discard confirmation
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal]")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (saveConfirmOpenRef.current) {
+        handleResume();
+      } else if (isDirtyRef.current) {
+        lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate('/dashboard');
+      }
+    };
+    window.addEventListener("keydown", handleEsc, { capture: true });
+    return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+  }, [handleResume, navigate]);
 
   if (loading && !company) return <CommonLoader text="Loading Company Settings..." fullScreen={false} />;
 
@@ -178,7 +315,7 @@ const CompanySettings: React.FC = () => {
             <p className="text-ink-muted">Please complete your company onboarding to get started.</p>
           </div>
           <div className="bg-card rounded-xl shadow-lg border border-line-soft">
-            <form onSubmit={handleSubmit} noValidate>
+            <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
               <div className="flex flex-col lg:flex-row min-h-[calc(100vh-270px)]">
 
                 {/* Left: All Input Fields — 70% */}
@@ -271,6 +408,23 @@ const CompanySettings: React.FC = () => {
             </form>
           </div>
         </div>
+
+        <CommonConfirmModal
+          isOpen={saveConfirmOpen}
+          onClose={handleResume}
+          onCancel={handleDiscard}
+          onConfirm={handleSaveFromModal}
+          title="Discard Changes?"
+          message="Are you sure you want to leave? Any unsaved company settings will be lost."
+          warningText="Save to keep your changes, or Discard to leave."
+          cancelText="Discard"
+          cancelVariant="danger"
+          confirmText="Save"
+          confirmVariant="primary"
+          confirmIcon={FaSave}
+          isDangerous={false}
+          defaultFocusCancel={false}
+        />
       </div>
     );
   }
@@ -279,7 +433,7 @@ const CompanySettings: React.FC = () => {
   return (
     <div className="max-w-[1024px] xl:mr-auto">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-        <form onSubmit={handleSubmit} noValidate>
+        <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
           <div className="flex flex-col lg:flex-row">
 
             {/* Left: All Input Fields — 70% */}
@@ -387,6 +541,23 @@ const CompanySettings: React.FC = () => {
           )}
         </form>
       </div>
+
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved company settings will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaSave}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
   );
 };

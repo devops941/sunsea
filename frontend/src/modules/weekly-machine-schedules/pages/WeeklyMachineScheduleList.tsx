@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronRight as FaCaretRight, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -73,7 +74,11 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [isGroupDelete, setIsGroupDelete] = useState<boolean>(false);
 
-    usePageShortcuts({ onRefresh: () => dispatch(fetchWeeklyPrograms(undefined)), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => dispatch(fetchWeeklyPrograms(undefined)),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => can("weekly_programs.create") && navigate("/weekly-machine-schedules/create"),
+    });
 
 
     const getMondayDateStr = () => {
@@ -235,6 +240,14 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const totalPages = Math.ceil(groupedData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedGroups = groupedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const tableRef = useRef<HTMLDivElement>(null);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: paginatedGroups.length,
+        onEnter: (i) => { const row = paginatedGroups[i]; if (row) toggleGroup(row.weekKey); },
+        containerRef: tableRef,
+    });
 
     const handleOpenAdd = () => {
         navigate("/weekly-machine-schedules/create");
@@ -445,13 +458,14 @@ const WeeklyMachineScheduleList: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <div className="p-0">
+                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none p-0">
                     <DataTable
                         columns={columns}
                         data={paginatedGroups}
                         rowKey={(row) => row.weekKey}
                         loading={loading}
-                        onRowClick={(row) => toggleGroup(row.weekKey)}
+                        rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                        onRowClick={(row, i) => { setFocusedIndex(i); toggleGroup(row.weekKey); }}
                         renderSubRow={renderSubRow}
                         emptyMessage="No weekly schedules found."
                     />

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { FaSave, FaEraser, FaCheckCircle, FaInfoCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaEraser, FaCheckCircle, FaInfoCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaCheck } from "react-icons/fa";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -45,7 +47,34 @@ const HourlyWorkReportEdit: React.FC = () => {
     const [showNewHighModal, setShowNewHighModal] = useState(false);
     const [newHighDetails, setNewHighDetails] = useState<any>(null);
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+    handleSubmitRef.current = () => { formRef.current?.requestSubmit(); };
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault(); e.stopPropagation();
+            if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
+            if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
+            else { navigate("/hourly-work-reports"); }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
 
     useEffect(() => {
         if (locationState.state) {
@@ -117,6 +146,7 @@ const HourlyWorkReportEdit: React.FC = () => {
     };
 
     return (
+        <>
         <div className="p-4 md:p-6 min-h-screen">
             <div className="bg-card rounded-2xl shadow-sm border border-line-soft">
 
@@ -130,7 +160,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6" noValidate>
+                <form ref={formRef} onSubmit={handleSubmit} onInput={() => setIsDirty(true)} onKeyDown={handleFormKeyDown} className="px-6 py-6 space-y-6" noValidate>
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
                         {/* Left Card: Read-Only Reference Info */}
@@ -408,6 +438,19 @@ const HourlyWorkReportEdit: React.FC = () => {
                 </div>
             </CommonModal>
         </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onConfirm={() => { setSaveConfirmOpen(false); setTimeout(() => handleSubmitRef.current(), 150); }}
+            title="Unsaved Changes"
+            message="You have unsaved changes. Do you want to save before leaving?"
+            confirmText="Save"
+            cancelText="Discard"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/hourly-work-reports"); }}
+        />
+        </>
     );
 };
 

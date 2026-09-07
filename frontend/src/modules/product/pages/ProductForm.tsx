@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaSave, FaEraser, FaTimes, FaPlus, FaImage } from "react-icons/fa";
+import { FaSave, FaEraser, FaTimes, FaPlus, FaImage, FaCheck } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -16,7 +17,9 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { getImageUrl } from "../../../utils/ImageUrls";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import BackButton from "../../../components/ui/BackButton/BackButton";
-import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
+import AutocompleteInput, { type AutocompleteOption } from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { employeeService } from "../../../services/employeeService";
 import { roleService } from "../../../services/roleService";
@@ -77,7 +80,7 @@ const ProductForm: React.FC = () => {
 
     const [formData, setFormData] = useState(initialFormState);
 
-    const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
+    const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([{ rawMaterialId: "", percentage: "" }]);
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
     const [initialCapacities, setInitialCapacities] = useState<InitialCapacityRow[]>([]);
 
@@ -90,7 +93,18 @@ const ProductForm: React.FC = () => {
     const [gradeRates, setGradeRates] = useState<Record<string, string>>({});
     const [categories, setCategories] = useState<any[]>([]);
 
-    useFormShortcuts({});
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
     const fetchStoresData = useCallback(() => {
         storeService.fetchAll({ storeCategory: "FINISHED_GOODS" }).then(res => {
@@ -179,13 +193,16 @@ const ProductForm: React.FC = () => {
             openingStockStoreId: latestStock ? String(latestStock.storeId) : "",
         });
 
-        if (productData.billOfMaterials) {
-            setRawMaterials(productData.billOfMaterials.filter((bom: any) => bom.percentage !== null).map((bom: any) => ({
-                rawMaterialId: bom.rawMaterialId,
-                percentage: bom.percentage ? String(bom.percentage) : ""
-            })));
+        if (productData.billOfMaterials && productData.billOfMaterials.length > 0) {
+            const loadedBOM = productData.billOfMaterials
+                .filter((bom: any) => bom.percentage !== null)
+                .map((bom: any) => ({
+                    rawMaterialId: String(bom.rawMaterialId),
+                    percentage: bom.percentage ? String(bom.percentage) : ""
+                }));
+            setRawMaterials(loadedBOM.length > 0 ? loadedBOM : [{ rawMaterialId: "", percentage: "" }]);
         } else {
-            setRawMaterials([]);
+            setRawMaterials([{ rawMaterialId: "", percentage: "" }]);
         }
 
         // Load grade-based rates from product data
@@ -292,27 +309,39 @@ const ProductForm: React.FC = () => {
             }
         }
 
-        if (rawMaterials.length === 0) {
+        const filledRows = rawMaterials.filter(rm => (rm.rawMaterialId && rm.rawMaterialId.trim() !== "") || (rm.percentage && rm.percentage.trim() !== ""));
+
+        if (filledRows.length === 0) {
             newErrors.rawMaterials = "At least one raw material is required for BOM composition.";
             toast.error("At least one raw material is required for BOM composition.");
         } else {
-            const totalPercent = rawMaterials.reduce((acc, rm) => acc + Number(rm.percentage), 0);
-            if (Math.abs(totalPercent - 100) > 0.01) {
-                newErrors.rawMaterials = "Total percentage must be exactly 100%";
-                toast.error("Total Raw Material percentage must be exactly 100%");
-            }
-
-            const selectedRmIds = rawMaterials.map(rm => rm.rawMaterialId).filter(Boolean);
-            const uniqueRmIds = new Set(selectedRmIds);
-            if (uniqueRmIds.size !== selectedRmIds.length) {
-                newErrors.rawMaterials = "Duplicate raw materials selected in BOM.";
-                toast.error("Duplicate raw materials selected in BOM");
-            }
-
             rawMaterials.forEach((rm, index) => {
-                if (!rm.rawMaterialId) newErrors[`rawMaterials.${index}.rawMaterialId`] = "Required";
-                if (!rm.percentage || Number(rm.percentage) <= 0) newErrors[`rawMaterials.${index}.percentage`] = "Invalid %";
+                if (rm.rawMaterialId && (!rm.percentage || Number(rm.percentage) <= 0)) {
+                    newErrors[`rawMaterials.${index}.percentage`] = "Invalid %";
+                }
+                if (!rm.rawMaterialId && rm.percentage) {
+                    newErrors[`rawMaterials.${index}.rawMaterialId`] = "Required";
+                }
             });
+
+            const validRmRows = rawMaterials.filter(rm => rm.rawMaterialId && rm.rawMaterialId.trim() !== "");
+            if (validRmRows.length === 0) {
+                newErrors.rawMaterials = "At least one raw material is required for BOM composition.";
+                toast.error("At least one raw material is required for BOM composition.");
+            } else {
+                const totalPercent = validRmRows.reduce((acc, rm) => acc + (Number(rm.percentage) || 0), 0);
+                if (Math.abs(totalPercent - 100) > 0.01) {
+                    newErrors.rawMaterials = `Total percentage must be exactly 100% (currently ${totalPercent.toFixed(2)}%)`;
+                    toast.error(`Total Raw Material percentage must be exactly 100% (currently ${totalPercent.toFixed(2)}%)`);
+                }
+
+                const selectedRmIds = validRmRows.map(rm => rm.rawMaterialId).filter(Boolean);
+                const uniqueRmIds = new Set(selectedRmIds);
+                if (uniqueRmIds.size !== selectedRmIds.length) {
+                    newErrors.rawMaterials = "Duplicate raw materials selected in BOM.";
+                    toast.error("Duplicate raw materials selected in BOM");
+                }
+            }
         }
 
         // Validate Initial Capacity Setup fields — all fields mandatory when a setup is added
@@ -335,29 +364,43 @@ const ProductForm: React.FC = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        setIsDirty(true);
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
     };
 
-    const handleAddRawMaterial = () => {
+    const handleAddRawMaterial = useCallback(() => {
         setRawMaterials(prev => [...prev, { rawMaterialId: "", percentage: "" }]);
-    };
+        setIsDirty(true);
+    }, []);
 
-    const handleRemoveRawMaterial = (index: number) => {
-        setRawMaterials(prev => prev.filter((_, i) => i !== index));
-    };
+    const handleRemoveRawMaterial = useCallback((index: number) => {
+        setRawMaterials(prev => {
+            const next = prev.filter((_, i) => i !== index);
+            return next.length > 0 ? next : [{ rawMaterialId: "", percentage: "" }];
+        });
+        setIsDirty(true);
+    }, []);
 
-    const handleRawMaterialChange = (index: number, field: keyof RawMaterialRow, value: string) => {
+    const handleRawMaterialChange = useCallback((index: number, field: keyof RawMaterialRow, value: string) => {
         setRawMaterials(prev => {
             const newRm = [...prev];
+            if (!newRm[index]) {
+                newRm[index] = { rawMaterialId: "", percentage: "" };
+            }
             newRm[index] = { ...newRm[index], [field]: value };
             return newRm;
         });
-        if (errors[`rawMaterials.${index}.${field}`] || errors.rawMaterials) {
-            setErrors(prev => ({ ...prev, [`rawMaterials.${index}.${field}`]: "", rawMaterials: "" }));
-        }
-    };
+        setIsDirty(true);
+        setErrors(prev => {
+            if (!prev[`rawMaterials.${index}.${field}`] && !prev.rawMaterials) return prev;
+            const next = { ...prev };
+            delete next[`rawMaterials.${index}.${field}`];
+            delete next.rawMaterials;
+            return next;
+        });
+    }, []);
 
     const handleAddInitialCapacity = () => {
         setInitialCapacities(prev => [...prev, {
@@ -431,7 +474,7 @@ const ProductForm: React.FC = () => {
 
     const handleClear = () => {
         setFormData(prev => ({ ...initialFormState, productCode: prev.productCode }));
-        setRawMaterials([]);
+        setRawMaterials([{ rawMaterialId: "", percentage: "" }]);
         setInitialCapacities([]);
         setGradeRates({});
         setErrors({});
@@ -439,6 +482,31 @@ const ProductForm: React.FC = () => {
         setNewImagePreviews([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
+
+    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/products");
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -482,7 +550,8 @@ const ProductForm: React.FC = () => {
             if (formData.openingStockQty) payload.append("openingStockQty", formData.openingStockQty);
             if (formData.openingStockStoreId) payload.append("openingStockStoreId", formData.openingStockStoreId);
 
-            const combinedBOM = rawMaterials.map(rm => ({
+            const validRawMaterials = rawMaterials.filter(rm => rm.rawMaterialId && String(rm.rawMaterialId).trim() !== "");
+            const combinedBOM = validRawMaterials.map(rm => ({
                 rawMaterialId: rm.rawMaterialId,
                 percentage: rm.percentage,
                 requiredQuantity: 0
@@ -519,6 +588,7 @@ const ProductForm: React.FC = () => {
                 await addProduct(payload as any);
                 toast.success("Product created successfully!");
             }
+            setIsDirty(false);
             navigate("/products");
         } catch (err: any) {
             toast.error(err.message || (isEditMode ? "Failed to update product" : "Failed to create product"));
@@ -537,13 +607,99 @@ const ProductForm: React.FC = () => {
         ...stores.map(s => ({ value: String(s.storeId), label: s.storeCode ? `${s.storeName} (${s.storeCode})` : s.storeName })),
     ], [stores]);
 
-    const bomOptions = useMemo(() => {
+    const bomAutocompleteOptions: AutocompleteOption[] = useMemo(() => {
         return allRawMaterials.map(rm => ({
             value: String(rm.rawMaterialId),
-            label: rm.materialName,
-            disabled: rawMaterials.some(r => String(r.rawMaterialId) === String(rm.rawMaterialId))
+            label: rm.materialName || rm.materialCode || String(rm.rawMaterialId),
+            info: rm.materialCode ? (
+                <span className="text-[11px] font-semibold text-ink-subtle">
+                    {rm.materialCode}
+                </span>
+            ) : undefined,
         }));
-    }, [allRawMaterials, rawMaterials]);
+    }, [allRawMaterials]);
+
+    const totalBOMPercentage = useMemo(() => {
+        return rawMaterials.reduce((acc, rm) => acc + (Number(rm.percentage) || 0), 0);
+    }, [rawMaterials]);
+
+    const bomColumns: BusyColumn<RawMaterialRow>[] = useMemo(() => [
+        {
+            key: "rawMaterialId",
+            header: "Item",
+            width: "1fr",
+            render: (row: RawMaterialRow, index: number, update: (patch: Partial<RawMaterialRow>) => void) => {
+                const selectedInOtherRows = new Set(
+                    rawMaterials
+                        .filter((_, i) => i !== index)
+                        .map(r => String(r.rawMaterialId))
+                        .filter(Boolean)
+                );
+                const opts = bomAutocompleteOptions.map(o => ({
+                    ...o,
+                    disabled: selectedInOtherRows.has(o.value),
+                }));
+                return (
+                    <AutocompleteInput
+                        inline
+                        name={`rawMaterials.${index}.rawMaterialId`}
+                        value={row?.rawMaterialId || ""}
+                        options={opts}
+                        placeholder="Type to search..."
+                        error={errors[`rawMaterials.${index}.rawMaterialId`]}
+                        onChange={(rmId) => {
+                            update({ rawMaterialId: rmId });
+                            setIsDirty(true);
+                            setErrors(prev => {
+                                if (!prev[`rawMaterials.${index}.rawMaterialId`] && !prev.rawMaterials) return prev;
+                                const next = { ...prev };
+                                delete next[`rawMaterials.${index}.rawMaterialId`];
+                                delete next.rawMaterials;
+                                return next;
+                            });
+                            setTimeout(() => {
+                                const pctCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                const pctInput = pctCell?.querySelector("input") as HTMLInputElement | null;
+                                if (pctInput) { pctInput.focus(); pctInput.select(); }
+                            }, 50);
+                        }}
+                    />
+                );
+            },
+        },
+        {
+            key: "percentage",
+            header: "Percentage (%)",
+            width: "140px",
+            align: "center" as const,
+            render: (row: RawMaterialRow, index: number, update: (patch: Partial<RawMaterialRow>) => void) => {
+                return (
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        data-nav
+                        value={row?.percentage ?? ""}
+                        onChange={e => {
+                            const val = e.target.value.replace(/[^0-9.]/g, "");
+                            const parts = val.split(".");
+                            const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : val;
+                            update({ percentage: cleanVal });
+                            setIsDirty(true);
+                            setErrors(prev => {
+                                if (!prev[`rawMaterials.${index}.percentage`] && !prev.rawMaterials) return prev;
+                                const next = { ...prev };
+                                delete next[`rawMaterials.${index}.percentage`];
+                                delete next.rawMaterials;
+                                return next;
+                            });
+                        }}
+                        placeholder="0.00"
+                        className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0"
+                    />
+                );
+            },
+        },
+    ], [rawMaterials, bomAutocompleteOptions, errors]);
 
     const hasAnyImage = existingImages.length > 0 || newImagePreviews.length > 0;
 
@@ -556,12 +712,14 @@ const ProductForm: React.FC = () => {
     }
 
     return (
+        <>
         <div className="w-full max-w-[1200px] mr-auto product-form-compact">
             {/* Compact overrides for child form components */}
             <style>{`
                 .product-form-compact label { margin-bottom: 3px !important; font-size: 11px !important; }
                 .product-form-compact input, .product-form-compact select,
                 .product-form-compact button[role="combobox"] { height: 34px !important; min-height: 34px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+                .product-form-compact [data-r] input { height: 100% !important; min-height: 0 !important; font-size: 13px !important; }
                 .product-form-compact .group { margin-bottom: 0 !important; }
             `}</style>
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
@@ -572,7 +730,7 @@ const ProductForm: React.FC = () => {
                     <BackButton text="Back to List" to="/products" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-5 py-3 space-y-3" noValidate>
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-5 py-3 space-y-3" noValidate>
 
                     {/* ── Section 1: Basic Product Details ── */}
                     <div>
@@ -639,9 +797,10 @@ const ProductForm: React.FC = () => {
                                     <input
                                         ref={fileInputRef}
                                         type="file"
+                                        data-nav
                                         multiple
                                         accept="image/png,image/jpeg,image/webp"
-                                        className="w-full text-[11px] text-ink-muted file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-primary/15 file:text-primary hover:file:bg-primary/25 cursor-pointer"
+                                        className="w-full text-[11px] text-ink-muted file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-primary/15 file:text-primary hover:file:bg-primary/25 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 rounded"
                                         onChange={handleImageChange}
                                         disabled={remainingSlots <= 0}
                                         style={{ height: 'auto', minHeight: 'auto' }}
@@ -683,68 +842,35 @@ const ProductForm: React.FC = () => {
 
                         {/* Raw Materials BOM */}
                         <div>
-                            <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Raw Materials (BOM) <span className="text-rose-500">*</span></h3>
-                                <CustomButton text="Add Raw Material" icon={FaPlus} onClick={handleAddRawMaterial} type="button" size="sm" variant="secondary" />
+                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">
+                                    Raw Materials (BOM) <span className="text-rose-500">*</span>
+                                </h3>
                             </div>
-                            <DataTable
-                                columns={[
+
+                            {errors.rawMaterials && (
+                                <p className="mb-2 text-[11px] text-rose-400 font-medium">{errors.rawMaterials}</p>
+                            )}
+
+                            <BusyItemsTable<RawMaterialRow>
+                                columns={bomColumns}
+                                rows={rawMaterials}
+                                onChange={(newRows) => {
+                                    setRawMaterials(newRows);
+                                    setIsDirty(true);
+                                }}
+                                emptyRow={{ rawMaterialId: "", percentage: "" }}
+                                onAdd={handleAddRawMaterial}
+                                onRemove={handleRemoveRawMaterial}
+                                editable={true}
+                                showTotals={[
                                     {
-                                        header: "RAW MATERIAL",
-                                        render: (_, idx) => (
-                                            <SelectInput
-                                                hideLabel
-                                                noMargin
-                                                name={`rm-${idx}`}
-                                                value={rawMaterials[idx]?.rawMaterialId ?? ""}
-                                                options={[{ value: "", label: "-- Select --" }, ...bomOptions]}
-                                                onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)}
-                                                error={errors[`rawMaterials.${idx}.rawMaterialId`]}
-                                            />
-                                        ),
+                                        colKey: "percentage",
+                                        value: `${totalBOMPercentage % 1 === 0 ? totalBOMPercentage : Number(totalBOMPercentage.toFixed(2))}%`,
                                     },
-                                    {
-                                        header: "PERCENTAGE (%)",
-                                        width: "200px",
-                                        render: (_, idx) => (
-                                            <TextInput
-                                                label=""
-                                                bottom
-                                                name={`percent-${idx}`}
-                                                type="number"
-                                                step="0.01"
-                                                value={rawMaterials[idx]?.percentage ?? ""}
-                                                placeholder="0.00"
-                                                onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)}
-                                                error={errors[`rawMaterials.${idx}.percentage`]}
-                                            />
-                                        ),
-                                    },
-                                    {
-                                        header: "",
-                                        width: "52px",
-                                        align: "center",
-                                        render: (_, idx) => (
-                                            <DeleteButton onClick={() => handleRemoveRawMaterial(idx)} />
-                                        ),
-                                    },
-                                ] as DataTableColumn<any>[]}
-                                data={rawMaterials}
-                                rowKey={(rm) => rm.rawMaterialId || rawMaterials.indexOf(rm)}
-                                minHeightClassName="min-h-0"
-                                density="compact"
-                                emptyMessage={
-                                    <span className={errors.rawMaterials ? "text-rose-400 font-medium" : "text-ink-subtle"}>
-                                        No raw materials added. Click "Add Raw Material" to specify the composition.
-                                    </span>
-                                }
+                                ]}
+                                visibleRows={10}
                             />
-                            {errors.rawMaterials && rawMaterials.length === 0 && (
-                                <p className="mt-1 text-[10px] text-rose-400 font-medium">{errors.rawMaterials}</p>
-                            )}
-                            {errors.rawMaterials && rawMaterials.length > 0 && (
-                                <p className="mt-1 text-[10px] text-rose-400 font-medium">{errors.rawMaterials}</p>
-                            )}
                         </div>
                     </div>
 
@@ -799,6 +925,25 @@ const ProductForm: React.FC = () => {
                 </form>
             </div>
         </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+            onConfirm={() => {
+                setSaveConfirmOpen(false);
+                setTimeout(() => {
+                    handleSubmitRef.current();
+                    setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                }, 150);
+            }}
+            title="Unsaved Changes"
+            message="You have unsaved changes. Do you want to save before leaving?"
+            confirmText="Save"
+            cancelText="Discard"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/products"); }}
+        />
+        </>
     );
 };
 

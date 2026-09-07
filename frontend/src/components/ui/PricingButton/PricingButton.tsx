@@ -33,7 +33,7 @@ const PricingButton: React.FC<PricingButtonProps> = ({
       disabled={disabled && !disabledMessage}
       title={title}
     >
-      <FaTags />
+      <FaTags className="pricing-btn-icon" />
     </button>
   );
 };

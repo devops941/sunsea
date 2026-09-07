@@ -114,6 +114,7 @@ export const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
                         inputMode="numeric"
                         pattern="[0-9]*"
                         name={name}
+                        data-nav
                         placeholder={placeholder || "98765 43210"}
                         value={displayValue}
                         onChange={handleInputChange}
@@ -228,6 +229,8 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
     const [draftError, setDraftError] = useState<string | null>(null);
     const [requiredError, setRequiredError] = useState<string | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const wasOpened = useRef(false);
 
     // close dropdown on outside click
@@ -240,6 +243,16 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // multi mode: auto-focus input when dropdown opens
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
 
     // multi mode: validate (required + 10-digit Indian number) whenever the dropdown closes
     useEffect(() => {
@@ -270,6 +283,48 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
         const usedTypes = entries.map((e) => e.label);
         const availableTypes = PHONE_ENTRY_TYPES.filter((t) => !usedTypes.includes(t));
 
+        const focusNextFormField = () => {
+            const form = wrapperRef.current?.closest('form') || wrapperRef.current?.closest('.form-container') || document;
+            if (!form) return;
+            const fields = Array.from(
+                form.querySelectorAll<HTMLElement>('[data-nav]')
+            ).filter(
+                (el) =>
+                    !el.hasAttribute('disabled') &&
+                    !(el as HTMLInputElement).disabled &&
+                    el.offsetParent !== null
+            );
+            const currentIdx = fields.indexOf(triggerRef.current!);
+            if (currentIdx !== -1 && currentIdx + 1 < fields.length) {
+                const nextEl = fields[currentIdx + 1];
+                nextEl.focus();
+                if (nextEl instanceof HTMLInputElement && nextEl.type !== 'button') {
+                    setTimeout(() => nextEl.select(), 0);
+                }
+            }
+        };
+
+        const focusPrevFormField = () => {
+            const form = wrapperRef.current?.closest('form') || wrapperRef.current?.closest('.form-container') || document;
+            if (!form) return;
+            const fields = Array.from(
+                form.querySelectorAll<HTMLElement>('[data-nav]')
+            ).filter(
+                (el) =>
+                    !el.hasAttribute('disabled') &&
+                    !(el as HTMLInputElement).disabled &&
+                    el.offsetParent !== null
+            );
+            const currentIdx = fields.indexOf(triggerRef.current!);
+            if (currentIdx > 0) {
+                const prevEl = fields[currentIdx - 1];
+                prevEl.focus();
+                if (prevEl instanceof HTMLInputElement && prevEl.type !== 'button') {
+                    setTimeout(() => prevEl.select(), 0);
+                }
+            }
+        };
+
         const formatNumber = (num: string) => {
             const digits = num.replace('+91', '').replace(/\D/g, '');
             return digits.length === 10
@@ -277,37 +332,37 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                 : num;
         };
 
-        const commitDraft = () => {
+        const commitDraft = (): boolean => {
             const rawName = draftName || availableTypes[0];
             const raw = draftValue.trim();
 
             if (!rawName) {
                 setDraftError('All number types have been added');
-                return;
+                return false;
             }
             if (!raw) {
                 setDraftError('Enter a mobile number');
-                return;
+                return false;
             }
 
             const digits = raw.replace(/\D/g, '');
             if (digits.length !== 10) {
                 setDraftError('Enter a valid 10-digit mobile number');
-                return;
+                return false;
             }
             const formatted = `+91${digits}`;
 
             if (entries.some((e) => e.label === rawName)) {
                 setDraftError(`${rawName} is already added`);
-                return;
+                return false;
             }
             if (entries.some((e) => e.number === formatted)) {
                 setDraftError('This number is already added');
-                return;
+                return false;
             }
             if (!isValidPhoneNumber(formatted)) {
                 setDraftError('Enter a valid Indian mobile number');
-                return;
+                return false;
             }
 
             const updated = [...entries, { label: rawName, number: formatted }];
@@ -317,6 +372,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
             onChange({ target: { name, value: updated } });
             setDraftValue('');
             setDraftError(null);
+            return true;
         };
 
         const handleRemove = (idx: number) => {
@@ -327,12 +383,58 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
             onChange({ target: { name, value: updated } });
         };
 
+        const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsOpen(true);
+            } else if (/^[0-9]$/.test(e.key)) {
+                e.preventDefault();
+                e.stopPropagation();
+                setDraftValue(e.key);
+                setIsOpen(true);
+            }
+        };
+
         const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                commitDraft();
+                e.stopPropagation();
+                if (draftValue.trim()) {
+                    const success = commitDraft();
+                    if (success) {
+                        setIsOpen(false);
+                        setTimeout(() => focusNextFormField(), 50);
+                    }
+                } else if (entries.length > 0) {
+                    setIsOpen(false);
+                    setTimeout(() => focusNextFormField(), 50);
+                } else {
+                    commitDraft();
+                }
             } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
                 setIsOpen(false);
+                triggerRef.current?.focus();
+            } else if (e.key === 'ArrowUp') {
+                if (availableTypes.length > 1) {
+                    e.preventDefault();
+                    const currentIdx = availableTypes.indexOf(draftName as PhoneEntryType);
+                    const prevIdx = (currentIdx - 1 + availableTypes.length) % availableTypes.length;
+                    setDraftName(availableTypes[prevIdx]);
+                } else if (!draftValue.trim()) {
+                    e.preventDefault();
+                    setIsOpen(false);
+                    focusPrevFormField();
+                }
+            } else if (e.key === 'ArrowDown') {
+                if (availableTypes.length > 1 && !draftValue.trim()) {
+                    e.preventDefault();
+                    const currentIdx = availableTypes.indexOf(draftName as PhoneEntryType);
+                    const nextIdx = (currentIdx + 1) % availableTypes.length;
+                    setDraftName(availableTypes[nextIdx]);
+                }
             }
         };
 
@@ -361,8 +463,11 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                 <div className={`relative ${multiHorizontal ? "flex-1" : ""}`}>
                     {/* ---- Closed field / trigger ---- */}
                     <button
+                        ref={triggerRef}
                         type="button"
+                        data-nav
                         onClick={() => setIsOpen((prev) => !prev)}
+                        onKeyDown={handleTriggerKeyDown}
                         className={`
                             w-full min-h-10 pl-4 pr-3 py-1.5
                             flex items-center justify-between gap-2
@@ -400,7 +505,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                             tabIndex={0}
                                             onClick={(e) => { e.stopPropagation(); handleRemove(0); }}
                                             aria-label={`Remove ${entry.label}`}
-                                            className="flex items-center justify-center w-4 h-4 rounded-full shrink-0 hover:bg-primary/20 transition-colors"
+                                            className="flex items-center justify-center w-4 h-4 rounded-full shrink-0 hover:bg-primary/20 transition-colors cursor-pointer"
                                         >
                                             <X size={11} />
                                         </span>
@@ -460,6 +565,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                     >
                                         <span className="text-[15px] font-medium text-ink-subtle select-none">+91</span>
                                         <input
+                                            ref={inputRef}
                                             type="text"
                                             inputMode="numeric"
                                             autoComplete="off"

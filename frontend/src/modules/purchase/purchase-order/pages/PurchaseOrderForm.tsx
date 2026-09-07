@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { FaSave, FaPaperPlane, FaPlus, FaTrash, FaUser, FaMapMarkerAlt, FaBoxOpen, FaInfoCircle } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../../hooks/useFormKeyboardNav";
+import { FaSave, FaPaperPlane, FaPlus, FaTrash, FaUser, FaMapMarkerAlt, FaBoxOpen, FaInfoCircle, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import CustomButton from "../../../../components/ui/Button/Button";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
+import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
@@ -17,6 +19,7 @@ import type { StateCityOption } from "../../../../components/ui/CityStateSelect/
 
 import { validatePurchaseOrder } from "../validations/purchaseOrderValidation";
 import type { PurchaseOrderFormData, PurchaseOrderItem } from "../../../../features/purchaseOrder/types";
+import { getUomMultiplier } from "../utils/uomUtils";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
 import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
@@ -65,29 +68,6 @@ const initialFormData: PurchaseOrderFormData = {
   totalSgst: 0,
   totalIgst: 0,
   netAmount: 0,
-};
-
-export const getUomMultiplier = (uom: string = "", baseUom: string = ""): number => {
-  const u = (uom || "").trim().toLowerCase();
-  const b = (baseUom || "").trim().toLowerCase();
-  if (!u || u === b) return 1;
-  if (u === "g" || u === "gram" || u === "grams") {
-    if (b.includes("kg") || b === "kilogram" || b === "kilograms" || !b) return 0.001;
-  }
-  if (u === "kg" || u === "kilogram" || u === "kilograms") {
-    if (b === "g" || b === "gram" || b === "grams") return 1000;
-  }
-  if (u === "mg") {
-    if (b.includes("kg")) return 0.000001;
-    if (b.includes("g")) return 0.001;
-  }
-  if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") {
-    if (b.includes("kg") || !b) return 1000;
-  }
-  if (u === "ml" && (b.includes("l") || !b)) return 0.001;
-  if (u === "mm" && (b.includes("m") || !b)) return 0.001;
-  if (u === "cm" && (b.includes("m") || !b)) return 0.01;
-  return 1;
 };
 
 const mapPOToFormData = (po: any): PurchaseOrderFormData => {
@@ -172,7 +152,60 @@ const PurchaseOrderForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
 
-  useFormShortcuts({});
+  // ── Keyboard nav / Escape modal ─────────────────────────────────────────
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleSaveRef = useRef<() => void>(() => {});
+  const isDirtyRef = useRef(isDirty);
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  const focusFirstField = useCallback(() => {
+    const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+    first?.focus();
+  }, []);
+
+  // F8 — clear form (create mode only; isLocked is always false in create mode)
+  const handleF8 = useCallback(() => {
+    if (!isEdit) {
+      setFormData({ ...initialFormData, poNumber: formData.poNumber, createdByOn: formData.createdByOn });
+      setErrors({});
+      setIsDirty(false);
+      setTimeout(() => focusFirstField(), 100);
+    }
+  }, [isEdit, formData.poNumber, formData.createdByOn, focusFirstField]);
+
+  useFormShortcuts({ onSave: () => handleSaveRef.current(), onDelete: handleF8 });
+
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+  // Auto-focus first field when loading finishes (edit mode: formRef is null during load)
+  useEffect(() => {
+    if (loading) return;
+    const timer = setTimeout(() => focusFirstField(), 250);
+    return () => clearTimeout(timer);
+  }, [loading, focusFirstField]);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (saveConfirmOpenRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (isDirtyRef.current) {
+        lastFocusedRef.current = document.activeElement as HTMLElement;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate("/purchase-orders");
+      }
+    };
+    document.addEventListener("keydown", handleEscape, true);
+    return () => document.removeEventListener("keydown", handleEscape, true);
+  }, [navigate]);
 
   const selectedSupplier = useMemo(() => (suppliers || []).find(
     (s) => String(s?.id) === String(formData.supplierId)
@@ -432,6 +465,7 @@ const PurchaseOrderForm: React.FC = () => {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
+    setIsDirty(true);
     const { name, value } = e.target;
 
     if (name === "supplierId") {
@@ -611,6 +645,7 @@ const PurchaseOrderForm: React.FC = () => {
 
 
   const handleItemChange = (index: number, field: keyof PurchaseOrderItem | "uom", value: any, selectedUom?: string) => {
+    setIsDirty(true);
     setFormData((prev) => {
       const items = [...prev.items];
       const updatedUom = selectedUom !== undefined ? selectedUom : (field === "uom" ? value : items[index].uom);
@@ -671,6 +706,7 @@ const PurchaseOrderForm: React.FC = () => {
   };
 
   const handleItemProductChange = (index: number, productId: string) => {
+    setIsDirty(true);
     const rawMaterial = rawMaterials.find(
       (rm) => String(rm.rawMaterialId) === String(productId)
     );
@@ -768,6 +804,7 @@ const PurchaseOrderForm: React.FC = () => {
   };
 
   const addItem = () => {
+    setIsDirty(true);
     setFormData((prev) => {
       const items = [
         ...prev.items,
@@ -796,6 +833,7 @@ const PurchaseOrderForm: React.FC = () => {
   };
 
   const removeItem = (index: number) => {
+    setIsDirty(true);
     setFormData((prev) => {
       const items = prev.items.filter((_, i) => i !== index);
       return {
@@ -885,12 +923,21 @@ const PurchaseOrderForm: React.FC = () => {
             : "Purchase Order approved successfully!"
         );
       }
+      setIsDirty(false);
       navigate("/purchase-orders");
     } catch (error: any) {
       toast.error(error?.message || `Failed to ${isEdit ? "update" : "create"} purchase order`);
     } finally {
       setIsSubmitting(false);
       setIsSubmittingForApproval(false);
+    }
+  };
+
+  // Wire save ref — calls "Save as Draft" (the primary save action)
+  handleSaveRef.current = () => {
+    if (!isSubmitting && !isSubmittingForApproval && !isLocked) {
+      const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+      handleSubmit(fakeEvent, "DRAFT");
     }
   };
 
@@ -977,7 +1024,7 @@ const PurchaseOrderForm: React.FC = () => {
           </div>
         )}
 
-        <form noValidate>
+        <form ref={formRef} onKeyDown={handleFormKeyDown} data-escape-guarded noValidate>
           <div className="px-5 py-3 space-y-3">
 
             {/* ── Section 1: PO Details ── */}
@@ -1133,6 +1180,22 @@ const PurchaseOrderForm: React.FC = () => {
           </div>
         </form>
       </div>
+
+      <CommonConfirmModal
+        show={saveConfirmOpen}
+        onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+        onConfirm={() => { setSaveConfirmOpen(false); handleSaveRef.current(); }}
+        onCancel={() => { setSaveConfirmOpen(false); navigate("/purchase-orders"); }}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved purchase order details will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        isDangerous={false}
+      />
     </div>
   );
 };

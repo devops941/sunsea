@@ -237,11 +237,16 @@ export default function CreatableSelectInput({
           type="text"
           name={name}
           autoComplete="off"
+          data-nav
           disabled={disabled || isLoading}
           placeholder={isLoading ? 'Loading...' : 'Select or create...'}
           value={inputDisplayValue}
-          onFocus={openDropdown}
           onClick={() => { if (!isOpen) openDropdown(); }}
+          onBlur={() => {
+            // Options use onMouseDown+preventDefault so blur won't fire on option click.
+            // This fires only when focus truly leaves (Tab, click outside).
+            closeDropdown();
+          }}
           onChange={(e) => {
             if (!isOpen) openDropdown();
             setInputText(e.target.value);
@@ -320,6 +325,7 @@ export default function CreatableSelectInput({
           createPortal(
             <div
               ref={portalRef}
+              data-select-portal="true"
               className="bg-card border border-line-soft rounded-xl shadow-xl flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink"
               style={dropdownStyle}
             >

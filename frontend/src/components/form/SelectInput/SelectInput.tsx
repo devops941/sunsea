@@ -176,7 +176,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
         e.preventDefault();
         updateDropdownPosition();
         setIsOpen(true);
@@ -207,6 +207,11 @@ const SelectInput: React.FC<SelectInputProps> = ({
           const opt = filteredOptions[highlightedIndex];
           if (!opt.disabled) handleSelect(opt.value, opt.disabled);
         }
+        break;
+      case "Tab":
+        // Close immediately on Tab; let focus move naturally (no preventDefault)
+        setIsOpen(false);
+        setSearchTerm("");
         break;
       case "Escape":
         e.preventDefault();
@@ -260,6 +265,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
               autoComplete="off"
               ref={triggerRef}
               disabled={disabled}
+              data-nav
               value={isOpen ? searchTerm : toPlainText(displayLabel)}
               placeholder={toPlainText(displayLabel)}
               onChange={(e) => {
@@ -269,11 +275,18 @@ const SelectInput: React.FC<SelectInputProps> = ({
                   setIsOpen(true);
                 }
               }}
-              onFocus={() => {
-                if (!disabled) {
+              onClick={() => {
+                if (!disabled && !isOpen) {
                   updateDropdownPosition();
                   setIsOpen(true);
                 }
+              }}
+              onBlur={() => {
+                // Delay so option onClick can fire before dropdown unmounts
+                setTimeout(() => {
+                  setIsOpen(false);
+                  setSearchTerm("");
+                }, 150);
               }}
               onKeyDown={handleKeyDown}
               className={`
@@ -296,6 +309,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
               type="button"
               ref={triggerRef}
               disabled={disabled}
+              data-nav
               onClick={() => {
                 if (!disabled) {
                   if (!isOpen) updateDropdownPosition();

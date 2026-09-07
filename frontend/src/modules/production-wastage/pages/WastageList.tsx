@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -41,7 +42,11 @@ const WastageList: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
-  usePageShortcuts({ onRefresh: () => dispatch(fetchProductionWastages({ page: currentPage, limit: ITEMS_PER_PAGE })), onDelete: () => setShowDeleteModal(true) });
+  usePageShortcuts({
+    onRefresh: () => dispatch(fetchProductionWastages({ page: currentPage, limit: ITEMS_PER_PAGE })),
+    onDelete: () => setShowDeleteModal(true),
+    onNew: () => can("production-wastages.create") && navigate("/production-wastages/create"),
+  });
 
   useEffect(() => {
     dispatch(fetchProductionWastages({
@@ -118,6 +123,8 @@ const WastageList: React.FC = () => {
     setShowViewModal(true);
   }, []);
 
+  const tableRef = useRef<HTMLDivElement>(null);
+
   const fetchWastagesForExport = useCallback(async () => {
     try {
       const res = await productionWastageService.getAll({ page: 1, limit: 100000 });
@@ -149,6 +156,13 @@ const WastageList: React.FC = () => {
   const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
   const displayWastages = wastages || [];
 
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: displayWastages.length,
+    onEnter: (i) => { const item = displayWastages[i]; if (item) handleView(item); },
+    onEdit: (i) => { const item = displayWastages[i]; if (item && can("production-wastages.edit")) navigate(`/production-wastages/edit/${item.id}`, { state: item }); },
+    containerRef: tableRef,
+  });
+
   return (
     <div className="p-4 md:p-1">
       <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
@@ -170,10 +184,13 @@ const WastageList: React.FC = () => {
         </div>
 
         {/* Table */}
+        <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
         <DataTable
           data={displayWastages}
           rowKey={(item) => String(item.id)}
           loading={loading}
+          rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+          onRowClick={(item, i) => { setFocusedIndex(i); handleView(item); }}
           pagination={{
             currentPage,
             totalPages,
@@ -235,6 +252,7 @@ const WastageList: React.FC = () => {
           ]}
           emptyMessage="No wastage logs found"
         />
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}
