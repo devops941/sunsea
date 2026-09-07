@@ -122,7 +122,10 @@ class PettyCashService {
       data: {
         entryNo,
         entryDate,
-        category: data.category,
+        // Category is optional now; default to the ledger name via a follow-up
+        // lookup would be ideal, but keeping "-" avoids a spurious DB round-trip
+        // when the frontend legitimately doesn't send one.
+        category: data.category || "-",
         description: data.description,
         amount: new Prisma.Decimal(data.amount),
         type: data.type,
@@ -130,6 +133,9 @@ class PettyCashService {
         receiptNo: data.receiptNo || null,
         companyId: data.companyId,
         createdBy: createdBy || null,
+        // Counter-side ledger picked by the operator (drives Golden-Rule
+        // posting in voucherPostingService.postPettyCashVoucher below).
+        accountLedgerId: data.accountLedgerId ?? null,
       },
     });
 

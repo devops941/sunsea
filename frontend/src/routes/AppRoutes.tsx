@@ -188,7 +188,10 @@ const PurchaseOrderListPage = lazy(() => import("../modules/purchase/purchase-or
 const PurchaseOrderForm = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderForm"));
 
 
-const ExpensesList = lazy(() => import("../modules/expenses/ExpensesList"));
+const ExpenseListPage = lazy(() => import("../modules/expenses/ExpenseListPage"));
+const ExpenseAddPage = lazy(() => import("../modules/expenses/ExpenseAddPage"));
+const ExpenseEditPage = lazy(() => import("../modules/expenses/ExpenseEditPage"));
+const ExpenseModifyPickerPage = lazy(() => import("../modules/expenses/ExpenseModifyPickerPage"));
 
 const InvoiceList = lazy(() => import("../modules/purchase/purchase-order/invoice/InvoiceList"));
 const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/InvoiceDetailPage"));
@@ -207,15 +210,24 @@ const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/recei
 const LedgerStatementPage = lazy(() => import("../modules/accounts/pages/ledger-statement/LedgerStatementPage"));
 const ChartOfAccountsPage = lazy(() => import("../modules/accounts/pages/chart-of-accounts/ChartOfAccountsPage"));
 const BankAccountsPage = lazy(() => import("../modules/accounts/pages/bank/BankAccountsPage"));
+const DayBookPage = lazy(() => import("../modules/accounts/pages/day-book/DayBookPage"));
 const BankStatementPage = lazy(() => import("../modules/accounts/pages/bank/BankStatementPage"));
 const PaymentVoucherPage = lazy(() => import("../modules/accounts/pages/vouchers/PaymentVoucherPage"));
 const PaymentVoucherAddPage = lazy(() => import("../modules/accounts/pages/vouchers/PaymentVoucherAddPage"));
+const PaymentVoucherEditPage = lazy(() => import("../modules/accounts/pages/vouchers/PaymentVoucherEditPage"));
+const PaymentVoucherModifyPickerPage = lazy(() => import("../modules/accounts/pages/vouchers/PaymentVoucherModifyPickerPage"));
 const ReceiptVoucherPage = lazy(() => import("../modules/accounts/pages/vouchers/ReceiptVoucherPage"));
 const ReceiptVoucherAddPage = lazy(() => import("../modules/accounts/pages/vouchers/ReceiptVoucherAddPage"));
+const ReceiptVoucherEditPage = lazy(() => import("../modules/accounts/pages/vouchers/ReceiptVoucherEditPage"));
+const ReceiptVoucherModifyPickerPage = lazy(() => import("../modules/accounts/pages/vouchers/ReceiptVoucherModifyPickerPage"));
 const JournalEntryPage = lazy(() => import("../modules/accounts/pages/vouchers/JournalEntryPage"));
 const JournalEntryAddPage = lazy(() => import("../modules/accounts/pages/vouchers/JournalEntryAddPage"));
+const JournalEntryEditPage = lazy(() => import("../modules/accounts/pages/vouchers/JournalEntryEditPage"));
+const JournalEntryModifyPickerPage = lazy(() => import("../modules/accounts/pages/vouchers/JournalEntryModifyPickerPage"));
 const ContraVoucherPage = lazy(() => import("../modules/accounts/pages/vouchers/ContraVoucherPage"));
 const ContraVoucherAddPage = lazy(() => import("../modules/accounts/pages/vouchers/ContraVoucherAddPage"));
+const ContraVoucherEditPage = lazy(() => import("../modules/accounts/pages/vouchers/ContraVoucherEditPage"));
+const ContraVoucherModifyPickerPage = lazy(() => import("../modules/accounts/pages/vouchers/ContraVoucherModifyPickerPage"));
 const TrialBalancePage = lazy(() => import("../modules/accounts/pages/reports/TrialBalancePage"));
 const BalanceSheetPage = lazy(() => import("../modules/accounts/pages/reports/BalanceSheetPage"));
 const ProfitLossPage = lazy(() => import("../modules/accounts/pages/reports/ProfitLossPage"));
@@ -228,9 +240,6 @@ const SalesReturnCreatePage = lazy(() =>
 );
 const PurchaseReturnPage = lazy(() =>
   import("../modules/accounts/pages/returns/PurchaseReturnPage").then((m) => ({ default: m.PurchaseReturnPage }))
-);
-const PettyCashPage = lazy(() =>
-  import("../modules/accounts/pages/petty-cash/PettyCashPage").then((m) => ({ default: m.PettyCashPage }))
 );
 
 // ===========================================================================
@@ -438,18 +447,18 @@ const AppRoutes = () => {
               </Route>
 
               {/* ---------- Accounts & Financials ---------- */}
-              <Route element={<ProtectedRoute permissionAny={["accounts.view", "payable.view", "receivable.view", "vouchers.view", "petty-cash.view", "chart-of-accounts.view"]} />}>
+              <Route element={<ProtectedRoute permissionAny={["accounts.view", "payable.view", "receivable.view", "vouchers.view", "chart-of-accounts.view"]} />}>
                 <Route path="/accounts/payable" element={<AmountPayablePage />} />
                 <Route path="/accounts/receivable" element={<AmountReceivablePage />} />
                 <Route path="/accounts/ledger-statement" element={<LedgerStatementPage />} />
                 <Route path="/accounts/ledger-statement/merged" element={<LedgerStatementPage />} />
                 <Route path="/accounts/chart-of-accounts" element={<ChartOfAccountsPage />} />
                 <Route path="/accounts/bank-accounts" element={<BankAccountsPage />} />
+                <Route path="/accounts/day-book" element={<DayBookPage />} />
                 <Route path="/accounts/payment-voucher" element={<PaymentVoucherPage />} />
                 <Route path="/accounts/receipt-voucher" element={<ReceiptVoucherPage />} />
                 <Route path="/accounts/journal-entry" element={<JournalEntryPage />} />
                 <Route path="/accounts/contra-entry" element={<ContraVoucherPage />} />
-                <Route path="/accounts/petty-cash" element={<PettyCashPage />} />
                 <Route path="/accounts/trial-balance" element={<TrialBalancePage />} />
                 <Route path="/accounts/balance-sheet" element={<BalanceSheetPage />} />
                 <Route path="/accounts/profit-loss" element={<ProfitLossPage />} />
@@ -465,9 +474,21 @@ const AppRoutes = () => {
             {/* ---------- Accounts Voucher Add Pages + Bank Statement ---------- */}
             <Route element={<ProtectedRoute permissionAny={["vouchers.view", "accounts.view"]} />}>
               <Route path="/accounts/payment-voucher/add" element={<PaymentVoucherAddPage />} />
+              <Route path="/accounts/payment-voucher/edit/:id" element={<PaymentVoucherEditPage />} />
+              <Route path="/accounts/payment-voucher/modify" element={<PaymentVoucherModifyPickerPage />} />
               <Route path="/accounts/receipt-voucher/add" element={<ReceiptVoucherAddPage />} />
+              <Route path="/accounts/receipt-voucher/edit/:id" element={<ReceiptVoucherEditPage />} />
+              <Route path="/accounts/receipt-voucher/modify" element={<ReceiptVoucherModifyPickerPage />} />
               <Route path="/accounts/journal-entry/add" element={<JournalEntryAddPage />} />
+              <Route path="/accounts/journal-entry/edit/:id" element={<JournalEntryEditPage />} />
+              <Route path="/accounts/journal-entry/modify" element={<JournalEntryModifyPickerPage />} />
               <Route path="/accounts/contra-entry/add" element={<ContraVoucherAddPage />} />
+              <Route path="/accounts/contra-entry/edit/:id" element={<ContraVoucherEditPage />} />
+              <Route path="/accounts/contra-entry/modify" element={<ContraVoucherModifyPickerPage />} />
+              <Route path="/expenses" element={<ExpenseListPage />} />
+              <Route path="/expenses/add" element={<ExpenseAddPage />} />
+              <Route path="/expenses/edit/:id" element={<ExpenseEditPage />} />
+              <Route path="/expenses/modify" element={<ExpenseModifyPickerPage />} />
               <Route path="/accounts/bank-accounts/:id" element={<BankStatementPage />} />
             </Route>
 

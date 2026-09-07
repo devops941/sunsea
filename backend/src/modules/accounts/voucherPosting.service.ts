@@ -921,8 +921,14 @@ class VoucherPostingService {
 
     await accountsService.ensureSystemLedgersExist(db);
     const pcashLedger = await db.accountLedger.findUnique({ where: { code: "PCASH-001" } });
-    const expenseLedger = await db.accountLedger.findUnique({ where: { code: "EXP-001" } });
-    const cashLedger = await db.accountLedger.findUnique({ where: { code: "CASH-001" } });
+    // If the operator picked a specific counter-side ledger, honour it; else
+    // fall back to system defaults (EXP-001 for OUT, CASH-001 for IN) so
+    // legacy rows created before this column existed still post correctly.
+    const chosenLedger = entry.accountLedgerId
+      ? await db.accountLedger.findUnique({ where: { id: entry.accountLedgerId } })
+      : null;
+    const expenseLedger = chosenLedger || await db.accountLedger.findUnique({ where: { code: "EXP-001" } });
+    const cashLedger = chosenLedger || await db.accountLedger.findUnique({ where: { code: "CASH-001" } });
 
     if (!pcashLedger || !expenseLedger) {
       console.warn("[Auto-Post Voucher] Missing system ledgers PCASH-001 or EXP-001.");
@@ -1059,12 +1065,27 @@ class VoucherPostingService {
 
     await accountsService.ensureSystemLedgersExist(db);
 
-    const expenseLedger = await db.accountLedger.findUnique({ where: { code: "EXP-001" } });
-    const creditLedgerCode = this.getCreditLedgerCodeForExpense(paymentMethod || expense.paymentMethod);
-    const creditLedger = await db.accountLedger.findUnique({ where: { code: creditLedgerCode } });
+    // Golden-Rule preference: use the ledger IDs the operator picked on the
+    // Expense form (Dr specific expense a/c, Cr specific bank/cash a/c).
+    // Only when those are missing (legacy rows / API imports without the
+    // new fields) do we fall back to EXP-001 + paymentMethod-guessed side.
+    let expenseLedger = expense.debitLedgerId
+      ? await db.accountLedger.findUnique({ where: { id: expense.debitLedgerId } })
+      : null;
+    if (!expenseLedger) {
+      expenseLedger = await db.accountLedger.findUnique({ where: { code: "EXP-001" } });
+    }
+
+    let creditLedger = expense.creditLedgerId
+      ? await db.accountLedger.findUnique({ where: { id: expense.creditLedgerId } })
+      : null;
+    if (!creditLedger) {
+      const creditLedgerCode = this.getCreditLedgerCodeForExpense(paymentMethod || expense.paymentMethod);
+      creditLedger = await db.accountLedger.findUnique({ where: { code: creditLedgerCode } });
+    }
 
     if (!expenseLedger || !creditLedger) {
-      console.warn(`[Auto-Post Expense Voucher] Missing system ledgers EXP-001 or ${creditLedgerCode}.`);
+      console.warn(`[Auto-Post Expense Voucher] Missing ledger(s) for expense ${expense.id} (Dr id=${expense.debitLedgerId ?? "EXP-001"}, Cr id=${expense.creditLedgerId ?? "guessed"}).`);
       return null;
     }
 
@@ -1186,15 +1207,21 @@ class VoucherPostingService {
         prisma.purchaseReturn.findMany({ select: { id: true } }),
         prisma.salesReturn.findMany({ select: { id: true } }),
         prisma.pettyCashEntry.findMany({ select: { id: true, entryNo: true } }),
-        prisma.expense.findMany({
-          include: { supplier: true },
-        }),
+        prisma.expense.findMany({ select: { id: true } }),
       ]));
 
       const postedGrnIds = new Set(postedGrnVouchers.map((v) => v.refDocId).filter(Boolean));
       const postedSalesIds = new Set(postedSalesVouchers.map((v) => v.refDocId).filter(Boolean));
       const postedPRIds = new Set(postedPurchaseReturnVouchers.map((v) => v.refDocId).filter(Boolean));
       const postedSRIds = new Set(postedSalesReturnVouchers.map((v) => v.refDocId).filter(Boolean));
+
+      // Also recover any EXPENSE row whose voucher failed to post at creation.
+      const postedExpenseVouchers = await prisma.voucher.findMany({
+        where: { refDocType: "EXPENSE" },
+        select: { refDocId: true },
+      });
+      const postedExpenseIds = new Set(postedExpenseVouchers.map((v) => v.refDocId).filter(Boolean));
+      const unpostedExpenseIds = allExpenses.filter((e) => !postedExpenseIds.has(e.id)).map((e) => e.id);
 
       const unpostedGrnIds = allGrnIds.filter((g) => !postedGrnIds.has(g.id)).map((g) => g.id);
       const unpostedSalesIds = allSalesIds.filter((s) => !postedSalesIds.has(s.id)).map((s) => s.id);
@@ -1266,38 +1293,27 @@ class VoucherPostingService {
         );
       }
 
-      // Sync unposted Expense & Petty Cash entries
-      const existingEntryNos = new Set(allPettyCashEntries.map((e) => e.entryNo));
-      const pettyCashList: Array<{ id: number; entryNo: string }> = [...allPettyCashEntries];
-
-      for (const exp of allExpenses) {
-        const pcEntryNo = `PC-EXP-${exp.expenseNumber}`;
-        if (!existingEntryNos.has(pcEntryNo)) {
-          try {
-            const createdEntry = await prisma.pettyCashEntry.create({
-              data: {
-                entryNo: pcEntryNo,
-                entryDate: exp.date || new Date(),
-                category: exp.expenseCategory || "General Expense",
-                description: `Expense (${exp.expenseNumber}): ${exp.expense}`,
-                amount: exp.amount ? new Prisma.Decimal(exp.amount) : new Prisma.Decimal(0),
-                type: "OUT",
-                paidTo: exp.supplier?.legalName || null,
-                receiptNo: exp.expenseNumber,
-                companyId: exp.companyId,
-                createdBy: exp.createdBy,
-              },
-            });
-            pettyCashList.push({ id: createdEntry.id, entryNo: createdEntry.entryNo });
-          } catch (pcErr: any) {
-            console.error(`[Auto-Post Voucher Error] Syncing expense ${exp.expenseNumber} to petty cash failed:`, pcErr);
-            failedPostings.push({ id: exp.id, docType: "EXPENSE_PETTY_CASH_SYNC", reason: pcErr?.message || String(pcErr) });
+      // Recover any EXPENSE row whose direct posting at creation failed.
+      for (const id of unpostedExpenseIds) {
+        try {
+          const res = await this.postExpenseVoucher(id);
+          if (!res) {
+            failedPostings.push({ id, docType: "EXPENSE", reason: "Returned null (missing ledger or invalid expense)" });
           }
+        } catch (err: any) {
+          failedPostings.push({ id, docType: "EXPENSE", reason: err?.message || String(err) });
         }
       }
 
+      // Sync unposted Petty Cash entries only.
+      // NOTE: We used to also create a `PC-EXP-*` PettyCashEntry for every
+      // Expense here as "record-keeping", then post THAT as a PETTY_CASH
+      // voucher below. That double-posted every expense — once as an
+      // EXPENSE voucher (by `postExpenseVoucher`) and again as PETTY_CASH.
+      // TB / P&L expense totals were inflated. Removed — expenses now post
+      // exactly once via the loop above, petty cash entries post below.
       const postedPettyCashIds = new Set(postedPettyCashVouchers.map((v) => v.refDocId).filter(Boolean));
-      const unpostedPettyCashIds = pettyCashList.filter((p) => !postedPettyCashIds.has(String(p.id))).map((p) => p.id);
+      const unpostedPettyCashIds = allPettyCashEntries.filter((p) => !postedPettyCashIds.has(String(p.id))).map((p) => p.id);
 
       for (const id of unpostedPettyCashIds) {
         try {

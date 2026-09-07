@@ -32,6 +32,23 @@ export interface CreateLedgerDto {
   openingBalanceType?: "DEBIT" | "CREDIT";
 }
 
+export interface LedgerStatementItemDetail {
+  description: string;
+  uom?: string | null;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+/** Extra invoice-level info surfaced under an entry when Show Items Details = Y.
+ *  Populated only for entries backed by a Sales Invoice today (transport +
+ *  bundle count + bill sundry lines like Lorry Freight / Discount / etc.). */
+export interface LedgerStatementEntryMeta {
+  transport?: string | null;
+  numberOfBundle?: number | null;
+  billSundry?: Array<{ label: string; amount: number }>;
+}
+
 export interface LedgerStatementEntry {
   id: string;
   voucherId?: number | string;
@@ -46,6 +63,11 @@ export interface LedgerStatementEntry {
   debit: number;
   credit: number;
   runningBalance: number;
+  /** Line-items of the source document (Sales Invoice / GRN). Present only when
+   *  the voucher was auto-posted from an invoice, otherwise undefined. */
+  items?: LedgerStatementItemDetail[];
+  /** Invoice-level extras (transport, bundle count, bill sundry). */
+  meta?: LedgerStatementEntryMeta;
 }
 
 export interface LedgerStatementResult {
@@ -77,6 +99,40 @@ export interface MultiLedgerStatementResult {
     closing: number;
     closingSide: "Dr" | "Cr";
   }>;
+}
+
+export interface DayBookRow {
+  voucherId: number;
+  voucherNo: string;
+  voucherType: string;
+  date: string;
+  typeShort: string;
+  particulars: string;
+  ledgerCode: string | null;
+  isCash: boolean;
+  cashAmount: number;
+  amount: number;
+  narration: string | null;
+}
+
+export interface DayBookResult {
+  startDate: string | null;
+  endDate: string | null;
+  openingCashBalance: number;
+  closingCashBalance: number;
+  debitRows: DayBookRow[];
+  creditRows: DayBookRow[];
+  totals: {
+    cashDrTotal: number;
+    cashCrTotal: number;
+    amountDrTotal: number;
+    amountCrTotal: number;
+    grandCashDr: number;
+    grandCashCr: number;
+    grandAmountDr: number;
+    grandAmountCr: number;
+  };
+  voucherCount: number;
 }
 
 export const accountService = {
@@ -158,6 +214,19 @@ export const accountService = {
    * Pass EITHER `ids` (comma-separated ledger ids) OR `group` (group name = all ledgers in that group).
    * Omit both to get "All Accounts" combined view.
    */
+  /**
+   * Day Book (Busy-style two-column cashbook) — returns Dr-side rows and
+   * Cr-side rows for every voucher in the date range, plus opening/closing
+   * cash balance and totals for the cash reconciliation invariant.
+   */
+  fetchDayBook: async (params?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<DayBookResult> => {
+    const response = await apiClient.get(`/accounts/day-book`, { params });
+    return response.data?.data || response.data;
+  },
+
   fetchMultiStatement: async (params?: {
     ids?: number[];
     group?: string;

@@ -1567,6 +1567,13 @@ model Expense {
   receiptInvoice  String?   @db.VarChar(255)
   companyId       String    @db.Uuid
   supplierId      Int?
+  // Golden-Rule fields: operator picks the EXACT expense ledger to Debit
+  // (Nominal — Dr all expenses) and the EXACT bank/cash ledger to Credit
+  // (Real — Cr what goes out). Nullable so legacy rows keep working; when
+  // both are present the posting engine uses them directly instead of
+  // guessing from paymentMethod string.
+  debitLedgerId   Int?
+  creditLedgerId  Int?
   createdBy       String?
   createdAt       DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
@@ -2030,18 +2037,19 @@ model Category {
 }
 
 model AccountLedger {
-  id          Int           @id @default(autoincrement())
-  code        String        @unique @db.VarChar(30)
-  name        String        @db.VarChar(160)
-  type        LedgerType
-  group       String        @db.VarChar(80)
-  isActive    Boolean       @default(true)
-  customerId  String?       @unique @db.Uuid
-  supplierId  Int?          @unique
-  customer    Customer?     @relation(fields: [customerId], references: [id])
-  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
-  debitItems  JournalItem[] @relation("DebitItems")
-  creditItems JournalItem[] @relation("CreditItems")
+  id                Int              @id @default(autoincrement())
+  code              String           @unique @db.VarChar(30)
+  name              String           @db.VarChar(160)
+  type              LedgerType
+  group             String           @db.VarChar(80)
+  isActive          Boolean          @default(true)
+  customerId        String?          @unique @db.Uuid
+  supplierId        Int?             @unique
+  customer          Customer?        @relation(fields: [customerId], references: [id])
+  supplier          Supplier?        @relation(fields: [supplierId], references: [id])
+  debitItems        JournalItem[]    @relation("DebitItems")
+  creditItems       JournalItem[]    @relation("CreditItems")
+  pettyCashEntries  PettyCashEntry[] @relation("PettyCashEntryLedger")
 
   @@map("account_ledgers")
 }
@@ -2168,21 +2176,36 @@ model PurchaseReturnItem {
 }
 
 model PettyCashEntry {
-  id          Int      @id @default(autoincrement())
-  entryNo     String   @unique @db.VarChar(30)
-  entryDate   DateTime @db.Date
-  category    String   @db.VarChar(80)
-  description String?  @db.VarChar(255)
-  amount      Decimal  @db.Decimal(14, 2)
-  type        String   @db.VarChar(3)
-  paidTo      String?  @db.VarChar(160)
-  receiptNo   String?  @db.VarChar(50)
-  companyId   String   @db.Uuid
-  createdBy   String?  @db.VarChar(36)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  entryNo         String   @unique @db.VarChar(30)
+  entryDate       DateTime @db.Date
+  category        String   @db.VarChar(80)
+  description     String?  @db.VarChar(255)
+  amount          Decimal  @db.Decimal(14, 2)
+  type            String   @db.VarChar(3)
+  paidTo          String?  @db.VarChar(160)
+  receiptNo       String?  @db.VarChar(50)
+  companyId       String   @db.Uuid
+  createdBy       String?  @db.VarChar(36)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  /**
+   * User-chosen counter-side ledger for double-entry posting.
+   *
+   *   OUT (cash disbursed) → DEBIT `accountLedgerId` (an expense / creditor)
+   *                          CREDIT Petty Cash Account (PCASH-001)
+   *   IN  (cash replenished) → DEBIT  Petty Cash Account (PCASH-001)
+   *                            CREDIT `accountLedgerId` (Cash/Bank source)
+   *
+   * Nullable for backwards-compatibility with rows created before this
+   * column existed — posting service falls back to system defaults
+   * (EXP-001 / CASH-001) when missing.
+   */
+  accountLedgerId Int?
+  accountLedger   AccountLedger? @relation("PettyCashEntryLedger", fields: [accountLedgerId], references: [id])
 
   @@index([companyId])
+  @@index([accountLedgerId])
   @@map("petty_cash_entries")
 }
 

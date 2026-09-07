@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import {
   FaBook,
   FaSync,
@@ -26,6 +26,7 @@ import {
 } from "../../../../services/accountService";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { useDetailCache, invalidateDetailCache, prefetchDetail } from "../../../../hooks/useDetailCache";
+import { useListCache } from "../../../../hooks/useListCache";
 
 type ViewMode = "one" | "group" | "all" | "selected";
 
@@ -53,9 +54,33 @@ function shortVoucherType(t: string | null | undefined): string {
   }
 }
 
+/**
+ * Display a voucher number the way the user typed it — strip the auto-added
+ * `SLS-` / `PUR-` / `EXP-` / etc. prefix that the ledger posting layer stuck
+ * on top of the operator's actual invoice number.
+ *
+ * Examples:
+ *   "SLS-INV-2026-27-0001"  →  "INV-2026-27-0001"
+ *   "PUR-GRN-2026-0007"     →  "GRN-2026-0007"
+ *   "PAY-2"                 →  "PAY-2"   (no strip — this IS the number)
+ *   "RCT-1"                 →  "RCT-1"
+ *   "JRN-3"                 →  "JRN-3"
+ */
+function ledgerVoucherLabel(voucherNo: string | null | undefined): string {
+  if (!voucherNo) return "";
+  // Only strip when there's a SECOND alpha segment behind the prefix
+  // (SLS-INV-…, PUR-GRN-…). Bare types like PAY-2 stay as-is.
+  const match = voucherNo.match(/^([A-Z]+)-([A-Z]+.*)$/);
+  if (!match) return voucherNo;
+  const [, prefix, rest] = match;
+  if (["SLS", "PUR", "EXP", "SRT", "PRT"].includes(prefix)) return rest;
+  return voucherNo;
+}
+
 export const LedgerStatementPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   // /accounts/ledger-statement/merged → Merged Accounts flow (Busy's "Merged
   // Ledger" report). Skips the Format + Mode dialogs, opens a small "Merged
   // Ledger for ?" modal with Group / Selected only, and renders a flat
@@ -107,8 +132,54 @@ export const LedgerStatementPage: React.FC = () => {
     return selectionReady ? "table" : "options";
   })();
 
-  const [ledgers, setLedgers] = useState<AccountLedger[]>([]);
-  const [groupedLedgers, setGroupedLedgers] = useState<Array<{ group: string; ledgers: AccountLedger[] }>>([]);
+  // Ledger list — cached via useListCache so it's loaded ONCE (or hits the
+  // pre-warmed cache from AccountsPrefetcher) and stays live-synced through
+  // socket `accountLedger:*` events. Prior implementation re-fetched every
+  // time this component mounted (or `sidebarSearch` changed), which is what
+  // caused the "Loading accounts data …" progress bar the user saw on every
+  // filter re-open. Same cacheKey as AccountsPrefetcher → instant hit.
+  const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
+    const list = res.ledgers || [];
+    return { data: list, total: list.length };
+  }, []);
+  const { data: ledgers } = useListCache<AccountLedger>({
+    cacheKey: "accounts:ledgers:all",
+    socketModule: "accountLedger",
+    fetcher: ledgersFetcher,
+  });
+  // Derive grouped view client-side from the flat cached list.
+  //
+  // Each ledger contributes to UP TO THREE buckets so the Group picker mirrors
+  // the backend's server-side grouping:
+  //   1. Its native `l.group`     (e.g. "Bank Accounts", "Sundry Debtors")
+  //   2. Its customer's Grade    (e.g. "A GRADE")  ← pseudo-group
+  //   3. Its customer's Type     (e.g. "NORTH")     ← pseudo-group
+  //
+  // Grade + Type pseudo-groups let the operator filter Sundry Debtors by
+  // grade/type from the same picker (Busy convention). De-dup by ledger.id
+  // per bucket so a ledger never doubles up under one key.
+  const groupedLedgers = useMemo(() => {
+    const map: Record<string, AccountLedger[]> = {};
+    const push = (key: string, l: AccountLedger) => {
+      if (!key) return;
+      if (!map[key]) map[key] = [];
+      if (!map[key].some((x) => x.id === l.id)) map[key].push(l);
+    };
+    for (const l of ledgers) {
+      push(l.group || "Other", l);
+      const grade = (l as any).customer?.customerGrade?.name as string | undefined;
+      const type = (l as any).customer?.customerType?.name as string | undefined;
+      if (grade) push(grade, l);
+      if (type) push(type, l);
+    }
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([group, ls]) => ({
+        group,
+        ledgers: [...ls].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+      }));
+  }, [ledgers]);
   const [viewMode, setViewMode] = useState<ViewMode>(urlSeed.mode);
   // Busy sequences three panels: Format → Mode → Options. Format is Step 1
   // and starts open; Mode/Options unlock as the user progresses. When the
@@ -170,8 +241,38 @@ export const LedgerStatementPage: React.FC = () => {
     balanceShownAs: "daily",
     showActualName: false,
   });
-  const defaultOptions: LedgerOptions = defaultOptionsFor("one");
+
+  // ─── Filter persistence ──────────────────────────────────────────
+  // "Yes" once → yes next time. Every dialog re-open hydrates from the
+  // last saved values (localStorage) instead of hard defaults. Only the
+  // toggle-y fields are persisted; mode-specific fields (detailLevel,
+  // applyFilterClosing) still follow the current scope.
+  const LEDGER_OPTIONS_KEY = "sunsea:ledger:options:v1";
+  const loadSavedOptions = (): Partial<LedgerOptions> | null => {
+    try {
+      const raw = localStorage.getItem(LEDGER_OPTIONS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  };
+  const saveOptions = (opts: LedgerOptions) => {
+    try {
+      // Persist everything except the mode-locked fields — those follow scope.
+      const { detailLevel: _dl, applyFilterClosing: _afc, ...persistable } = opts;
+      void _dl; void _afc;
+      localStorage.setItem(LEDGER_OPTIONS_KEY, JSON.stringify(persistable));
+    } catch { /* ignore quota */ }
+  };
+  const buildOptionsForMode = (mode: ViewMode): LedgerOptions => {
+    const base = defaultOptionsFor(mode);
+    const saved = loadSavedOptions();
+    return saved ? { ...base, ...saved, detailLevel: base.detailLevel, applyFilterClosing: base.applyFilterClosing } : base;
+  };
+
+  const defaultOptions: LedgerOptions = buildOptionsForMode("one");
   const [options, setOptions] = useState<LedgerOptions>(defaultOptions);
+
+  // Persist every commit so next open starts with the user's last-picked toggles.
+  useEffect(() => { saveOptions(options); }, [options]);
   // Default date range: current Indian financial year (Apr 1 → today).
   // If we're in Jan–Mar, FY starts in April of the previous calendar year.
   const isoDate = (d: Date) => d.toISOString().split("T")[0];
@@ -198,6 +299,224 @@ export const LedgerStatementPage: React.FC = () => {
   // Group dropdown inside the selection panel (searchable, LedgerSearchInput-style)
   const [selGroupPickerOpen, setSelGroupPickerOpen] = useState<boolean>(false);
   const [selGroupPickerQuery, setSelGroupPickerQuery] = useState<string>("");
+  // Keyboard-first: type to filter accounts in the "List of Accounts" panel;
+  // Down/Up navigates a highlight, Space toggles the checkbox at highlight,
+  // Enter advances to the config step. Matches Busy's operator flow.
+  const [selListQuery, setSelListQuery] = useState<string>("");
+  const [selHighlightIdx, setSelHighlightIdx] = useState<number>(-1);
+  const selListSearchRef = useRef<HTMLInputElement>(null);
+  const selListRowsRef = useRef<HTMLDivElement>(null);
+
+  // Keep the highlighted row in view — only scrolls when the row is outside
+  // the visible area, and by the minimum amount needed (matches the same
+  // pattern used inside LedgerSearchInput).
+  useEffect(() => {
+    if (selHighlightIdx < 0 || !selListRowsRef.current) return;
+    const scroller = selListRowsRef.current;
+    const row = scroller.querySelector<HTMLElement>(`[data-sel-row="${selHighlightIdx}"]`);
+    if (!row) return;
+    const scRect = scroller.getBoundingClientRect();
+    const rRect = row.getBoundingClientRect();
+    if (rRect.top < scRect.top) {
+      scroller.scrollTop -= (scRect.top - rRect.top);
+    } else if (rRect.bottom > scRect.bottom) {
+      scroller.scrollTop += (rRect.bottom - scRect.bottom);
+    }
+  }, [selHighlightIdx]);
+
+  // ─── Ledger table row navigation (arrow keys + Enter → voucher edit) ──
+  // Once the statement table is visible, first row is highlighted by default.
+  // ↑/↓ moves the highlight; Enter opens the underlying voucher.
+  const [selectedTableRow, setSelectedTableRow] = useState<number>(-1);
+  const selectedTableRowRef = useRef<number>(-1);
+  useEffect(() => { selectedTableRowRef.current = selectedTableRow; }, [selectedTableRow]);
+
+  // Scroll the highlighted row into view when it moves off-screen. Uses
+  // scrollIntoView({ block: "nearest" }) so no scroll happens when the row
+  // is already visible — matches the LedgerSearchInput behaviour.
+  useEffect(() => {
+    if (selectedTableRow < 0) return;
+    const row = document.querySelector<HTMLElement>(`[data-ledger-row="${selectedTableRow}"]`);
+    if (row) row.scrollIntoView({ block: "nearest" });
+  }, [selectedTableRow]);
+
+  // Options Dialog opens → focus the first field so the operator's keyboard
+  // is instantly on the right control. One/Group modes handle it via native
+  // autoFocus; All mode has no picker so we focus Starting Date; Selected
+  // mode has its own auto-focused hidden search input.
+  useEffect(() => {
+    if (!showOptionsDialog) return;
+    if (viewMode !== "all") return;
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>('input[name="draftStartDate"]')?.focus();
+    });
+  }, [showOptionsDialog, viewMode]);
+
+  // Map a row → its detail/edit route so Enter opens the underlying record.
+  // KEY: for auto-posted vouchers (Sales/Purchase/GRN), the "voucherId" is
+  // the JOURNAL voucher's integer id, but the detail page lives at a URL
+  // keyed by the SOURCE document's UUID → we route by `refDocId` for those
+  // types instead. Voucher-native types (Payment/Receipt/Journal/Contra) use
+  // voucherId directly since the voucher IS the record.
+  const editRouteFor = (row: any): string | null => {
+    if (!row) return null;
+    const t = (row.voucherType || "").toUpperCase();
+    switch (t) {
+      case "PAYMENT":
+        return row.voucherId ? `/accounts/payment-voucher/edit/${row.voucherId}` : null;
+      case "RECEIPT":
+        return row.voucherId ? `/accounts/receipt-voucher/edit/${row.voucherId}` : null;
+      case "JOURNAL":
+        return row.voucherId ? `/accounts/journal-entry/edit/${row.voucherId}` : null;
+      case "CONTRA":
+        return row.voucherId ? `/accounts/contra-entry/edit/${row.voucherId}` : null;
+      case "SALES":
+      case "SALES_INVOICE":
+        return row.refDocId ? `/sales-invoices/details/${row.refDocId}` : null;
+      case "PURCHASE":
+      case "GRN":
+        return row.refDocId ? `/invoice/details/${row.refDocId}` : null;
+      case "EXPENSE":
+        return row.refDocId ? `/accounts/expenses/${row.refDocId}` : null;
+      default:
+        return null;
+    }
+  };
+
+  // ─── Modal keyboard navigation (default highlight + arrow keys + Enter) ──
+  // Every dialog opens with option index 0 highlighted so the operator can
+  // hit Enter immediately to accept the default, or arrow to change first.
+  const [formatDialogHlIdx, setFormatDialogHlIdx] = useState<number>(0);
+  const [modeDialogHlIdx, setModeDialogHlIdx] = useState<number>(0);
+  const [mergedDialogHlIdx, setMergedDialogHlIdx] = useState<number>(0);
+
+  // Reset the highlight to 0 whenever a dialog re-opens so users always land
+  // on the first option (Busy convention — first choice is the default action).
+  useEffect(() => { if (showFormatDialog) setFormatDialogHlIdx(0); }, [showFormatDialog]);
+  useEffect(() => { if (showModeDialog) setModeDialogHlIdx(0); }, [showModeDialog]);
+  useEffect(() => { if (showMergedDialog) setMergedDialogHlIdx(0); }, [showMergedDialog]);
+
+  // Format dialog — Standard / T-Format (2 options, 1 row).
+  useEffect(() => {
+    if (!showFormatDialog) return;
+    const optCount = 2;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFormatDialogHlIdx((p) => Math.min(p + 1, optCount - 1));
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFormatDialogHlIdx((p) => Math.max(p - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = document.querySelector<HTMLButtonElement>(
+          `[data-format-hl="${formatDialogHlIdxRef.current}"]`
+        );
+        btn?.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setShowFormatDialog(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showFormatDialog]);
+
+  // Mode dialog — 2x2 grid: One / Group / All / Selected.
+  useEffect(() => {
+    if (!showModeDialog) return;
+    const optCount = 4;
+    const cols = 2;
+    const onKey = (e: KeyboardEvent) => {
+      const idx = modeDialogHlIdxRef.current;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (idx % cols < cols - 1 && idx + 1 < optCount) setModeDialogHlIdx(idx + 1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (idx % cols > 0) setModeDialogHlIdx(idx - 1);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (idx + cols < optCount) setModeDialogHlIdx(idx + cols);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (idx - cols >= 0) setModeDialogHlIdx(idx - cols);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = document.querySelector<HTMLButtonElement>(
+          `[data-mode-hl="${modeDialogHlIdxRef.current}"]`
+        );
+        btn?.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setShowModeDialog(false);
+        setShowFormatDialog(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showModeDialog]);
+
+  // Options config dialog — Esc reverses to the previous step (Merged /
+  // Format / Mode) matching the "← Back" button in the header. Keeps the
+  // whole reverse-nav chain keyboard-only.
+  useEffect(() => {
+    if (!showOptionsDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Ignore Esc typed inside a text input's search dropdown, etc.
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        // Let child components handle Esc first (clear their own state).
+        // If focus is still on that element next tick, we do nothing —
+        // caller's onKeyDown already handled it.
+        return;
+      }
+      e.preventDefault();
+      setShowOptionsDialog(false);
+      if (isMerged) setShowMergedDialog(true);
+      else if (format === "t-format") setShowFormatDialog(true);
+      else setShowModeDialog(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, isMerged, format]);
+
+  // Merged Ledger dialog — currently 1 option (Account Group).
+  useEffect(() => {
+    if (!showMergedDialog) return;
+    const optCount = 1;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setMergedDialogHlIdx((p) => Math.min(p + 1, optCount - 1));
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setMergedDialogHlIdx((p) => Math.max(p - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = document.querySelector<HTMLButtonElement>(
+          `[data-merged-hl="${mergedDialogHlIdxRef.current}"]`
+        );
+        btn?.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setShowMergedDialog(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showMergedDialog]);
+
+  // Refs mirror the latest highlight index so the keydown closures (which
+  // capture state at effect-attach time) always click the CURRENT selection,
+  // not the one that was active when the effect was first registered.
+  const formatDialogHlIdxRef = useRef(formatDialogHlIdx);
+  const modeDialogHlIdxRef = useRef(modeDialogHlIdx);
+  const mergedDialogHlIdxRef = useRef(mergedDialogHlIdx);
+  useEffect(() => { formatDialogHlIdxRef.current = formatDialogHlIdx; }, [formatDialogHlIdx]);
+  useEffect(() => { modeDialogHlIdxRef.current = modeDialogHlIdx; }, [modeDialogHlIdx]);
+  useEffect(() => { mergedDialogHlIdxRef.current = mergedDialogHlIdx; }, [mergedDialogHlIdx]);
   // Selected mode is a 2-step flow: "panel" (Busy's Select Accounts screen)
   // then "config" (dates + toggles). Other scopes stay single-panel.
   const [selectedStep, setSelectedStep] = useState<"panel" | "config">("panel");
@@ -255,27 +574,14 @@ export const LedgerStatementPage: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // Auto-select first ledger once the cached list arrives (drop-in for the
+  // old inline `setSelectedLedgerId(res.ledgers[0].id)` behaviour).
   useEffect(() => {
-    const loadLedgerList = async () => {
-      try {
-        const res = await accountService.fetchLedgers({
-          page: 1,
-          limit: 1000,
-          search: sidebarSearch || undefined,
-          grouped: true,
-        });
-        setLedgers(res.ledgers || []);
-        setGroupedLedgers(res.grouped || []);
-        if (res.ledgers && res.ledgers.length > 0 && !selectedLedgerId) {
-          setSelectedLedgerId(res.ledgers[0].id);
-        }
-      } catch (err: any) {
-        toast.error("Failed to load ledgers list");
-      }
-    };
-    loadLedgerList();
+    if (ledgers.length > 0 && !selectedLedgerId) {
+      setSelectedLedgerId(ledgers[0].id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarSearch]);
+  }, [ledgers]);
 
   const sortedSelectedIds = useMemo(
     () => Array.from(selectedLedgerIds).sort((a, b) => a - b).join(","),
@@ -419,10 +725,17 @@ export const LedgerStatementPage: React.FC = () => {
       });
     }
     if (options.dailyBal) {
-      // Show only the last row per date (the "daily closing" balance)
-      const perDate = new Map<string, any>();
-      for (const row of list) perDate.set(row.date, row);
-      list = Array.from(perDate.values());
+      // Busy behaviour: keep EVERY entry, but overwrite the balance column
+      // with the day's CLOSING balance (last entry of that date). Previously
+      // this filtered out non-last rows which hid Sales/Receipt entries the
+      // user still wants to see — the toggle only changes the balance value,
+      // not the row set.
+      const dailyClose = new Map<string, number>();
+      for (const row of list as any[]) dailyClose.set(row.date, row.runningBalance);
+      list = (list as any[]).map((row) => ({
+        ...row,
+        runningBalance: dailyClose.get(row.date) ?? row.runningBalance,
+      }));
     }
     return list;
   }, [statement, isMerged, options.skipOpening, options.chronological, options.dailyBal]);
@@ -442,7 +755,7 @@ export const LedgerStatementPage: React.FC = () => {
     const isMulti = statement.mode === "multi";
     const columns = [
       { header: "Date", accessor: (item: any) => item.date },
-      { header: "Voucher No", accessor: (item: any) => item.voucherNo },
+      { header: "Voucher No", accessor: (item: any) => ledgerVoucherLabel(item.voucherNo) },
       { header: "Type", accessor: (item: any) => item.voucherType },
       ...(isMulti ? [{ header: "Account", accessor: (item: any) => item.accountName || "-" }] : []),
       { header: "Particulars", accessor: (item: any) => item.particulars },
@@ -460,6 +773,76 @@ export const LedgerStatementPage: React.FC = () => {
       csvFilename: `Ledger_Statement_${nameForFile}_${new Date().toISOString().split("T")[0]}.csv`,
     };
   }, [statement, filteredEntries]);
+
+  // Auto-select the first row as soon as the table has entries. Reset when
+  // filter/dates change (statement id or entries length changes).
+  useEffect(() => {
+    if (filteredEntries.length > 0) setSelectedTableRow(0);
+    else setSelectedTableRow(-1);
+  }, [filteredEntries.length, statement]);
+
+  // Keyboard nav on the statement table — only active while the table is
+  // visible (statement loaded, no modals open). ↑/↓ moves highlight, PgUp/
+  // PgDn jumps 10, Home/End jumps to first/last, Enter opens the voucher's
+  // edit page (falls back to view page for sales/purchase types).
+  useEffect(() => {
+    const tableVisible = !!statement
+      && !showFormatDialog && !showModeDialog && !showMergedDialog && !showOptionsDialog;
+    if (!tableVisible) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      const total = filteredEntries.length;
+      if (total === 0) return;
+      const idx = selectedTableRowRef.current;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedTableRow(idx < 0 ? 0 : Math.min(idx + 1, total - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedTableRow(idx <= 0 ? 0 : idx - 1);
+      } else if (e.key === "PageDown") {
+        e.preventDefault();
+        setSelectedTableRow(Math.min((idx < 0 ? 0 : idx) + 10, total - 1));
+      } else if (e.key === "PageUp") {
+        e.preventDefault();
+        setSelectedTableRow(Math.max((idx < 0 ? 0 : idx) - 10, 0));
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setSelectedTableRow(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setSelectedTableRow(total - 1);
+      } else if (e.key === "Enter") {
+        if (idx < 0 || idx >= total) return;
+        const row: any = filteredEntries[idx];
+        const route = editRouteFor(row);
+        if (route) {
+          e.preventDefault();
+          navigate(route);
+        }
+      } else if (e.key === "Escape") {
+        // Busy reverse-nav: Esc on the table view re-opens the Options
+        // config dialog with the CURRENT filters pre-loaded, so the
+        // operator can tweak dates/toggles and click OK again without
+        // starting over.
+        e.preventDefault();
+        setDraftLedgerId(selectedLedgerId);
+        setDraftGroup(selectedGroup);
+        setDraftLedgerIds(new Set(selectedLedgerIds));
+        setDraftStartDate(startDate);
+        setDraftEndDate(endDate);
+        setDraftOptions(options);
+        setShowOptionsDialog(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statement, showFormatDialog, showModeDialog, showMergedDialog, showOptionsDialog, filteredEntries]);
 
   return (
     <div className="p-3 font-sans text-ink relative" style={{ minHeight: "calc(100vh - 100px)" }}>
@@ -479,9 +862,11 @@ export const LedgerStatementPage: React.FC = () => {
                 {[
                   { key: "group" as const, label: "Account Group", icon: <FaLayerGroup /> },
                   // { key: "selected" as const, label: "Selected Accounts", icon: <FaCheckSquare /> },
-                ].map((m) => (
+                ].map((m, idx) => (
                   <button
                     key={m.key}
+                    data-merged-hl={idx}
+                    onMouseEnter={() => setMergedDialogHlIdx(idx)}
                     onClick={() => {
                       setViewMode(m.key);
                       setShowMergedDialog(false);
@@ -497,7 +882,7 @@ export const LedgerStatementPage: React.FC = () => {
                       setSelGroupPickerOpen(false);
                       setSelGroupPickerQuery("");
                       setSelectedStep("panel");
-                      setDraftOptions(defaultOptionsFor(m.key));
+                      setDraftOptions(buildOptionsForMode(m.key));
                       setShowOptionsDialog(true);
                       writeUrl({
                         mode: m.key,
@@ -514,16 +899,23 @@ export const LedgerStatementPage: React.FC = () => {
                         endDate,
                       });
                     }}
-                    className="p-3 rounded border border-line bg-card-2 hover:border-blue-500 hover:bg-blue-500/10 text-left transition-colors group"
+                    className={`p-3 rounded border text-left transition-colors group ${
+                      mergedDialogHlIdx === idx
+                        ? "bg-blue-500/20 border-blue-500 ring-2 ring-blue-500/40"
+                        : "bg-card-2 hover:border-blue-500 hover:bg-blue-500/10 border-line"
+                    }`}
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-ink group-hover:text-blue-400">
+                    <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                      mergedDialogHlIdx === idx ? "text-blue-300" : "text-ink group-hover:text-blue-400"
+                    }`}>
                       {m.icon} {m.label}
                     </div>
                   </button>
                 ))}
               </div>
               <div className="text-[10px] text-ink-subtle italic pt-3">
-                Press <kbd className="px-1 border border-line rounded bg-card">Esc</kbd> to cancel
+                <kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> cancel
               </div>
             </div>
           </div>
@@ -551,9 +943,11 @@ export const LedgerStatementPage: React.FC = () => {
                     { key: "standard" as const, label: "Standard" },
                     { key: "t-format" as const, label: "T-Format" },
                   ]
-                ).map((f) => (
+                ).map((f, idx) => (
                   <button
                     key={f.key}
+                    data-format-hl={idx}
+                    onMouseEnter={() => setFormatDialogHlIdx(idx)}
                     onClick={() => {
                       setFormat(f.key);
                       setShowFormatDialog(false);
@@ -578,7 +972,7 @@ export const LedgerStatementPage: React.FC = () => {
                         setDraftLedgerIds(new Set());
                         setDraftStartDate(startDate);
                         setDraftEndDate(endDate);
-                        setDraftOptions(defaultOptionsFor("one"));
+                        setDraftOptions(buildOptionsForMode("one"));
                         setShowOptionsDialog(true);
                         // T-Format has no Mode step, so mode=one is implied.
                         writeUrl({ mode: "one" });
@@ -595,14 +989,20 @@ export const LedgerStatementPage: React.FC = () => {
                         setShowModeDialog(true);
                       }
                     }}
-                    className="px-3 py-2 bg-card-2 hover:bg-blue-500/10 hover:border-blue-500 border border-line rounded text-xs font-bold text-ink transition-colors cursor-pointer"
+                    className={`px-3 py-2 border rounded text-xs font-bold transition-colors cursor-pointer ${
+                      formatDialogHlIdx === idx
+                        ? "bg-blue-500/20 border-blue-500 text-blue-300 ring-2 ring-blue-500/40"
+                        : "bg-card-2 hover:bg-blue-500/10 hover:border-blue-500 border-line text-ink"
+                    }`}
                   >
                     {f.label}
                   </button>
                 ))}
               </div>
               <div className="text-center text-[10px] text-ink-subtle italic pt-3">
-                Press <kbd className="px-1 border border-line rounded bg-card">Esc</kbd> to cancel
+                <kbd className="px-1 border border-line rounded bg-card">← →</kbd> select ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> cancel
               </div>
             </div>
           </div>
@@ -637,9 +1037,11 @@ export const LedgerStatementPage: React.FC = () => {
                   { key: "group" as const, label: "Group of Accounts", icon: <FaLayerGroup />, desc: "All accounts in a group" },
                   { key: "all" as const, label: "All Accounts", icon: <FaGlobe />, desc: "Combined across every ledger" },
                   { key: "selected" as const, label: "Selected Accounts", icon: <FaCheckSquare />, desc: "Pick multiple ledgers" },
-                ].map((m) => (
+                ].map((m, idx) => (
                   <button
                     key={m.key}
+                    data-mode-hl={idx}
+                    onMouseEnter={() => setModeDialogHlIdx(idx)}
                     onClick={() => {
                       setViewMode(m.key);
                       setShowModeDialog(false);
@@ -669,7 +1071,7 @@ export const LedgerStatementPage: React.FC = () => {
                       // Reset draft options to the scope-specific Busy defaults
                       // (one → Single Account (Auto); others → All Other Accounts,
                       // and Skip-Opening flips to Apply-Filter-on-Closing-Bal.)
-                      setDraftOptions(defaultOptionsFor(m.key));
+                      setDraftOptions(buildOptionsForMode(m.key));
                       setShowOptionsDialog(true);
                       // Kick off prefetch IMMEDIATELY (before the Options
                       // dialog even paints) using the same draft values we
@@ -685,14 +1087,25 @@ export const LedgerStatementPage: React.FC = () => {
                         endDate,
                       });
                     }}
-                    className="p-3 rounded border border-line bg-card-2 hover:border-blue-500 hover:bg-blue-500/10 text-left transition-colors group"
+                    className={`p-3 rounded border text-left transition-colors group ${
+                      modeDialogHlIdx === idx
+                        ? "bg-blue-500/20 border-blue-500 ring-2 ring-blue-500/40"
+                        : "bg-card-2 hover:border-blue-500 hover:bg-blue-500/10 border-line"
+                    }`}
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-ink group-hover:text-blue-400">
+                    <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                      modeDialogHlIdx === idx ? "text-blue-300" : "text-ink group-hover:text-blue-400"
+                    }`}>
                       {m.icon} {m.label}
                     </div>
                     <div className="text-[10px] text-ink-subtle mt-1">{m.desc}</div>
                   </button>
                 ))}
+              </div>
+              <div className="text-center text-[10px] text-ink-subtle italic pt-3">
+                <kbd className="px-1 border border-line rounded bg-card">← → ↑ ↓</kbd> select ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> back
               </div>
             </div>
             <div className="px-4 py-2 border-t border-line bg-card-2/50 flex items-center justify-between">
@@ -737,12 +1150,23 @@ export const LedgerStatementPage: React.FC = () => {
                   <label className="col-span-4 text-ink-subtle font-semibold">Select Account *</label>
                   <div className="col-span-8">
                     <LedgerSearchInput
+                      autoFocus
                       value={draftLedgerId ? String(draftLedgerId) : ""}
                       ledgers={ledgers}
                       onChange={(v) => setDraftLedgerId(v ? parseInt(v, 10) : null)}
                       placeholder="Type to search..."
                       required
-                      onSelected={(l) => setDraftLedgerId(l.id)}
+                      onSelected={(l) => {
+                        setDraftLedgerId(l.id);
+                        // Busy behaviour — auto-advance focus to the next
+                        // input (Starting Date) so the operator's keyboard
+                        // flow is: search → pick → type date → …
+                        setTimeout(() => {
+                          document
+                            .querySelector<HTMLInputElement>('input[name="draftStartDate"]')
+                            ?.focus();
+                        }, 0);
+                      }}
                     />
                   </div>
                   {draftLedgerId && (() => {
@@ -773,6 +1197,7 @@ export const LedgerStatementPage: React.FC = () => {
                     <div className="relative">
                       <input
                         type="text"
+                        autoFocus
                         value={groupPickerOpen ? groupPickerQuery : (draftGroup || "")}
                         placeholder="Type to search group..."
                         onFocus={() => {
@@ -864,7 +1289,57 @@ export const LedgerStatementPage: React.FC = () => {
                   selFilter === "group" && selFilterGroup
                     ? ledgers.filter((l) => l.group === selFilterGroup)
                     : ledgers;
-                const allTicked = pool.length > 0 && pool.every((l) => draftLedgerIds.has(l.id));
+                // Type-to-search filter — keyboard-first flow, matches Busy.
+                const q = selListQuery.trim().toLowerCase();
+                const filtered = q
+                  ? pool.filter((l) =>
+                      l.name.toLowerCase().includes(q) ||
+                      l.code.toLowerCase().includes(q) ||
+                      (l.group || "").toLowerCase().includes(q) ||
+                      (l.customer?.firmName || "").toLowerCase().includes(q) ||
+                      (l.supplier?.legalName || "").toLowerCase().includes(q)
+                    )
+                  : pool;
+                const allTicked = filtered.length > 0 && filtered.every((l) => draftLedgerIds.has(l.id));
+
+                // Keyboard handlers on the search input — Down/Up navigates
+                // highlight, Space toggles highlighted checkbox (no space
+                // typed in search when a row is active — user can still type
+                // spaces if no highlight is set), Enter advances.
+                const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSelHighlightIdx((prev) => Math.min(prev + 1, filtered.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSelHighlightIdx((prev) => Math.max(prev < 0 ? 0 : prev - 1, 0));
+                  } else if (e.key === "Home") {
+                    e.preventDefault();
+                    setSelHighlightIdx(filtered.length > 0 ? 0 : -1);
+                  } else if (e.key === "End") {
+                    e.preventDefault();
+                    setSelHighlightIdx(filtered.length - 1);
+                  } else if (e.key === " " && selHighlightIdx >= 0 && selHighlightIdx < filtered.length) {
+                    // Toggle checkbox for highlighted row.
+                    e.preventDefault();
+                    const l = filtered[selHighlightIdx];
+                    const next = new Set(draftLedgerIds);
+                    if (next.has(l.id)) next.delete(l.id);
+                    else next.add(l.id);
+                    setDraftLedgerIds(next);
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    // Advance panel → config step (equivalent to "Next →").
+                    if (!selListShown) setSelListShown(true);
+                    else setSelectedStep("config");
+                  } else if (e.key === "Escape") {
+                    if (selListQuery) {
+                      e.preventDefault();
+                      setSelListQuery("");
+                      setSelHighlightIdx(-1);
+                    }
+                  }
+                };
                 return (
                   <>
                     {/* Busy Selection Panel — radio + searchable group +
@@ -1001,21 +1476,88 @@ export const LedgerStatementPage: React.FC = () => {
                        renders at least 15 rows so the panel doesn't collapse
                        when the list is empty / short. */}
                     <div className="col-span-12">
-                      <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle mb-1">
-                        List of Accounts
+                      <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
+                        <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle flex items-center gap-2">
+                          <span>List of Accounts</span>
+                          {selListShown && <span className="text-ink normal-case">· {filtered.length}</span>}
+                          {selListQuery && (
+                            <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 bg-blue-500/15 border border-blue-500/40 text-blue-400 rounded flex items-center gap-1">
+                              🔍 {selListQuery}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelListQuery("");
+                                  setSelHighlightIdx(-1);
+                                  selListSearchRef.current?.focus();
+                                }}
+                                className="text-blue-400 hover:text-blue-200"
+                                title="Clear search (Esc)"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[9px] text-ink-subtle italic">
+                          <kbd className="px-1 border border-line rounded bg-card">type</kbd> filter ·
+                          {" "}<kbd className="px-1 border border-line rounded bg-card">↑↓</kbd> nav ·
+                          {" "}<kbd className="px-1 border border-line rounded bg-card">Space</kbd> tick ·
+                          {" "}<kbd className="px-1 border border-line rounded bg-card">Enter</kbd> next
+                        </div>
                       </div>
-                      <div className="border border-line rounded overflow-auto bg-card-2/40" style={{ maxHeight: 320 }}>
+                      {/* Off-screen input keeps browser-native text handling
+                         (typing, backspace, IME, clipboard) but shows nothing
+                         to the user. Query renders as a small chip on the
+                         label row so they still see what they've typed. */}
+                      <input
+                        ref={selListSearchRef}
+                        type="text"
+                        autoFocus
+                        aria-label="Search accounts"
+                        value={selListQuery}
+                        onChange={(e) => {
+                          setSelListQuery(e.target.value);
+                          if (!selListShown) setSelListShown(true);
+                          setSelHighlightIdx(-1);
+                        }}
+                        onKeyDown={onSearchKeyDown}
+                        onBlur={() => {
+                          // Auto-refocus so keystrokes anywhere in the panel
+                          // still land here. Uses a microtask so a click on
+                          // a real target (checkbox, button) can still handle
+                          // its onClick before we steal focus back.
+                          setTimeout(() => {
+                            if (viewMode === "selected" && selectedStep === "panel") {
+                              selListSearchRef.current?.focus();
+                            }
+                          }, 0);
+                        }}
+                        className="absolute w-px h-px opacity-0 pointer-events-none"
+                        style={{ left: -9999, top: -9999 }}
+                        autoComplete="off"
+                      />
+                      <div
+                        ref={selListRowsRef}
+                        className="border border-line rounded overflow-auto bg-card-2/40"
+                        style={{ maxHeight: 320 }}
+                      >
                         {(() => {
-                          const visible = !selListShown ? [] : pool.slice(0, 1000);
+                          const visible = !selListShown ? [] : filtered.slice(0, 1000);
                           const fillerCount = Math.max(0, 15 - visible.length);
                           return (
                             <>
                               {visible.map((l, i) => (
                                 <label
                                   key={l.id}
+                                  data-sel-row={i}
+                                  onMouseEnter={() => setSelHighlightIdx(i)}
                                   className={`flex items-center gap-2 px-2 py-0.5 text-[10px] border-b border-line-soft cursor-pointer ${
-                                    i % 2 === 1 ? "bg-card-2/20" : ""
-                                  } hover:bg-card-2`}
+                                    selHighlightIdx === i
+                                      ? "bg-blue-600/20 text-ink"
+                                      : i % 2 === 1
+                                        ? "bg-card-2/20 hover:bg-card-2"
+                                        : "hover:bg-card-2"
+                                  }`}
                                 >
                                   <input
                                     type="checkbox"
@@ -1035,12 +1577,12 @@ export const LedgerStatementPage: React.FC = () => {
                                  row so panel doesn't look broken. */}
                               {!selListShown && (
                                 <div className="px-2 py-2 text-center text-[10px] text-ink-subtle italic border-b border-line-soft">
-                                  Click <b>Show List</b> above to load accounts
+                                  Start typing to load & filter, or click <b>Show List</b> above.
                                 </div>
                               )}
-                              {selListShown && pool.length === 0 && (
+                              {selListShown && filtered.length === 0 && (
                                 <div className="px-2 py-2 text-center text-[10px] text-ink-subtle italic border-b border-line-soft">
-                                  No accounts in this filter
+                                  {pool.length === 0 ? "No accounts in this filter" : `No matches for "${selListQuery}"`}
                                 </div>
                               )}
                               {/* Busy-style empty filler rows */}
@@ -1060,7 +1602,9 @@ export const LedgerStatementPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Select All footer — only shown once list is loaded */}
+                    {/* Select All footer — only shown once list is loaded.
+                       "Select All" operates on the CURRENTLY FILTERED pool so
+                       ticking after typing a search term ticks only matches. */}
                     {selListShown && (
                       <div className="col-span-12 flex items-center gap-3 text-[11px]">
                         <label className="flex items-center gap-1.5 text-ink cursor-pointer">
@@ -1069,8 +1613,8 @@ export const LedgerStatementPage: React.FC = () => {
                             checked={allTicked}
                             onChange={(e) => {
                               const next = new Set(draftLedgerIds);
-                              if (e.target.checked) pool.forEach((l) => next.add(l.id));
-                              else pool.forEach((l) => next.delete(l.id));
+                              if (e.target.checked) filtered.forEach((l) => next.add(l.id));
+                              else filtered.forEach((l) => next.delete(l.id));
                               setDraftLedgerIds(next);
                             }}
                             className="w-3 h-3 accent-blue-500"
@@ -1206,43 +1750,22 @@ export const LedgerStatementPage: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      {/* Standard: full Busy field set */}
-                      <label className="col-span-4 text-ink-subtle font-semibold">Details to be shown</label>
-                      <div className="col-span-8">
-                        <select
-                          value={draftOptions.detailLevel}
-                          onChange={(e) => setDraftOptions((p) => ({ ...p, detailLevel: e.target.value as DetailLevel }))}
-                          className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
-                        >
-                          <option value="single-auto">Single Account (Auto)</option>
-                          <option value="other-auto">Other Accounts (Auto)</option>
-                          <option value="all-other">All Other Accounts</option>
-                          <option value="full-voucher">Full Voucher Details</option>
-                          <option value="single-first">Single Account (First)</option>
-                        </select>
-                      </div>
-                      <label className="col-span-4 text-ink-subtle font-semibold">Account to be shown by</label>
-                      <div className="col-span-8">
-                        <select
-                          value={draftOptions.accountBy}
-                          onChange={(e) => setDraftOptions((p) => ({ ...p, accountBy: e.target.value as AccountBy }))}
-                          className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
-                        >
-                          <option value="name">Name</option>
-                          <option value="code">Code</option>
-                        </select>
-                      </div>
-
-                      <div className="col-span-12 border-t border-line-soft my-0.5" />
-
-                      {/* Y/N toggles — compact row per option */}
+                      {/* Standard: minimal field set per user preference.
+                         Removed (locked to defaults in state initialisation):
+                           • Details to be shown  → "single-auto"
+                           • Account to be shown by → "name"
+                           • Show Vch. Long Narration
+                           • Show Bank Instrument Details
+                           • Show data chronologically within date
+                           • Show Year-wise Opening & Closing Bal.
+                         Kept: Short Narration, Opt. Fields, Item Details,
+                         Bill Refs, Skip Opening / Apply-Filter-on-Closing,
+                         Daily Bal. */}
                       {(() => {
                         const setOpt = <K extends keyof LedgerOptions>(k: K, v: LedgerOptions[K]) =>
                           setDraftOptions((prev) => ({ ...prev, [k]: v }));
                         const rows: Array<{ key: keyof LedgerOptions; label: string; disabled?: boolean }> = [
-                          { key: "longNarration",  label: "Show Vch. Long Narration ?" },
                           { key: "shortNarration", label: "Show Short Narration" },
-                          { key: "bankInstrument", label: "Show Bank Instrument Details ?" },
                           { key: "optFields",      label: "Show Opt. Fields/Transport Details ?" },
                           { key: "itemDetails",    label: "Show Items Details ?" },
                           { key: "billRefs",       label: "Show Bill References ?" },
@@ -1253,7 +1776,6 @@ export const LedgerStatementPage: React.FC = () => {
                             ? { key: "skipOpening",        label: "Skip Opening Balance" }
                             : { key: "applyFilterClosing", label: "Apply Filter on Closing Bal." },
                           { key: "dailyBal",       label: "Show 'Daily Bal.' instead of 'Running Bal.'" },
-                          { key: "chronological",  label: "Show data chronologically within date?" },
                         ];
                         return rows.map((r) => (
                           <React.Fragment key={r.key}>
@@ -1264,6 +1786,22 @@ export const LedgerStatementPage: React.FC = () => {
                               <select
                                 value={(draftOptions[r.key] as boolean) ? "Y" : "N"}
                                 onChange={(e) => setOpt(r.key, (e.target.value === "Y") as any)}
+                                onKeyDown={(e) => {
+                                  // Enter → commit + advance to next filter.
+                                  // Busy convention: every field's Enter
+                                  // moves the operator forward, so the whole
+                                  // dialog can be filled with keyboard only.
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const tabbables = Array.from(
+                                      document.querySelectorAll<HTMLElement>(
+                                        'input:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]'
+                                      )
+                                    ).filter((el) => el.getAttribute("tabindex") !== "-1");
+                                    const idx = tabbables.indexOf(e.currentTarget);
+                                    if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
+                                  }
+                                }}
                                 disabled={r.disabled}
                                 className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none disabled:opacity-40"
                               >
@@ -1274,10 +1812,6 @@ export const LedgerStatementPage: React.FC = () => {
                           </React.Fragment>
                         ));
                       })()}
-                      <label className="col-span-9 text-ink-subtle/70 font-semibold">
-                        Show Year-wise Opening &amp; Closing Bal. ?<span className="text-[9px] italic ml-1">(N/A)</span>
-                      </label>
-                      <div className="col-span-3 text-[10px] text-ink-subtle italic">—</div>
                     </>
                   )}
                 </>
@@ -1761,7 +2295,7 @@ export const LedgerStatementPage: React.FC = () => {
                                 </span>
                               </td>
                               <td className={`${cell} font-mono font-bold whitespace-nowrap text-ink`}>
-                                {row.voucherNo}
+                                {ledgerVoucherLabel(row.voucherNo)}
                               </td>
                               <td className={`${cell} font-semibold text-ink whitespace-nowrap max-w-[220px] truncate`}>
                                 {row.particulars}
@@ -1864,10 +2398,23 @@ export const LedgerStatementPage: React.FC = () => {
 
                     // A single voucher-line row (shared between flat "one"
                     // mode and grouped "multi" mode rendering).
-                    const renderRow = (row: any, absIdx: number) => (
+                    const renderRow = (row: any, absIdx: number) => {
+                      const isSelected = selectedTableRow === absIdx;
+                      const route = editRouteFor(row);
+                      return (
                       <tr
                         key={row.id}
-                        className={`border-b border-line-soft ${absIdx % 2 === 1 ? "bg-card-2/20" : ""} hover:bg-card-2/70`}
+                        data-ledger-row={absIdx}
+                        onClick={() => setSelectedTableRow(absIdx)}
+                        onDoubleClick={() => { if (route) navigate(route); }}
+                        title={route ? "Enter or double-click to open voucher" : undefined}
+                        className={`border-b border-line-soft cursor-pointer ${
+                          isSelected
+                            ? "bg-blue-600/25 text-ink"
+                            : absIdx % 2 === 1
+                              ? "bg-card-2/20 hover:bg-card-2/70"
+                              : "hover:bg-card-2/70"
+                        }`}
                       >
                         <td className={`${cellBase} font-mono text-[11px] whitespace-nowrap`}>{row.date}</td>
                         <td className={`${cellBase} whitespace-nowrap`}>
@@ -1876,7 +2423,7 @@ export const LedgerStatementPage: React.FC = () => {
                           </span>
                         </td>
                         <td className={`${cellBase} font-mono font-bold whitespace-nowrap text-ink`}>
-                          {row.voucherNo}
+                          {ledgerVoucherLabel(row.voucherNo)}
                         </td>
                         <td className={`${cellBase} font-semibold text-ink whitespace-nowrap`}>
                           {row.particulars}
@@ -1903,7 +2450,77 @@ export const LedgerStatementPage: React.FC = () => {
                           )}
                         </td>
                       </tr>
+                      );
+                    };
+
+                    // Busy "Show Items Details" — render sub-rows under an
+                    // invoice-based entry: transport line, per-item lines,
+                    // and bill sundry lines (Lorry Freight / Discount / etc.).
+                    // Uses the Particulars column (spans across type + vch
+                    // no + acc) to show the details.
+                    // Sub-row uses the SAME typography as the main row (text-[11px],
+                    // text-ink font-semibold, no italic, no muted variants) so the
+                    // Details section reads as a natural continuation of the
+                    // invoice line — matching Busy's reference screenshot.
+                    const subRow = (key: string, content: React.ReactNode) => (
+                      <tr key={key} className="border-b border-line-soft bg-card-2/10">
+                        <td className={cellBase}></td>
+                        <td className={cellBase}></td>
+                        <td className={cellBase}></td>
+                        <td className={`${cellBase} text-[11px] font-semibold text-ink pl-4`}>{content}</td>
+                        {narrCol > 0 && <td className={cellBase}></td>}
+                        <td className={cellBase}></td>
+                        <td className={cellBase}></td>
+                        <td className="px-2 py-1"></td>
+                      </tr>
                     );
+
+                    const renderItemRows = (row: any) => {
+                      if (!options.itemDetails) return null;
+                      const items: any[] | undefined = row.items;
+                      const meta = row.meta;
+                      const hasAnything =
+                        (items && items.length > 0) ||
+                        (meta && (meta.transport || meta.numberOfBundle != null || (meta.billSundry && meta.billSundry.length > 0)));
+                      if (!hasAnything) return null;
+
+                      const rows: React.ReactNode[] = [];
+
+                      // Transport line
+                      if (meta?.transport) {
+                        rows.push(subRow(`${row.id}-transport`, (
+                          <>Transport : {meta.transport}</>
+                        )));
+                      }
+                      // Bundle count
+                      if (meta?.numberOfBundle != null) {
+                        rows.push(subRow(`${row.id}-bundle`, (
+                          <>Bundles : {meta.numberOfBundle}</>
+                        )));
+                      }
+                      // Line items
+                      if (items && items.length > 0) {
+                        items.forEach((it, i) => {
+                          rows.push(subRow(`${row.id}-item-${i}`, (
+                            <>
+                              {it.description}{"  "}
+                              {Number(it.quantity).toLocaleString("en-IN")}
+                              {it.uom ? ` ${it.uom}` : ""} @ ₹{Number(it.unitPrice).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {" "}= ₹{Number(it.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </>
+                          )));
+                        });
+                      }
+                      // Bill sundry lines (Lorry Freight, Discount, etc.)
+                      if (meta?.billSundry && meta.billSundry.length > 0) {
+                        meta.billSundry.forEach((bs: any, i: number) => {
+                          rows.push(subRow(`${row.id}-bs-${i}`, (
+                            <>{bs.label} : ₹{Number(bs.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>
+                          )));
+                        });
+                      }
+                      return rows;
+                    };
 
                     // Busy-style filler rows so the table never looks empty.
                     // MIN_ROWS mirrors PaymentVoucherPage list (25 rows).
@@ -1937,7 +2554,12 @@ export const LedgerStatementPage: React.FC = () => {
                     if (statement.mode !== "multi" || isMerged) {
                       return (
                         <>
-                          {filteredEntries.map((row, i) => renderRow(row, i))}
+                          {filteredEntries.map((row, i) => (
+                            <React.Fragment key={row.id}>
+                              {renderRow(row, i)}
+                              {renderItemRows(row)}
+                            </React.Fragment>
+                          ))}
                           {renderFillers(filteredEntries.length)}
                         </>
                       );
@@ -1982,7 +2604,12 @@ export const LedgerStatementPage: React.FC = () => {
                     const openingOutput = openingRows.map((r) => {
                       const el = renderRow(r, rowCursor);
                       rowCursor++;
-                      return el;
+                      return (
+                        <React.Fragment key={`op-${r.id}`}>
+                          {el}
+                          {renderItemRows(r)}
+                        </React.Fragment>
+                      );
                     });
                     const groupOutput = groups.map((g, gi) => {
                       // 1 header + N rows + 1 footer
@@ -1990,7 +2617,12 @@ export const LedgerStatementPage: React.FC = () => {
                       const groupRows = g.rows.map((r) => {
                         const el = renderRow(r, rowCursor);
                         rowCursor++;
-                        return el;
+                        return (
+                          <React.Fragment key={`grp-row-${r.id}`}>
+                            {el}
+                            {renderItemRows(r)}
+                          </React.Fragment>
+                        );
                       });
                       const bal = acctBalances[g.name] as
                         | { closing: number; closingSide: "Dr" | "Cr" }

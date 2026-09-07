@@ -7,7 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BusyItemsTable from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -338,10 +338,20 @@ const ExpandedComponents: React.FC<{
 
 const SalesOrderForm: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { id: routeId } = useParams<{ id?: string }>();
     const { can } = usePermission();
     const targetId = routeId ? Number(routeId) : null;
     const isEditMode = Boolean(targetId);
+
+    // Zero-loading Edit: list page navigates with `state: item`, so we can
+    // pre-fill the scalar fields (customer, orderNo, date, source, narration)
+    // instantly on mount — no network wait. The items array still needs
+    // salesProducts to reconstruct, so the useEffect below handles that
+    // and does the final full `reset()` once both are available.
+    const preloadedOrder = (location.state && typeof location.state === "object")
+        ? (location.state as any)
+        : null;
 
     const { customers, loadCustomers } = useCustomers();
     const { employees, loadEmployees } = useEmployees();
@@ -361,6 +371,28 @@ const SalesOrderForm: React.FC = () => {
     const saveConfirmOpenRef = useRef(false);
     const lastFocusedRef = useRef<HTMLElement | null>(null);
 
+    // Derive an initial form-values snapshot from the router-state preload.
+    // Items are left as a placeholder because reconstructing them requires
+    // salesProducts (loaded async) — the useEffect below fills them in.
+    const initialFormValues: SalesOrderFormValues = React.useMemo(() => {
+        if (!isEditMode || !preloadedOrder) return defaultValues;
+        return {
+            id: preloadedOrder.id,
+            orderNo: preloadedOrder.orderNo || "",
+            orderDate: preloadedOrder.orderDate ? String(preloadedOrder.orderDate).split("T")[0] : today,
+            customerId: preloadedOrder.customerId != null ? String(preloadedOrder.customerId) : "",
+            mobile: preloadedOrder.mobile || "",
+            orderSource: preloadedOrder.orderSource || "",
+            sourceEmployeeId: preloadedOrder.sourceEmployeeId != null ? String(preloadedOrder.sourceEmployeeId) : null,
+            referredByCustomerId: preloadedOrder.referredByCustomerId || null,
+            referredByName: preloadedOrder.referredByName || null,
+            narration: preloadedOrder.narration || preloadedOrder.remarks || preloadedOrder.internalNotes || "",
+            items: [{ salesProductId: "", orderQuantity: "1", components: [] }],
+            isInterState: Boolean(preloadedOrder.isInterState),
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const {
         control,
         handleSubmit,
@@ -371,7 +403,7 @@ const SalesOrderForm: React.FC = () => {
         formState: { errors, isDirty },
     } = useForm<SalesOrderFormValues>({
         resolver: zodResolver(salesOrderSchema),
-        defaultValues,
+        defaultValues: initialFormValues,
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
@@ -411,6 +443,21 @@ const SalesOrderForm: React.FC = () => {
     useEffect(() => {
         let isMounted = true;
 
+        const buildEditValues = (orderData: any, activeProducts: any[]): SalesOrderFormValues => ({
+            id: orderData.id,
+            orderNo: orderData.orderNo || "",
+            orderDate: orderData.orderDate ? String(orderData.orderDate).split("T")[0] : today,
+            customerId: orderData.customerId != null ? String(orderData.customerId) : "",
+            mobile: orderData.mobile || "",
+            orderSource: orderData.orderSource || "",
+            sourceEmployeeId: orderData.sourceEmployeeId != null ? String(orderData.sourceEmployeeId) : null,
+            referredByCustomerId: orderData.referredByCustomerId || null,
+            referredByName: orderData.referredByName || null,
+            narration: orderData.narration || orderData.remarks || orderData.internalNotes || "",
+            items: reconstructFormItems(orderData.items || [], activeProducts),
+            isInterState: Boolean(orderData.isInterState),
+        });
+
         const loadData = async () => {
             try {
                 const productsData = await salesProductService.fetchAll();
@@ -418,25 +465,22 @@ const SalesOrderForm: React.FC = () => {
                 if (isMounted) setSalesProducts(activeProducts);
 
                 if (targetId) {
+                    // Zero-loading path: if the list navigated us here with the
+                    // full order in router state AND it already carries items,
+                    // reset the form INSTANTLY with those items. Then still
+                    // fetch fresh data in the background to reconcile any
+                    // server-side changes since the list was loaded.
+                    if (preloadedOrder && Array.isArray(preloadedOrder.items) && preloadedOrder.items.length > 0) {
+                        const initialEdit = buildEditValues(preloadedOrder, activeProducts);
+                        editValuesRef.current = initialEdit;
+                        justResetRef.current = true;
+                        reset(initialEdit);
+                    }
+
                     const orderData = await salesOrderService.fetchById(targetId);
                     if (!isMounted) return;
 
-                    const formItems = reconstructFormItems(orderData.items || [], activeProducts);
-
-                    const editValues: SalesOrderFormValues = {
-                        id: orderData.id,
-                        orderNo: orderData.orderNo || "",
-                        orderDate: orderData.orderDate ? orderData.orderDate.split("T")[0] : today,
-                        customerId: orderData.customerId != null ? String(orderData.customerId) : "",
-                        mobile: orderData.mobile || "",
-                        orderSource: orderData.orderSource || "",
-                        sourceEmployeeId: orderData.sourceEmployeeId != null ? String(orderData.sourceEmployeeId) : null,
-                        referredByCustomerId: orderData.referredByCustomerId || null,
-                        referredByName: orderData.referredByName || null,
-                        narration: orderData.narration || orderData.remarks || orderData.internalNotes || "",
-                        items: formItems,
-                        isInterState: Boolean(orderData.isInterState),
-                    };
+                    const editValues = buildEditValues(orderData, activeProducts);
                     editValuesRef.current = editValues;
                     justResetRef.current = true;
                     reset(editValues);
@@ -461,7 +505,7 @@ const SalesOrderForm: React.FC = () => {
         return () => {
             isMounted = false;
         };
-    }, [targetId, reset, setValue]);
+    }, [targetId, reset, setValue, preloadedOrder]);
 
     // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {

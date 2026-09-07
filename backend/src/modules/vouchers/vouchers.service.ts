@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { VoucherType, Prisma } from "@prisma/client";
 import { ApiError } from "../../utils/ApiError";
-import { CreateVoucherInput, GetVouchersQueryInput } from "./vouchers.types";
+import { CreateVoucherInput, GetVouchersQueryInput, UpdateVoucherInput } from "./vouchers.types";
 
 class VouchersService {
   private readonly prefixMap: Record<VoucherType, string> = {
@@ -80,6 +80,115 @@ class VouchersService {
     ]);
 
     return { deleted: true, id };
+  }
+
+  /**
+   * Update an existing voucher — supports Busy-style "List → Modify" flow.
+   *
+   * Rules:
+   *  • Voucher ID stays the same (ledger history references it by id).
+   *  • System-generated vouchers (opening balance JVs) are locked, same as
+   *    delete — modifying them would silently corrupt the audit trail.
+   *  • Items, when supplied, fully replace existing journal items (delete
+   *    then recreate). Journal items don't have a stable business key we
+   *    can diff on, so wholesale swap is both correct and simplest.
+   *  • Dr/Cr totals must still balance if items are updated.
+   *  • Same Bank/Cash side guard as create for PAYMENT/RECEIPT.
+   */
+  async updateVoucher(id: number, data: UpdateVoucherInput) {
+    const existing = await prisma.voucher.findUnique({
+      where: { id },
+      select: { id: true, type: true, refDocType: true },
+    });
+    if (!existing) throw new ApiError(404, "Voucher not found");
+
+    const blockedRefDocTypes = [
+      "LEDGER_OPENING_BALANCE",
+      "CUSTOMER_OPENING_BALANCE",
+      "SUPPLIER_OPENING_BALANCE",
+    ];
+    if (existing.refDocType && blockedRefDocTypes.includes(existing.refDocType)) {
+      throw new ApiError(400, "System-generated vouchers cannot be edited");
+    }
+
+    if (data.items && data.items.length > 0) {
+      let totalDebit = 0;
+      let totalCredit = 0;
+      for (const item of data.items) {
+        totalDebit += item.debitAmount || 0;
+        totalCredit += item.creditAmount || 0;
+      }
+      if (Math.abs(totalDebit - totalCredit) > 0.01) {
+        throw new ApiError(
+          400,
+          `Unbalanced voucher entry: Total Debit (${totalDebit.toFixed(2)}) must equal Total Credit (${totalCredit.toFixed(2)})`
+        );
+      }
+
+      // Same Bank/Cash side guard as create — a modified PAYMENT can't move
+      // to a party ledger on the credit side (would silently corrupt).
+      if (existing.type === "PAYMENT" || existing.type === "RECEIPT") {
+        const partyIds = data.items
+          .map((i) => (existing.type === "PAYMENT" ? i.creditLedgerId : i.debitLedgerId))
+          .filter((pid): pid is number => pid != null);
+        if (partyIds.length > 0) {
+          const ledgers = await prisma.accountLedger.findMany({
+            where: { id: { in: partyIds } },
+            select: { id: true, code: true, name: true, group: true },
+          });
+          const bankOrCash = (g: string | null | undefined) => {
+            const gg = (g || "").toLowerCase();
+            return gg.includes("cash") || gg.includes("bank");
+          };
+          const wrongSide = ledgers.find((l) => !bankOrCash(l.group));
+          if (wrongSide) {
+            const side = existing.type === "PAYMENT" ? '"Paid From"' : '"Received In"';
+            throw new ApiError(
+              400,
+              `${existing.type} voucher's ${side} account must be a Bank or Cash ledger, ` +
+                `but "${wrongSide.name}" (group: ${wrongSide.group || "-"}) was used.`
+            );
+          }
+        }
+      }
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.voucher.update({
+        where: { id },
+        data: {
+          ...(data.date ? { date: new Date(data.date) } : {}),
+          ...(data.narration !== undefined ? { narration: data.narration || null } : {}),
+        },
+      });
+
+      if (data.items && data.items.length > 0) {
+        // Wholesale swap: kill existing items, then re-create from payload.
+        await tx.journalItem.deleteMany({ where: { voucherId: id } });
+        await tx.journalItem.createMany({
+          data: data.items.map((item) => ({
+            voucherId: id,
+            debitLedgerId: item.debitLedgerId || null,
+            creditLedgerId: item.creditLedgerId || null,
+            debitAmount: new Prisma.Decimal(item.debitAmount || 0),
+            creditAmount: new Prisma.Decimal(item.creditAmount || 0),
+            narration: item.narration || data.narration || null,
+          })),
+        });
+      }
+
+      return tx.voucher.findUnique({
+        where: { id },
+        include: {
+          items: {
+            include: {
+              debitLedger: true,
+              creditLedger: true,
+            },
+          },
+        },
+      });
+    });
   }
 
   private async enrichVouchers(vouchers: any[]) {

@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
 import { useSocket } from "../providers/SocketProvider";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -65,6 +66,136 @@ function evict() {
   if (cache.size < MAX_ENTRIES) return;
   const oldest = cache.keys().next().value;
   if (oldest) cache.delete(oldest);
+}
+
+// ─── Global socket listener registry ──────────────────────────────────────────
+// Per-mount socket listeners (inside the hook) only run while the list page
+// is visible. That misses updates fired while the user is on any OTHER page:
+// e.g. user goes to /sales-order/create → server emits `salesOrder:created` →
+// no one is listening → user navigates back to /sales-order → cache is still
+// fresh (< TTL) → old data shown.
+//
+// Fix: register ONE persistent socket listener per (socket, socketModule) the
+// first time any hook mounts with that pair. On every event for that module,
+// mark ALL registered cacheKeys stale. Registry entries live for the app
+// lifetime (bounded by MAX_ENTRIES eviction of the cache itself). When the
+// list page later mounts, useListCache reads the stale cache, renders it
+// instantly, and silently refetches — user sees fresh data with zero flash.
+const moduleToKeys = new Map<string, Set<string>>();
+const registeredPerSocket = new WeakMap<Socket, Set<string>>();
+
+function trackKeyForModule(socketModule: string, cacheKey: string) {
+  let set = moduleToKeys.get(socketModule);
+  if (!set) {
+    set = new Set();
+    moduleToKeys.set(socketModule, set);
+  }
+  set.add(cacheKey);
+}
+
+// Extract an id from a socket payload. Supports common conventions:
+// `.id`, `._id`, or falls back to null (which forces the "no id" fallback path).
+function payloadId(payload: any): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const id = payload.id ?? payload._id;
+  return id != null ? String(id) : null;
+}
+
+/**
+ * Apply a socket event payload DIRECTLY to every module-registered cache.
+ * This is the "TanStack Query subscription → cache normalization" pattern:
+ * instead of marking stale + refetching, we mutate the cache with the delta
+ * the server just told us about. Result — the list re-renders instantly
+ * with the new row / updated row / removed row, no network round-trip.
+ *
+ * Falls back to mark-stale when the payload lacks the info we need to apply
+ * a delta safely (missing id on delete, empty payload on create/update, etc.).
+ * Every mutation writes fresh data with a fresh timestamp so mounted hooks
+ * see the update instantly via the subscribe() notification.
+ */
+function applyPayloadToModuleCaches(
+  socketModule: string,
+  event: "created" | "updated" | "deleted",
+  payload: any
+) {
+  const keys = moduleToKeys.get(socketModule);
+  if (!keys) return;
+
+  const id = payloadId(payload);
+  const hasFullPayload =
+    event !== "deleted" && payload && typeof payload === "object" && id != null;
+
+  for (const key of Array.from(keys)) {
+    const entry = cache.get(key);
+    if (!entry) continue;
+
+    if (event === "deleted") {
+      if (id == null) {
+        // Can't identify the row — mark stale so next mount refetches.
+        writeCache(key, { ...entry, timestamp: 0 });
+        continue;
+      }
+      const nextData = entry.data.filter(
+        (it: any) => String(it?.id ?? it?._id) !== id
+      );
+      const removed = entry.data.length - nextData.length;
+      if (removed === 0) continue;
+      writeCache(key, {
+        data: nextData,
+        total: Math.max(0, entry.total - removed),
+        timestamp: Date.now(),
+      });
+      continue;
+    }
+
+    if (!hasFullPayload) {
+      // Server gave us an event with no usable payload — stale-mark forces
+      // the next mount / mounted hook's refetch pass to grab fresh data.
+      writeCache(key, { ...entry, timestamp: 0 });
+      continue;
+    }
+
+    // created / updated → upsert the payload in-place.
+    const idx = entry.data.findIndex(
+      (it: any) => String(it?.id ?? it?._id) === id
+    );
+    if (idx >= 0) {
+      const nextData = [...entry.data];
+      nextData[idx] = payload;
+      writeCache(key, { ...entry, data: nextData, timestamp: Date.now() });
+    } else if (event === "created") {
+      // Prepend so new rows show up at the top of a "newest first" list.
+      writeCache(key, {
+        data: [payload, ...entry.data],
+        total: entry.total + 1,
+        timestamp: Date.now(),
+      });
+    } else {
+      // updated but the row isn't in this cache view (filter mismatch or
+      // pagination window) — just stale so refetch reconciles.
+      writeCache(key, { ...entry, timestamp: 0 });
+    }
+  }
+}
+
+function ensureGlobalListListener(socket: Socket, socketModule: string) {
+  let registered = registeredPerSocket.get(socket);
+  if (!registered) {
+    registered = new Set();
+    registeredPerSocket.set(socket, registered);
+  }
+  if (registered.has(socketModule)) return;
+  registered.add(socketModule);
+
+  socket.on(`${socketModule}:created`, (p: any) =>
+    applyPayloadToModuleCaches(socketModule, "created", p)
+  );
+  socket.on(`${socketModule}:updated`, (p: any) =>
+    applyPayloadToModuleCaches(socketModule, "updated", p)
+  );
+  socket.on(`${socketModule}:deleted`, (p: any) =>
+    applyPayloadToModuleCaches(socketModule, "deleted", p)
+  );
 }
 
 /** Write to both memory and sessionStorage. Notifies subscribers. */
@@ -254,10 +385,21 @@ export function useListCache<T = any>({
   }, [doFetch]);
 
   // ─── Socket live-sync ─────────────────────────────────────────
+  // TWO layers:
+  //  1. Persistent GLOBAL listener (survives unmounts) marks every cacheKey
+  //     for this socketModule stale on any event — so when the list page
+  //     re-mounts, it silently refetches even if it was closed at the moment
+  //     the event fired.
+  //  2. Per-mount listener does the same for the CURRENT key AND actively
+  //     triggers doFetch so the user sees live updates without navigation.
   // Debounce burst events (e.g. bulk imports firing 50 :created in a row)
   // into a single refetch. Uses trailing edge — user sees the final state.
   useEffect(() => {
     if (!socket) return;
+
+    // Register the persistent global sync for this module (idempotent).
+    trackKeyForModule(socketModule, cacheKey);
+    ensureGlobalListListener(socket, socketModule);
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onEvent = () => {
@@ -278,7 +420,7 @@ export function useListCache<T = any>({
       socket.off(`${socketModule}:updated`, onEvent);
       socket.off(`${socketModule}:deleted`, onEvent);
     };
-  }, [socket, socketModule, doFetch, ttl]);
+  }, [socket, socketModule, cacheKey, doFetch, ttl]);
 
   // ─── Manual refresh ───────────────────────────────────────────
   const refresh = useCallback(() => {

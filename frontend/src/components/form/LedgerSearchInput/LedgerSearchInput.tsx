@@ -18,6 +18,8 @@ interface LedgerSearchInputProps {
   /** Called after a ledger is selected (via keyboard or click). Use to auto-advance focus. */
   onSelected?: (ledger: AccountLedger) => void;
   disabled?: boolean;
+  /** Auto-focus on mount — matches other <input autoFocus/> Busy first-field behaviour. */
+  autoFocus?: boolean;
 }
 
 /** True if a ledger's group looks like a bank or cash account. */
@@ -39,6 +41,7 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
   variant = "default",
   onSelected,
   disabled,
+  autoFocus,
 }) => {
   const [searchText, setSearchText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -66,15 +69,14 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
     );
   });
 
-  // Group by group name for organized display
-  const grouped: Record<string, AccountLedger[]> = {};
-  for (const l of filtered) {
-    const grp = l.group || "Other";
-    if (!grouped[grp]) grouped[grp] = [];
-    grouped[grp].push(l);
-  }
-  const groupNames = Object.keys(grouped).sort();
-  const flatFiltered = groupNames.flatMap((g) => grouped[g]);
+  // Flat sorted list — group name kept per-row (right-side tag) but no
+  // grouping headers, matching Busy's simple searchable account picker.
+  const flatFiltered = filtered
+    .slice()
+    .sort((a, b) => {
+      const g = (a.group || "").localeCompare(b.group || "");
+      return g !== 0 ? g : a.name.localeCompare(b.name);
+    });
 
   const updatePosition = useCallback(() => {
     if (containerRef.current) {
@@ -162,14 +164,33 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
     }
   };
 
-  // Scroll highlighted item into view
+  // Keep the highlighted item visible with the minimum possible scroll.
+  // Behaviour matches Busy: arrow keys move the highlight through visible
+  // rows WITHOUT scrolling — the list only shifts once the highlight would
+  // move OUTSIDE the viewport (below the last visible row / above the first).
+  // At that point we scroll by the smallest amount needed to bring the new
+  // highlighted row fully back into view.
   useEffect(() => {
-    if (dropdownRef.current && highlightIndex >= 0) {
-      const items = dropdownRef.current.querySelectorAll("[data-ledger-item]");
-      if (items[highlightIndex]) {
-        items[highlightIndex].scrollIntoView({ block: "nearest" });
-      }
+    if (highlightIndex < 0 || !dropdownRef.current) return;
+    const items = dropdownRef.current.querySelectorAll<HTMLElement>("[data-ledger-item]");
+    const item = items[highlightIndex];
+    if (!item) return;
+
+    // The inner .overflow-y-auto wrapper is the actual scroll container.
+    const scroller = dropdownRef.current.firstElementChild as HTMLElement | null;
+    if (!scroller) return;
+
+    const scRect = scroller.getBoundingClientRect();
+    const itRect = item.getBoundingClientRect();
+
+    if (itRect.top < scRect.top) {
+      // Above viewport — scroll up JUST enough to reveal the top of the row.
+      scroller.scrollTop -= (scRect.top - itRect.top);
+    } else if (itRect.bottom > scRect.bottom) {
+      // Below viewport — scroll down JUST enough to reveal the bottom.
+      scroller.scrollTop += (itRect.bottom - scRect.bottom);
     }
+    // else: fully visible → no scroll (Busy behaviour the user asked for).
   }, [highlightIndex]);
 
   const displayValue = isOpen
@@ -181,7 +202,10 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
   const ringClass = `focus:ring-${accentColor}`;
   const inputClass =
     variant === "cell"
-      ? `w-full px-2 py-1 bg-transparent border-0 text-xs text-ink focus:outline-none focus:bg-card-2/60`
+      // Busy-style active cell: currently focused cell becomes black with
+      // white bold text so the operator always knows which cell keystrokes
+      // land in. Non-cell variants keep their normal ring/outline.
+      ? `w-full px-2 py-1 bg-transparent border-0 text-xs text-ink focus:outline-none focus:bg-slate-900 focus:text-white focus:font-semibold`
       : `w-full px-3 py-2 border border-line bg-card rounded-lg text-sm text-ink focus:ring-2 ${ringClass} focus:outline-none`;
 
   return (
@@ -194,6 +218,7 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
       <input
         ref={inputRef}
         type="text"
+        autoFocus={autoFocus}
         value={displayValue}
         placeholder={placeholder}
         required={required && !value}
@@ -209,7 +234,18 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
         onFocus={() => {
           if (disabled) return;
           setIsOpen(true);
-          setSearchText("");
+          // If a value is already selected, pre-fill searchText with its
+          // display label AND select-all — so the operator SEES what's
+          // currently selected and their first keystroke overwrites it
+          // (Busy convention: click a filled field → see value + type to
+          // replace, don't blank the field on click).
+          if (selectedLedger) {
+            const label = `${selectedLedger.name} (${selectedLedger.group})`;
+            setSearchText(label);
+            requestAnimationFrame(() => inputRef.current?.select());
+          } else {
+            setSearchText("");
+          }
           updatePosition();
         }}
         onKeyDown={handleKeyDown}
@@ -253,48 +289,42 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
                   No accounts found
                 </div>
               ) : (
-                groupNames.map((groupName) => (
-                  <div key={groupName}>
-                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-subtle bg-card-2 border-b border-line sticky top-0">
-                      {groupName} ({grouped[groupName].length})
-                    </div>
-                    {grouped[groupName].map((ledger) => {
-                      const globalIdx = flatFiltered.indexOf(ledger);
-                      const isHighlighted = globalIdx === highlightIndex;
-                      const isSelected = String(ledger.id) === value;
-
-                      return (
-                        <div
-                          key={ledger.id}
-                          data-ledger-item
-                          onClick={() => handleSelect(ledger)}
-                          className={`px-3 py-2 cursor-pointer flex items-center justify-between text-sm transition-colors ${
-                            isHighlighted
-                              ? "bg-blue-600/10 text-ink"
-                              : isSelected
-                                ? "bg-blue-50/10 text-ink font-medium"
-                                : "text-ink-muted hover:bg-card-2"
-                          }`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium text-ink truncate block">
-                              {ledger.name}
-                            </span>
-                            {(ledger.customer || ledger.supplier) && (
-                              <span className="text-[10px] text-ink-subtle">
-                                {ledger.customer ? `Customer: ${ledger.customer.firmName}` : ""}
-                                {ledger.supplier ? `Supplier: ${ledger.supplier.legalName}` : ""}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-ink-subtle ml-2 shrink-0">
-                            {ledger.group}
+                // Flat list — group headers removed per user preference.
+                // Each row still shows its group name as a small right-side
+                // tag so the account's category stays visible for context.
+                flatFiltered.map((ledger, globalIdx) => {
+                  const isHighlighted = globalIdx === highlightIndex;
+                  const isSelected = String(ledger.id) === value;
+                  return (
+                    <div
+                      key={ledger.id}
+                      data-ledger-item
+                      onClick={() => handleSelect(ledger)}
+                      className={`px-3 py-2 cursor-pointer flex items-center justify-between text-sm transition-colors border-b border-line-soft last:border-b-0 ${
+                        isHighlighted
+                          ? "bg-blue-600/10 text-ink"
+                          : isSelected
+                            ? "bg-blue-50/10 text-ink font-medium"
+                            : "text-ink-muted hover:bg-card-2"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-ink truncate block">
+                          {ledger.name}
+                        </span>
+                        {(ledger.customer || ledger.supplier) && (
+                          <span className="text-[10px] text-ink-subtle">
+                            {ledger.customer ? `Customer: ${ledger.customer.firmName}` : ""}
+                            {ledger.supplier ? `Supplier: ${ledger.supplier.legalName}` : ""}
                           </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))
+                        )}
+                      </div>
+                      <span className="text-[10px] text-ink-subtle ml-2 shrink-0">
+                        {ledger.group}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>,

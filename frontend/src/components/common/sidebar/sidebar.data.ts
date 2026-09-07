@@ -66,31 +66,61 @@ export const sidebarItems: SidebarItem[] = [
             title: "Employees",
             permission: "employees.view",
             children: [
-              { title: "Add", path: "/employees/create", permission: "employees.create" },
-              { title: "List", path: "/employees", permission: "employees.view", badge: "Ctrl+E" },
+              {
+                title: "Add",
+                path: "/employees/create",
+                permission: "employees.create",
+              },
+              {
+                title: "List",
+                path: "/employees",
+                permission: "employees.view",
+                badge: "Ctrl+E",
+              },
             ],
           },
           {
             title: "Machines",
             permission: "machines.view",
             children: [
-              { title: "Add", path: "/machines/create", permission: "machines.create" },
-              { title: "List", path: "/machines", permission: "machines.view", badge: "Ctrl+M" },
+              {
+                title: "Add",
+                path: "/machines/create",
+                permission: "machines.create",
+              },
+              {
+                title: "List",
+                path: "/machines",
+                permission: "machines.view",
+                badge: "Ctrl+M",
+              },
             ],
           },
           {
             title: "Machine Assignments",
             permission: "machine-assignments.view",
             children: [
-              { title: "Add", path: "/machines/assignments/create", permission: "machine-assignments.create" },
-              { title: "List", path: "/machines/assignments", permission: "machine-assignments.view" },
+              {
+                title: "Add",
+                path: "/machines/assignments/create",
+                permission: "machine-assignments.create",
+              },
+              {
+                title: "List",
+                path: "/machines/assignments",
+                permission: "machine-assignments.view",
+              },
             ],
           },
           {
             title: "Shifts",
             permission: "shifts.view",
             children: [
-              { title: "Add", path: "/shifts/create", permission: "shifts.create" },
+              {
+                title: "Add",
+                path: "/shifts/create",
+                permission: "shifts.create",
+              },
               { title: "List", path: "/shifts", permission: "shifts.view" },
             ],
           },
@@ -278,13 +308,6 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/accounts/contra-entry", permission: "vouchers.view" },
         ],
       },
-      // ── Petty Cash ──
-      {
-        title: "Petty Cash",
-        path: "/accounts/petty-cash",
-        permission: "petty-cash.view",
-      },
-      
     ],
     activePaths: [
       "/sales-order",
@@ -298,7 +321,6 @@ export const sidebarItems: SidebarItem[] = [
       "/accounts/receipt-voucher",
       "/accounts/journal-entry",
       "/accounts/contra-entry",
-      "/accounts/petty-cash",
     ],
     permissionAny: [
       "sales-orders.view",
@@ -309,7 +331,6 @@ export const sidebarItems: SidebarItem[] = [
       "invoice.view",
       "purchase-returns.view",
       "vouchers.view",
-      "petty-cash.view",
     ],
   },
 
@@ -411,39 +432,75 @@ export const sidebarItems: SidebarItem[] = [
             title: "Categories",
             permission: "categories.view",
             children: [
-              { title: "Add", path: "/categories/create", permission: "categories.create" },
-              { title: "List", path: "/categories", permission: "categories.view" },
+              {
+                title: "Add",
+                path: "/categories/create",
+                permission: "categories.create",
+              },
+              {
+                title: "List",
+                path: "/categories",
+                permission: "categories.view",
+              },
             ],
           },
           {
             title: "Storage Stores",
             permission: "stores.view",
             children: [
-              { title: "Add", path: "/storage-stores/create", permission: "stores.create" },
-              { title: "List", path: "/storage-stores", permission: "stores.view" },
+              {
+                title: "Add",
+                path: "/storage-stores/create",
+                permission: "stores.create",
+              },
+              {
+                title: "List",
+                path: "/storage-stores",
+                permission: "stores.view",
+              },
             ],
           },
           {
             title: "Raw Materials",
             permission: "raw_materials.view",
             children: [
-              { title: "Add", path: "/raw-materials/create", permission: "raw_materials.create" },
-              { title: "List", path: "/raw-materials", permission: "raw_materials.view" },
+              {
+                title: "Add",
+                path: "/raw-materials/create",
+                permission: "raw_materials.create",
+              },
+              {
+                title: "List",
+                path: "/raw-materials",
+                permission: "raw_materials.view",
+              },
             ],
           },
           {
             title: "Wastage Store",
             permission: "wastage-store.view",
             children: [
-              { title: "Add", path: "/wastage-store/create", permission: "raw_materials.create" },
-              { title: "List", path: "/wastage-store", permission: "wastage-store.view" },
+              {
+                title: "Add",
+                path: "/wastage-store/create",
+                permission: "raw_materials.create",
+              },
+              {
+                title: "List",
+                path: "/wastage-store",
+                permission: "wastage-store.view",
+              },
             ],
           },
           {
             title: "Production Products",
             permission: "products.view",
             children: [
-              { title: "Add", path: "/products/create", permission: "products.create" },
+              {
+                title: "Add",
+                path: "/products/create",
+                permission: "products.create",
+              },
               { title: "List", path: "/products", permission: "products.view" },
             ],
           },
@@ -451,8 +508,16 @@ export const sidebarItems: SidebarItem[] = [
             title: "Sales Products",
             permission: "sales_products.view",
             children: [
-              { title: "Add", path: "/sales-products/create", permission: "sales_products.create" },
-              { title: "List", path: "/sales-products", permission: "sales_products.view" },
+              {
+                title: "Add",
+                path: "/sales-products/create",
+                permission: "sales_products.create",
+              },
+              {
+                title: "List",
+                path: "/sales-products",
+                permission: "sales_products.view",
+              },
             ],
           },
         ],
@@ -484,6 +549,386 @@ export const sidebarItems: SidebarItem[] = [
       "/wastage-store",
       "/products",
       "/sales-products",
+      "/customers",
+      "/suppliers",
+      "/accounts/bank-accounts",
+      "/accounts/chart-of-accounts",
+    ],
+    permissionAny: [
+      "company-settings.view",
+      "roles.view",
+      "departments.view",
+      "role-permissions.view",
+      "users.view",
+      "whatsapp.view",
+      "email-config.view",
+      "invoice-settings.view",
+      "employees.view",
+      "machines.view",
+      "machine-assignments.view",
+      "shifts.view",
+      "categories.view",
+      "products.view",
+      "uoms.view",
+      "raw_materials.view",
+      "wastage-store.view",
+      "sales_products.view",
+      "stores.view",
+      "customers.view",
+      "suppliers.view",
+      "accounts.view",
+      "chart-of-accounts.view",
+    ],
+  },
+
+  // ── 3. Transactions (Busy ERP Style: Sales, Purchase, Vouchers, Production)
+  {
+    title: "Transactions",
+    icon: FiRepeat,
+    path: "/sales-order",
+    pathsByPermission: [
+      { permission: "sales-orders.view", path: "/sales-order" },
+      { permission: "quotations.view", path: "/quatation-order" },
+      { permission: "purchaseOrders.view", path: "/purchase-orders" },
+      { permission: "vouchers.view", path: "/accounts/payment-voucher" },
+      { permission: "production_orders.view", path: "/production-orders" },
+      {
+        permission: "stock-adjustments.view",
+        path: "/inventory/stock-adjustments",
+      },
+    ],
+    children: [
+      // ── Sales Order ──
+      {
+        title: "Sales Order",
+        permission: "sales-orders.view",
+        children: [
+          {
+            title: "Add",
+            path: "/sales-order/create",
+            permission: "sales-orders.create",
+            badge: "Ctrl+O",
+          },
+          {
+            title: "List",
+            path: "/sales-order",
+            permission: "sales-orders.view",
+          },
+        ],
+      },
+      // ── Purchase Order ──
+      {
+        title: "Purchase Order",
+        permission: "purchaseOrders.view",
+        children: [
+          {
+            title: "Add",
+            path: "/purchase-orders/create",
+            permission: "purchaseOrders.create",
+            badge: "Ctrl+X",
+          },
+          {
+            title: "List",
+            path: "/purchase-orders",
+            permission: "purchaseOrders.view",
+          },
+        ],
+      },
+      // ── Sales (Invoice) ──
+      {
+        title: "Sales",
+        permission: "sales-invoices.view",
+        children: [
+          {
+            title: "Add",
+            path: "/sales-invoices/create",
+            permission: "sales-invoices.create",
+            badge: "Ctrl+1",
+          },
+          {
+            title: "List",
+            path: "/sales-invoices",
+            permission: "sales-invoices.view",
+            badge: "Ctrl+6",
+          },
+        ],
+      },
+      // ── Purchase (GRN) ──
+      {
+        title: "Purchase",
+        permission: "invoice.view",
+        children: [
+          {
+            title: "Add",
+            path: "/invoice/create",
+            permission: "invoice.create",
+            badge: "Ctrl+U",
+          },
+          {
+            title: "List",
+            path: "/invoice",
+            permission: "invoice.view",
+            badge: "Ctrl+G",
+          },
+        ],
+      },
+      // ── Sales Return (Cr. Note) ──
+      {
+        title: "Sales Return (Cr. Note)",
+        permission: "sales-returns.view",
+        children: [
+          {
+            title: "Add",
+            path: "/sales-returns/create",
+            permission: "sales-returns.create",
+          },
+          {
+            title: "List",
+            path: "/sales-returns",
+            permission: "sales-returns.view",
+          },
+        ],
+      },
+      // ── Purchase Return (Dr. Note) ──
+      {
+        title: "Purchase Return (Dr. Note)",
+        permission: "purchase-returns.view",
+        children: [
+          {
+            title: "Add",
+            path: "/purchase-returns/create",
+            permission: "purchase-returns.create",
+          },
+          {
+            title: "List",
+            path: "/purchase-returns",
+            permission: "purchase-returns.view",
+          },
+        ],
+      },
+      // ── Payment Voucher ──
+      {
+        title: "Payment",
+        permission: "vouchers.view",
+        children: [
+          {
+            title: "Add",
+            path: "/accounts/payment-voucher/add",
+            permission: "vouchers.create",
+            badge: "Ctrl+P",
+          },
+          {
+            title: "Modify",
+            path: "/accounts/payment-voucher/modify",
+            permission: "vouchers.update",
+          },
+          {
+            title: "List",
+            path: "/accounts/payment-voucher",
+            permission: "vouchers.view",
+          },
+        ],
+      },
+      // ── Receipt Voucher ──
+      {
+        title: "Receipt",
+        permission: "vouchers.view",
+        children: [
+          {
+            title: "Add",
+            path: "/accounts/receipt-voucher/add",
+            permission: "vouchers.create",
+            badge: "Ctrl+R",
+          },
+          {
+            title: "Modify",
+            path: "/accounts/receipt-voucher/modify",
+            permission: "vouchers.update",
+          },
+          {
+            title: "List",
+            path: "/accounts/receipt-voucher",
+            permission: "vouchers.view",
+          },
+        ],
+      },
+      // ── Journal Entry ──
+      {
+        title: "Journal",
+        permission: "vouchers.view",
+        children: [
+          {
+            title: "Add",
+            path: "/accounts/journal-entry/add",
+            permission: "vouchers.create",
+            badge: "Ctrl+J",
+          },
+          {
+            title: "Modify",
+            path: "/accounts/journal-entry/modify",
+            permission: "vouchers.update",
+          },
+          {
+            title: "List",
+            path: "/accounts/journal-entry",
+            permission: "vouchers.view",
+          },
+        ],
+      },
+      // ── Contra Entry ──
+      {
+        title: "Contra",
+        permission: "vouchers.view",
+        children: [
+          {
+            title: "Add",
+            path: "/accounts/contra-entry/add",
+            permission: "vouchers.create",
+          },
+          {
+            title: "Modify",
+            path: "/accounts/contra-entry/modify",
+            permission: "vouchers.update",
+          },
+          {
+            title: "List",
+            path: "/accounts/contra-entry",
+            permission: "vouchers.view",
+          },
+        ],
+      },
+      // ── Expenses (replaces Petty Cash — source is user's pick per row) ──
+      {
+        title: "Expenses",
+        permission: "vouchers.view",
+        children: [
+          {
+            title: "Add",
+            path: "/expenses/add",
+            permission: "vouchers.create",
+          },
+          {
+            title: "Modify",
+            path: "/expenses/modify",
+            permission: "vouchers.update",
+          },
+          {
+            title: "List",
+            path: "/expenses",
+            permission: "vouchers.view",
+          },
+        ],
+      },
+      // ── Quotations ──
+      {
+        title: "Quotations",
+        permission: "quotations.view",
+        children: [
+          {
+            title: "Add",
+            path: "/quatation-order/create",
+            permission: "quotations.create",
+          },
+          {
+            title: "List",
+            path: "/quatation-order",
+            permission: "quotations.view",
+            badge: "Ctrl+Q",
+          },
+        ],
+      },
+      // ── Production ──
+      {
+        title: "Production",
+        permission: "production_orders.view",
+        children: [
+          {
+            title: "Add Production Order",
+            path: "/production-orders/create",
+            permission: "production_orders.create",
+          },
+          {
+            title: "Production Orders List",
+            path: "/production-orders",
+            permission: "production_orders.view",
+            badge: "P",
+          },
+          {
+            title: "Order History",
+            path: "/allproduction-orders",
+            permission: "production_orders.view",
+          },
+          {
+            title: "Daily Machine Planning",
+            path: "/daily-machine-planning",
+            permission: "daily-machine-planning.view",
+          },
+          {
+            title: "Hourly Work Reports",
+            path: "/hourly-work-reports",
+            permission: "hourly_productions.view",
+          },
+          {
+            title: "Production Wastages",
+            path: "/production-wastages",
+            permission: "production-wastages.view",
+          },
+          {
+            title: "Weekly Schedules",
+            path: "/weekly-machine-schedules",
+            permission: "weekly_programs.view",
+          },
+          {
+            title: "Goods Dispatch",
+            path: "/production/goods-dispatch",
+            permission: "goods-dispatch.view",
+          },
+          {
+            title: "Shift Execution Board",
+            path: "/shift-execution",
+            permission: "shift-execution.view",
+          },
+        ],
+      },
+      // ── Inventory / Stock ──
+      {
+        title: "Inventory",
+        permission: "stock-adjustments.view",
+        children: [
+          {
+            title: "Add Stock Adjustment",
+            path: "/inventory/stock-adjustments/create",
+            permission: "stock-adjustments.create",
+          },
+          {
+            title: "Stock Adjustments List",
+            path: "/inventory/stock-adjustments",
+            permission: "stock-adjustments.view",
+          },
+        ],
+      },
+    ],
+    activePaths: [
+      "/sales-order",
+      "/quatation-order",
+      "/sales-invoices",
+      "/sales-returns",
+      "/purchase-orders",
+      "/invoice",
+      "/purchase-returns",
+      "/accounts/payment-voucher",
+      "/accounts/receipt-voucher",
+      "/accounts/journal-entry",
+      "/accounts/contra-entry",
+      "/expenses",
+      "/production-orders",
+      "/allproduction-orders",
+      "/weekly-machine-schedules",
+      "/daily-machine-planning",
+      "/hourly-work-reports",
+      "/production-wastages",
+      "/production/goods-dispatch",
+      "/shift-execution",
       "/inventory/stock-adjustments",
       "/inventory/eod-stock",
       "/stock",
@@ -623,13 +1068,41 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "payroll-advance.view", path: "/payroll/advance" },
     ],
     children: [
-      { title: "Payroll Dashboard", path: "/payroll", permission: "payroll.view" },
-      { title: "Run Payroll", path: "/payroll/run", permission: "payroll-run.view" },
-      { title: "Attendance", path: "/payroll/attendance", permission: "payroll-attendance.view" },
-      { title: "Salary Advances", path: "/payroll/advance", permission: "payroll-advance.view" },
-      { title: "Payroll Settings", path: "/payroll/settings", permission: "payroll-settings.view" },
-      { title: "Weekly Payroll Report", path: "/payroll/weekly-report", permission: "payroll.view" },
-      { title: "Monthly Payroll Report", path: "/payroll/monthly-report", permission: "payroll.view" },
+      {
+        title: "Payroll Dashboard",
+        path: "/payroll",
+        permission: "payroll.view",
+      },
+      {
+        title: "Run Payroll",
+        path: "/payroll/run",
+        permission: "payroll-run.view",
+      },
+      {
+        title: "Attendance",
+        path: "/payroll/attendance",
+        permission: "payroll-attendance.view",
+      },
+      {
+        title: "Salary Advances",
+        path: "/payroll/advance",
+        permission: "payroll-advance.view",
+      },
+      {
+        title: "Payroll Settings",
+        path: "/payroll/settings",
+        permission: "payroll-settings.view",
+      },
+      {
+        title: "Weekly Payroll Report",
+        path: "/payroll/weekly-report",
+        permission: "payroll.view",
+      },
+      {
+        title: "Monthly Payroll Report",
+        path: "/payroll/monthly-report",
+        permission: "payroll.view",
+      },
     ],
     activePaths: [
       "/payroll",

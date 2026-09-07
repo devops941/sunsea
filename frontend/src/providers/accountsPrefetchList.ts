@@ -27,7 +27,6 @@ import { receivableService } from "../services/receivableService";
 import { payableService } from "../services/payableService";
 import { voucherService } from "../services/voucherService";
 import { returnService } from "../services/returnService";
-import { pettyCashService } from "../services/pettyCashService";
 import { trackPrefetch } from "./PrefetchProgressTracker";
 
 // Note: `prefetchCache` auto-tracks any key starting with "accounts:", so we
@@ -90,7 +89,7 @@ export async function prefetchHotAccountsCaches(): Promise<void> {
  * pages (breakdowns, statements) are handled by the parent list's onSuccess
  * when the user visits.
  */
-export async function prefetchAllAccountsCaches(companyId?: string): Promise<void> {
+export async function prefetchAllAccountsCaches(_companyId?: string): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
   const currentYear = new Date().getFullYear();
   const fyStart = `${currentYear}-04-01`;
@@ -143,13 +142,9 @@ export async function prefetchAllAccountsCaches(companyId?: string): Promise<voi
     return { data: res.vouchers || [], total: res.total || 0 };
   });
 
-  if (companyId) {
-    prefetchCache(`accounts:petty-cash-entries:${companyId}:ALL::`, async () => {
-      const res = await pettyCashService.fetchEntries({ companyId });
-      const list = res.entries || [];
-      return { data: list, total: list.length };
-    });
-  }
+  // Petty Cash prefetch removed — that module was replaced by the Expenses
+  // module (source-flexible per-row: Petty Cash / Bank / Cash). Expenses
+  // list is warmed on-demand by its own useListCache when the user opens it.
 
   // Balance Sheet + P&L (Trial Balance is in hot set)
   prefetchCache(`accounts:balance-sheet:${today}:false:true`, async () => {

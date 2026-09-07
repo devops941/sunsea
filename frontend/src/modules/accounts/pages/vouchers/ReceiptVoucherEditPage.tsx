@@ -1,22 +1,20 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaReceipt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
+import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
+import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 
-// Receipt = money coming IN. Direction reversed from Payment:
-//   creditLedgerId  = Customer / Income account that paid us ("Received From")
-//   receiptModeId   = Bank/Cash where the money lands ("Received In") — PER-ROW
-// so 5 customers can each pay via different bank/cash accounts in one voucher.
+// Same shape as the Add page — one row per payer, with a per-row Receipt
+// Mode (bank/cash) column.
 interface ReceiptRow {
   id: number;
-  creditLedgerId: string;
-  receiptModeId: string;
+  creditLedgerId: string;   // Payer (customer)
+  receiptModeId: string;    // Bank/cash where the money landed
   amount: string;
   narration: string;
 }
@@ -32,37 +30,100 @@ const makeEmptyRow = (): ReceiptRow => ({
   narration: "",
 });
 
-// Busy-style ACTIVE-CELL highlight — focused input turns black w/ white text.
 const ACTIVE_CELL = "focus:bg-slate-900 focus:text-white focus:font-semibold";
 
-const ReceiptVoucherAddPage: React.FC = () => {
+const ReceiptVoucherEditPage: React.FC = () => {
   const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
+  const location = useLocation();
+  const { id: routeId } = useParams<{ id: string }>();
+  const id = routeId ? parseInt(routeId, 10) : NaN;
 
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [mainNarration, setMainNarration] = useState("");
-  const [nextVoucherNo, setNextVoucherNo] = useState<string>("");
-  const [rows, setRows] = useState<ReceiptRow[]>(() =>
-    Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow)
+  // Zero-loading strategy (three layers, fastest → slowest):
+  //   1. Router-state preload from list-page navigate() — instant, no cache hit needed
+  //   2. useDetailCache hit (memory → sessionStorage) — instant on second visit,
+  //      also works when coming from Day Book or a direct URL after any prior fetch
+  //   3. Network fetch via useDetailCache's SWR — only when both above miss
+  const preloaded = (location.state as { voucher?: Voucher } | null)?.voucher || null;
+  const cacheKey = `voucher-${id}`;
+
+  // Seed the detail cache with router-state preloaded data so socket sync
+  // and other components can read it immediately.
+  useEffect(() => {
+    if (preloaded && id && !isNaN(id)) updateDetailCache<Voucher>(cacheKey, preloaded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preloaded, cacheKey]);
+
+  const voucherFetcher = useCallback(
+    async (_signal: AbortSignal): Promise<Voucher> => {
+      const v = await voucherService.fetchVoucherById(id);
+      if (!v) throw new Error("Voucher not found");
+      return v;
+    },
+    [id]
   );
 
-  useFormShortcuts({});
+  // useDetailCache reads sync from cache first (memory/sessionStorage), then
+  // background-refreshes via socket sync. `loading` is true ONLY when there's
+  // no cached data AND no preloaded state — i.e. genuine first-time fetch.
+  const { data: cachedVoucher, loading: detailLoading } = useDetailCache<Voucher>({
+    cacheKey,
+    socketModule: "voucher",
+    socketMatchId: id,
+    fetcher: voucherFetcher,
+    enabled: !!id && !isNaN(id),
+  });
 
-  // Peek next Vch No so the operator sees "R-5" waiting for them
+  // The effective voucher — pick router-state first (freshest), else cache.
+  const effective = preloaded || cachedVoucher || getDetailFromCache<Voucher>(cacheKey);
+
+  const hydrateFromVoucher = (v: Voucher): ReceiptRow[] => {
+    const populated: ReceiptRow[] = (v.items || []).map((it) => ({
+      id: rowCounter++,
+      // In Receipt: creditLedger = payer, debitLedger = bank/cash receiving.
+      creditLedgerId: it.creditLedgerId != null ? String(it.creditLedgerId) : "",
+      receiptModeId: it.debitLedgerId != null ? String(it.debitLedgerId) : "",
+      amount: String(Number(it.debitAmount || it.creditAmount || 0)),
+      narration: it.narration || "",
+    }));
+    while (populated.length < INITIAL_ROW_COUNT) populated.push(makeEmptyRow());
+    return populated;
+  };
+
+  const [submitting, setSubmitting] = useState(false);
+  const [voucher, setVoucher] = useState<Voucher | null>(effective);
+  const [date, setDate] = useState(() => (effective?.date || "").split("T")[0]);
+  const [mainNarration, setMainNarration] = useState(effective?.narration || "");
+  const [rows, setRows] = useState<ReceiptRow[]>(() =>
+    effective ? hydrateFromVoucher(effective) : []
+  );
+
+  // When cache lands (or refreshes), keep local editable state in sync only
+  // if the user hasn't started editing. We track "user touched" implicitly
+  // by comparing the currently-loaded voucher id to prevent overwrites.
+  const lastAppliedIdRef = useRef<number | null>(effective?.id ?? null);
   useEffect(() => {
-    let cancelled = false;
-    voucherService
-      .fetchNextVoucherNo("RECEIPT")
-      .then((no) => {
-        if (!cancelled) setNextVoucherNo(no);
-      })
-      .catch(() => {
-        if (!cancelled) setNextVoucherNo("");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!cachedVoucher) return;
+    // Only apply if this is a different voucher OR we haven't hydrated yet
+    if (lastAppliedIdRef.current === cachedVoucher.id && voucher) return;
+    setVoucher(cachedVoucher);
+    setDate((cachedVoucher.date || "").split("T")[0]);
+    setMainNarration(cachedVoucher.narration || "");
+    setRows(hydrateFromVoucher(cachedVoucher));
+    lastAppliedIdRef.current = cachedVoucher.id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cachedVoucher]);
+
+  // Guard: invalid id → back to list.
+  useEffect(() => {
+    if (!id || isNaN(id)) {
+      toast.error("Invalid voucher id");
+      navigate("/accounts/receipt-voucher");
+    }
+  }, [id, navigate]);
+
+  // Loading flag — true ONLY when we have nothing to show at all (no preload,
+  // no cache, and useDetailCache is still fetching for the first time).
+  const loading = !effective && detailLoading;
 
   const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await accountService.fetchLedgers({ limit: 1000 });
@@ -82,8 +143,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
     if (!tableRef.current) return;
     const wrap = tableRef.current.querySelector<HTMLElement>(`[data-cell="${rowIdx}-${field}"]`);
     if (!wrap) return;
-    const el =
-      wrap.tagName === "INPUT" ? (wrap as HTMLInputElement) : wrap.querySelector("input");
+    const el = wrap.tagName === "INPUT" ? (wrap as HTMLInputElement) : wrap.querySelector("input");
     if (el) {
       el.focus();
       if (el.select) el.select();
@@ -118,7 +178,6 @@ const ReceiptVoucherAddPage: React.FC = () => {
       prev.map((r) => {
         if (r.id !== id) return r;
         const next = { ...r, [field]: value };
-        // Clearing the payer wipes the row so orphan amounts don't linger.
         if (field === "creditLedgerId" && !value) {
           next.receiptModeId = "";
           next.amount = "";
@@ -143,16 +202,6 @@ const ReceiptVoucherAddPage: React.FC = () => {
     return true;
   };
 
-  const resetFormForNext = () => {
-    setMainNarration("");
-    setRows(Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow));
-    voucherService
-      .fetchNextVoucherNo("RECEIPT")
-      .then(setNextVoucherNo)
-      .catch(() => setNextVoucherNo(""));
-    setTimeout(() => focusCell(0, "account"), 0);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -163,7 +212,6 @@ const ReceiptVoucherAddPage: React.FC = () => {
       toast.error("Add at least one receipt entry with account + receipt mode + amount");
       return;
     }
-
     for (const r of validRows) {
       if (r.creditLedgerId === r.receiptModeId) {
         toast.error("'Received From' and 'Receipt Mode' cannot be the same account in a row");
@@ -173,8 +221,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const created = await voucherService.createVoucher({
-        type: "RECEIPT",
+      const updated = await voucherService.updateVoucher(id, {
         date,
         narration: mainNarration || "Receipt Voucher",
         items: validRows.map((r) => ({
@@ -185,17 +232,31 @@ const ReceiptVoucherAddPage: React.FC = () => {
           narration: r.narration || mainNarration || "Receipt",
         })),
       });
-      if (created?.id) {
-        prependToListCacheByPrefix<Voucher>("accounts:receipt-vouchers:", created);
+      if (updated?.id) {
+        // 1. Update the list cache so Receipt Register reflects the edit
+        //    without a network refetch.
+        upsertInListCacheByPrefix<Voucher>(
+          "accounts:receipt-vouchers:",
+          (v) => v.id === updated.id,
+          updated
+        );
+        // 2. Update the detail cache too — the next visit to this Edit
+        //    page (from anywhere: list, Day Book, direct URL) will be
+        //    instant and show the latest values.
+        updateDetailCache<Voucher>(`voucher-${updated.id}`, updated);
       }
-      toast.success("Receipt voucher saved successfully");
-      resetFormForNext();
+      toast.success("Receipt voucher updated");
+      navigate("/accounts/receipt-voucher");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to save");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return <div className="p-6 text-center text-xs text-ink-subtle">Loading voucher…</div>;
+  }
 
   return (
     <div className="p-3">
@@ -204,12 +265,10 @@ const ReceiptVoucherAddPage: React.FC = () => {
           onSubmit={handleSubmit}
           className="bg-card border border-line rounded-md overflow-hidden shadow-sm"
         >
-          {/* Title bar — Busy-style green header (Receipt uses green) */}
-          <div className="bg-emerald-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
-            Add Receipt Voucher
+          <div className="text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line bg-emerald-600/90">
+            Modify Receipt Voucher
           </div>
 
-          {/* Top meta section */}
           <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-3 gap-y-1.5 text-[11px] items-center">
             <label className="col-span-2 text-ink-subtle font-semibold">Date</label>
             <div className="col-span-4">
@@ -218,14 +277,13 @@ const ReceiptVoucherAddPage: React.FC = () => {
 
             <label className="col-span-2 text-ink-subtle font-semibold">Vch No.</label>
             <div className="col-span-4 text-ink font-mono font-bold text-[12px]">
-              {nextVoucherNo ? displayVoucherNo(nextVoucherNo) : "…"}
+              {voucher ? displayVoucherNo(voucher.voucherNo) : "…"}
             </div>
 
             <label className="col-span-2 text-ink-subtle font-semibold">Narration</label>
             <div className="col-span-4">
               <input
                 type="text"
-                placeholder=""
                 value={mainNarration}
                 onChange={(e) => setMainNarration(e.target.value)}
                 onKeyDown={(e) => {
@@ -240,7 +298,6 @@ const ReceiptVoucherAddPage: React.FC = () => {
             <div className="col-span-6" />
           </div>
 
-          {/* Spreadsheet-style items grid */}
           <div className="border-b border-line" ref={tableRef}>
             <table className="w-full text-[11px] border-collapse">
               <thead>
@@ -299,7 +356,6 @@ const ReceiptVoucherAddPage: React.FC = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          placeholder=""
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                           onKeyDown={(e) => handleAmountKeyDown(e, idx)}
@@ -312,7 +368,6 @@ const ReceiptVoucherAddPage: React.FC = () => {
                         <input
                           data-cell={`${idx}-narration`}
                           type="text"
-                          placeholder=""
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
                           onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
@@ -347,15 +402,10 @@ const ReceiptVoucherAddPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Bottom action bar */}
           <div className="px-3 py-2 flex items-center justify-between bg-card-2/40">
             <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
               <FaReceipt className="text-emerald-500" />
-              <span>
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> /
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">Tab</kbd> to move forward •
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">↑↓</kbd> in dropdown
-              </span>
+              <span>Modify existing voucher — items will be fully replaced on save</span>
             </div>
             <div className="flex gap-2">
               <button
@@ -380,4 +430,4 @@ const ReceiptVoucherAddPage: React.FC = () => {
   );
 };
 
-export default ReceiptVoucherAddPage;
+export default ReceiptVoucherEditPage;

@@ -49,6 +49,13 @@ const JournalEntryPage: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [panelOpen, pending]);
 
+  const openVoucherEdit = useCallback(
+    (v: Voucher) => {
+      navigate(`/accounts/journal-entry/edit/${v.id}`, { state: { voucher: v } });
+    },
+    [navigate]
+  );
+
   const cacheKey = `accounts:journal-vouchers:${applied.startDate}:${applied.endDate}`;
 
   const fetcher = useCallback(
@@ -75,6 +82,72 @@ const JournalEntryPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+
+  // Busy-style auto-select the first voucher so Enter opens Modify without
+  // any prior click. Preserves current selection if it still exists.
+  useEffect(() => {
+    if (panelOpen) return;
+    if (vouchers.length === 0) {
+      setSelectedRow(null);
+      return;
+    }
+    if (selectedRow == null || !vouchers.some((v) => v.id === selectedRow)) {
+      setSelectedRow(vouchers[0].id);
+    }
+  }, [vouchers, panelOpen, selectedRow]);
+
+  // List keyboard shortcuts (only when the filter panel is closed).
+  //   ↑ / ↓         move selection between vouchers
+  //   Home / End    jump to first / last voucher
+  //   Enter         open Modify page for the selected voucher
+  useEffect(() => {
+    if (panelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (vouchers.length === 0) return;
+      const idx = selectedRow != null ? vouchers.findIndex((v) => v.id === selectedRow) : -1;
+
+      if (e.key === "Enter" && selectedRow != null) {
+        const v = vouchers.find((x) => x.id === selectedRow);
+        if (v) {
+          e.preventDefault();
+          openVoucherEdit(v);
+        }
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = vouchers[Math.min(idx + 1, vouchers.length - 1)];
+        if (next) setSelectedRow(next.id);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = vouchers[Math.max(idx - 1, 0)];
+        if (prev) setSelectedRow(prev.id);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setSelectedRow(vouchers[0].id);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setSelectedRow(vouchers[vouchers.length - 1].id);
+      } else if (e.key === "PageDown") {
+        e.preventDefault();
+        const start = idx < 0 ? 0 : idx;
+        setSelectedRow(vouchers[Math.min(start + 10, vouchers.length - 1)].id);
+      } else if (e.key === "PageUp") {
+        e.preventDefault();
+        const start = idx < 0 ? 0 : idx;
+        setSelectedRow(vouchers[Math.max(start - 10, 0)].id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panelOpen, selectedRow, vouchers, openVoucherEdit]);
+
+  // Keep the highlighted row in view — minimal scroll (no smooth animation).
+  useEffect(() => {
+    if (selectedRow == null) return;
+    const el = document.querySelector<HTMLElement>(`[data-jrn-row="${selectedRow}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [selectedRow]);
 
   // Journal list shows ONE ROW PER JOURNAL ITEM (Busy convention), not one
   // row per voucher. So flatten items with a reference back to the voucher
@@ -271,7 +344,10 @@ const JournalEntryPage: React.FC = () => {
                   return (
                     <tr
                       key={`${voucher.id}-${itemIdx}`}
+                      data-jrn-row={voucher.id}
                       onClick={() => setSelectedRow(voucher.id)}
+                      onDoubleClick={() => openVoucherEdit(voucher)}
+                      title="Double-click or press Enter to modify"
                       className={`border-b border-line-soft cursor-pointer ${
                         isSelected
                           ? "bg-purple-600/20 text-ink"

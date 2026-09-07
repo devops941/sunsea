@@ -615,6 +615,11 @@ class AccountsService {
       );
     }
 
+    // Enrich entries with line-item details for invoice-based vouchers so
+    // Busy's "Show Items Details" toggle can render the product/qty/price
+    // breakdown under each row. Batched to keep this O(1) round-trips.
+    const enrichedEntries = await this.enrichEntriesWithItems(filteredEntries);
+
     return {
       ledger,
       mode: "one" as const,
@@ -626,8 +631,146 @@ class AccountsService {
       // the header banner consistent with the row math.
       openingBalance: openingBalanceForDisplay,
       closingBalance: runningBalance,
-      entries: filteredEntries,
+      entries: enrichedEntries,
     };
+  }
+
+  /**
+   * Batch-fetch line items for entries whose voucher was auto-posted from a
+   * source document (Sales Invoice / GRN Invoice). Two queries total per call,
+   * regardless of entry count.
+   *
+   * Returns the entries with an `items?: Array<{...}>` field attached where
+   * available. Entries without a matching refDoc are returned unchanged.
+   */
+  private async enrichEntriesWithItems(entries: any[]): Promise<any[]> {
+    const salesInvoiceIds = entries
+      .filter((e) => e.refDocType === "SALES_INVOICE" && e.refDocId)
+      .map((e) => String(e.refDocId));
+    const grnInvoiceIds = entries
+      .filter((e) => e.refDocType === "GRN_INVOICE" && e.refDocId)
+      .map((e) => String(e.refDocId));
+
+    if (salesInvoiceIds.length === 0 && grnInvoiceIds.length === 0) return entries;
+
+    const [salesInvoices, grnInvoices] = await Promise.all([
+      salesInvoiceIds.length
+        ? prisma.salesInvoice.findMany({
+            where: { id: { in: salesInvoiceIds } },
+            select: {
+              id: true,
+              transport: true,
+              numberOfBundle: true,
+              billSundry: true,
+              items: {
+                select: {
+                  description: true,
+                  uom: true,
+                  quantity: true,
+                  unitPrice: true,
+                  lineTotal: true,
+                  product: { select: { productName: true, productCode: true } },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      grnInvoiceIds.length
+        ? prisma.grnInvoice.findMany({
+            where: { id: { in: grnInvoiceIds } },
+            select: {
+              id: true,
+              items: {
+                select: {
+                  description: true,
+                  uom: true,
+                  quantity: true,
+                  unitPrice: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Extract a friendly transport label — the JSON blob usually has
+    // { name, vehicle, driver } or just a string. Fall back to the raw
+    // JSON stringified.
+    const transportLabel = (t: any): string | null => {
+      if (!t) return null;
+      if (typeof t === "string") return t.trim() || null;
+      if (typeof t === "object") {
+        const parts: string[] = [];
+        if (t.name) parts.push(String(t.name));
+        if (t.vehicle) parts.push(String(t.vehicle));
+        if (t.driver) parts.push(`Driver: ${t.driver}`);
+        if (parts.length > 0) return parts.join(" · ");
+      }
+      return null;
+    };
+
+    // Normalise bill sundry to Array<{ label, amount }> regardless of shape.
+    const normaliseSundry = (bs: any): Array<{ label: string; amount: number }> => {
+      if (!bs) return [];
+      const arr = Array.isArray(bs) ? bs : Array.isArray(bs?.items) ? bs.items : [];
+      return arr
+        .map((s: any) => ({
+          label: String(s?.name ?? s?.label ?? s?.title ?? "").trim(),
+          amount: Number(s?.amount ?? s?.value ?? 0),
+        }))
+        .filter((s: { label: string; amount: number }) => s.label && Number.isFinite(s.amount) && s.amount !== 0);
+    };
+
+    const siMap = new Map(
+      salesInvoices.map((si: any) => [
+        si.id,
+        {
+          items: si.items.map((it: any) => ({
+            description: it.product?.productName || it.description || "",
+            uom: it.uom || null,
+            quantity: Number(it.quantity),
+            unitPrice: Number(it.unitPrice),
+            amount: Number(it.lineTotal),
+          })),
+          transport: transportLabel(si.transport),
+          numberOfBundle: si.numberOfBundle != null ? Number(si.numberOfBundle) : null,
+          billSundry: normaliseSundry(si.billSundry),
+        },
+      ])
+    );
+    const giMap = new Map(
+      grnInvoices.map((gi: any) => [
+        gi.id,
+        {
+          items: gi.items.map((it: any) => ({
+            description: it.description || "",
+            uom: it.uom || null,
+            quantity: Number(it.quantity),
+            unitPrice: Number(it.unitPrice),
+            amount: Number(it.quantity) * Number(it.unitPrice),
+          })),
+          transport: null as string | null,
+          numberOfBundle: null as number | null,
+          billSundry: [] as Array<{ label: string; amount: number }>,
+        },
+      ])
+    );
+
+    return entries.map((e) => {
+      if (e.refDocType === "SALES_INVOICE" && e.refDocId) {
+        const rec = siMap.get(String(e.refDocId));
+        return rec ? { ...e, items: rec.items, meta: {
+          transport: rec.transport,
+          numberOfBundle: rec.numberOfBundle,
+          billSundry: rec.billSundry,
+        }} : e;
+      }
+      if (e.refDocType === "GRN_INVOICE" && e.refDocId) {
+        const rec = giMap.get(String(e.refDocId));
+        return rec ? { ...e, items: rec.items } : e;
+      }
+      return e;
+    });
   }
 
   /**
@@ -863,6 +1006,10 @@ class AccountsService {
       };
     }
 
+    // Attach invoice line-items so the frontend's "Show Items Details"
+    // toggle can render them (mirrors getLedgerStatement enrichment).
+    const enrichedEntries = await this.enrichEntriesWithItems(filteredEntries);
+
     return {
       mode: "multi" as const,
       label: options.label || `${ledgers.length} accounts`,
@@ -872,7 +1019,7 @@ class AccountsService {
       endDate: options.endDate || null,
       openingBalance,
       closingBalance: runningBalance,
-      entries: filteredEntries,
+      entries: enrichedEntries,
       accountBalances,
     };
   }
@@ -1484,6 +1631,207 @@ class AccountsService {
     }
 
     return { ledgerId: ledger.id, openingBalance: amount };
+  }
+
+  /**
+   * Day Book (Busy-style) — returns every voucher in a date range, split into
+   * Dr-side and Cr-side rows for the two-column cashbook layout.
+   *
+   * Golden-Rule invariants this function honours:
+   *   • Every voucher's Σ Dr = Σ Cr (double-entry) — enforced by the posting layer;
+   *     we just surface the individual rows here.
+   *   • Cash reconciliation: Opening Cash + Σ Dr(cash) − Σ Cr(cash) = Closing Cash.
+   *   • Each row is classified `isCash` iff the row's ledger is Cash/Bank/Petty Cash
+   *     (Real Account, Rule 2). Non-cash rows fall in the "Amount" column.
+   *
+   * Return shape mirrors the Busy Day Book screenshot: a debit-side list and a
+   * credit-side list, each row carrying either `cashAmount` OR `amount` (never both).
+   */
+  async getDayBook(options: { startDate?: string; endDate?: string }) {
+    // Same sync pattern as getLedgerStatement so newly-created invoices show up.
+    try {
+      const { voucherPostingService } = require("./voucherPosting.service");
+      await voucherPostingService.syncUnpostedVouchers();
+      await voucherPostingService.syncMissingOpeningBalanceVouchers();
+    } catch (err) {
+      console.error("[AccountsService.getDayBook] Sync unposted vouchers failed:", err);
+    }
+
+    const startDate = options.startDate ? new Date(options.startDate) : null;
+    const endDate = options.endDate ? new Date(options.endDate) : null;
+
+    // ── Cash/Bank ledger IDs (Real Account — Rule 2 lives here) ──
+    const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand"];
+    const cashLedgers = await prisma.accountLedger.findMany({
+      where: {
+        type: LedgerType.ASSET,
+        group: { in: bankGroups, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    const cashLedgerIds = new Set(cashLedgers.map((l) => l.id));
+
+    // ── Opening Cash Balance = net Dr movement across all cash/bank ledgers
+    //     STRICTLY BEFORE startDate. Golden Rule (Real Account): Dr in − Cr out.
+    let openingCashBalance = 0;
+    if (startDate && cashLedgerIds.size > 0) {
+      const preItems = await prisma.journalItem.findMany({
+        where: {
+          voucher: { date: { lt: startDate } },
+          OR: [
+            { debitLedgerId: { in: [...cashLedgerIds] } },
+            { creditLedgerId: { in: [...cashLedgerIds] } },
+          ],
+        },
+        select: { debitLedgerId: true, creditLedgerId: true, debitAmount: true, creditAmount: true },
+      });
+      for (const it of preItems) {
+        if (it.debitLedgerId && cashLedgerIds.has(it.debitLedgerId)) {
+          openingCashBalance += Number(it.debitAmount || 0);
+        }
+        if (it.creditLedgerId && cashLedgerIds.has(it.creditLedgerId)) {
+          openingCashBalance -= Number(it.creditAmount || 0);
+        }
+      }
+    }
+
+    // ── Vouchers within the range ──
+    const dateFilter: Prisma.VoucherWhereInput = {};
+    if (startDate || endDate) {
+      dateFilter.date = {
+        ...(startDate && { gte: startDate }),
+        ...(endDate && { lte: endDate }),
+      };
+    }
+
+    const vouchers = await prisma.voucher.findMany({
+      where: dateFilter,
+      include: {
+        items: {
+          include: {
+            debitLedger: { select: { id: true, code: true, name: true, group: true } },
+            creditLedger: { select: { id: true, code: true, name: true, group: true } },
+          },
+        },
+      },
+      orderBy: [{ date: "asc" }, { id: "asc" }],
+    });
+
+    // ── Emit Dr-side and Cr-side rows ──
+    // Each row = one journal item. `isCash` marks Real-Account (Rule 2) rows so
+    // the frontend can drop them in the Cash column vs the Amount column.
+    type DayBookRow = {
+      voucherId: number;
+      voucherNo: string;
+      voucherType: string;
+      date: string;
+      typeShort: string;                 // "Sale", "Pymt", "Rcpt", "Jrnl", "Cntr", "Rct", "OpBal", "Exp"
+      particulars: string;               // ledger name on THIS side of the entry
+      ledgerCode: string | null;
+      isCash: boolean;
+      cashAmount: number;                // populated iff isCash
+      amount: number;                    // populated iff !isCash
+      narration: string | null;
+    };
+
+    const shortByType: Record<string, string> = {
+      SALES: "Sale",
+      PURCHASE: "Purc",
+      PAYMENT: "Pymt",
+      RECEIPT: "Rcpt",
+      JOURNAL: "Jrnl",
+      CONTRA: "Cntr",
+      OPENING_BALANCE: "OpBal",
+      EXPENSE: "Exp",
+      SALES_RETURN: "SRet",
+      PURCHASE_RETURN: "PRet",
+      PETTY_CASH: "PC",
+    };
+
+    const debitRows: DayBookRow[] = [];
+    const creditRows: DayBookRow[] = [];
+
+    let cashDrTotal = 0;
+    let cashCrTotal = 0;
+    let amountDrTotal = 0;
+    let amountCrTotal = 0;
+
+    for (const v of vouchers) {
+      const typeShort = shortByType[v.type] || v.type.slice(0, 4);
+      const dateStr = v.date.toISOString().split("T")[0];
+
+      for (const it of v.items) {
+        const dr = Number(it.debitAmount || 0);
+        const cr = Number(it.creditAmount || 0);
+
+        // Debit side row (posted when debitLedgerId + debitAmount > 0)
+        if (it.debitLedgerId && dr > 0 && it.debitLedger) {
+          const isCash = cashLedgerIds.has(it.debitLedgerId);
+          const row: DayBookRow = {
+            voucherId: v.id,
+            voucherNo: v.voucherNo,
+            voucherType: v.type,
+            date: dateStr,
+            typeShort,
+            particulars: it.debitLedger.name,
+            ledgerCode: it.debitLedger.code,
+            isCash,
+            cashAmount: isCash ? dr : 0,
+            amount: isCash ? 0 : dr,
+            narration: it.narration || null,
+          };
+          debitRows.push(row);
+          if (isCash) cashDrTotal += dr; else amountDrTotal += dr;
+        }
+
+        // Credit side row (posted when creditLedgerId + creditAmount > 0)
+        if (it.creditLedgerId && cr > 0 && it.creditLedger) {
+          const isCash = cashLedgerIds.has(it.creditLedgerId);
+          const row: DayBookRow = {
+            voucherId: v.id,
+            voucherNo: v.voucherNo,
+            voucherType: v.type,
+            date: dateStr,
+            typeShort,
+            particulars: it.creditLedger.name,
+            ledgerCode: it.creditLedger.code,
+            isCash,
+            cashAmount: isCash ? cr : 0,
+            amount: isCash ? 0 : cr,
+            narration: it.narration || null,
+          };
+          creditRows.push(row);
+          if (isCash) cashCrTotal += cr; else amountCrTotal += cr;
+        }
+      }
+    }
+
+    // Closing Cash = Opening + Dr cash − Cr cash (Real Account rule)
+    const closingCashBalance = openingCashBalance + cashDrTotal - cashCrTotal;
+
+    return {
+      startDate: options.startDate || null,
+      endDate: options.endDate || null,
+      openingCashBalance,
+      closingCashBalance,
+      debitRows,
+      creditRows,
+      totals: {
+        cashDrTotal,
+        cashCrTotal,
+        amountDrTotal,
+        amountCrTotal,
+        // Grand Total column semantics (matches Busy screenshot):
+        //   Left Grand = openingCashBalance + cashDrTotal   (Cash "in" side)
+        //   Right Grand = cashCrTotal + closingCashBalance  (Cash "out" side)
+        //   Both must be equal — cash reconciliation invariant.
+        grandCashDr: openingCashBalance + cashDrTotal,
+        grandCashCr: cashCrTotal + closingCashBalance,
+        grandAmountDr: amountDrTotal,
+        grandAmountCr: amountCrTotal,
+      },
+      voucherCount: vouchers.length,
+    };
   }
 }
 
