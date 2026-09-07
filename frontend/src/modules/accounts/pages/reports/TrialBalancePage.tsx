@@ -91,9 +91,20 @@ const TrialBalancePage: React.FC = () => {
     fetcher: ledgersFetcher,
   });
 
+  // Group picker options — mirrors LedgerStatement's `groupedLedgers`:
+  // includes ledger's own `group` (e.g. "SUNDRY DEBTORS") PLUS the
+  // customer's grade (e.g. "A GRADE") and customer's type (e.g. "NORTH")
+  // as pseudo-groups so the operator can filter Sundry Debtors by grade
+  // or type from the same picker (Busy convention).
   const groupList = useMemo(() => {
     const set = new Set<string>();
-    for (const l of ledgers) if (l.group) set.add(l.group);
+    for (const l of ledgers) {
+      if (l.group) set.add(l.group);
+      const grade = (l as any).customer?.customerGrade?.name as string | undefined;
+      const type = (l as any).customer?.customerType?.name as string | undefined;
+      if (grade) set.add(grade);
+      if (type) set.add(type);
+    }
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [ledgers]);
 
@@ -529,9 +540,13 @@ const TrialBalancePage: React.FC = () => {
       )}
 
       {/* ─── Options Dialog (Busy-style) ────────────────────────── */}
+      {/* Pinned to the top-left corner like Busy's operator flow —
+         `overflow-visible` on the outer card + inner body so the
+         group-picker dropdown can escape without pushing the modal's
+         own scrollbar. */}
       {showOptionsDialog && (
-        <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
-          <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
+        <div className="fixed top-[80px] left-4 z-30 w-[460px] max-w-[95vw]">
+          <div className="bg-card border border-line rounded-md shadow-2xl w-full flex flex-col overflow-visible">
             <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
               <span className="flex-1 text-center">
                 Trial Balance — {viewMode === "all" ? "All Accounts" : viewMode === "group" ? "Group of Accounts" : "Selected Accounts"}
@@ -544,7 +559,7 @@ const TrialBalancePage: React.FC = () => {
               </button>
             </div>
 
-            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+            <div className="px-3 py-2 overflow-visible grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
               {/* Group picker (only for group mode) */}
               {viewMode === "group" && (
                 <>
