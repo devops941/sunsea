@@ -190,7 +190,7 @@ export const sidebarItems: SidebarItem[] = [
       },
       // ── Purchase Order ──
       {
-        title: "Purchase Order",
+        title: "Purchase",
         permission: "purchaseOrders.view",
         children: [
           { title: "Add", path: "/purchase-orders/create", permission: "purchaseOrders.create", badge: "Ctrl+X" },
@@ -217,7 +217,7 @@ export const sidebarItems: SidebarItem[] = [
       },
       // ── Purchase (GRN) ──
       {
-        title: "GRN Invoice",
+        title: "Purchase Order",
         permission: "invoice.view",
         children: [
           { title: "Add", path: "/invoice/create", permission: "invoice.create", badge: "Ctrl+U" },
