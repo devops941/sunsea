@@ -152,6 +152,15 @@ const SalesInvoiceView: React.FC = () => {
     }, [invoicesList, loadingList]);
 
     // Keyboard navigation: Escape to go back, ArrowUp/ArrowDown to navigate list, F10 to print
+    const filteredInvoices = useMemo(() => {
+        const term = searchTerm.toLowerCase();
+        return invoicesList.filter((inv) => {
+            const invoiceNo = inv.invoiceNo?.toLowerCase() ?? "";
+            const customerName = (inv.customer?.displayName || inv.customer?.firmName || "").toLowerCase();
+            return invoiceNo.includes(term) || customerName.includes(term);
+        });
+    }, [invoicesList, searchTerm]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement;
@@ -202,15 +211,6 @@ const SalesInvoiceView: React.FC = () => {
     }, [fetchList, idParam, loadDetail]);
 
     useSocketSync("salesInvoice", undefined, handleSocketUpdate);
-
-    const filteredInvoices = useMemo(() => {
-        const term = searchTerm.toLowerCase();
-        return invoicesList.filter((inv) => {
-            const invoiceNo = inv.invoiceNo?.toLowerCase() ?? "";
-            const customerName = (inv.customer?.displayName || inv.customer?.firmName || "").toLowerCase();
-            return invoiceNo.includes(term) || customerName.includes(term);
-        });
-    }, [invoicesList, searchTerm]);
 
     // ─── Tax calculations per item (CGST/SGST or IGST) ─────────────────
     const isInterState = useMemo(() => {
