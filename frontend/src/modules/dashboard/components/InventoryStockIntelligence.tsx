@@ -177,7 +177,8 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
   const [liveRawStocks, setLiveRawStocks] = useState<any[]>(initialRawStocks);
   const [liveFgStocks, setLiveFgStocks] = useState<any[]>(initialFgStocks);
   const [liveProducts, setLiveProducts] = useState<any[]>(initialProducts);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [hasLoadedData, setHasLoadedData] = useState<boolean>(() => Boolean(initialRawMaterials?.length || initialRawStocks?.length || initialProducts?.length));
+  const [isLoading, setIsLoading] = useState<boolean>(() => !initialRawMaterials?.length && !initialRawStocks?.length);
 
   // Prevent concurrent fetches: if a socket event fires while a fetch is
   // in-flight, skip it — the in-flight response is already the freshest data.
@@ -223,6 +224,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
       console.warn("Live inventory fetch fallback to props:", err);
     } finally {
       setIsLoading(false);
+      setHasLoadedData(true);
       fetchingRef.current = false;
     }
   }, []);
@@ -242,12 +244,32 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
 
   // Sync props if parent updates
   useEffect(() => {
-    if (initialRawMaterials?.length > 0) setLiveRawMaterials(initialRawMaterials);
+    if (initialRawMaterials?.length > 0) {
+      setLiveRawMaterials(initialRawMaterials);
+      setHasLoadedData(true);
+    }
   }, [initialRawMaterials]);
 
   useEffect(() => {
-    if (initialProducts?.length > 0) setLiveProducts(initialProducts);
+    if (initialProducts?.length > 0) {
+      setLiveProducts(initialProducts);
+      setHasLoadedData(true);
+    }
   }, [initialProducts]);
+
+  useEffect(() => {
+    if (initialRawStocks?.length > 0) {
+      setLiveRawStocks(initialRawStocks);
+      setHasLoadedData(true);
+    }
+  }, [initialRawStocks]);
+
+  useEffect(() => {
+    if (initialFgStocks?.length > 0) {
+      setLiveFgStocks(initialFgStocks);
+      setHasLoadedData(true);
+    }
+  }, [initialFgStocks]);
 
   // 1. Process All Raw Stock Entries (Separating Standard Raw Materials from Wastage Store)
   const { rawStockItems, wastageStockItems } = useMemo(() => {
@@ -269,25 +291,45 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         (s: any) => String(s.rawMaterialId) === rmId || String(s.rawMaterial?.rawMaterialId) === rmId || String(s.rawMaterial?.id) === rmId
       );
 
+      let hasRealStock = matchingStocks.length > 0;
       let totalStockQty = matchingStocks.reduce(
         (sum: number, s: any) => sum + (Number(s.onHandQty ?? s.currentStock ?? s.quantity ?? 0) || 0),
         0
       );
 
-      if (totalStockQty === 0) {
+      if (!hasRealStock && (rm.onHandQty !== undefined && rm.onHandQty !== null)) {
         totalStockQty = Number(rm.onHandQty ?? rm.currentStock ?? rm.totalQuantity ?? rm.quantity ?? 0) || 0;
       }
 
-      if (totalStockQty === 0) {
-        const seedBaselines = [1850, 620, 340, 980, 2400, 480, 150, 780];
-        totalStockQty = seedBaselines[idx % seedBaselines.length];
-      }
-
-      const minLevel = Number(rm.minimumStock || rm.reorderLevel || rm.minStock || (isWastage ? 100 : 600));
+      const minStock = Number(rm.minimumStock ?? rm.minStock ?? (isWastage ? 50 : 0));
+      const reorderLevel = Number(rm.reorderLevel ?? rm.reorderPoint ?? (isWastage ? 100 : 0));
       const unitPrice = Number(rm.rate || rm.price || rm.unitPrice || rm.standardCost || (isWastage ? 25 : 85));
       const uom = getPrimaryUom(rm.baseUom || rm.uom || "KG", "KG");
-      const isLow = totalStockQty <= minLevel;
-      const isCritical = totalStockQty <= minLevel * 0.4;
+
+      let isCritical = false;
+      let isLow = false;
+      let status: "CRITICAL" | "REORDER" | "OPTIMAL" = "OPTIMAL";
+
+      if (isWastage) {
+        if (reorderLevel > 0 && totalStockQty >= reorderLevel) {
+          isLow = true;
+          status = "REORDER";
+        }
+      } else {
+        if (minStock > 0 && totalStockQty <= minStock) {
+          isCritical = true;
+          isLow = true;
+          status = "CRITICAL";
+        } else if (reorderLevel > 0 && totalStockQty <= reorderLevel) {
+          isLow = true;
+          status = "REORDER";
+        } else if (minStock === 0 && reorderLevel === 0 && totalStockQty === 0) {
+          isCritical = true;
+          isLow = true;
+          status = "CRITICAL";
+        }
+      }
+
       const value = totalStockQty * unitPrice;
       const category = isWastage ? (rm.category?.name || "Plastic Scrap") : extractRawCategory(rm, name);
 
@@ -298,13 +340,15 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         category,
         isWastage,
         qty: totalStockQty,
-        minLevel,
+        minStock,
+        reorderLevel,
+        minLevel: minStock,
         uom,
         unitPrice,
         value,
         isLow,
         isCritical,
-        status: isCritical ? "CRITICAL" : isLow ? "LOW STOCK" : "OPTIMAL",
+        status,
       };
 
       if (isWastage) {
@@ -331,21 +375,18 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         (fg: any) => String(fg.productItemId) === pId || String(fg.productId) === pId || String(fg.product?.id) === pId
       );
 
+      let hasRealFgStock = matchingFg.length > 0;
       let totalFgQty = matchingFg.reduce(
         (sum: number, fg: any) => sum + (Number(fg.onHandQty ?? fg.currentStock ?? fg.quantity ?? 0) || 0),
         0
       );
 
-      if (totalFgQty === 0) {
+      if (!hasRealFgStock && (p.onHandQty != null || p.currentStock != null || p.stock != null || p.quantity != null)) {
         totalFgQty = Number(p.onHandQty ?? p.currentStock ?? p.stock ?? p.quantity ?? 0) || 0;
       }
 
-      if (totalFgQty === 0) {
-        const seedFgBaselines = [999, 4500, 8200, 2100, 6400, 3900, 1800, 7500];
-        totalFgQty = seedFgBaselines[idx % seedFgBaselines.length];
-      }
-
-      const minLevel = Number(p.minimumQty || p.minStock || p.reorderLevel || 1500);
+      const minStock = Number(p.minimumQty ?? p.minStock ?? p.minimumStock ?? 0);
+      const reorderLevel = Number(p.reorderLevel ?? p.reorderPoint ?? 0);
       const unitPrice = Number(p.rate || p.price || p.b2b || p.mrp || 15);
       const dynamicUom =
         matchingFg[0]?.product?.uom?.uomCode ||
@@ -357,8 +398,24 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         p.uom ||
         "PCS";
       const uom = getPrimaryUom(dynamicUom, "PCS");
-      const isLow = totalFgQty <= minLevel;
-      const isCritical = totalFgQty <= minLevel * 0.4;
+
+      let isCritical = false;
+      let isLow = false;
+      let status: "CRITICAL" | "REORDER" | "OPTIMAL" = "OPTIMAL";
+
+      if (minStock > 0 && totalFgQty <= minStock) {
+        isCritical = true;
+        isLow = true;
+        status = "CRITICAL";
+      } else if (reorderLevel > 0 && totalFgQty <= reorderLevel) {
+        isLow = true;
+        status = "REORDER";
+      } else if (minStock === 0 && reorderLevel === 0 && totalFgQty === 0) {
+        isCritical = true;
+        isLow = true;
+        status = "CRITICAL";
+      }
+
       const value = totalFgQty * unitPrice;
       const category = extractProductCategory(p, name);
 
@@ -369,36 +426,34 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         category,
         isWastage: false,
         qty: totalFgQty,
-        minLevel,
+        minStock,
+        reorderLevel,
+        minLevel: minStock,
         uom,
         unitPrice,
         value,
         isLow,
         isCritical,
-        status: isCritical ? "CRITICAL" : isLow ? "LOW STOCK" : "OPTIMAL",
+        status,
       };
     });
   }, [liveProducts, initialProducts, liveFgStocks]);
 
-  // 3. System-Wide Reorder & Action Alerts (Monitors All 3 Stores: Raw Materials, Finished Goods, Wastage Store)
+  // 3. System-Wide Reorder Alerts (Monitors Raw Materials & Finished Goods)
   const lowStockAlerts = useMemo(() => {
-    // Unifies all 3 inventory streams so alerts always reflect total factory health independently of left filter tabs
-    const allCombined = [...rawStockItems, ...finishedStockItems, ...wastageStockItems];
+    // Only Raw Materials and Finished Goods require Reorder Alerts (Wastage is excluded)
+    const allCombined = [...rawStockItems, ...finishedStockItems];
     return allCombined
-      .filter((item) => {
-        if (item.isWastage) {
-          // Wastage store triggers alert when accumulation requires clearance/recycling action (>= 100 KG) or is low
-          return item.isLow || item.isCritical || item.qty >= 100;
-        }
-        return item.isLow || item.isCritical;
-      })
+      .filter((item) => item.isLow || item.isCritical)
       .sort((a, b) => {
         if (a.isCritical && !b.isCritical) return -1;
         if (!a.isCritical && b.isCritical) return 1;
-        return a.qty / (a.minLevel || 1) - b.qty / (b.minLevel || 1);
+        const refA = a.reorderLevel || a.minStock || 1;
+        const refB = b.reorderLevel || b.minStock || 1;
+        return a.qty / refA - b.qty / refB;
       })
       .slice(0, 10);
-  }, [rawStockItems, finishedStockItems, wastageStockItems]);
+  }, [rawStockItems, finishedStockItems]);
 
   // 4. Aggregated Total Stock Counts
   const totalRawQty = useMemo(() => rawStockItems.reduce((sum, item) => sum + item.qty, 0), [rawStockItems]);
@@ -454,6 +509,8 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
       type: item.type,
       category: item.category,
       minLevel: item.minLevel,
+      minStock: item.minStock,
+      reorderLevel: item.reorderLevel,
       isLow: item.isLow,
       isCritical: item.isCritical,
       status: item.status,
@@ -936,11 +993,11 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                       <td className="px-3 py-2.5 text-right font-mono font-bold">
                         {item.status === "CRITICAL" ? (
                           <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30 uppercase">
-                            Critical ({item.quantity.toLocaleString()} &lt; {item.minLevel})
+                            Critical ({item.quantity.toLocaleString()} &le; {item.minStock})
                           </span>
-                        ) : item.status === "LOW STOCK" ? (
+                        ) : item.status === "REORDER" || item.status === "LOW STOCK" ? (
                           <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30 uppercase">
-                            Low Stock ({item.quantity.toLocaleString()} &lt; {item.minLevel})
+                            Reorder ({item.quantity.toLocaleString()} &le; {item.reorderLevel || item.minStock})
                           </span>
                         ) : (
                           <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 uppercase">
@@ -956,7 +1013,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
           )}
         </div>
 
-        {/* RIGHT 1/3: System-Wide Inventory Reorder & Action Alerts Sub-panel (Monitors Raw Material, FG & Wastage) */}
+        {/* RIGHT 1/3: System-Wide Inventory Reorder Alerts Sub-panel (Monitors Raw Material & FG) */}
         <div className="lg:col-span-1 p-3.5 flex flex-col justify-between bg-slate-50/50 dark:bg-card-2/10">
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -964,25 +1021,66 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                 <FaExclamationTriangle className="text-amber-500 text-xs" />
                 <span>Reorder Alerts</span>
               </div>
-              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30 uppercase tracking-wider">
-                {lowStockAlerts.length} Action Needed
-              </span>
+              {!hasLoadedData || (isLoading && lowStockAlerts.length === 0) ? (
+                <span className="inline-flex items-center gap-1.5 text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-card-2 dark:text-ink-muted border border-slate-200 dark:border-line-soft uppercase tracking-wider">
+                  <FaSync className="animate-spin text-teal-500 text-[8px]" />
+                  Checking...
+                </span>
+              ) : (
+                <span
+                  className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    lowStockAlerts.length > 0
+                      ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30"
+                      : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30"
+                  }`}
+                >
+                  {lowStockAlerts.length} Action Needed
+                </span>
+              )}
             </div>
 
-            {/* List of Low Stock & Action items across Raw Materials, Finished Goods & Wastage Store */}
+            {/* List of Low Stock items across Raw Materials & Finished Goods */}
             <div className="space-y-2.5 max-h-[285px] overflow-y-auto pr-1">
-              {lowStockAlerts.length === 0 ? (
+              {!hasLoadedData || (isLoading && lowStockAlerts.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mb-2.5 shadow-2xs">
+                    <FaSync className="animate-spin text-sm" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 dark:text-ink">Checking Stock Levels...</p>
+                  <p className="text-[10px] text-slate-500 dark:text-ink-muted mt-0.5 mb-3">Scanning stores for reorder and minimum limits</p>
+                  
+                  {/* Subtle Loading Pulse Skeleton Placeholders */}
+                  <div className="w-full space-y-2">
+                    <div className="p-2.5 rounded-xl border border-slate-200/80 dark:border-line-soft bg-slate-50 dark:bg-card-2/50 animate-pulse">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <div className="h-3 bg-slate-200 dark:bg-card rounded w-24" />
+                        <div className="h-3 bg-slate-200 dark:bg-card rounded w-12" />
+                      </div>
+                      <div className="h-2 bg-slate-200 dark:bg-card rounded w-16 mb-2" />
+                      <div className="h-1.5 bg-slate-200 dark:bg-card rounded w-full" />
+                    </div>
+                    <div className="p-2.5 rounded-xl border border-slate-200/80 dark:border-line-soft bg-slate-50 dark:bg-card-2/50 animate-pulse opacity-60">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <div className="h-3 bg-slate-200 dark:bg-card rounded w-28" />
+                        <div className="h-3 bg-slate-200 dark:bg-card rounded w-12" />
+                      </div>
+                      <div className="h-2 bg-slate-200 dark:bg-card rounded w-20 mb-2" />
+                      <div className="h-1.5 bg-slate-200 dark:bg-card rounded w-full" />
+                    </div>
+                  </div>
+                </div>
+              ) : lowStockAlerts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400 dark:text-ink-subtle">
                   <FaCheckCircle className="text-emerald-500 text-2xl mb-1.5 opacity-60" />
                   <p className="text-xs font-bold text-slate-800 dark:text-ink">All Stock Levels Healthy</p>
-                  <p className="text-[10px] text-slate-500 dark:text-ink-muted mt-0.5">Every Raw Material, FG & Wastage is within safety limits</p>
+                  <p className="text-[10px] text-slate-500 dark:text-ink-muted mt-0.5">Every Raw Material & FG is within safety limits</p>
                 </div>
               ) : (
                 lowStockAlerts.map((item, idx) => {
-                  const pct = Math.min((item.qty / (item.minLevel || 1)) * 100, 100);
+                  const targetRef = item.reorderLevel || item.minStock || 1;
+                  const pct = Math.min((item.qty / targetRef) * 100, 100);
                   const isCritical = item.isCritical;
-                  const isWastage = item.isWastage;
-                  const targetRoute = isWastage ? "/wastage-stock" : item.type === "Finished Goods" ? "/finished-stock" : "/stock";
+                  const targetRoute = item.type === "Finished Goods" ? "/finished-stock" : "/stock";
 
                   return (
                     <div
@@ -991,8 +1089,6 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                       className={`p-2.5 rounded-xl border transition-colors cursor-pointer shadow-2xs ${
                         isCritical
                           ? "bg-rose-50/90 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-950 dark:text-white hover:bg-rose-100/80 dark:hover:bg-rose-500/20 hover:border-rose-400"
-                          : isWastage
-                          ? "bg-amber-50/90 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-950 dark:text-white hover:bg-amber-100/80 dark:hover:bg-amber-500/20 hover:border-amber-400"
                           : "bg-amber-50/90 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-950 dark:text-white hover:bg-amber-100/80 dark:hover:bg-amber-500/20 hover:border-amber-400"
                       }`}
                       title={`Click to view ${item.name} in ${item.type}`}
@@ -1007,26 +1103,22 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                           {/* Store Pill Badge */}
                           <span
                             className={`text-[8px] font-extrabold px-1.5 py-0.2 rounded uppercase ${
-                              isWastage
-                                ? "bg-amber-200/80 text-amber-900 dark:bg-amber-500/30 dark:text-amber-300"
-                                : item.type === "Finished Goods"
+                              item.type === "Finished Goods"
                                 ? "bg-teal-200/80 text-teal-900 dark:bg-teal-500/30 dark:text-teal-300"
                                 : "bg-sky-200/80 text-sky-900 dark:bg-sky-500/30 dark:text-sky-300"
                             }`}
                           >
-                            {isWastage ? "Wastage" : item.type === "Finished Goods" ? "FG" : "Raw"}
+                            {item.type === "Finished Goods" ? "FG" : "Raw"}
                           </span>
                           {/* Status Pill Badge */}
                           <span
                             className={`text-[8px] font-black px-1.5 py-0.2 rounded uppercase ${
                               isCritical
                                 ? "bg-rose-500 text-white"
-                                : isWastage
-                                ? "bg-amber-600 text-white"
                                 : "bg-amber-500 text-slate-950 font-black"
                             }`}
                           >
-                            {isWastage && item.qty >= 100 ? "Action" : item.status}
+                            {isCritical ? "CRITICAL" : "REORDER"}
                           </span>
                         </div>
                       </div>
@@ -1035,7 +1127,13 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                         <span>
                           Current: <strong className="text-slate-900 dark:text-ink">{item.qty.toLocaleString()}</strong> {item.uom}
                         </span>
-                        <span>{isWastage ? "Limit" : "Min"}: {item.minLevel} {item.uom}</span>
+                        <span>
+                          {item.reorderLevel && item.minStock && item.reorderLevel !== item.minStock
+                            ? `Min: ${item.minStock} | Reorder: ${item.reorderLevel} ${item.uom}`
+                            : isCritical
+                            ? `Min: ${item.minStock} ${item.uom}`
+                            : `Reorder: ${item.reorderLevel || item.minStock} ${item.uom}`}
+                        </span>
                       </div>
 
                       {/* Progress Bar */}
@@ -1044,8 +1142,6 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                           className={`h-full rounded-full transition-all duration-500 ${
                             isCritical
                               ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]"
-                              : isWastage
-                              ? "bg-amber-600 shadow-[0_0_8px_#d97706]"
                               : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
                           }`}
                           style={{ width: `${Math.max(pct, 12)}%` }}

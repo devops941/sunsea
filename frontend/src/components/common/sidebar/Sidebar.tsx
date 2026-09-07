@@ -22,38 +22,9 @@ const Sidebar = () => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const location = useLocation();
-  const isMenuActive = useCallback((menu: any) => {
-    // Check main path
-    if (menu.path && location.pathname.startsWith(menu.path)) return true;
-    // Check activePaths array if it exists (for flat menus with multiple related paths)
-    if (menu.activePaths && Array.isArray(menu.activePaths)) {
-      if (menu.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
-    }
-    // Check nested children
-    if (menu.children) {
-      return menu.children.some((child: any) => {
-        if (child.path && location.pathname.startsWith(child.path)) return true;
-        if (child.activePaths && Array.isArray(child.activePaths)) {
-          if (child.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
-        }
-        if (child.children) {
-          return child.children.some((subChild: any) => {
-            if (subChild.path && location.pathname.startsWith(subChild.path)) return true;
-            if (subChild.activePaths && Array.isArray(subChild.activePaths)) {
-              if (subChild.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
-            }
-            return false;
-          });
-        }
-        return false;
-      });
-    }
-    return false;
-  }, [location.pathname]);
-
   const isLeafActive = useCallback(
     (item: any): boolean => {
-      if (!item.path) return false;
+      if (!item || !item.path) return false;
       const [itemBasePath, itemQuery] = item.path.split("?");
       const currentBasePath = location.pathname;
       const currentQuery = location.search ? location.search.replace(/^\?/, "") : "";
@@ -74,7 +45,18 @@ const Sidebar = () => {
 
       // 4. Custom activePaths defined on the item
       if (item.activePaths && Array.isArray(item.activePaths)) {
-        if (item.activePaths.some((p: string) => currentBasePath.startsWith(p))) return true;
+        if (
+          item.activePaths.some((p: string) => {
+            if (currentBasePath === p) return true;
+            if (currentBasePath.startsWith(p + "/")) {
+              const nextSegment = currentBasePath.slice(p.length + 1).split("/")[0];
+              return /^\d+$/.test(nextSegment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nextSegment);
+            }
+            return false;
+          })
+        ) {
+          return true;
+        }
       }
 
       // 5. Detail / edit page match (e.g. /employees/123 or /employees/123/edit matching /employees list)
@@ -86,12 +68,39 @@ const Sidebar = () => {
         !currentBasePath.includes("/create/") &&
         !currentBasePath.includes("/add/")
       ) {
-        return true;
+        const nextSegment = currentBasePath.slice(itemBasePath.length + 1).split("/")[0];
+        const isId = /^\d+$/.test(nextSegment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nextSegment);
+        if (isId) return true;
       }
 
       return false;
     },
     [location.pathname, location.search]
+  );
+
+  const isItemOrDescendantActive = useCallback(
+    (item: any): boolean => {
+      if (!item) return false;
+      if (isLeafActive(item)) return true;
+      if (item.activePaths && Array.isArray(item.activePaths)) {
+        if (item.activePaths.some((p: string) => location.pathname === p || location.pathname.startsWith(p + "/"))) {
+          return true;
+        }
+      }
+      if (item.children && Array.isArray(item.children)) {
+        return item.children.some((child: any) => isItemOrDescendantActive(child));
+      }
+      return false;
+    },
+    [isLeafActive, location.pathname]
+  );
+
+  const isMenuActive = useCallback(
+    (menu: any) => {
+      if (!menu) return false;
+      return isItemOrDescendantActive(menu);
+    },
+    [isItemOrDescendantActive]
   );
 
   const toggleMenu = (menuTitle: string) => {

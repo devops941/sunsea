@@ -29,6 +29,7 @@ import { FiTrendingUp, FiTrendingDown, FiMoreVertical } from "react-icons/fi";
 
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { SparklineCard } from "../components/SparklineCard";
+import { DashboardStatCard } from "../components/DashboardStatCard";
 import SalesPurchaseTrendChart from "../components/SalesPurchaseTrendChart";
 import { SalesPersonLiveMap } from "../components/SalesPersonLiveMap";
 import { InventoryStockIntelligence } from "../components/InventoryStockIntelligence";
@@ -198,6 +199,7 @@ const DashboardPage: React.FC = () => {
   const refreshAccountsSummary = accountsSummaryCache.refresh;
   const rawAccountsSummary = accSummaryList[0] || null;
   const accountsSummary = rawAccountsSummary ? { ...rawAccountsSummary, alerts: rawAccountsSummary.alerts || [], recentTransactions: rawAccountsSummary.recentTransactions || [] } : null;
+  const isAccountsLoading = accountsSummaryCache.loading || !accountsSummary;
 
   usePageSocketSync(
     ["payment", "journalItem", "accountLedger", "salesInvoice", "grnInvoice", "pettyCashEntry"],
@@ -439,10 +441,19 @@ const DashboardPage: React.FC = () => {
 
   // Recent orders
   const recentSales = useMemo(() => {
+    const invoiceByOrderId = safe(salesInvoices).reduce((map: Record<number, any>, inv: any) => {
+      if (inv.salesOrderId != null) map[inv.salesOrderId] = inv;
+      return map;
+    }, {});
     return safe(salesOrders)
+      .filter((so: any) => (so.status || "").toUpperCase() !== "DRAFT")
       .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5);
-  }, [salesOrders]);
+      .slice(0, 5)
+      .map((so: any) => {
+        const invoice = invoiceByOrderId[so.id];
+        return { ...so, displayAmount: invoice ? Number(invoice.grandTotal) : Number(so.netAmount || 0) };
+      });
+  }, [salesOrders, salesInvoices]);
 
   // Customer Purchase Report — per-customer: which sales products purchased in last 3 months vs not purchased
   const customerPurchaseReport = useMemo(() => {
@@ -623,237 +634,110 @@ const DashboardPage: React.FC = () => {
            ROW 0  –  ACCOUNTS SUMMARY (Busy-style)
            6 stat cards + Quick Actions + Alerts + Recent Txns
            ══════════════════════════════════════════════════════ */}
-        {accountsSummary && (
-          <>
-            {/* 6 Top Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
+        {/* 6 Top Stat Cards (Using Reusable DashboardStatCard Component) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
 
-              {/* TOTAL SALES */}
-              <button
-                onClick={() => navigate("/sales-invoices")}
-                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)", border: "1px solid rgba(52,211,153,0.25)" }}
-              >
-                {/* Bottom-right corner white shade on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
-                {/* BG Icon — visible, scales on hover */}
-                <FaArrowUp
-                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
-                  style={{ fontSize: "5.5rem" }}
-                />
-                <div className="relative z-10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-emerald-200">Total Sales</span>
-                    {cardTrends.sales !== "neutral" && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                        cardTrends.sales === "up"
-                          ? "bg-white/10 border-white/20 text-white"
-                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
-                      }`}>
-                        {cardTrends.sales === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
-                    ₹{Number(accountsSummary.totalSales).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm" />
-                    <span className="text-[11px] font-bold text-emerald-100/80">{accountsSummary.salesVoucherCount} vouchers</span>
-                  </div>
-                </div>
-              </button>
+          {/* TOTAL SALES */}
+          <DashboardStatCard
+            title="Total Sales"
+            amount={isAccountsLoading ? undefined : accountsSummary?.totalSales}
+            countText={isAccountsLoading ? null : (accountsSummary ? `${accountsSummary.salesVoucherCount ?? 0} vouchers` : "0 vouchers")}
+            onClick={() => navigate("/sales-invoices")}
+            backgroundGradient="linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)"
+            borderColor="rgba(52,211,153,0.25)"
+            titleColorClass="text-emerald-200"
+            bulletColorClass="bg-emerald-400"
+            countTextColorClass="text-emerald-100/80"
+            bgIcon={FaArrowUp}
+            trend={cardTrends.sales}
+            loading={isAccountsLoading}
+          />
 
-              {/* TOTAL PURCHASE */}
-              <button
-                onClick={() => navigate("/invoice")}
-                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #1d4ed8 100%)", border: "1px solid rgba(96,165,250,0.25)" }}
-              >
-                {/* Bottom-right corner white shade on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
-                <FaCheckCircle
-                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
-                  style={{ fontSize: "5.5rem" }}
-                />
-                <div className="relative z-10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-blue-200">Total Purchase</span>
-                    {cardTrends.purchase !== "neutral" && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                        cardTrends.purchase === "up"
-                          ? "bg-white/10 border-white/20 text-white"
-                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
-                      }`}>
-                        {cardTrends.purchase === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
-                    ₹{Number(accountsSummary.totalPurchase).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-sm" />
-                    <span className="text-[11px] font-bold text-blue-100/80">{accountsSummary.purchaseVoucherCount} vouchers</span>
-                  </div>
-                </div>
-              </button>
+          {/* TOTAL PURCHASE */}
+          <DashboardStatCard
+            title="Total Purchase"
+            amount={isAccountsLoading ? undefined : accountsSummary?.totalPurchase}
+            countText={isAccountsLoading ? null : (accountsSummary ? `${accountsSummary.purchaseVoucherCount ?? 0} vouchers` : "0 vouchers")}
+            onClick={() => navigate("/invoice")}
+            backgroundGradient="linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #1d4ed8 100%)"
+            borderColor="rgba(96,165,250,0.25)"
+            titleColorClass="text-blue-200"
+            bulletColorClass="bg-blue-400"
+            countTextColorClass="text-blue-100/80"
+            bgIcon={FaCheckCircle}
+            trend={cardTrends.purchase}
+            loading={isAccountsLoading}
+          />
 
-              {/* RECEIVABLE */}
-              <button
-                onClick={() => navigate("/accounts/receivable")}
-                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "linear-gradient(135deg, #451a03 0%, #78350f 50%, #92400e 100%)", border: "1px solid rgba(251,191,36,0.25)" }}
-              >
-                {/* Bottom-right corner white shade on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
-                <FaHandHoldingUsd
-                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
-                  style={{ fontSize: "5.5rem" }}
-                />
-                <div className="relative z-10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-amber-200">Receivable</span>
-                    {cardTrends.receivable !== "neutral" && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                        cardTrends.receivable === "up"
-                          ? "bg-white/10 border-white/20 text-white"
-                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
-                      }`}>
-                        {cardTrends.receivable === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] flex items-baseline gap-1">
-                    <span>₹{Math.abs(accountsSummary.totalReceivable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
-                    {accountsSummary.totalReceivable < 0 && (
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-black/40 text-emerald-300 border border-emerald-400/30">Cr</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-sm" />
-                    <span className="text-[11px] font-bold text-amber-100/80">{accountsSummary.receivableCustomerCount} customers</span>
-                  </div>
-                </div>
-              </button>
+          {/* RECEIVABLE */}
+          <DashboardStatCard
+            title="Receivable"
+            amount={isAccountsLoading || !accountsSummary ? undefined : Math.abs(Number(accountsSummary.totalReceivable) || 0)}
+            countText={isAccountsLoading || !accountsSummary ? null : `${accountsSummary.receivableCustomerCount ?? 0} customers`}
+            suffixBadge={accountsSummary && accountsSummary.totalReceivable < 0 ? "Cr" : undefined}
+            suffixBadgeColorClass="text-emerald-300 border-emerald-400/30"
+            onClick={() => navigate("/accounts/receivable")}
+            backgroundGradient="linear-gradient(135deg, #451a03 0%, #78350f 50%, #92400e 100%)"
+            borderColor="rgba(251,191,36,0.25)"
+            titleColorClass="text-amber-200"
+            bulletColorClass="bg-amber-400"
+            countTextColorClass="text-amber-100/80"
+            bgIcon={FaHandHoldingUsd}
+            trend={cardTrends.receivable}
+            loading={isAccountsLoading}
+          />
 
-              {/* PAYABLE */}
-              <button
-                onClick={() => navigate("/accounts/payable")}
-                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "linear-gradient(135deg, #4c0519 0%, #9f1239 50%, #be123c 100%)", border: "1px solid rgba(251,113,133,0.25)" }}
-              >
-                {/* Bottom-right corner white shade on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
-                <FaFileInvoiceDollar
-                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
-                  style={{ fontSize: "5.5rem" }}
-                />
-                <div className="relative z-10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-rose-200">Payable</span>
-                    {cardTrends.payable !== "neutral" && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                        cardTrends.payable === "up"
-                          ? "bg-white/10 border-white/20 text-white"
-                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
-                      }`}>
-                        {cardTrends.payable === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] flex items-baseline gap-1">
-                    <span>₹{Math.abs(accountsSummary.totalPayable).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
-                    {accountsSummary.totalPayable < 0 && (
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-black/40 text-rose-300 border border-rose-400/30">Dr</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-sm" />
-                    <span className="text-[11px] font-bold text-rose-100/80">{accountsSummary.payableSupplierCount} suppliers</span>
-                  </div>
-                </div>
-              </button>
+          {/* PAYABLE */}
+          <DashboardStatCard
+            title="Payable"
+            amount={isAccountsLoading || !accountsSummary ? undefined : Math.abs(Number(accountsSummary.totalPayable) || 0)}
+            countText={isAccountsLoading || !accountsSummary ? null : `${accountsSummary.payableSupplierCount ?? 0} suppliers`}
+            suffixBadge={accountsSummary && accountsSummary.totalPayable < 0 ? "Dr" : undefined}
+            suffixBadgeColorClass="text-rose-300 border-rose-400/30"
+            onClick={() => navigate("/accounts/payable")}
+            backgroundGradient="linear-gradient(135deg, #4c0519 0%, #9f1239 50%, #be123c 100%)"
+            borderColor="rgba(251,113,133,0.25)"
+            titleColorClass="text-rose-200"
+            bulletColorClass="bg-rose-400"
+            countTextColorClass="text-rose-100/80"
+            bgIcon={FaFileInvoiceDollar}
+            trend={cardTrends.payable}
+            loading={isAccountsLoading}
+          />
 
-              {/* CASH */}
-              <button
-                onClick={() => navigate("/accounts/bank-accounts?filter=cash")}
-                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "linear-gradient(135deg, #042f2e 0%, #115e59 50%, #0d9488 100%)", border: "1px solid rgba(45,212,191,0.25)" }}
-              >
-                {/* Bottom-right corner white shade on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
-                <FaMoneyBillWave
-                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
-                  style={{ fontSize: "5.5rem" }}
-                />
-                <div className="relative z-10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-200">Cash</span>
-                    {cardTrends.cash !== "neutral" && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                        cardTrends.cash === "up"
-                          ? "bg-white/10 border-white/20 text-white"
-                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
-                      }`}>
-                        {cardTrends.cash === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
-                    ₹{Math.abs(accountsSummary.totalCashInHand).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shadow-sm" />
-                    <span className="text-[11px] font-bold text-teal-100/80">{accountsSummary.cashAccountCount || 0} accounts</span>
-                  </div>
-                </div>
-              </button>
+          {/* CASH */}
+          <DashboardStatCard
+            title="Cash"
+            amount={isAccountsLoading || !accountsSummary ? undefined : Math.abs(Number(accountsSummary.totalCashInHand) || 0)}
+            countText={isAccountsLoading || !accountsSummary ? null : `${accountsSummary.cashAccountCount || 0} accounts`}
+            onClick={() => navigate("/accounts/bank-accounts?filter=cash")}
+            backgroundGradient="linear-gradient(135deg, #042f2e 0%, #115e59 50%, #0d9488 100%)"
+            borderColor="rgba(45,212,191,0.25)"
+            titleColorClass="text-teal-200"
+            bulletColorClass="bg-teal-400"
+            countTextColorClass="text-teal-100/80"
+            bgIcon={FaMoneyBillWave}
+            trend={cardTrends.cash}
+            loading={isAccountsLoading}
+          />
 
-              {/* BANK */}
-              <button
-                onClick={() => navigate("/accounts/bank-accounts?filter=bank")}
-                className="relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #6d28d9 100%)", border: "1px solid rgba(167,139,250,0.25)" }}
-              >
-                {/* Bottom-right corner white shade on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-                  style={{ background: "radial-gradient(circle at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)" }} />
-                <FaUniversity
-                  className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
-                  style={{ fontSize: "5.5rem" }}
-                />
-                <div className="relative z-10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-violet-200">Bank</span>
-                    {cardTrends.bank !== "neutral" && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                        cardTrends.bank === "up"
-                          ? "bg-white/10 border-white/20 text-white"
-                          : "bg-rose-400/20 border-rose-400/40 text-rose-300"
-                      }`}>
-                        {cardTrends.bank === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
-                    ₹{Math.abs(accountsSummary.totalBankBalance).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shadow-sm" />
-                    <span className="text-[11px] font-bold text-violet-100/80">{accountsSummary.bankAccountCount || 0} accounts</span>
-                  </div>
-                </div>
-              </button>
+          {/* BANK */}
+          <DashboardStatCard
+            title="Bank"
+            amount={isAccountsLoading || !accountsSummary ? undefined : Math.abs(Number(accountsSummary.totalBankBalance) || 0)}
+            countText={isAccountsLoading || !accountsSummary ? null : `${accountsSummary.bankAccountCount || 0} accounts`}
+            onClick={() => navigate("/accounts/bank-accounts?filter=bank")}
+            backgroundGradient="linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #6d28d9 100%)"
+            borderColor="rgba(167,139,250,0.25)"
+            titleColorClass="text-violet-200"
+            bulletColorClass="bg-violet-400"
+            countTextColorClass="text-violet-100/80"
+            bgIcon={FaUniversity}
+            trend={cardTrends.bank}
+            loading={isAccountsLoading}
+          />
 
-            </div>
-          </>
-        )}        {/* ══════════════════════════════════════════════════════
+        </div>        {/* ══════════════════════════════════════════════════════
            ROW 2  –  Sales/Purchase Trend Chart (Left) + Today's Tasks & Recent Sales (Right)
            ══════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "530px" }}>
@@ -1006,7 +890,7 @@ const DashboardPage: React.FC = () => {
                           </div>
                           <div className="flex flex-col items-end gap-0.5 shrink-0">
                             <span className="text-[12px] font-mono font-black text-ink whitespace-nowrap">
-                              ₹{Number(so.netAmount || 0).toLocaleString("en-IN")}
+                              ₹{so.displayAmount.toLocaleString("en-IN")}
                             </span>
                             <span
                               className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${
@@ -1033,7 +917,7 @@ const DashboardPage: React.FC = () => {
         {/* ══════════════════════════════════════════════════════
            ROW 3  –  Alerts & Recent Transactions (3/4 Left) + Top Products (1/4 Right)
            ══════════════════════════════════════════════════════ */}
-        {accountsSummary && <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "360px" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "360px" }}>
           {/* Left 3/4: Alerts (1/3) + Recent Transactions (2/3) */}
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 h-full">
             {/* Alerts (1 of 3 inside 3/4) */}
@@ -1043,7 +927,9 @@ const DashboardPage: React.FC = () => {
                   <FaBell className="text-amber-400 text-xs" />
                   <span>Alerts</span>
                 </div>
-                {accountsSummary.alerts.length > 0 ? (
+                {isAccountsLoading ? (
+                  <span className="h-4 w-12 bg-white/10 rounded animate-pulse" />
+                ) : accountsSummary?.alerts && accountsSummary.alerts.length > 0 ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
                     {accountsSummary.alerts.length} Action{accountsSummary.alerts.length > 1 ? "s" : ""}
                   </span>
@@ -1055,7 +941,22 @@ const DashboardPage: React.FC = () => {
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2">
-                {accountsSummary.alerts.length === 0 ? (
+                {isAccountsLoading ? (
+                  <div className="p-1 space-y-2.5 animate-pulse">
+                    <div className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
+                      <div className="h-3.5 bg-white/15 rounded w-4/5" />
+                      <div className="h-2.5 bg-white/10 rounded w-1/2" />
+                    </div>
+                    <div className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
+                      <div className="h-3.5 bg-white/15 rounded w-3/4" />
+                      <div className="h-2.5 bg-white/10 rounded w-2/5" />
+                    </div>
+                    <div className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
+                      <div className="h-3.5 bg-white/15 rounded w-2/3" />
+                      <div className="h-2.5 bg-white/10 rounded w-1/3" />
+                    </div>
+                  </div>
+                ) : !accountsSummary || accountsSummary.alerts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full py-8 text-center">
                     <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-2">
                       <FaCheckCircle className="text-sm" />
@@ -1133,7 +1034,7 @@ const DashboardPage: React.FC = () => {
                 )}
               </div>
 
-              {accountsSummary.alerts.length > 0 && (
+              {!isAccountsLoading && accountsSummary && accountsSummary.alerts.length > 0 && (
                 <div className="shrink-0 px-3 py-1.5 bg-card-2/50 border-t border-line-soft flex items-center justify-between text-[10px] text-ink-subtle">
                   <span className="flex items-center gap-1.5 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -1157,7 +1058,19 @@ const DashboardPage: React.FC = () => {
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-auto">
-                {accountsSummary.recentTransactions.length === 0 ? (
+                {isAccountsLoading ? (
+                  <div className="p-4 space-y-3 animate-pulse">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <div key={n} className="flex items-center justify-between py-2 border-b border-line-soft/40">
+                        <div className="h-3 bg-white/15 rounded w-20" />
+                        <div className="h-3 bg-white/10 rounded w-16" />
+                        <div className="h-3 bg-white/15 rounded w-36" />
+                        <div className="h-3 bg-white/10 rounded w-20" />
+                        <div className="h-3 bg-white/15 rounded w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : !accountsSummary || accountsSummary.recentTransactions.length === 0 ? (
                   <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
                 ) : (
                   <table className="w-full text-left text-xs">
@@ -1418,7 +1331,7 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
           )}
-        </div>}
+        </div>
 
         {/* ══════════════════════════════════════════════════════
            ROW 4  –  Customer Product Purchase Report (Left) + Sales Person Location (Right)

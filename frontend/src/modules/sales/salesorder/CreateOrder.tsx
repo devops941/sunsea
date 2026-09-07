@@ -513,6 +513,20 @@ const SalesOrderForm: React.FC = () => {
         if (can("employees.view")) loadEmployees({ limit: 500 });
     }, [loadCustomers, loadEmployees, can]);
 
+    // ─── Auto-focus Order Items table in Edit Mode ───────────────────
+    useEffect(() => {
+        if (!isEditMode) return;
+        const timer = setTimeout(() => {
+            const tableFirstCell = formRef.current?.querySelector<HTMLElement>(
+                '[data-busy-table] [data-r="0"][data-c="0"] [tabindex="0"], [data-busy-table] [data-r="0"][data-c="0"] input, [data-busy-table] [data-r="0"][data-c="0"]'
+            );
+            if (tableFirstCell) {
+                tableFirstCell.focus();
+            }
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [isEditMode, salesProducts.length, targetId]);
+
     // ─── Options ─────────────────────────────────────────────────────
     const customerOptions = useMemo(() =>
         customers.map(d => ({
@@ -686,6 +700,7 @@ const SalesOrderForm: React.FC = () => {
                 return (
                     <AutocompleteInput
                         inline
+                        dataNavDefault={isEditMode && index === 0}
                         name={`items.${index}.salesProductId`}
                         value={itemValue?.salesProductId || ""}
                         options={opts}
@@ -844,7 +859,7 @@ const SalesOrderForm: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
                         <div className="sm:col-span-2">
                             <Controller name="customerId" control={control} render={({ field }) => (
-                                <AutocompleteInput horizontal label="Customer" name={field.name} value={field.value} options={customerAutocompleteOptions} required onChange={(val) => field.onChange({ target: { name: field.name, value: val } })} placeholder="Type to search customer..." disabled={isEditMode} error={errors.customerId?.message} />
+                                <AutocompleteInput horizontal label="Customer" name={field.name} value={field.value} options={customerAutocompleteOptions} required onChange={(val) => field.onChange({ target: { name: field.name, value: val } })} placeholder="Type to search customer..." disabled={isEditMode} dataNavDefault={!isEditMode} error={errors.customerId?.message} />
                             )} />
                         </div>
 

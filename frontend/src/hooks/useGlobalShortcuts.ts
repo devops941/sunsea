@@ -119,10 +119,10 @@ export function useGlobalShortcuts({
         return;
       }
 
-      // ── Alt+H / Ctrl+H / Ctrl+Home Dashboard (works even inside form fields) ──
+      // ── Alt+H / Ctrl+H Dashboard (works even inside form fields) ──
       if (
         (isAlt && (lowerKey === "h" || e.code === "KeyH")) ||
-        (isCtrl && (lowerKey === "h" || key === "Home"))
+        (isCtrl && (lowerKey === "h" || e.code === "KeyH"))
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -289,11 +289,11 @@ export function useGlobalShortcuts({
           return;
         }
 
-        // Display Menu (Alt+D / Ctrl+D)
-        if (lowerKey === "d" || e.code === "KeyD") {
+        // Display Menu (Alt+D)
+        if (isAlt && (lowerKey === "d" || e.code === "KeyD")) {
           e.preventDefault();
           e.stopPropagation();
-          flash(isAlt ? "Alt+D" : "Ctrl+D");
+          flash("Alt+D");
           window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Display" } }));
           return;
         }
@@ -310,16 +310,6 @@ export function useGlobalShortcuts({
 
       // Guard: skip plain/ctrl shortcuts when inside form fields
       if (inField) return;
-
-      // ── Plain single letter shortcuts (Tally/Busy style) ───────────────
-      // Single key 'D' / 'd' -> Direct Dashboard navigation
-      if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && (lowerKey === "d" || e.code === "KeyD")) {
-        e.preventDefault();
-        e.stopPropagation();
-        flash("D");
-        navigate("/dashboard");
-        return;
-      }
 
       // ── Other Alt+ or Ctrl+ or Ctrl+Shift+ or Alt+Shift+ combinations ──
       if (isCtrl || isAlt || isCtrlShift || isAltShift) {
@@ -358,9 +348,11 @@ export function useGlobalShortcuts({
         return;
       }
 
-      // ── Plain letter  reports shortcuts ────────────────────────────────
+      // ── Plain letter  reports shortcuts (truly no-modifier shortcuts only) ──
+      // Must check !s.alt and !s.shift too — otherwise Alt+Shift+T entries
+      // would also fire on a bare "t" keypress since only !s.ctrl was guarded.
       const letterMatch = allowedShortcuts.find(
-        (s) => !s.ctrl && s.key === key.toLowerCase() && s.category === "reports"
+        (s) => !s.ctrl && !s.alt && !s.shift && s.key === key.toLowerCase() && s.category === "reports"
       );
       if (letterMatch?.route) {
         e.preventDefault();

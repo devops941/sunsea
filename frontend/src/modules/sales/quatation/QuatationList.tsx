@@ -903,7 +903,10 @@ const QuotationList: React.FC = () => {
                                     const isEditable = item.status !== "CONFIRMED";
                                     const isDeletable = item.status !== "CONFIRMED";
                                     return (
-                                        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                        <div
+                                            className="flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             <ViewButton onClick={() => handleOpenView(item)} />
 
                                             {/* Estimate preview */}
@@ -911,7 +914,10 @@ const QuotationList: React.FC = () => {
                                                 icon={FiClipboard}
                                                 variant="info"
                                                 title="Preview / Print Estimate"
-                                                onClick={() => handleOpenEstimate(item.id)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenEstimate(item.id);
+                                                }}
                                             />
 
                                             {isEditable && canEdit && (

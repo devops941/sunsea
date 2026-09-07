@@ -229,8 +229,21 @@ const Toggle: React.FC<{ label: string; value: boolean; onChange: (v: boolean) =
 }) => (
   <div className="flex items-center gap-3">
     <label className="text-xs font-bold uppercase tracking-[0.5px] text-ink-muted">{label}</label>
-    <label className="relative inline-flex cursor-pointer items-center">
-      <input type="checkbox" className="sr-only" checked={value} onChange={(e) => onChange(e.target.checked)} />
+    <label
+      className="relative inline-flex cursor-pointer items-center"
+      tabIndex={0}
+      data-nav
+      role="switch"
+      aria-checked={value}
+      aria-label={label}
+      onKeyDown={(e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          onChange(!value);
+        }
+      }}
+    >
+      <input type="checkbox" className="sr-only" tabIndex={-1} checked={value} onChange={(e) => onChange(e.target.checked)} />
       <div className={`block w-14 h-8 rounded-full transition-colors duration-300 ${value ? "bg-primary" : "bg-gray-300"}`} />
       <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ${value ? "transform translate-x-6" : ""}`} />
     </label>
@@ -868,11 +881,18 @@ const EmployeeForm: React.FC = () => {
   // Auto-focus first field when switching tabs
   useEffect(() => {
     const timer = setTimeout(() => {
-      const first = tabContentRef.current?.querySelector<HTMLElement>(
-        "[data-nav]:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), textarea:not([disabled])"
+      if (!tabContentRef.current) return;
+      // Use [data-nav] only — the broader selector (input/select/textarea) would
+      // accidentally match the hidden <select> inside SelectInput before the visible
+      // trigger input, causing focus() to silently fail on a display:none element.
+      const defaultEl = tabContentRef.current.querySelector<HTMLElement>(
+        "[data-nav-default]:not([disabled]):not([tabindex='-1'])"
+      );
+      const first = defaultEl ?? tabContentRef.current.querySelector<HTMLElement>(
+        "[data-nav]:not([disabled]):not([tabindex='-1'])"
       );
       first?.focus();
-    }, 60);
+    }, 80);
     return () => clearTimeout(timer);
   }, [activeTab]);
 

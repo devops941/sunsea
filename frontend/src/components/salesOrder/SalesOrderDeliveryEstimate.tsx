@@ -93,44 +93,48 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
     // Notes text
     const notesText = order.notes || order.remarks || order.internalNotes || "";
 
-    // Enough filler rows to fill A4 height naturally
-    const MIN_ROWS    = 22;
+    // Enough filler rows to fill A4 height naturally without spilling over
+    const MIN_ROWS    = 14;
     const fillerCount = Math.max(0, MIN_ROWS - items.length);
 
     // ─── Shared styles ────────────────────────────────────────────────────────
     const cell: React.CSSProperties = {
         border:        "1px solid #000",
-        padding:       "4px 8px",
+        padding:       "3px 6px",
         verticalAlign: "middle",
+        fontSize:      "12px",
+        lineHeight:    "1.3",
     };
 
     const head: React.CSSProperties = {
         border:     "1px solid #000",
-        padding:    "5px 8px",
+        padding:    "4px 6px",
         fontWeight: "bold",
         textAlign:  "center",
         background: "#fff",
+        fontSize:   "11px",
     };
 
     return (
         /*
-         * Outer wrapper:  thin border, fixed A4 min-height, flex column.
-         * Padding (12px sides) gives the "margin inside the outline".
+         * Outer wrapper: thin border, A4 single-page flow, flex column.
+         * Padding (10px sides) gives clean inner margin.
          */
         <div
             style={{
-                fontFamily:    "Arial, Helvetica, sans-serif",
-                fontSize:      "13px",
-                lineHeight:    "1.5",
-                color:         "#000",
-                background:    "#fff",
-                border:        "1px solid #000",
-                padding:       "0 12px",          /* ← margin inside the border */
-                width:         "100%",
-                minHeight:     "1085px",
-                boxSizing:     "border-box",
-                display:       "flex",
-                flexDirection: "column",
+                fontFamily:       "Arial, Helvetica, sans-serif",
+                fontSize:         "12px",
+                lineHeight:       "1.35",
+                color:            "#000",
+                background:       "#fff",
+                border:           "1px solid #000",
+                padding:          "0 10px",
+                width:            "100%",
+                boxSizing:        "border-box",
+                display:          "flex",
+                flexDirection:    "column",
+                pageBreakInside:  "avoid",
+                breakInside:      "avoid",
             }}
         >
 
@@ -138,40 +142,40 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
             <div
                 style={{
                     textAlign:    "center",
-                    padding:      "10px 0 8px",
+                    padding:      "8px 0 6px",
                     borderBottom: "1px solid #000",
                 }}
             >
-                <div style={{ fontSize: "13px", fontWeight: "bold" }}>Sales Order</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", letterSpacing: "2px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "bold" }}>Sales Order</div>
+                <div style={{ fontSize: "20px", fontWeight: "bold", letterSpacing: "2px" }}>
                     ESTIMATE
                 </div>
             </div>
 
             {/* ── Party Details + Order Meta ── */}
-            <div style={{ display: "flex", borderBottom: "1px solid #000", minHeight: "100px" }}>
+            <div style={{ display: "flex", borderBottom: "1px solid #000", minHeight: "85px" }}>
 
                 {/* Left — customer */}
-                <div style={{ flex: 1, padding: "10px 4px 10px 0" }}>
-                    <div style={{ fontStyle: "italic", fontWeight: "bold", marginBottom: "4px" }}>
+                <div style={{ flex: 1, padding: "8px 4px 8px 0" }}>
+                    <div style={{ fontStyle: "italic", fontWeight: "bold", marginBottom: "2px", fontSize: "11px" }}>
                         Party Details :
                     </div>
-                    <div style={{ fontWeight: "bold", fontSize: "14px" }}>
+                    <div style={{ fontWeight: "bold", fontSize: "13px" }}>
                         {customerName.toUpperCase()}
                     </div>
                     {addrParts.map((line, i) => (
-                        <div key={i} style={{ fontSize: "12px" }}>{line}</div>
+                        <div key={i} style={{ fontSize: "11px" }}>{line}</div>
                     ))}
-                    {addrCity && <div style={{ fontSize: "12px" }}>{addrCity}</div>}
-                    {customerPhone && <div style={{ fontSize: "12px" }}>Ph: {customerPhone}</div>}
-                    {cust.gstin    && <div style={{ fontSize: "12px" }}>GSTIN: {cust.gstin}</div>}
+                    {addrCity && <div style={{ fontSize: "11px" }}>{addrCity}</div>}
+                    {customerPhone && <div style={{ fontSize: "11px" }}>Ph: {customerPhone}</div>}
+                    {cust.gstin    && <div style={{ fontSize: "11px" }}>GSTIN: {cust.gstin}</div>}
                 </div>
 
                 {/* Vertical divider */}
                 <div style={{ width: "1px", background: "#000", flexShrink: 0 }} />
 
                 {/* Right — order meta */}
-                <div style={{ minWidth: "220px", padding: "10px 0 10px 14px" }}>
+                <div style={{ minWidth: "210px", padding: "8px 0 8px 12px" }}>
                     {(
                         [
                             ["Order No.", orderNo],
@@ -182,9 +186,9 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                         ] as [string, string][]
                     ).map(([key, val], i) => (
                         <div key={i} style={{ display: "flex", gap: "6px", marginBottom: "2px" }}>
-                            <span style={{ minWidth: "72px", fontSize: "12px" }}>{key}</span>
+                            <span style={{ minWidth: "68px", fontSize: "11px" }}>{key}</span>
                             <span>:</span>
-                            <strong style={{ fontSize: "12px" }}>{val}</strong>
+                            <strong style={{ fontSize: "11px" }}>{val}</strong>
                         </div>
                     ))}
                 </div>
@@ -193,8 +197,8 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
             {/* ── Intro line ── */}
             <div
                 style={{
-                    padding:      "5px 0",
-                    fontSize:     "12px",
+                    padding:      "4px 0",
+                    fontSize:     "11px",
                     fontStyle:    "italic",
                     borderBottom: "1px solid #000",
                 }}
@@ -202,30 +206,21 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                 We are pleased to receive the order for the following items :
             </div>
 
-            {/* ─────────────────────────────────────────────────────────────────
-             * Table wrapper: flex:1 + height:0 forces a resolved pixel height
-             * so that the absolutely-positioned table inside can fill it 100%.
-             * ───────────────────────────────────────────────────────────────── */}
-            <div style={{ flex: 1, height: 0, position: "relative" }}>
+            {/* ── Table Section ── */}
+            <div style={{ width: "100%" }}>
                 <table
                     style={{
-                        position:       "absolute",
-                        top:            0,
-                        left:           0,
-                        right:          0,
-                        bottom:         0,
                         width:          "100%",
-                        height:         "100%",
                         borderCollapse: "collapse",
                         tableLayout:    "fixed",
                     }}
                 >
                     <colgroup>
-                        <col style={{ width: "48px"  }} />
+                        <col style={{ width: "42px"  }} />
                         <col />
-                        <col style={{ width: "70px"  }} />
-                        <col style={{ width: "60px"  }} />
-                        <col style={{ width: "160px" }} />
+                        <col style={{ width: "65px"  }} />
+                        <col style={{ width: "55px"  }} />
+                        <col style={{ width: "150px" }} />
                     </colgroup>
 
                     <thead>
@@ -246,7 +241,7 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                                     ? itemRemarks[item.id]
                                     : item.remarks || "";
                             return (
-                                <tr key={item.id}>
+                                <tr key={item.id} style={{ height: "24px" }}>
                                     <td style={{ ...cell, textAlign: "center" }}>{idx + 1}.</td>
                                     <td style={{ ...cell }}>
                                         {item.product?.productName || `Product #${item.productId}`}
@@ -257,7 +252,7 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                                     <td style={{ ...cell, textAlign: "center" }}>
                                         {item.unit || "Pcs."}
                                     </td>
-                                    <td style={{ ...cell, padding: isEditable ? "0 4px" : "4px 8px" }}>
+                                    <td style={{ ...cell, padding: isEditable ? "0 4px" : "3px 6px" }}>
                                         {isEditable ? (
                                             <input
                                                 type="text"
@@ -270,8 +265,8 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                                                     border:     "none",
                                                     outline:    "none",
                                                     background: "transparent",
-                                                    fontSize:   "12px",
-                                                    padding:    "4px 4px",
+                                                    fontSize:   "11px",
+                                                    padding:    "2px 4px",
                                                     color:      "#000",
                                                     fontFamily: "Arial, Helvetica, sans-serif",
                                                 }}
@@ -285,9 +280,9 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                             );
                         })}
 
-                        {/* Filler rows — naturally fills remaining height */}
+                        {/* Filler rows — naturally fills clean single-page height */}
                         {Array.from({ length: fillerCount }).map((_, i) => (
-                            <tr key={`pad-${i}`}>
+                            <tr key={`pad-${i}`} style={{ height: "24px" }}>
                                 <td style={{ ...cell }}>&nbsp;</td>
                                 <td style={{ ...cell }}>&nbsp;</td>
                                 <td style={{ ...cell }}>&nbsp;</td>
@@ -297,15 +292,14 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                         ))}
 
                         {/* Notes row — always visible */}
-                        <tr>
+                        <tr style={{ height: "28px" }}>
                             <td
                                 colSpan={5}
                                 style={{
                                     ...cell,
-                                    padding:       "6px 8px",
-                                    fontSize:      "12px",
+                                    padding:       "4px 6px",
+                                    fontSize:      "11px",
                                     verticalAlign: "top",
-                                    height:        "32px",
                                 }}
                             >
                                 <span style={{ fontWeight: "bold" }}>Notes: </span>
@@ -315,22 +309,23 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                     </tbody>
 
                     <tfoot>
-                        <tr>
+                        <tr style={{ height: "26px" }}>
                             <td
                                 colSpan={2}
                                 style={{
                                     ...cell,
-                                    textAlign:   "right",
-                                    fontWeight:  "bold",
-                                    paddingRight: "12px",
+                                    textAlign:    "right",
+                                    fontWeight:   "bold",
+                                    paddingRight: "10px",
+                                    fontSize:     "11px",
                                 }}
                             >
                                 Grand Total
                             </td>
-                            <td style={{ ...cell, textAlign: "center", fontWeight: "bold" }}>
+                            <td style={{ ...cell, textAlign: "center", fontWeight: "bold", fontSize: "11px" }}>
                                 {totalPcs}
                             </td>
-                            <td style={{ ...cell, textAlign: "center", fontWeight: "bold" }}>
+                            <td style={{ ...cell, textAlign: "center", fontWeight: "bold", fontSize: "11px" }}>
                                 Pcs.
                             </td>
                             <td style={{ ...cell }} />
@@ -345,23 +340,24 @@ export const SalesOrderDeliveryEstimate: React.FC<SalesOrderDeliveryEstimateProp
                     display:        "flex",
                     justifyContent: "space-between",
                     alignItems:     "flex-end",
-                    padding:        "16px 0 14px",
+                    padding:        "10px 0 8px",
                     borderTop:      "1px solid #000",
-                    marginTop:      "1px",
+                    marginTop:      "auto",
                 }}
             >
-                <div style={{ fontSize: "11px", color: "#555" }}>
+                <div style={{ fontSize: "10px", color: "#555" }}>
                     This is a computer-generated estimate.
                 </div>
                 <div style={{ textAlign: "center" }}>
-                    <div style={{ fontWeight: "bold", marginBottom: "40px" }}>for ESTIMATE</div>
+                    <div style={{ fontWeight: "bold", marginBottom: "26px", fontSize: "11px" }}>for ESTIMATE</div>
                     <div
                         style={{
                             borderTop:  "1px solid #000",
-                            paddingTop: "4px",
-                            minWidth:   "160px",
+                            paddingTop: "3px",
+                            minWidth:   "150px",
                             textAlign:  "center",
                             fontWeight: "bold",
+                            fontSize:   "11px",
                         }}
                     >
                         Authorised Signatory

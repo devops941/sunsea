@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import {
-  FaPlus,
-  FaToggleOn,
-  FaToggleOff,
-} from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -17,6 +13,7 @@ import DataTable from "../../../components/ui/table/DataTable";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import ToggleSwitch from "../../../components/ui/ToggleSwitch/ToggleSwitch";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -29,6 +26,7 @@ import {
 import { machineService } from "../../../services/machineService";
 import MachineAssignmentViewModal from "../components/MachineAssignmentViewModal";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -43,6 +41,10 @@ const MachineAssignmentList: React.FC = () => {
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Toggle confirm state
+  const [toggleItem, setToggleItem] = useState<any | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
 
   // View modal state
   const [viewModalData, setViewModalData] = useState<any>(null);
@@ -159,14 +161,19 @@ const MachineAssignmentList: React.FC = () => {
     navigate(`/machines/assignments/edit/${item.id}`);
   };
 
-  const handleToggleStatus = async (item: any) => {
-    const newStatus = !item.isActive;
+  const handleConfirmToggle = async () => {
+    if (!toggleItem || isToggling) return;
+    const newStatus = !toggleItem.isActive;
+    setIsToggling(true);
     try {
-      await machineOperationAssignmentService.toggleStatus(item.id, newStatus);
+      await machineOperationAssignmentService.toggleStatus(toggleItem.id, newStatus);
       toast.success(`Assignment ${newStatus ? "activated" : "closed"} successfully!`);
+      setToggleItem(null);
       refresh();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to change assignment status");
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -393,17 +400,11 @@ const MachineAssignmentList: React.FC = () => {
                     <ViewButton onClick={() => setViewModalData(item)} />
                     {canEditAssignment && <EditButton onClick={() => handleOpenEdit(item)} />}
                     {canDeleteAssignment && (
-                      <button
-                        type="button"
+                      <ToggleSwitch
+                        checked={item.isActive}
                         title={item.isActive ? "Close Assignment" : "Activate Assignment"}
-                        onClick={() => handleToggleStatus(item)}
-                        className={`p-2 rounded-lg transition-colors ${item.isActive
-                          ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                          : "bg-card-2 text-ink-subtle hover:bg-line"
-                          }`}
-                      >
-                        {item.isActive ? <FaToggleOn size={18} /> : <FaToggleOff size={18} />}
-                      </button>
+                        onChange={() => setToggleItem(item)}
+                      />
                     )}
                   </div>
                 ),
@@ -419,6 +420,21 @@ const MachineAssignmentList: React.FC = () => {
         show={!!viewModalData}
         onHide={() => setViewModalData(null)}
         assignment={viewModalData}
+      />
+
+      {/* Status Toggle Confirmation Modal */}
+      <CommonConfirmModal
+        show={!!toggleItem}
+        onHide={() => !isToggling && setToggleItem(null)}
+        onConfirm={handleConfirmToggle}
+        title={toggleItem?.isActive ? "Close Machine Assignment" : "Activate Machine Assignment"}
+        message={
+          toggleItem
+            ? `Are you sure you want to ${toggleItem.isActive ? "close" : "activate"} the assignment for ${toggleItem.machine?.machineName || toggleItem.machineId || "this machine"} (${toggleItem.weekStartDate ? toggleItem.weekStartDate.split("T")[0] : ""} to ${toggleItem.weekEndDate ? toggleItem.weekEndDate.split("T")[0] : ""})?`
+            : ""
+        }
+        confirmText={isToggling ? "Updating..." : toggleItem?.isActive ? "Close Assignment" : "Activate"}
+        confirmVariant={toggleItem?.isActive ? "warning" : "primary"}
       />
     </div>
   );

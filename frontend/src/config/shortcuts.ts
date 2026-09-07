@@ -47,7 +47,6 @@ export const SHORTCUTS: ShortcutItem[] = [
   { id: "export",      keyLabel: "Ctrl+Shift+E", key: "e", ctrl: true, shift: true, label: "Export / Download", category: "system", action: "export" },
   { id: "calc",        keyLabel: "Alt+C",        key: "c", alt: true, label: "Calculator",     category: "system", action: "calculator" },
   { id: "go-back",     keyLabel: "Esc",          key: "Escape",  label: "Go Back",             category: "system", action: "back" },
-  { id: "dashboard",   keyLabel: "Ctrl+Home",    key: "Home", ctrl: true, label: "Dashboard",   category: "system", action: "dashboard" },
 
   // ── 3. Create / Add (Alt+ / Ctrl+ shortcuts) ───────────────────
   { id: "add-sales",   keyLabel: "Ctrl+V",       key: "v", ctrl: true, label: "Add Sales Invoice",   category: "create", route: "/sales-invoices/create",         permission: "sales-invoices.view" },
@@ -69,7 +68,7 @@ export const SHORTCUTS: ShortcutItem[] = [
   { id: "production",    keyLabel: "Alt+Shift+P", key: "p", alt: true, shift: true, label: "Production Orders", category: "reports", route: "/production-orders",        permission: "production_orders.view" },
 
   // ── 5. Page Navigation Shortcuts ──────────────────────────────
-  { id: "key-d",  keyLabel: "D",           key: "d",                     label: "Dashboard",      category: "ctrl", route: "/dashboard" },
+  { id: "ctrl-d", keyLabel: "Ctrl+D",      key: "d", ctrl: true,         label: "Dashboard",      category: "ctrl", route: "/dashboard" },
   { id: "ctrl-i", keyLabel: "Ctrl+I",      key: "i", ctrl: true,         label: "Sales Invoices", category: "ctrl", route: "/sales-invoices",        permission: "sales-invoices.view" },
   { id: "ctrl-g", keyLabel: "Ctrl+G",      key: "g", ctrl: true,         label: "GRN Invoices",   category: "ctrl", route: "/invoice",               permission: "invoice.view" },
   { id: "ctrl-c", keyLabel: "Ctrl+Shift+C",key: "c", ctrl: true, shift: true, label: "Customers", category: "ctrl", route: "/customers",             permission: "customers.view" },
