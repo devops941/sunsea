@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../hooks/useFormKeyboardNav";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { FaSave, FaExclamationTriangle } from "react-icons/fa";
+import { FaSave, FaExclamationTriangle, FaCheck, FaArrowLeft, FaUndo } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 
 import TextInput from "../../components/form/TextInput/TextInput";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
-import AutocompleteInput from "../../components/form/AutocompleteInput/AutocompleteInput";
+import AutocompleteInput, { type AutocompleteOption } from "../../components/form/AutocompleteInput/AutocompleteInput";
 import CustomButton from "../../components/ui/Button/Button";
 import BackButton from "../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
+import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn, SundryRow } from "../../components/form/OrderItemsTable/BusyItemsTable";
 import {
@@ -189,7 +191,104 @@ const SalesInvoiceForm: React.FC = () => {
   
   const [numberOfBundle, setNumberOfBundle] = useState<string>("");
 
-  useFormShortcuts({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+  const itemsTableRef = useRef<HTMLDivElement>(null);
+  const sundryTableRef = useRef<HTMLDivElement>(null);
+
+  const focusFieldByName = useCallback((name: string) => {
+    const el = formRef.current?.querySelector<HTMLElement>(
+      `input[name="${name}"][data-nav], [data-nav][name="${name}"], input[name="${name}"]`
+    );
+    if (el) {
+      el.focus();
+      return true;
+    }
+    return false;
+  }, []);
+
+  const focusFirstField = useCallback(() => {
+    const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+    first?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const timer = setTimeout(() => focusFirstField(), 250);
+    return () => clearTimeout(timer);
+  }, [loading, focusFirstField]);
+
+  // ── Discard / Save Confirmation Modal on Esc or Back ──
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  const isDirty = useMemo(() => {
+    if (!isEditMode) {
+      return Boolean(
+        customerId ||
+        selectedSalesOrderId ||
+        notes ||
+        numberOfBundle ||
+        lines.some((l) => Boolean(l.itemId)) ||
+        sundryRows.length > 0
+      );
+    }
+    return false;
+  }, [isEditMode, customerId, selectedSalesOrderId, notes, numberOfBundle, lines, sundryRows]);
+
+  const openDiscardModal = useCallback(() => {
+    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+    setSaveConfirmOpen(true);
+  }, []);
+
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
+        lastFocusedElementRef.current.focus();
+      } else {
+        focusFirstField();
+      }
+    }, 50);
+  }, [focusFirstField]);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    navigate("/sales-invoices");
+  }, [navigate]);
+
+  const handleBack = useCallback(() => {
+    if (isDirty) {
+      openDiscardModal();
+    } else {
+      navigate("/sales-invoices");
+    }
+  }, [isDirty, openDiscardModal, navigate]);
+
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal]")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (saveConfirmOpenRef.current) {
+        handleResume();
+      } else if (isDirtyRef.current) {
+        openDiscardModal();
+      } else {
+        navigate("/sales-invoices");
+      }
+    };
+    window.addEventListener("keydown", handleEsc, { capture: true });
+    return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+  }, [handleResume, openDiscardModal, navigate]);
 
   useEffect(() => {
     dispatch(fetchCompany());
@@ -739,9 +838,22 @@ const SalesInvoiceForm: React.FC = () => {
   const isLocked = isEditMode && invoiceStatus === "PAID";
 
   // ---- Submit ----
-  const handleSubmit = async (e: React.SyntheticEvent, _asDraft: boolean = false) => {
-    e.preventDefault();
-    if (!validate()) return;
+  const handleSubmit = async (e?: React.SyntheticEvent, _asDraft: boolean = false) => {
+    if (e) e.preventDefault();
+    if (!validate()) {
+      toast.error("Required fields fill pannuga — please fill all required fields.");
+      setTimeout(() => {
+        if (!customerId) {
+          focusFieldByName("customerId");
+        } else if (!invoiceDate) {
+          focusFieldByName("invoiceDate");
+        } else {
+          const firstTableInput = formRef.current?.querySelector<HTMLElement>("[data-busy-table] input:not([disabled])");
+          firstTableInput?.focus();
+        }
+      }, 100);
+      return;
+    }
 
     setSaving(true);
 
@@ -809,6 +921,94 @@ const SalesInvoiceForm: React.FC = () => {
     }
   };
 
+  const handleSaveFromModal = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      handleSubmit(undefined, false);
+    }, 150);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    if (isEditMode) return;
+    setCustomerId("");
+    setSelectedSalesOrderId("");
+    setSelectedTransport(null);
+    setNumberOfBundle("");
+    setNotes("");
+    setLines([emptyLine()]);
+    setSundryRows([]);
+    setChargeRows([]);
+    setErrors({});
+    if (invoiceSettings) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      setInvoiceDate(todayStr);
+      setPreviewInvoiceNo(calculateInvoiceNumber(todayStr, invoiceSettings, allOrders));
+    }
+    setTimeout(() => focusFirstField(), 100);
+  }, [isEditMode, invoiceSettings, allOrders, focusFirstField]);
+
+  // ── Global F-Keys / Shortcuts Integration (F2 / F9 / F8 / F5) ──
+  useFormShortcuts({
+    onSave: () => {
+      if (!saving) {
+        handleSubmit(undefined, false);
+      }
+    },
+    onDelete: () => {
+      if (!isEditMode) {
+        handleClear();
+      }
+    },
+  });
+
+  // F5 Data Refresh
+  useEffect(() => {
+    const handleRefresh = async () => {
+      if (isEditMode && id) {
+        try {
+          setLoading(true);
+          const invoice = await salesInvoiceService.fetchById(id);
+          if (invoice) {
+            setInvoiceStatus(invoice.status || "DRAFT");
+            setCustomerId(invoice.customerId || "");
+            setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
+            if (invoice.transport) setSelectedTransport(invoice.transport);
+            if (invoice.numberOfBundle != null) setNumberOfBundle(String(invoice.numberOfBundle));
+            if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate.split("T")[0]);
+            setNotes(invoice.notes || "");
+            setPreviewInvoiceNo(invoice.invoiceNo || "");
+            if (invoice.items?.length > 0) {
+              setLines(invoice.items.map((item: any) => ({
+                id: crypto.randomUUID(),
+                itemId: String(item.productId || ""),
+                itemName: item.product?.productName || "Unknown Item",
+                qty: Number(item.quantity) || 0,
+                rate: Number(item.unitPrice) || 0,
+                weight: Number(item.weight) || 0,
+                discountAmount: Number(item.discountAmount) || 0,
+                taxPercent: Number(item.taxRate) || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0) + Number(item.igstRate || 0)),
+                amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
+                taxAmount: Number(item.taxAmount) || 0,
+                total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
+              })));
+            }
+          }
+          toast.info("Invoice details refreshed");
+        } catch {
+          toast.error("Failed to reload invoice details");
+        } finally {
+          setLoading(false);
+        }
+      } else if (!isEditMode) {
+        handleClear();
+        toast.info("Form reset");
+      }
+    };
+
+    window.addEventListener("fkey-refresh", handleRefresh);
+    return () => window.removeEventListener("fkey-refresh", handleRefresh);
+  }, [id, isEditMode, handleClear]);
+
   // ---- Customer / product select options ----
   const customerAutocompleteOptions = useMemo(() =>
     customersRaw.map((c: any) => {
@@ -859,32 +1059,21 @@ const SalesInvoiceForm: React.FC = () => {
     });
   }, [salesOrders, customerId, isEditMode, editInvoiceSalesOrder]);
 
-  const productOptions = useMemo(() => [
-    { value: "", label: "-- Select Product --" },
-    ...items.map((i) => {
+  const productAutocompleteOptions: AutocompleteOption[] = useMemo(() =>
+    items.map((i) => {
       const liveStock = stockMap.get(i.id) ?? 0;
-      const badge = (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
-          liveStock > 0
-            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-            : "bg-rose-500/10 text-rose-600 border border-rose-500/20"
-        }`}>
-          {liveStock} pcs
-        </span>
-      );
       return {
         value: i.id,
-        selectedLabel: i.name,
-        badge,
-        label: (
-          <div className="flex items-center justify-between w-full gap-2">
-            <span className="truncate">{i.name}</span>
-            {badge}
-          </div>
+        label: i.name,
+        info: (
+          <span className={`text-[11px] font-semibold ${liveStock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
+            {liveStock} pcs
+          </span>
         ),
       };
     }),
-  ], [items, stockMap]);
+    [items, stockMap]
+  );
 
   // ---- Derived (non-hook) values ----
   // ── Invoice item columns for BusyItemsTable ──
@@ -893,7 +1082,7 @@ const SalesInvoiceForm: React.FC = () => {
       key: "itemName",
       header: selectedSalesOrderId ? "Sales Product" : "Product",
       width: "1fr",
-      render: (row: InvoiceLineItem) => {
+      render: (row: InvoiceLineItem, index: number) => {
         if (selectedSalesOrderId) {
           // Compute live stock from component products
           const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
@@ -910,7 +1099,10 @@ const SalesInvoiceForm: React.FC = () => {
             }
           }
           return (
-            <div className="flex items-center justify-between w-full gap-2 text-[13px]">
+            <div
+              tabIndex={0}
+              className="flex items-center justify-between w-full gap-2 text-[13px] px-1 outline-none cursor-default"
+            >
               <span className="text-ink font-medium truncate">{row.itemName || "—"}</span>
               <span className={`text-[11px] font-semibold shrink-0 ${liveStock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
                 {liveStock} pcs
@@ -919,8 +1111,30 @@ const SalesInvoiceForm: React.FC = () => {
           );
         }
         return (
-          <SelectInput hideLabel label="" name={`item-${row.id}`} value={row.itemId} disabled={isLocked} options={productOptions} searchable
-            onChange={(e) => updateLine(row.id, "itemId", (e as any).target ? (e as any).target.value : String(e))} />
+          <AutocompleteInput
+            inline
+            name={`item-${row.id}`}
+            value={row.itemId}
+            disabled={isLocked}
+            options={productAutocompleteOptions}
+            placeholder="Type to search product..."
+            onChange={(val) => {
+              updateLine(row.id, "itemId", val);
+              const selectedProd = items.find((p) => p.id === val);
+              if (selectedProd) {
+                updateLine(row.id, "rate", selectedProd.defaultRate);
+                updateLine(row.id, "taxPercent", selectedProd.gstRate);
+              }
+              setTimeout(() => {
+                const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                if (qtyInput) {
+                  qtyInput.focus();
+                  qtyInput.select?.();
+                }
+              }, 50);
+            }}
+          />
         );
       },
     },
@@ -930,12 +1144,23 @@ const SalesInvoiceForm: React.FC = () => {
       width: "80px",
       align: "center" as const,
       render: (row: InvoiceLineItem) => (
-        <div>
-          <input type="text" inputMode="numeric" value={String(row.qty)} disabled={isLocked}
-            onChange={(e) => updateLine(row.id, "qty", Number(e.target.value))}
-            className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full" placeholder="0" />
+        <div className="flex items-center justify-center w-full h-full relative">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={row.qty === 0 && !row.itemId ? "" : row.qty}
+            disabled={isLocked}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, "");
+              updateLine(row.id, "qty", val === "" ? 0 : Number(val));
+            }}
+            className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full"
+            placeholder="0"
+          />
           {row.itemId && row.qty > (stockMap.get(row.itemId) || 0) && (
-            <div className="text-red-500 text-[10px] font-medium whitespace-nowrap">Avail: {Math.round((stockMap.get(row.itemId) || 0) * 100) / 100}</div>
+            <div className="absolute -bottom-1 text-red-500 text-[9px] font-medium whitespace-nowrap pointer-events-none">
+              Avail: {Math.round((stockMap.get(row.itemId) || 0) * 100) / 100}
+            </div>
           )}
         </div>
       ),
@@ -946,9 +1171,18 @@ const SalesInvoiceForm: React.FC = () => {
       width: "100px",
       align: "right" as const,
       render: (row: InvoiceLineItem) => (
-        <input type="text" inputMode="decimal" value={String(row.rate)} disabled={isLocked}
-          onChange={(e) => updateLine(row.id, "rate", Number(e.target.value))}
-          className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full" placeholder="0" />
+        <input
+          type="text"
+          inputMode="decimal"
+          value={row.rate === 0 && !row.itemId ? "" : row.rate}
+          disabled={isLocked}
+          onChange={(e) => {
+            const val = e.target.value.replace(/[^0-9.]/g, "");
+            updateLine(row.id, "rate", val === "" ? 0 : Number(val));
+          }}
+          className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full"
+          placeholder="0.00"
+        />
       ),
     },
     {
@@ -957,9 +1191,18 @@ const SalesInvoiceForm: React.FC = () => {
       width: "90px",
       align: "center" as const,
       render: (row: InvoiceLineItem) => (
-        <input type="text" inputMode="decimal" value={String(row.weight || 0)} disabled={isLocked}
-          onChange={(e) => updateLine(row.id, "weight", Number(e.target.value))}
-          className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full" placeholder="0" />
+        <input
+          type="text"
+          inputMode="decimal"
+          value={row.weight === 0 && !row.itemId ? "" : row.weight}
+          disabled={isLocked}
+          onChange={(e) => {
+            const val = e.target.value.replace(/[^0-9.]/g, "");
+            updateLine(row.id, "weight", val === "" ? 0 : Number(val));
+          }}
+          className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full"
+          placeholder="0"
+        />
       ),
     },
     {
@@ -977,7 +1220,7 @@ const SalesInvoiceForm: React.FC = () => {
         );
       },
     },
-  ], [selectedSalesOrderId, salesProducts, isLocked, productOptions, stockMap, lines, updateLine]);
+  ], [selectedSalesOrderId, stockMap, isLocked, productAutocompleteOptions, items, updateLine]);
 
   // ── Expanded components renderer for BusyItemsTable ──
   const renderExpandedComponents = useCallback((row: InvoiceLineItem, _index: number) => {
@@ -1039,29 +1282,44 @@ const SalesInvoiceForm: React.FC = () => {
         </div>
       </div>
     );
-  }, [selectedSalesOrderId, salesProducts, excludedComponents, lines]);
+  }, [selectedSalesOrderId, salesProducts, excludedComponents]);
 
   // ── Bill Sundry columns for BusyItemsTable ──
   const sundryColumns: BusyColumn<SundryRow>[] = useMemo(() => {
-    const usedTypes = new Set(sundryRows.map(r => r.type));
     return [
       {
         key: "type",
         header: "Bill Sundry",
         width: "1fr",
-        render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => (
-          <select
-            value={row.type}
-            onChange={e => update({ type: e.target.value })}
-            style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 13, color: "var(--color-ink)", cursor: "pointer" }}
-          >
-            {DEFAULT_SUNDRY_OPTIONS.map(o => (
-              <option key={o.value} value={o.value} disabled={o.value !== row.type && usedTypes.has(o.value)}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        ),
+        render: (row: SundryRow, index: number, update: (patch: Partial<SundryRow>) => void) => {
+          const opts: AutocompleteOption[] = DEFAULT_SUNDRY_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }));
+
+          return (
+            <AutocompleteInput
+              inline
+              name={`sundry.${index}.type`}
+              value={row.type || ""}
+              options={opts}
+              placeholder="Select bill sundry..."
+              onChange={(val) => {
+                update({ type: val });
+                setTimeout(() => {
+                  const hasRate = val.startsWith("BILL_TAX") || val.startsWith("DISCOUNT");
+                  const targetCol = hasRate ? 1 : 2;
+                  const cell = sundryTableRef.current?.querySelector(`[data-r="${index}"][data-c="${targetCol}"]`) as HTMLElement | null;
+                  const input = cell?.querySelector("input") as HTMLInputElement | null;
+                  if (input) {
+                    input.focus();
+                    input.select?.();
+                  }
+                }, 50);
+              }}
+            />
+          );
+        },
       },
       {
         key: "rate",
@@ -1069,7 +1327,7 @@ const SalesInvoiceForm: React.FC = () => {
         width: "100px",
         align: "right" as const,
         render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
-          const hasRate = row.type.startsWith("BILL_TAX") || row.type.startsWith("DISCOUNT");
+          const hasRate = Boolean(row.type && (row.type.startsWith("BILL_TAX") || row.type.startsWith("DISCOUNT")));
           if (!hasRate) return null;
           return (
             <div className="flex items-center gap-0.5 w-full justify-end">
@@ -1077,10 +1335,10 @@ const SalesInvoiceForm: React.FC = () => {
                 type="text"
                 inputMode="decimal"
                 value={row.rate}
-                onChange={e => {
+                onChange={(e) => {
                   const rate = e.target.value.replace(/[^0-9.]/g, "");
                   const rateNum = Number(rate) || 0;
-                  const calcAmount = (totals.subTotal * rateNum / 100).toFixed(2);
+                  const calcAmount = ((totals.subTotal * rateNum) / 100).toFixed(2);
                   update({ rate, amount: rateNum > 0 ? calcAmount : "" });
                 }}
                 placeholder="0.000"
@@ -1097,13 +1355,13 @@ const SalesInvoiceForm: React.FC = () => {
         width: "120px",
         align: "right" as const,
         render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
-          const isNeg = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === row.type)?.sign === -1;
+          const isNeg = DEFAULT_SUNDRY_OPTIONS.find((o) => o.value === row.type)?.sign === -1;
           return (
             <input
               type="text"
               inputMode="decimal"
               value={row.amount}
-              onChange={e => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
+              onChange={(e) => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
               placeholder="0.00"
               className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right font-semibold"
               style={{ color: isNeg ? "#ef4444" : "var(--color-ink)" }}
@@ -1112,13 +1370,11 @@ const SalesInvoiceForm: React.FC = () => {
         },
       },
     ];
-  }, [sundryRows, totals.subTotal]);
+  }, [totals.subTotal]);
 
   const sundryEmptyRow: SundryRow = useMemo(() => {
-    const usedTypes = new Set(sundryRows.map(r => r.type));
-    const next = DEFAULT_SUNDRY_OPTIONS.find(o => !usedTypes.has(o.value))?.value ?? DEFAULT_SUNDRY_OPTIONS[0]?.value ?? "";
-    return { id: `${Date.now()}-${Math.random()}`, type: next, rate: "", amount: "" };
-  }, [sundryRows]);
+    return { id: `${Date.now()}-${Math.random()}`, type: "", rate: "", amount: "" };
+  }, []);
 
   // ── Find expanded line index for BusyItemsTable ──
   const expandedLineIndex = useMemo(() => {
@@ -1141,10 +1397,22 @@ const SalesInvoiceForm: React.FC = () => {
             {isEditMode ? "Edit Sales Invoice" : "Create Sales Invoice"}
             <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{previewInvoiceNo || "Auto"}</span>
           </h2>
-          <BackButton text="Back to List" />
+          <CustomButton
+            text="Back to List"
+            icon={FaArrowLeft}
+            variant="secondary"
+            onClick={handleBack}
+          />
         </div>
 
-        <form className="px-5 py-3 space-y-2" noValidate>
+        <form
+          ref={formRef}
+          onKeyDown={handleFormKeyDown}
+          data-escape-guarded
+          onSubmit={(e) => handleSubmit(e, false)}
+          className="px-5 py-3 space-y-2"
+          noValidate
+        >
           <div className="flex flex-col gap-2">
           {/* ── Full-width Form ── */}
           <div className="w-full space-y-2">
@@ -1282,7 +1550,7 @@ const SalesInvoiceForm: React.FC = () => {
 
           {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
           <div className="flex gap-3">
-            <div className="w-[65%]">
+            <div ref={itemsTableRef} className="w-[65%]">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-semibold text-ink">Invoice Items</span>
               </div>
@@ -1291,7 +1559,7 @@ const SalesInvoiceForm: React.FC = () => {
                 rows={lines}
                 onAdd={() => setLines((prev) => [...prev, emptyLine()])}
                 onRemove={(i) => setLines((prev) => prev.length > 1 ? prev.filter((_, j) => j !== i) : prev)}
-                editable={!isEditMode && lines.length > 1}
+                editable={!isEditMode && !selectedSalesOrderId && lines.length > 1}
                 expandable={Boolean(selectedSalesOrderId)}
                 canExpand={(row) => {
                   const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
@@ -1310,9 +1578,52 @@ const SalesInvoiceForm: React.FC = () => {
                   { colKey: "total", value: `₹${totals.subTotal.toFixed(2)}` },
                 ]}
                 visibleRows={10}
+                getFieldBeforeTable={() => {
+                  const bundle = document.querySelector('input[name="numberOfBundle"]') as HTMLElement | null;
+                  if (bundle && !bundle.hasAttribute("disabled") && !(bundle as any).disabled) return bundle;
+                  const transport = document.querySelector('input[name="transport"]') as HTMLElement | null;
+                  if (transport && !transport.hasAttribute("disabled") && !(transport as any).disabled) return transport;
+                  const invDate = document.querySelector('input[name="invoiceDate"]') as HTMLElement | null;
+                  if (invDate && !invDate.hasAttribute("disabled") && !(invDate as any).disabled) return invDate;
+                  const selOrder = document.querySelector('input[name="selectedSalesOrderId"]') as HTMLElement | null;
+                  if (selOrder && !selOrder.hasAttribute("disabled") && !(selOrder as any).disabled) return selOrder;
+                  return document.querySelector('input[name="customerId"]') as HTMLElement | null;
+                }}
+                getFieldAfterTable={() => {
+                  const notes = document.querySelector('textarea[name="notes"]') as HTMLElement | null;
+                  if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
+                  return document.querySelector('button[type="submit"]') as HTMLElement | null;
+                }}
+                onNavigateRight={(row) => {
+                  const st = sundryTableRef.current;
+                  if (!st) return false;
+                  if (sundryRows.length === 0) {
+                    setSundryRows([{ ...sundryEmptyRow }]);
+                    setTimeout(() => {
+                      const firstCell = st.querySelector(`[data-r="0"][data-c="0"]`) as HTMLElement | null;
+                      const input = firstCell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                      if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); }
+                      else if (firstCell) { firstCell.focus(); }
+                    }, 40);
+                    return true;
+                  }
+                  const targetRow = Math.min(row, Math.max(0, sundryRows.length - 1));
+                  const doFocus = () => {
+                    const cell = st.querySelector(`[data-r="${targetRow}"][data-c="0"]`) as HTMLElement | null;
+                    const input = cell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                    if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); return true; }
+                    if (cell) { cell.focus(); return true; }
+                    return false;
+                  };
+                  if (!doFocus()) {
+                    setTimeout(doFocus, 30);
+                    setTimeout(doFocus, 80);
+                  }
+                  return true;
+                }}
               />
             </div>
-            <div className="w-[35%]">
+            <div ref={sundryTableRef} className="w-[35%]">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-semibold text-ink">Bill Sundry</span>
               </div>
@@ -1328,6 +1639,7 @@ const SalesInvoiceForm: React.FC = () => {
                     colKey: "amount",
                     value: (() => {
                       const t = sundryRows.reduce((s, r) => {
+                        if (!r.type) return s;
                         const a = Number(r.amount) || 0;
                         const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
                         return s + (o?.sign === -1 ? -a : a);
@@ -1336,6 +1648,33 @@ const SalesInvoiceForm: React.FC = () => {
                     })(),
                   },
                 ]}
+                getFieldBeforeTable={() => {
+                  const bundle = document.querySelector('input[name="numberOfBundle"]') as HTMLElement | null;
+                  if (bundle && !bundle.hasAttribute("disabled") && !(bundle as any).disabled) return bundle;
+                  return document.querySelector('input[name="customerId"]') as HTMLElement | null;
+                }}
+                getFieldAfterTable={() => {
+                  const notes = document.querySelector('textarea[name="notes"]') as HTMLElement | null;
+                  if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
+                  return document.querySelector('button[type="submit"]') as HTMLElement | null;
+                }}
+                onNavigateLeft={(row) => {
+                  const it = itemsTableRef.current;
+                  if (!it) return false;
+                  const targetRow = Math.min(row, Math.max(0, lines.length - 1));
+                  const doFocus = () => {
+                    const cell = it.querySelector(`[data-r="${targetRow}"][data-c="3"]`) as HTMLElement | null;
+                    const input = cell?.querySelector("input, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                    if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); return true; }
+                    if (cell) { cell.focus(); return true; }
+                    return false;
+                  };
+                  if (!doFocus()) {
+                    setTimeout(doFocus, 30);
+                    setTimeout(doFocus, 80);
+                  }
+                  return true;
+                }}
               />
               {/* ── Full Amount ── */}
               <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
@@ -1409,11 +1748,49 @@ const SalesInvoiceForm: React.FC = () => {
 
         {/* ── Actions ── */}
         <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
-          <CustomButton text="Cancel" type="button" variant="secondary" onClick={() => navigate(-1)} />
-          <CustomButton text={saving ? "Saving..." : isEditMode ? "Update Invoice" : "Confirm Invoice"}
-            icon={FaSave} type="button" disabled={saving || isStockNotEnough} variant="primary" onClick={(e) => handleSubmit(e, false)} />
+          {!isEditMode && (
+            <CustomButton
+              text="Clear Form"
+              type="button"
+              variant="secondary"
+              icon={FaUndo}
+              onClick={handleClear}
+            />
+          )}
+          <CustomButton
+            text="Cancel"
+            type="button"
+            variant="secondary"
+            onClick={handleBack}
+          />
+          <CustomButton
+            text={saving ? "Saving..." : isEditMode ? "Update Invoice" : "Confirm Invoice"}
+            icon={FaSave}
+            type="submit"
+            disabled={saving || isStockNotEnough}
+            variant="primary"
+            onClick={(e) => handleSubmit(e, false)}
+          />
         </div>
       </div>
+
+      {/* Discard / Save Confirmation Modal on Esc or Back */}
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved sales invoice details will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
   );
 };

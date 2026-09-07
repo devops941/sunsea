@@ -109,12 +109,26 @@ const Toggle: React.FC<{
     <label className="text-xs font-extrabold uppercase tracking-[0.5px] text-ink select-none">
       {label}
     </label>
-    <label className={`relative inline-flex items-center ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+    <label
+      className={`relative inline-flex items-center ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+      tabIndex={disabled ? -1 : 0}
+      data-nav
+      role="switch"
+      aria-checked={value}
+      aria-label={label}
+      onKeyDown={(e) => {
+        if ((e.key === " " || e.key === "Enter") && !disabled) {
+          e.preventDefault();
+          onChange(!value);
+        }
+      }}
+    >
       <input
         type="checkbox"
         className="sr-only"
         checked={value}
         disabled={disabled}
+        tabIndex={-1}
         onChange={(e) => !disabled && onChange(e.target.checked)}
       />
       <div

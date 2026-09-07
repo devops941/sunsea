@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaPlus } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Search } from "lucide-react";
@@ -14,6 +15,7 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { categoryService } from "../../../services/categoryService";
 
@@ -22,6 +24,9 @@ import { usePermission } from "../../../hooks/usePermission";
 import { useListCache } from "../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
+
+type SortOrder = "default" | "asc" | "desc";
+const CATEGORY_SORT_KEY = "sunsea_category_sort_name";
 
 const TYPE_LABELS: Record<CategoryType, string> = {
   PRODUCT: "Product",
@@ -53,6 +58,8 @@ const CategoryList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
+  const [draftTypeFilter, setDraftTypeFilter] = useState<string>("ALL");
+  const [draftActiveFilter, setDraftActiveFilter] = useState<string>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showViewModal, setShowViewModal] = useState(false);
@@ -62,7 +69,49 @@ const CategoryList: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    try {
+      const saved = localStorage.getItem(CATEGORY_SORT_KEY);
+      if (saved === "asc" || saved === "desc") return saved;
+    } catch (_) {}
+    return "default";
+  });
+
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder((prev) => {
+      const next: SortOrder = prev === "default" ? "asc" : prev === "asc" ? "desc" : "default";
+      try { localStorage.setItem(CATEGORY_SORT_KEY, next); } catch (_) {}
+      return next;
+    });
+  }, []);
+
+  const activeFilterCount = [
+    typeFilter !== "ALL",
+    activeFilter !== "ALL",
+  ].filter(Boolean).length;
+
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const handleApplyFilters = useCallback(() => {
+    setTypeFilter(draftTypeFilter);
+    setActiveFilter(draftActiveFilter);
+    setCurrentPage(1);
+  }, [draftTypeFilter, draftActiveFilter]);
+
+  const handleClearFilters = useCallback(() => {
+    setDraftTypeFilter("ALL");
+    setDraftActiveFilter("ALL");
+    setTypeFilter("ALL");
+    setActiveFilter("ALL");
+    setCurrentPage(1);
+  }, []);
+
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onDelete: () => setShowDeleteModal(true),
+    onNew: () => canCreate && navigate("/categories/create"),
+    onSort: () => toggleSortOrder(),
+  });
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await categoryService.fetchAll({ limit: 10000 });
@@ -88,8 +137,17 @@ const CategoryList: React.FC = () => {
     });
   }, [allCategories, searchTerm, typeFilter, activeFilter]);
 
-  const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE);
-  const paginatedCategories = categories.slice(
+  const sortedCategories = useMemo(() => {
+    if (sortOrder === "default") return categories;
+    return [...categories].sort((a, b) => {
+      const nameA = (a.name || "").toLowerCase();
+      const nameB = (b.name || "").toLowerCase();
+      return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+  }, [categories, sortOrder]);
+
+  const totalPages = Math.ceil(sortedCategories.length / ITEMS_PER_PAGE);
+  const paginatedCategories = sortedCategories.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -98,19 +156,11 @@ const CategoryList: React.FC = () => {
     setSearchTerm(e.target.value);
   }, []);
 
-  const handleTypeFilter = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setTypeFilter(e.target.value);
-    setCurrentPage(1);
-  }, []);
-
-  const handleActiveFilter = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setActiveFilter(e.target.value);
-    setCurrentPage(1);
-  }, []);
 
   const handleOpenView = useCallback((item: Category) => {
     setSelectedItem(item);
     setShowViewModal(true);
+    setTimeout(() => tableRef.current?.focus(), 50);
   }, []);
 
   const handleOpenEdit = useCallback(
@@ -144,6 +194,14 @@ const CategoryList: React.FC = () => {
 
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
+  const tableRef = useRef<HTMLDivElement>(null);
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: paginatedCategories.length,
+    onEnter: (i) => { const item = paginatedCategories[i]; if (item) handleOpenView(item); },
+    onEdit: (i) => { const item = paginatedCategories[i]; if (item && canEdit) handleOpenEdit(item); },
+    containerRef: tableRef,
+  });
+
   const fetchCategoriesForExport = useCallback(async () => {
     const res = await categoryService.fetchAll({ limit: 100000 });
     return Array.isArray(res) ? res : (res?.categories || res?.data || []);
@@ -172,39 +230,6 @@ const CategoryList: React.FC = () => {
             <h2 className="text-base font-bold text-ink">Categories</h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Type Filter */}
-            <div className="w-36">
-              <SelectInput
-                label="Type Filter"
-                hideLabel={true}
-                name="typeFilter"
-                value={typeFilter}
-                options={[
-                  { label: "All Types", value: "ALL" },
-                  { label: "Product", value: "PRODUCT" },
-                  { label: "Raw Material", value: "RAW_MATERIAL" },
-                  { label: "Wastage", value: "WASTAGE" },
-                ]}
-                onChange={handleTypeFilter}
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div className="w-32">
-              <SelectInput
-                label="Status Filter"
-                hideLabel={true}
-                name="activeFilter"
-                value={activeFilter}
-                options={[
-                  { label: "All Status", value: "ALL" },
-                  { label: "Active", value: "true" },
-                  { label: "Inactive", value: "false" },
-                ]}
-                onChange={handleActiveFilter}
-              />
-            </div>
-
             {/* Search */}
             <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
@@ -217,6 +242,57 @@ const CategoryList: React.FC = () => {
                 onChange={handleSearch}
               />
             </div>
+
+            {/* Filter Popover */}
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onOpen={() => {
+                setDraftTypeFilter(typeFilter);
+                setDraftActiveFilter(activeFilter);
+              }}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+            >
+              <div className="space-y-3">
+                {/* Category Type */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Category Type
+                  </label>
+                  <SelectInput
+                    name="typeFilter"
+                    value={draftTypeFilter}
+                    onChange={(e) => setDraftTypeFilter(e.target.value)}
+                    options={[
+                      { label: "Product", value: "PRODUCT" },
+                      { label: "Raw Material", value: "RAW_MATERIAL" },
+                      { label: "Wastage", value: "WASTAGE" },
+                    ]}
+                    defaultOptionLabel="All Types"
+                    noMargin
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Status
+                  </label>
+                  <SelectInput
+                    name="activeFilter"
+                    value={draftActiveFilter}
+                    onChange={(e) => setDraftActiveFilter(e.target.value)}
+                    options={[
+                      { label: "Active", value: "true" },
+                      { label: "Inactive", value: "false" },
+                    ]}
+                    defaultOptionLabel="All Status"
+                    noMargin
+                  />
+                </div>
+              </div>
+            </FilterPopover>
 
             {canExport && (
               <ExportCSVButton
@@ -237,13 +313,42 @@ const CategoryList: React.FC = () => {
           </div>
         </div>
 
+        {/* Active filter chips */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 px-5 py-2 border-b border-line flex-wrap">
+            <span className="text-xs text-ink-subtle">Active filters:</span>
+
+            {typeFilter !== "ALL" && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Type: {TYPE_LABELS[typeFilter as CategoryType] || typeFilter}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => { setTypeFilter("ALL"); setDraftTypeFilter("ALL"); setCurrentPage(1); }}
+                />
+              </span>
+            )}
+
+            {activeFilter !== "ALL" && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Status: {activeFilter === "true" ? "Active" : "Inactive"}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => { setActiveFilter("ALL"); setDraftActiveFilter("ALL"); setCurrentPage(1); }}
+                />
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Table */}
-          <div className="p-0 overflow-hidden rounded-b-2xl">
+          <div ref={tableRef} tabIndex={0} data-table-nav className="p-0 overflow-hidden rounded-b-2xl outline-none">
             <DataTable
               data={paginatedCategories}
               rowKey={(item) => item.id}
               loading={loading}
               emptyMessage="No categories found."
+              rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+              onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item); }}
               pagination={
                 totalPages > 1
                   ? {
@@ -265,7 +370,29 @@ const CategoryList: React.FC = () => {
                   ),
                 },
                 { header: "CODE", accessor: "code", width: "110px" },
-                { header: "NAME", accessor: "name", width: "160px" },
+                {
+                  header: "NAME",
+                  width: "160px",
+                  headerNode: (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                      title={`Sort Alphabetically (F6) — ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A to Z" : "Z to A"}`}
+                      className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                    >
+                      <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>NAME</span>
+                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                        {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                      </span>
+                      {sortOrder !== "default" && (
+                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                          {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                        </span>
+                      )}
+                    </button>
+                  ),
+                  accessor: "name",
+                },
                 {
                   header: "TYPE",
                   width: "130px",

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { FaSave, FaArrowLeft } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaArrowLeft, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -15,6 +16,7 @@ import { useRoles } from "../../../hooks/useRoles";
 
 import Button from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
@@ -82,8 +84,18 @@ const StorageStoreForm: React.FC = () => {
     const [pageLoading, setPageLoading] = useState(true);
     const [selectedRoleId, setSelectedRoleId] = useState("");
     const [dbStoreTypes, setDbStoreTypes] = useState<Array<{ label: string; value: string }>>([]);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
     const { roles, loadRoles } = useRoles();
@@ -206,11 +218,38 @@ const StorageStoreForm: React.FC = () => {
             ...prev,
             [name]: type === "checkbox" ? checked : value
         }));
+        setIsDirty(true);
 
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
     };
+
+    // Sync handleSubmit ref
+    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/storage-stores");
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -267,6 +306,7 @@ const StorageStoreForm: React.FC = () => {
                 await dispatch(createStore(payload as any)).unwrap();
                 toast.success("Store created successfully!");
             }
+            setIsDirty(false);
             navigate("/storage-stores");
         } catch (err: any) {
             const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to save store";
@@ -304,7 +344,7 @@ const StorageStoreForm: React.FC = () => {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
                     {/* Section 1: Basic Information */}
                     <div>
                         <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
@@ -446,6 +486,25 @@ const StorageStoreForm: React.FC = () => {
                     </div>
                 </form>
             </div>
+
+            <CommonConfirmModal
+                show={saveConfirmOpen}
+                onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+                onConfirm={() => {
+                    setSaveConfirmOpen(false);
+                    setTimeout(() => {
+                        handleSubmitRef.current();
+                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                    }, 150);
+                }}
+                title="Unsaved Changes"
+                message="You have unsaved changes. Do you want to save before leaving?"
+                confirmText="Save"
+                cancelText="Discard"
+                confirmVariant="primary"
+                confirmIcon={FaCheck}
+                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/storage-stores"); }}
+            />
         </div>
     );
 };

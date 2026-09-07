@@ -11,6 +11,7 @@ interface DateInputProps {
   onChange: (
     event: React.ChangeEvent<HTMLInputElement>
   ) => void;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }
 
 const DateInput: React.FC<DateInputProps> = ({
@@ -22,6 +23,7 @@ const DateInput: React.FC<DateInputProps> = ({
   disabled = false,
   icon,
   onChange,
+  onKeyDown,
 }) => {
   return (
     <div className="mb-[18px] group flex flex-col w-full">
@@ -47,8 +49,10 @@ const DateInput: React.FC<DateInputProps> = ({
       <input
         type="date"
         name={name}
+        data-nav
         value={value}
         onChange={onChange}
+        onKeyDown={onKeyDown}
         disabled={disabled}
         min={min}
         className={`

@@ -7,7 +7,7 @@ import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonVie
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useUsers } from "../../../../hooks/useUsers";
 
-import { getUomMultiplier } from "../pages/PurchaseOrderForm";
+import { getUomMultiplier } from "../utils/uomUtils";
 
 interface PurchaseOrderViewModalProps {
   show: boolean;
@@ -88,7 +88,11 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
               {purchaseOrder.shippingCity || "-"}, {purchaseOrder.shippingState || "-"} <br />
               {purchaseOrder.shippingPincode || "-"}
               {purchaseOrder.sameAsBilling && (
-                <div className="mt-1"><span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Same as billing</span></div>
+                <div className="mt-1">
+                  <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    Same as billing
+                  </span>
+                </div>
               )}
             </>
           ),
@@ -107,7 +111,7 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
   if (purchaseOrder.status === "REJECTED" && purchaseOrder.rejectReason) {
     sections.push({
       title: "Rejection Reason",
-      fields: [{ label: "Reason", value: <span className="text-red-600 font-semibold">{purchaseOrder.rejectReason}</span> }],
+      fields: [{ label: "Reason", value: <span className="text-rose-600 dark:text-rose-400 font-semibold">{purchaseOrder.rejectReason}</span> }],
     });
   }
 
@@ -120,31 +124,34 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
   });
 
   const customContent = (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-        <h6 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Items</h6>
+    <div className="bg-card-2/40 rounded-xl border border-line shadow-sm overflow-hidden">
+      <div className="px-5 py-3 bg-card-2 border-b border-line flex items-center justify-between">
+        <h6 className="text-xs font-bold text-ink uppercase tracking-wider">Items</h6>
+        <span className="text-xs text-ink-subtle font-medium">
+          {(purchaseOrder.items || []).length} {(purchaseOrder.items || []).length === 1 ? "item" : "items"}
+        </span>
       </div>
       <div className="p-0 overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-              <th className="p-4">S.No</th>
-              <th className="p-4">Product</th>
-              <th className="p-4 text-right">Qty</th>
-              <th className="p-4 text-right">Unit Price</th>
-              <th className="p-4 text-right">Tax %</th>
+            <tr className="bg-card-2/70 border-b border-line text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
+              <th className="py-3 px-4">S.No</th>
+              <th className="py-3 px-4">Product</th>
+              <th className="py-3 px-4 text-right">Qty</th>
+              <th className="py-3 px-4 text-right">Unit Price</th>
+              <th className="py-3 px-4 text-right">Tax %</th>
               {isInterState ? (
-                <th className="p-4 text-right">IGST</th>
+                <th className="py-3 px-4 text-right">IGST</th>
               ) : (
                 <>
-                  <th className="p-4 text-right">CGST</th>
-                  <th className="p-4 text-right">SGST</th>
+                  <th className="py-3 px-4 text-right">CGST</th>
+                  <th className="py-3 px-4 text-right">SGST</th>
                 </>
               )}
-              <th className="p-4 text-right">Total</th>
+              <th className="py-3 px-4 text-right">Total</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+          <tbody className="divide-y divide-line-soft text-sm text-ink-muted">
             {(purchaseOrder.items || []).length > 0 ? (
               purchaseOrder.items.map((item, index) => {
                 const qty = safeNumber(item.quantity);
@@ -171,27 +178,27 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                 const productName = matchedMaterial?.materialName || `Product #${item.productId || "-"}`;
 
                 return (
-                  <tr key={item.id || index} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4">{index + 1}</td>
-                    <td className="p-4 font-medium text-slate-900">{productName}</td>
-                    <td className="p-4 text-right">{qty}</td>
-                    <td className="p-4 text-right">₹{price.toFixed(2)}</td>
-                    <td className="p-4 text-right">{tax}%</td>
+                  <tr key={item.id || index} className="hover:bg-card-2/60 transition-colors">
+                    <td className="py-3.5 px-4 text-ink-subtle font-mono text-xs">{index + 1}</td>
+                    <td className="py-3.5 px-4 font-medium text-ink">{productName}</td>
+                    <td className="py-3.5 px-4 text-right font-mono font-medium text-ink">{qty}</td>
+                    <td className="py-3.5 px-4 text-right font-mono text-ink-muted">₹{price.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-right font-mono text-ink-subtle">{tax}%</td>
                     {isInterState ? (
-                      <td className="p-4 text-right text-blue-600">₹{igstAmt.toFixed(2)}</td>
+                      <td className="py-3.5 px-4 text-right font-mono text-blue-600 dark:text-blue-400">₹{igstAmt.toFixed(2)}</td>
                     ) : (
                       <>
-                        <td className="p-4 text-right text-blue-600">₹{cgstAmt.toFixed(2)}</td>
-                        <td className="p-4 text-right text-purple-600">₹{sgstAmt.toFixed(2)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-blue-600 dark:text-blue-400">₹{cgstAmt.toFixed(2)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-purple-600 dark:text-purple-400">₹{sgstAmt.toFixed(2)}</td>
                       </>
                     )}
-                    <td className="p-4 text-right font-medium">₹{total.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-right font-mono font-semibold text-ink">₹{total.toFixed(2)}</td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-500">
+                <td colSpan={isInterState ? 7 : 8} className="p-8 text-center text-ink-subtle">
                   No items found
                 </td>
               </tr>
@@ -200,46 +207,42 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
         </table>
       </div>
 
-      <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end">
+      <div className="p-5 bg-card-2/50 border-t border-line flex justify-end">
         <div className="w-full sm:w-1/2 lg:w-1/3 space-y-2 text-sm">
-          <div className="flex justify-between text-slate-600">
+          <div className="flex justify-between text-ink-muted">
             <span>Subtotal:</span>
-            <span>₹{safeNumber(purchaseOrder.subtotal).toFixed(2)}</span>
+            <span className="font-mono font-medium text-ink">₹{safeNumber(purchaseOrder.subtotal).toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-red-600">
+          <div className="flex justify-between text-rose-600 dark:text-rose-400">
             <span>Discount:</span>
-            <span>-₹{safeNumber(purchaseOrder.totalDiscount).toFixed(2)}</span>
+            <span className="font-mono font-medium">-₹{safeNumber(purchaseOrder.totalDiscount).toFixed(2)}</span>
           </div>
-          {/* <div className="flex justify-between text-green-600">
-            <span>Tax:</span>
-            <span>+₹{safeNumber(purchaseOrder.totalTax).toFixed(2)}</span>
-          </div> */}
           {isInterState ? (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between text-blue-600 dark:text-blue-400">
               <span>IGST:</span>
-              <span>+₹{safeNumber(purchaseOrder.totalIgst).toFixed(2)}</span>
+              <span className="font-mono font-medium">+₹{safeNumber(purchaseOrder.totalIgst).toFixed(2)}</span>
             </div>
           ) : (
             <>
-              <div className="flex justify-between text-blue-600">
+              <div className="flex justify-between text-blue-600 dark:text-blue-400">
                 <span>CGST:</span>
-                <span>+₹{safeNumber(purchaseOrder.totalCgst).toFixed(2)}</span>
+                <span className="font-mono font-medium">+₹{safeNumber(purchaseOrder.totalCgst).toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-purple-600">
+              <div className="flex justify-between text-purple-600 dark:text-purple-400">
                 <span>SGST:</span>
-                <span>+₹{safeNumber(purchaseOrder.totalSgst).toFixed(2)}</span>
+                <span className="font-mono font-medium">+₹{safeNumber(purchaseOrder.totalSgst).toFixed(2)}</span>
               </div>
             </>
           )}
           {Number((purchaseOrder as any).roundingAdjust || 0) !== 0 && (
-            <div className="flex justify-between text-slate-600">
+            <div className="flex justify-between text-ink-muted">
               <span>Round Off:</span>
-              <span>{Number((purchaseOrder as any).roundingAdjust) > 0 ? "+" : ""}₹{safeNumber((purchaseOrder as any).roundingAdjust).toFixed(2)}</span>
+              <span className="font-mono font-medium">{Number((purchaseOrder as any).roundingAdjust) > 0 ? "+" : ""}₹{safeNumber((purchaseOrder as any).roundingAdjust).toFixed(2)}</span>
             </div>
           )}
-          <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-slate-900 text-base">
+          <div className="border-t border-line pt-2.5 mt-2 flex justify-between font-bold text-ink text-base">
             <span>Net Amount:</span>
-            <span>₹{safeNumber(purchaseOrder.netAmount).toFixed(2)}</span>
+            <span className="font-mono text-primary font-bold text-lg">₹{safeNumber(purchaseOrder.netAmount).toFixed(2)}</span>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -9,6 +10,7 @@ import {
   FaClipboardList, FaSave, FaChevronLeft, FaChevronRight, FaCamera,
   FaRandom, FaEye, FaEyeSlash, FaCheck, FaTimes, FaSpinner,
 } from "react-icons/fa";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -256,8 +258,17 @@ const EmployeeForm: React.FC = () => {
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const photoInputRef = useRef<HTMLInputElement>(null);
   const usernameCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  const handleSubmitRef = useRef<() => void>(() => {});
+  const handleFormKeyDown = useFormKeyboardNav(tabContentRef);
 
-  useFormShortcuts({});
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const isDirtyRef = useRef(isDirty);
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+
+  useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
   const fetchShifts = useCallback(() => {
     apiClient.get("/shifts").then((res) => {
@@ -487,10 +498,12 @@ const EmployeeForm: React.FC = () => {
     if (errors[name as keyof FormState]) {
       setErrors((p) => ({ ...p, [name]: undefined }));
     }
+    setIsDirty(true);
   };
 
   const handleToggle = (name: keyof FormState) => (v: boolean) => {
     setForm((p) => ({ ...p, [name]: v }));
+    setIsDirty(true);
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -499,6 +512,7 @@ const EmployeeForm: React.FC = () => {
     if (file.size > 5 * 1024 * 1024) { toast.error("Photo must be under 5 MB"); return; }
     const preview = URL.createObjectURL(file);
     setForm((p) => ({ ...p, photoFile: file, photoPreview: preview }));
+    setIsDirty(true);
   };
 
   // ── derived
@@ -773,6 +787,7 @@ const EmployeeForm: React.FC = () => {
         await employeeService.create(fd as any);
         toast.success("Employee created successfully!");
       }
+      setIsDirty(false);
       navigate("/employees");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || `Failed to ${isEdit ? "update" : "create"} employee`);
@@ -780,6 +795,115 @@ const EmployeeForm: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Keep submitRef current on every render so useFormShortcuts (F2/F9) always calls the latest handleSubmit
+  handleSubmitRef.current = handleSubmit;
+
+  // Keep dirty/modal refs current to avoid stale closures in Escape handler
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  // ── Escape: dirty-check back navigation ──────────────────────────────────
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (saveConfirmOpenRef.current) {
+        setSaveConfirmOpen(false);
+        setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+      } else if (isDirtyRef.current) {
+        lastFocusedRef.current = document.activeElement as HTMLElement | null;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate("/employees");
+      }
+    };
+    window.addEventListener("keydown", handleEsc, { capture: true });
+    return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+  }, [navigate]);
+
+  // ── Tab Navigation Shortcuts (Alt+Right / Alt+N / Ctrl+PageDown, Alt+Left / Alt+P / Ctrl+PageUp, Ctrl+S) ──
+  useEffect(() => {
+    const handleTabShortcuts = (e: KeyboardEvent) => {
+      if (document.querySelector("[role='dialog']:not([aria-hidden='true']), [data-radix-popper-content-wrapper]")) return;
+
+      // Next tab: Alt + ArrowRight OR Alt + N OR Ctrl + PageDown
+      if (
+        (e.altKey && (e.key === "ArrowRight" || e.key === "n" || e.key === "N")) ||
+        (e.ctrlKey && e.key === "PageDown")
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveTab((p) => Math.min(TABS.length - 1, p + 1));
+        return;
+      }
+
+      // Previous tab: Alt + ArrowLeft OR Alt + P OR Ctrl + PageUp
+      if (
+        (e.altKey && (e.key === "ArrowLeft" || e.key === "p" || e.key === "P")) ||
+        (e.ctrlKey && e.key === "PageUp")
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveTab((p) => Math.max(0, p - 1));
+        return;
+      }
+
+      // Ctrl + S save shortcut
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSubmitRef.current();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleTabShortcuts, { capture: true });
+    return () => window.removeEventListener("keydown", handleTabShortcuts, { capture: true });
+  }, []);
+
+  // Auto-focus first field when switching tabs
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const first = tabContentRef.current?.querySelector<HTMLElement>(
+        "[data-nav]:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), textarea:not([disabled])"
+      );
+      first?.focus();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  // ── F5 Refresh ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleRefresh = async () => {
+      if (isEdit && id) {
+        try {
+          setIsLoading(true);
+          const emp = await employeeService.fetchById(id);
+          // Re-trigger the existing load effect by resetting loading state
+          setForm(INITIAL_STATE); // brief reset
+          employeeService.fetchById(id).then((fresh: any) => {
+            setForm((prev) => ({
+              ...prev,
+              fullName: fresh.fullName || "",
+              employeeStatus: fresh.status || "active",
+            }));
+            setIsDirty(false);
+            toast.info("Employee details refreshed");
+          });
+        } catch {
+          toast.error("Failed to reload employee details");
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    window.addEventListener("fkey-refresh", handleRefresh);
+    return () => window.removeEventListener("fkey-refresh", handleRefresh);
+  }, [id, isEdit]);
 
   // ─── tab content renderers ────────────────────────────────────────────────
 
@@ -814,8 +938,13 @@ const EmployeeForm: React.FC = () => {
         <SectionHeader icon={FaCamera} title="Profile Photo" />
         <div className="flex items-center gap-6">
           <div
-            className="w-28 h-28 rounded-full border-2 border-dashed border-line-soft flex items-center justify-center bg-card-2 overflow-hidden cursor-pointer hover:border-primary transition-colors shadow-xs"
+            className="w-28 h-28 rounded-full border-2 border-dashed border-line-soft flex items-center justify-center bg-card-2 overflow-hidden cursor-pointer hover:border-primary transition-colors shadow-xs focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
             onClick={() => photoInputRef.current?.click()}
+            tabIndex={0}
+            data-nav
+            role="button"
+            aria-label="Upload profile photo"
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); photoInputRef.current?.click(); } }}
           >
             {form.photoPreview ? (
               <img src={form.photoPreview} alt="New preview" className="w-full h-full object-cover" />
@@ -1156,7 +1285,13 @@ const EmployeeForm: React.FC = () => {
 
         {/* Tab navigation */}
         <div className="px-5 overflow-x-auto border-b border-line">
-          <div className="flex gap-0 min-w-max">
+          <div
+            className="flex gap-0 min-w-max"
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight") { e.preventDefault(); setActiveTab((p) => Math.min(TABS.length - 1, p + 1)); }
+              else if (e.key === "ArrowLeft") { e.preventDefault(); setActiveTab((p) => Math.max(0, p - 1)); }
+            }}
+          >
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1183,7 +1318,7 @@ const EmployeeForm: React.FC = () => {
         </div>
 
         {/* Tab content */}
-        <div className="px-5 py-5 min-h-[350px]">
+        <div ref={tabContentRef} onKeyDown={handleFormKeyDown} className="px-5 py-5 min-h-[350px]">
           {tabRenderers[activeTab]()}
         </div>
 
@@ -1218,16 +1353,44 @@ const EmployeeForm: React.FC = () => {
           {activeTab < TABS.length - 1 ? (
             <button
               type="button"
+              data-nav
               onClick={() => setActiveTab((p) => Math.min(TABS.length - 1, p + 1))}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-all"
+              title="Next Tab (Alt + Right Arrow or Alt + N)"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-xs transition-all cursor-pointer active:scale-95"
             >
-              Next <FaChevronRight size={12} />
+              <span>Next</span>
+              <span className="text-[9.5px] font-mono font-bold text-white/90 ml-1 px-1.5 py-0.5 rounded bg-white/20 border border-white/25">Alt+Right</span>
+              <FaChevronRight size={11} />
             </button>
           ) : (
             <div className="w-24" />
           )}
         </div>
       </div>
+
+      {/* Discard Changes Modal */}
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+        onCancel={() => { setSaveConfirmOpen(false); navigate("/employees"); }}
+        onConfirm={() => {
+          setSaveConfirmOpen(false);
+          setTimeout(() => {
+            handleSubmitRef.current();
+            setTimeout(() => tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+          }, 150);
+        }}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved employee details will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
   );
 };

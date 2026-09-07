@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FaWhatsapp, FaSave, FaEraser } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../api/apiClient";
 import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
 import IndiaPhoneInput from "../../components/ui/PhoneInput/PhoneInput";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
+import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { usePermission } from "../../hooks/usePermission";
 import { useDetailCache, invalidateDetailCache } from "../../hooks/useDetailCache";
+import { useFormKeyboardNav } from "../../hooks/useFormKeyboardNav";
+import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 
 interface WhatsappConfigForm {
     phoneNumberId: string;
@@ -18,6 +22,7 @@ interface WhatsappConfigForm {
 }
 
 const WhatsappCreatePage: React.FC = () => {
+    const navigate = useNavigate();
     const initialFormData: WhatsappConfigForm = {
         phoneNumberId: "",
         wabaId: "",
@@ -27,11 +32,17 @@ const WhatsappCreatePage: React.FC = () => {
     };
 
     const [formData, setFormData] = useState<WhatsappConfigForm>(initialFormData);
+    const [originalFormData, setOriginalFormData] = useState<WhatsappConfigForm>(initialFormData);
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
     const { can } = usePermission();
     const canEditWhatsapp = can("whatsapp.edit");
+
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+    const lastFocusedElementRef = useRef<HTMLElement | null>(null);
 
     // Test message state
     const [testPhone, setTestPhone] = useState("");
@@ -59,15 +70,46 @@ const WhatsappCreatePage: React.FC = () => {
         if (!configData || populated.current) return;
         populated.current = true;
         const { phoneNumberId, wabaId, businessPhone, hasAccessToken, webhookVerifyToken } = configData;
-        setFormData({
+        const loadedData: WhatsappConfigForm = {
             phoneNumberId: phoneNumberId || "",
             wabaId: wabaId || "",
             businessPhone: businessPhone || "",
             accessToken: hasAccessToken ? "••••••••••••••••••••" : "",
             webhookVerifyToken: webhookVerifyToken || "",
-        });
+        };
+        setFormData(loadedData);
+        setOriginalFormData(loadedData);
         setIsEditing(true);
     }, [configData]);
+
+    // Auto-focus first input when loaded
+    useEffect(() => {
+        if (!loading) {
+            const timer = setTimeout(() => {
+                const firstInput = formRef.current?.querySelector<HTMLElement>(
+                    'input[name="phoneNumberId"], input[data-nav]:not([disabled])'
+                );
+                firstInput?.focus();
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [loading]);
+
+    const isDirty = useMemo(() => {
+        return (
+            formData.phoneNumberId.trim() !== originalFormData.phoneNumberId.trim() ||
+            formData.wabaId.trim() !== originalFormData.wabaId.trim() ||
+            formData.businessPhone.trim() !== originalFormData.businessPhone.trim() ||
+            (formData.accessToken !== "••••••••••••••••••••" && formData.accessToken.trim() !== originalFormData.accessToken.trim()) ||
+            formData.webhookVerifyToken.trim() !== originalFormData.webhookVerifyToken.trim()
+        );
+    }, [formData, originalFormData]);
+
+    const isDirtyRef = useRef(isDirty);
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+    const saveConfirmOpenRef = useRef(saveConfirmOpen);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -87,9 +129,13 @@ const WhatsappCreatePage: React.FC = () => {
         setFormData(initialFormData);
         setIsEditing(false);
         setErrors({});
+        setTimeout(() => {
+            const firstInput = formRef.current?.querySelector<HTMLElement>('input[name="phoneNumberId"]');
+            firstInput?.focus();
+        }, 50);
     };
 
-    const validate = (): boolean => {
+    const validate = useCallback((): boolean => {
         const newErrors: Record<string, string> = {};
 
         if (!formData.phoneNumberId.trim()) {
@@ -103,12 +149,20 @@ const WhatsappCreatePage: React.FC = () => {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+        if (Object.keys(newErrors).length > 0) {
+            const fieldOrder = ["phoneNumberId", "wabaId", "accessToken"];
+            const firstError = fieldOrder.find((f) => newErrors[f]);
+            if (firstError) {
+                const el = formRef.current?.querySelector<HTMLElement>(`[name="${firstError}"]`);
+                el?.focus();
+            }
+            return false;
+        }
+        return true;
+    }, [formData]);
 
+    const submitForm = useCallback(async () => {
         if (!validate()) {
             toast.warn("Please fill in all required fields correctly.");
             return;
@@ -135,13 +189,15 @@ const WhatsappCreatePage: React.FC = () => {
                         ? "WhatsApp configuration updated successfully!"
                         : "WhatsApp configuration saved successfully!"
                 );
-                setFormData({
+                const updatedData: WhatsappConfigForm = {
                     phoneNumberId: formData.phoneNumberId.trim(),
                     wabaId: formData.wabaId.trim(),
                     businessPhone: formData.businessPhone.trim(),
                     accessToken: "••••••••••••••••••••",
                     webhookVerifyToken: formData.webhookVerifyToken.trim(),
-                });
+                };
+                setFormData(updatedData);
+                setOriginalFormData(updatedData);
                 setIsEditing(true);
                 setErrors({});
                 invalidateDetailCache("whatsapp:config");
@@ -155,7 +211,87 @@ const WhatsappCreatePage: React.FC = () => {
         } finally {
             setSaving(false);
         }
+    }, [validate, canEditWhatsapp, formData, isEditing]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await submitForm();
     };
+
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
+                lastFocusedElementRef.current.focus();
+            } else {
+                const firstInput = formRef.current?.querySelector<HTMLElement>(
+                    'input[name="phoneNumberId"], input[data-nav]:not([disabled])'
+                );
+                firstInput?.focus();
+            }
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        navigate('/dashboard');
+    }, [navigate]);
+
+    const handleSaveFromModal = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            if (!validate()) {
+                toast.error("Required fields fill pannunga — please fill all required fields.");
+                return;
+            }
+            submitForm();
+        }, 150);
+    }, [validate, submitForm]);
+
+    // Global F2 / F9 save shortcut
+    useFormShortcuts({
+        onSave: () => {
+            if (!saveConfirmOpen) {
+                submitForm();
+            }
+        },
+    });
+
+    // Ctrl+S shortcut support
+    useEffect(() => {
+        if (saveConfirmOpen) return;
+        const handleCtrlS = (e: KeyboardEvent) => {
+            if (e.ctrlKey && (e.key === "s" || e.key === "S")) {
+                e.preventDefault();
+                e.stopPropagation();
+                submitForm();
+            }
+        };
+        window.addEventListener("keydown", handleCtrlS, { capture: true });
+        return () => window.removeEventListener("keydown", handleCtrlS, { capture: true });
+    }, [saveConfirmOpen, submitForm]);
+
+    // Esc key Discard confirmation
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal]")) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (saveConfirmOpenRef.current) {
+                handleResume();
+            } else if (isDirtyRef.current) {
+                lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate('/dashboard');
+            }
+        };
+        window.addEventListener("keydown", handleEsc, { capture: true });
+        return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+    }, [handleResume, navigate]);
 
     const handleSendTestMessage = async () => {
         if (!testPhone.trim() || !testMessage.trim()) {
@@ -189,7 +325,7 @@ const WhatsappCreatePage: React.FC = () => {
 
     return (
         <div className="max-w-[1024px] xl:mr-auto">
-            <form onSubmit={handleSubmit} noValidate>
+            <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
                     {/* Page Header */}
@@ -311,6 +447,24 @@ const WhatsappCreatePage: React.FC = () => {
 
                 </div>
             </form>
+
+            {/* Discard Changes Confirm Modal */}
+            <CommonConfirmModal
+                isOpen={saveConfirmOpen}
+                onClose={handleResume}
+                onCancel={handleDiscard}
+                onConfirm={handleSaveFromModal}
+                title="Discard Changes?"
+                message="Are you sure you want to leave? Any unsaved WhatsApp configuration will be lost."
+                warningText="Save to keep your changes, or Discard to leave."
+                cancelText="Discard"
+                cancelVariant="danger"
+                confirmText="Save"
+                confirmVariant="primary"
+                confirmIcon={FaSave}
+                isDangerous={false}
+                defaultFocusCancel={false}
+            />
         </div>
     );
 };

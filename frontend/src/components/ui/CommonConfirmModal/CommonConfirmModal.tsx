@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import CustomButton from "../Button/Button";
 import { FaTrash } from "react-icons/fa";
@@ -11,10 +11,13 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   onHide,
   onClose,
   onConfirm,
+  onCancel,
+  onDiscard,
   title = "Confirm Action",
   message = "Are you sure you want to perform this action?",
   confirmText = "Confirm",
   cancelText = "Cancel",
+  discardText,
   confirmVariant = "danger",
   confirmDisabled = false,
   isLoading = false,
@@ -22,15 +25,44 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   warningText = "This action cannot be undone.",
   loadingText = "Processing...",
   confirmIcon = FaTrash,
+  defaultFocusCancel = false,
+  cancelVariant = "secondary",
 }) => {
   const isVisible = show ?? isOpen ?? false;
   const handleClose = onHide ?? onClose ?? (() => {});
+  const handleCancelClick = onCancel ?? handleClose;
   const dangerMode = isDangerous ?? confirmVariant === "danger";
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard navigation (Escape + Arrow Left/Right)
   useEffect(() => {
+    if (!isVisible) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isVisible) handleClose();
+      if (e.key === "Escape") {
+        handleClose();
+        return;
+      }
+
+      // Arrow Left / Right → move focus between the buttons
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const buttons = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not([disabled])") ?? []
+        );
+        if (buttons.length < 2) return;
+
+        const activeIdx = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        if (activeIdx === -1) return;
+
+        e.preventDefault();
+        const nextIdx = e.key === "ArrowRight"
+          ? (activeIdx + 1) % buttons.length
+          : (activeIdx - 1 + buttons.length) % buttons.length;
+        buttons[nextIdx].focus();
+      }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isVisible, handleClose]);
@@ -44,6 +76,7 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
     >
       <div
+        ref={dialogRef}
         className="bg-card border border-line-soft rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 relative my-auto"
         role="dialog"
         aria-modal="true"
@@ -69,21 +102,32 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
             </p>
           )}
 
-          <div className="flex justify-center gap-2.5 mt-6">
+          <div className="flex flex-wrap items-center justify-center gap-2.5 mt-6">
             <CustomButton
               text={cancelText}
-              variant="secondary"
-              onClick={handleClose}
+              variant={cancelVariant}
+              onClick={handleCancelClick}
               disabled={isLoading}
-              className="px-5"
+              autoFocus={defaultFocusCancel}
+              className="px-4"
             />
+            {discardText && onDiscard && (
+              <CustomButton
+                text={discardText}
+                variant="danger"
+                onClick={onDiscard}
+                disabled={isLoading}
+                className="px-4"
+              />
+            )}
             <CustomButton
               text={isLoading ? loadingText : confirmText}
               icon={confirmIcon}
-              variant={dangerMode ? "danger" : "primary"}
+              variant={dangerMode ? "danger" : confirmVariant === "secondary" ? "secondary" : "primary"}
               onClick={onConfirm}
               disabled={confirmDisabled || isLoading}
-              className="px-5"
+              autoFocus={!defaultFocusCancel && !discardText}
+              className="px-4"
             />
           </div>
         </div>

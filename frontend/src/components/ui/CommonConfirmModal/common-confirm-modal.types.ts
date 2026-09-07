@@ -13,6 +13,7 @@ export interface CommonConfirmModalProps {
 
   confirmText?: string;
   cancelText?: string;
+  discardText?: string;
   confirmDisabled?: boolean;
   isLoading?: boolean;
   isDangerous?: boolean;
@@ -20,6 +21,19 @@ export interface CommonConfirmModalProps {
   loadingText?: string;
   confirmIcon?: any;
   size?: "sm" | "md" | "lg" | "xl";
+
+  /** If provided, called when user clicks the Discard button. */
+  onDiscard?: () => void;
+
+  /** If provided, the cancel button uses this instead of onHide/onClose.
+   *  Lets you separate "Esc / backdrop → stay on page" from "Discard → navigate away". */
+  onCancel?: () => void;
+
+  /** When true, auto-focus the cancel/resume button instead of the confirm button on open. */
+  defaultFocusCancel?: boolean;
+
+  /** Variant for the cancel button. Defaults to "secondary". */
+  cancelVariant?: "primary" | "secondary" | "danger";
 
   confirmVariant?:
     | "primary"

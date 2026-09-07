@@ -151,6 +151,48 @@ const SalesInvoiceView: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [invoicesList, loadingList]);
 
+    // Keyboard navigation: Escape to go back, ArrowUp/ArrowDown to navigate list, F10 to print
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            const inField = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+
+            if (e.key === "Escape") {
+                e.preventDefault();
+                navigate("/sales-invoices");
+                return;
+            }
+
+            if (e.key === "F10") {
+                e.preventDefault();
+                window.print();
+                return;
+            }
+
+            // Arrow navigation through sidebar list when not typing in search
+            if (!inField && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                if (filteredInvoices.length === 0) return;
+                const currentIndex = filteredInvoices.findIndex((inv) => String(inv.id) === String(idParam || invoice?.id));
+                if (e.key === "ArrowDown") {
+                    const nextIdx = Math.min((currentIndex >= 0 ? currentIndex : -1) + 1, filteredInvoices.length - 1);
+                    if (nextIdx !== currentIndex && filteredInvoices[nextIdx]) {
+                        e.preventDefault();
+                        navigate(`/sales-invoices/details/${filteredInvoices[nextIdx].id}`);
+                    }
+                } else if (e.key === "ArrowUp") {
+                    const prevIdx = Math.max((currentIndex >= 0 ? currentIndex : 1) - 1, 0);
+                    if (prevIdx !== currentIndex && filteredInvoices[prevIdx]) {
+                        e.preventDefault();
+                        navigate(`/sales-invoices/details/${filteredInvoices[prevIdx].id}`);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [filteredInvoices, idParam, invoice, navigate]);
+
     const handleSocketUpdate = useCallback(() => {
         fetchList();
         // Re-load current invoice detail only if we have a valid database id (from URL param)

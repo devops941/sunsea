@@ -27,25 +27,26 @@ export const SHORTCUTS: ShortcutItem[] = [
   // ── 1. Header Nav Menus (Alt / Ctrl keys) ──────────────────────
   { id: "nav-trans",   keyLabel: "Alt+T",  key: "t", alt: true,  label: "Transactions Menu",   category: "nav", action: "open-trans" },
   { id: "nav-admin",   keyLabel: "Alt+A",  key: "a", alt: true,  label: "Administration Menu", category: "nav", action: "open-admin" },
+  { id: "nav-prod",    keyLabel: "Alt+R",  key: "r", alt: true,  label: "Production Menu",     category: "nav", action: "open-production" },
+  { id: "nav-inv",     keyLabel: "Alt+I",  key: "i", alt: true,  label: "Inventory Menu",      category: "nav", action: "open-inventory" },
   { id: "nav-display", keyLabel: "Alt+D",  key: "d", alt: true,  label: "Display Menu",        category: "nav", action: "open-display" },
   { id: "nav-payroll", keyLabel: "Alt+P",  key: "p", alt: true,  label: "Payroll Menu",        category: "nav", action: "open-payroll" },
 
   // ── 2. Action & Function Keys (Tally-style Operations) ────────
+  { id: "f1",          keyLabel: "F1",           key: "F1",      label: "Toggle Panel",        category: "system", action: "toggle-panel" },
   { id: "f2",          keyLabel: "F2",           key: "F2",      label: "Save Record",         category: "system", action: "save" },
-  { id: "f9",          keyLabel: "F9",           key: "F9",      label: "Submit / Confirm",    category: "system", action: "submit" },
-  { id: "new-record",  keyLabel: "Ins",          key: "Insert",  label: "New Record",          category: "system", action: "new" },
   { id: "f3",          keyLabel: "F3",           key: "F3",      label: "Search / Find",       category: "system", action: "search" },
+  { id: "f4",          keyLabel: "F4",           key: "F4",      label: "Open / Select",       category: "system", action: "open-select" },
   { id: "f5",          keyLabel: "F5",           key: "F5",      label: "Refresh Data",        category: "system", action: "refresh" },
+  { id: "f6",          keyLabel: "F6",           key: "F6",      label: "Sort (A-Z)",          category: "system", action: "sort" },
+  { id: "f7",          keyLabel: "F7",           key: "F7",      label: "Reports",             category: "system", action: "reports" },
   { id: "f10",         keyLabel: "F10",          key: "F10",     label: "Print",               category: "system", action: "print" },
+  { id: "f11",         keyLabel: "F11",          key: "F11",     label: "Full Screen",         category: "system", action: "fullscreen" },
+  { id: "edit-record", keyLabel: "E",            key: "e",       label: "Edit Record",         category: "system", action: "edit" },
+  { id: "new-record",  keyLabel: "Ins",          key: "Insert",  label: "New Record",          category: "system", action: "new" },
   { id: "export",      keyLabel: "Ctrl+Shift+E", key: "e", ctrl: true, shift: true, label: "Export / Download", category: "system", action: "export" },
   { id: "calc",        keyLabel: "Alt+C",        key: "c", alt: true, label: "Calculator",     category: "system", action: "calculator" },
   { id: "go-back",     keyLabel: "Esc",          key: "Escape",  label: "Go Back",             category: "system", action: "back" },
-  { id: "f8",          keyLabel: "F8",           key: "F8",      label: "Delete / Remove",     category: "system", action: "delete" },
-  { id: "f1",          keyLabel: "F1",           key: "F1",      label: "Toggle Panel",        category: "system", action: "toggle-panel" },
-  { id: "f11",         keyLabel: "F11",          key: "F11",     label: "Full Screen",         category: "system", action: "fullscreen" },
-  { id: "f4",          keyLabel: "F4",           key: "F4",      label: "Open / Select",       category: "system", action: "open-select" },
-  { id: "f6",          keyLabel: "F6",           key: "F6",      label: "Next Field",          category: "system", action: "next-field" },
-  { id: "f7",          keyLabel: "F7",           key: "F7",      label: "Reports",             category: "system", action: "reports" },
   { id: "dashboard",   keyLabel: "Ctrl+Home",    key: "Home", ctrl: true, label: "Dashboard",   category: "system", action: "dashboard" },
 
   // ── 3. Create / Add (Alt+ / Ctrl+ shortcuts) ───────────────────
@@ -56,15 +57,16 @@ export const SHORTCUTS: ShortcutItem[] = [
   { id: "add-journal", keyLabel: "Ctrl+J",       key: "j", ctrl: true, label: "Add Journal Entry",   category: "create", route: "/accounts/journal-entry/add",    permission: "vouchers.view" },
   { id: "add-grn",     keyLabel: "Ctrl+U",       key: "u", ctrl: true, label: "Add GRN Invoice",     category: "create", route: "/invoice/create",                permission: "invoice.view" },
   { id: "add-po",      keyLabel: "Ctrl+X",       key: "x", ctrl: true, label: "Add Purchase Order",  category: "create", route: "/purchase-orders/create",        permission: "purchaseOrders.view" },
+  { id: "ctrl-po",     keyLabel: "Ctrl+Shift+O", key: "o", ctrl: true, shift: true, label: "Purchase Orders", category: "ctrl", route: "/purchase-orders", permission: "purchaseOrders.view" },
   { id: "add-account", keyLabel: "Alt+N",        key: "n", alt: true,  label: "Add Account / Chart", category: "create", route: "/accounts/chart-of-accounts",    permission: "chart-of-accounts.view" },
 
-  // ── 4. Quick Reports (plain letter keys) ───────────────────────
-  { id: "sales-report",  keyLabel: "S", key: "s", label: "Sales Reports",     category: "reports", route: "/reports/sales",            permission: "sales-reports.view" },
-  { id: "balance-sheet", keyLabel: "B", key: "b", label: "Balance Sheet",     category: "reports", route: "/accounts/balance-sheet",   permission: "accounts.view" },
-  { id: "trial-balance", keyLabel: "T", key: "t", label: "Trial Balance",     category: "reports", route: "/accounts/trial-balance",   permission: "accounts.view" },
-  { id: "acc-ledger",    keyLabel: "L", key: "l", label: "Acc. Ledger",       category: "reports", route: "/accounts/ledger-statement",permission: "accounts.view" },
-  { id: "acc-summary",   keyLabel: "A", key: "a", label: "Acc. Summary",      category: "reports", route: "/accounts/receivable",      permission: "receivable.view" },
-  { id: "production",    keyLabel: "P", key: "p", label: "Production Orders", category: "reports", route: "/production-orders",        permission: "production_orders.view" },
+  // ── 4. Quick Reports (Alt+Shift+ combination keys) ────────────
+  { id: "sales-report",  keyLabel: "Alt+Shift+S", key: "s", alt: true, shift: true, label: "Sales Reports",     category: "reports", route: "/reports/sales",            permission: "sales-reports.view" },
+  { id: "balance-sheet", keyLabel: "Alt+Shift+B", key: "b", alt: true, shift: true, label: "Balance Sheet",     category: "reports", route: "/accounts/balance-sheet",   permission: "accounts.view" },
+  { id: "trial-balance", keyLabel: "Alt+Shift+T", key: "t", alt: true, shift: true, label: "Trial Balance",     category: "reports", route: "/accounts/trial-balance",   permission: "accounts.view" },
+  { id: "acc-ledger",    keyLabel: "Alt+Shift+L", key: "l", alt: true, shift: true, label: "Acc. Ledger",       category: "reports", route: "/accounts/ledger-statement",permission: "accounts.view" },
+  { id: "acc-summary",   keyLabel: "Alt+Shift+A", key: "a", alt: true, shift: true, label: "Acc. Summary",      category: "reports", route: "/accounts/receivable",      permission: "receivable.view" },
+  { id: "production",    keyLabel: "Alt+Shift+P", key: "p", alt: true, shift: true, label: "Production Orders", category: "reports", route: "/production-orders",        permission: "production_orders.view" },
 
   // ── 5. Page Navigation Shortcuts ──────────────────────────────
   { id: "key-d",  keyLabel: "D",           key: "d",                     label: "Dashboard",      category: "ctrl", route: "/dashboard" },

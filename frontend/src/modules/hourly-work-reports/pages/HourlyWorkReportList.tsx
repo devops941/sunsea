@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useNavigate } from "react-router-dom";
@@ -52,7 +53,11 @@ const HourlyWorkReportList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedViewGroup, setSelectedViewGroup] = useState<any>(null);
 
-    usePageShortcuts({ onRefresh: () => dispatch(fetchHourlyProductions(undefined)), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => dispatch(fetchHourlyProductions(undefined)),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => can("hourly_productions.create") && navigate("/hourly-work-reports/create"),
+    });
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -205,6 +210,15 @@ const HourlyWorkReportList: React.FC = () => {
     const totalPages = Math.ceil(groupedData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = groupedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const tableRef = useRef<HTMLDivElement>(null);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: paginatedData.length,
+        onEnter: (i) => { const group = paginatedData[i]; if (group) toggleGroup(group.key); },
+        onEdit: (i) => { const group = paginatedData[i]; if (group && group.hours?.length > 0 && can("hourly_productions.edit")) handleOpenEdit(group, group.hours[group.hours.length - 1]); },
+        containerRef: tableRef,
+    });
 
 
 
@@ -538,30 +552,33 @@ const HourlyWorkReportList: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <DataTable
-                    columns={columns}
-                    data={paginatedData}
-                    rowKey={(group) => group.key}
-                    loading={loading}
-                    emptyMessage="No hourly reports found."
-                    onRowClick={(group) => toggleGroup(group.key)}
-                    renderSubRow={renderSubRow}
-                    getRowStyle={(group) => {
-                        const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
-                        if (isActiveNoEntry) {
-                            return {
-                                background: "linear-gradient(90deg, #f0fdf4 0%, #fff 100%)",
-                                borderLeft: "4px solid #16a34a"
-                            };
-                        }
-                        return {};
-                    }}
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: setCurrentPage
-                    }}
-                />
+                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
+                    <DataTable
+                        columns={columns}
+                        data={paginatedData}
+                        rowKey={(group) => group.key}
+                        loading={loading}
+                        emptyMessage="No hourly reports found."
+                        rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                        onRowClick={(group, i) => { setFocusedIndex(i); toggleGroup(group.key); }}
+                        renderSubRow={renderSubRow}
+                        getRowStyle={(group) => {
+                            const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
+                            if (isActiveNoEntry) {
+                                return {
+                                    background: "linear-gradient(90deg, #f0fdf4 0%, #fff 100%)",
+                                    borderLeft: "4px solid #16a34a"
+                                };
+                            }
+                            return {};
+                        }}
+                        pagination={{
+                            currentPage,
+                            totalPages,
+                            onPageChange: setCurrentPage
+                        }}
+                    />
+                </div>
             </div>
 
             <CommonConfirmModal

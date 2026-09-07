@@ -9,7 +9,8 @@ export const FKEY_EVENTS = {
   SAVE:       "fkey-save",       // F2  — forms listen → submit
   OPEN:       "fkey-open",       // F4  — selects/dropdowns listen → open
   REFRESH:    "fkey-refresh",    // F5  — list pages listen → reload data
-  NEXT_FIELD: "fkey-next-field", // F6  — focus next focusable element
+  SORT:       "fkey-sort",       // F6  — list pages listen → toggle A-Z sort
+  NEXT_FIELD: "fkey-next-field", // focus next focusable element
   DELETE:     "fkey-delete",     // F8  — forms/lists listen → delete
   SUBMIT:     "fkey-submit",     // F9  — forms listen → confirm submit
   NEW:        "fkey-new",        // Ins — list pages listen → open create form
@@ -89,6 +90,7 @@ export function useGlobalShortcuts({
       const isCtrl      = e.ctrlKey && !e.altKey && !e.shiftKey;
       const isCtrlShift = e.ctrlKey && !e.altKey && e.shiftKey;
       const isAlt       = e.altKey  && !e.ctrlKey && !e.shiftKey;
+      const isAltShift  = e.altKey  && !e.ctrlKey && e.shiftKey;
 
       // ── Alt+C Calculator (Tally-style — works even inside form fields) ────
       if (isAlt && (lowerKey === "c" || e.code === "KeyC")) {
@@ -160,12 +162,24 @@ export function useGlobalShortcuts({
               dispatchFKey(FKEY_EVENTS.SAVE);
               break;
 
-            // F3  Search / Find — focus the search input on the current page
+            // F3  Search / Find — toggle focus on the search input.
+            //   First F3  → focus the search box (select existing text).
+            //   Second F3 → blur the search box, return focus to the table.
             case "F3": {
               const searchEl = document.querySelector<HTMLElement>(
                 "[data-search-input], input[placeholder*='earch'], input[placeholder*='ind']"
               );
-              searchEl?.focus();
+              if (!searchEl) break;
+              if (document.activeElement === searchEl) {
+                searchEl.blur();
+                // Return focus to the nearest table nav container so arrow keys
+                // work immediately after exiting search.
+                const tableNav = document.querySelector<HTMLElement>("[data-table-nav]");
+                tableNav?.focus({ preventScroll: true });
+              } else {
+                searchEl.focus();
+                if (searchEl instanceof HTMLInputElement) searchEl.select();
+              }
               break;
             }
 
@@ -191,30 +205,22 @@ export function useGlobalShortcuts({
               dispatchFKey(FKEY_EVENTS.REFRESH);
               break;
 
-            // F6  Next field — focus next focusable element
-            case "F6": {
-              dispatchFKey(FKEY_EVENTS.NEXT_FIELD);
-              const focusable = Array.from(
-                document.querySelectorAll<HTMLElement>(
-                  "input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])"
-                )
-              ).filter((el) => el.offsetParent !== null);
-              const idx = focusable.indexOf(document.activeElement as HTMLElement);
-              focusable[idx + 1]?.focus();
+            // F6  Sort — toggle alphabetical sorting on list pages
+            case "F6":
+              dispatchFKey(FKEY_EVENTS.SORT);
               break;
-            }
 
             // F7  Reports
             case "F7":
               navigate("/reports/sales");
               break;
 
-            // F8  Delete / Remove
+            // F8  Delete / Clear — forms and list pages listen for this
             case "F8":
               dispatchFKey(FKEY_EVENTS.DELETE);
               break;
 
-            // F9  Submit / Confirm
+            // F9  Submit / Confirm — forms listen for this (same action as F2)
             case "F9":
               dispatchFKey(FKEY_EVENTS.SUBMIT);
               break;
@@ -265,6 +271,24 @@ export function useGlobalShortcuts({
           }
         }
 
+        // Production Menu (Alt+R)
+        if (isAlt && (lowerKey === "r" || e.code === "KeyR")) {
+          e.preventDefault();
+          e.stopPropagation();
+          flash("Alt+R");
+          window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Production" } }));
+          return;
+        }
+
+        // Inventory Menu (Alt+I)
+        if (isAlt && (lowerKey === "i" || e.code === "KeyI")) {
+          e.preventDefault();
+          e.stopPropagation();
+          flash("Alt+I");
+          window.dispatchEvent(new CustomEvent("nav-open-menu", { detail: { menuTitle: "Inventory" } }));
+          return;
+        }
+
         // Display Menu (Alt+D / Ctrl+D)
         if (lowerKey === "d" || e.code === "KeyD") {
           e.preventDefault();
@@ -297,14 +321,15 @@ export function useGlobalShortcuts({
         return;
       }
 
-      // ── Other Alt+ or Ctrl+ or Ctrl+Shift+ combinations ───────────────
-      if (isCtrl || isAlt || isCtrlShift) {
+      // ── Other Alt+ or Ctrl+ or Ctrl+Shift+ or Alt+Shift+ combinations ──
+      if (isCtrl || isAlt || isCtrlShift || isAltShift) {
         const match =
           allowedShortcuts.find(
             (s) =>
               (s.ctrl && !s.shift && isCtrl      && (s.key === lowerKey || s.key === key)) ||
-              (s.alt  &&            isAlt         && (s.key === lowerKey || s.key === key)) ||
-              (s.ctrl && s.shift  && isCtrlShift  && (s.key === lowerKey || s.key === key))
+              (s.alt  && !s.shift && isAlt       && (s.key === lowerKey || s.key === key)) ||
+              (s.ctrl && s.shift  && isCtrlShift  && (s.key === lowerKey || s.key === key)) ||
+              (s.alt  && s.shift  && isAltShift  && (s.key === lowerKey || s.key === key))
           );
 
         if (match?.route) {
@@ -321,6 +346,9 @@ export function useGlobalShortcuts({
 
       // ── ESC  smart back ────────────────────────────────────────────────
       if (key === "Escape") {
+        if (e.defaultPrevented) return;
+        // If a form has registered its own Escape handler, let it take over
+        if (document.querySelector("[data-escape-guarded]")) return;
         const openDialog = document.querySelector<HTMLElement>(
           "[role='dialog']:not([aria-hidden='true']), [data-radix-popper-content-wrapper]"
         );

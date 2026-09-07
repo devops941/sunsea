@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaPlus } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -19,11 +20,15 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { formatStockQty, parseBaseUom } from "../../../utils/uomConversion";
 
 const ITEMS_PER_PAGE = 15;
+
+type SortOrder = "default" | "asc" | "desc";
+const RAWMAT_SORT_KEY = "sunsea_rawmat_sort_name";
 
 const RawMaterialList: React.FC = () => {
     const navigate = useNavigate();
@@ -32,6 +37,8 @@ const RawMaterialList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
     const [activeFilter, setActiveFilter] = useState("");
+    const [draftStoreFilter, setDraftStoreFilter] = useState("");
+    const [draftActiveFilter, setDraftActiveFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -39,9 +46,46 @@ const RawMaterialList: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const [showViewModal, setShowViewModal] = useState(false);
+
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(RAWMAT_SORT_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            const next: SortOrder = prev === "default" ? "asc" : prev === "asc" ? "desc" : "default";
+            try { localStorage.setItem(RAWMAT_SORT_KEY, next); } catch (_) {}
+            return next;
+        });
+    }, []);
     const [selectedItem, setSelectedItem] = useState<RawMaterial | null>(null);
 
     const [stores, setStores] = useState<any[]>([]);
+
+    const activeFilterCount = [
+        storeFilter !== "",
+        activeFilter !== "",
+    ].filter(Boolean).length;
+
+    const hasActiveFilters = activeFilterCount > 0;
+
+    const handleApplyFilters = useCallback(() => {
+        setStoreFilter(draftStoreFilter);
+        setActiveFilter(draftActiveFilter);
+        setCurrentPage(1);
+    }, [draftStoreFilter, draftActiveFilter]);
+
+    const handleClearFilters = useCallback(() => {
+        setDraftStoreFilter("");
+        setDraftActiveFilter("");
+        setStoreFilter("");
+        setActiveFilter("");
+        setCurrentPage(1);
+    }, []);
 
     // Fetch RAW_MATERIAL stores for filter dropdown
     useEffect(() => {
@@ -63,7 +107,12 @@ const RawMaterialList: React.FC = () => {
         fetcher,
     });
 
-    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => can("raw_materials.create") && navigate("/raw-materials/create"),
+        onSort: () => toggleSortOrder(),
+    });
 
     const filteredData = useMemo(() => {
         return allRawMaterials.filter((item: any) => {
@@ -77,9 +126,18 @@ const RawMaterialList: React.FC = () => {
         });
     }, [allRawMaterials, searchTerm, storeFilter, activeFilter]);
 
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-    const total = filteredData.length;
-    const paginatedData = filteredData.slice(
+    const sortedData = useMemo(() => {
+        if (sortOrder === "default") return filteredData;
+        return [...filteredData].sort((a, b) => {
+            const nameA = (a.materialName || "").toLowerCase();
+            const nameB = (b.materialName || "").toLowerCase();
+            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        });
+    }, [filteredData, sortOrder]);
+
+    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+    const total = sortedData.length;
+    const paginatedData = sortedData.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
     );
@@ -96,19 +154,20 @@ const RawMaterialList: React.FC = () => {
         setSearchTerm(e.target.value);
     }, []);
 
-    const handleStoreFilter = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setStoreFilter(e.target.value);
-        setCurrentPage(1);
-    }, []);
 
-    const handleActiveFilter = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setActiveFilter(e.target.value);
-        setCurrentPage(1);
-    }, []);
+    const tableRef = useRef<HTMLDivElement>(null);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: paginatedData.length,
+        onEnter: (i) => { const item = paginatedData[i]; if (item) handleOpenView(item); },
+        onEdit: (i) => { const item = paginatedData[i]; if (item && can("raw_materials.edit")) handleOpenEdit(item); },
+        containerRef: tableRef,
+    });
 
     const handleOpenView = useCallback((item: RawMaterial) => {
         setSelectedItem(item);
         setShowViewModal(true);
+        setTimeout(() => tableRef.current?.focus(), 50);
     }, []);
 
     const handleOpenAdd = useCallback(() => {
@@ -186,6 +245,24 @@ const RawMaterialList: React.FC = () => {
         },
         {
             header: "NAME",
+            headerNode: (
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                    title={`Sort Alphabetically (F6) — ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A to Z" : "Z to A"}`}
+                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                >
+                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>NAME</span>
+                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                        {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                    </span>
+                    {sortOrder !== "default" && (
+                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                            {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                        </span>
+                    )}
+                </button>
+            ),
             render: (item) => (
                 <div>
                     <div className="font-semibold text-ink">{item.materialName}</div>
@@ -255,38 +332,57 @@ const RawMaterialList: React.FC = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
                         <h2 className="text-2xl font-bold text-ink">Raw Materials Management</h2>
-                        
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        <div className="w-40">
-                            <SelectInput
-                                label="Store Filter"
-                                hideLabel
-                                name="storeFilter"
-                                value={storeFilter}
-                                options={storeOptions}
-                                onChange={handleStoreFilter}
-                            />
-                        </div>
-                        <div className="w-36">
-                            <SelectInput
-                                label="Status Filter"
-                                hideLabel
-                                name="activeFilter"
-                                value={activeFilter}
-                                options={[
-                                    { label: "All Status", value: "" },
-                                    { label: "Active", value: "true" },
-                                    { label: "Inactive", value: "false" },
-                                ]}
-                                onChange={handleActiveFilter}
-                            />
-                        </div>
                         <SearchInput
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search materials..."
                         />
+
+                        {/* Filter Popover */}
+                        <FilterPopover
+                            activeFilterCount={activeFilterCount}
+                            hasActiveFilters={hasActiveFilters}
+                            onOpen={() => {
+                                setDraftStoreFilter(storeFilter);
+                                setDraftActiveFilter(activeFilter);
+                            }}
+                            onApply={handleApplyFilters}
+                            onClear={handleClearFilters}
+                        >
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Store
+                                    </label>
+                                    <SelectInput
+                                        name="storeFilter"
+                                        value={draftStoreFilter}
+                                        onChange={(e) => setDraftStoreFilter(e.target.value)}
+                                        options={storeOptions}
+                                        noMargin
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Status
+                                    </label>
+                                    <SelectInput
+                                        name="activeFilter"
+                                        value={draftActiveFilter}
+                                        onChange={(e) => setDraftActiveFilter(e.target.value)}
+                                        options={[
+                                            { label: "All Status", value: "" },
+                                            { label: "Active", value: "true" },
+                                            { label: "Inactive", value: "false" },
+                                        ]}
+                                        noMargin
+                                    />
+                                </div>
+                            </div>
+                        </FilterPopover>
+
                         {can("raw_materials.export") && (
                             <ExportCSVButton
                                 fetchData={fetchRawMaterialsForExport}
@@ -305,21 +401,52 @@ const RawMaterialList: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div className="flex items-center gap-2 px-6 py-2.5 border-b border-line flex-wrap">
+                        <span className="text-xs text-ink-subtle">Active filters:</span>
+
+                        {storeFilter && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Store: {storeOptions.find((s) => s.value === storeFilter)?.label || storeFilter}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setStoreFilter(""); setDraftStoreFilter(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {activeFilter !== "" && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Status: {activeFilter === "true" ? "Active" : "Inactive"}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setActiveFilter(""); setDraftActiveFilter(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+                    </div>
+                )}
+
                 {/* Data Table */}
-                <DataTable
-                    columns={columns}
-                    data={paginatedData}
-                    rowKey={(row) => row.rawMaterialId}
-                    loading={loading}
-                    emptyMessage="No raw materials found."
-                    pagination={
-                        totalPages > 1
-                            ? { currentPage, totalPages, onPageChange: setCurrentPage }
-                            : undefined
-                    }
-                />
-                <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
-                    Total: {total} record(s)
+                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
+                    <DataTable
+                        columns={columns}
+                        data={paginatedData}
+                        rowKey={(row) => row.rawMaterialId}
+                        loading={loading}
+                        emptyMessage="No raw materials found."
+                        rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                        onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item); }}
+                        pagination={
+                            totalPages > 1
+                                ? { currentPage, totalPages, onPageChange: setCurrentPage }
+                                : undefined
+                        }
+                    />
+                    <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
+                        Total: {total} record(s)
+                    </div>
                 </div>
             </div>
 

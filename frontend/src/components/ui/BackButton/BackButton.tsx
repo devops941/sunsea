@@ -10,17 +10,22 @@ interface BackButtonProps {
   text?: string;
   /** Additional custom Tailwind classes */
   className?: string;
+  /** Optional custom onClick handler (e.g., to intercept unsaved changes) */
+  onClick?: () => void;
 }
 
 const BackButton: React.FC<BackButtonProps> = ({
   to,
   text = "Back",
-  className = ""
+  className = "",
+  onClick,
 }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    if (to) {
+    if (onClick) {
+      onClick();
+    } else if (to) {
       navigate(to);
     } else {
       navigate(-1); // Go back one step in browser history

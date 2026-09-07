@@ -61,8 +61,21 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
             </label>
 
             <div
-                className={`flex items-center justify-between w-full min-h-10 py-1 px-3 bg-card-2 border rounded-md ${error ? 'border-red-500' : 'border-line-soft'} cursor-pointer ${open ? 'ring-1 ring-primary border-primary' : 'hover:border-line-soft/80'}`}
+                data-nav
+                tabIndex={0}
+                role="combobox"
+                aria-expanded={open}
+                className={`flex items-center justify-between w-full min-h-10 py-1 px-3 bg-card-2 border rounded-md outline-none ${error ? 'border-red-500 focus:ring-4 focus:ring-red-500/15' : 'border-line-soft focus:border-primary focus:ring-4 focus:ring-primary/15'} cursor-pointer ${open ? 'ring-4 ring-primary/15 border-primary' : 'hover:border-line-soft/80'}`}
                 onClick={() => setOpen((prev) => !prev)}
+                onKeyDown={(e) => {
+                    if (e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setOpen((prev) => !prev);
+                    } else if (e.key === "Escape" && open) {
+                        e.preventDefault();
+                        setOpen(false);
+                    }
+                }}
             >
                 <div className="flex flex-wrap gap-1 flex-1">
                     {selectedLabels.length === 0 ? (

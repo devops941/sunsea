@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { FaSave, FaEraser, FaPlus } from "react-icons/fa";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { FaSave, FaEraser, FaPlus, FaCheck } from "react-icons/fa";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -458,7 +460,20 @@ const ProductionOrderCreate: React.FC = () => {
     const [rowRmStates, setRowRmStates] = useState<Record<string, RowRawMaterialState>>({});
     const storeRmCacheRef = useRef<Record<string, { options: any[]; loading: boolean; promise?: Promise<any> }>>({});
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+    handleSubmitRef.current = () => {
+        handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "CREATED" : data.status }))();
+    };
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
     // Helper: update a single row's state
     const updateRowState = (
@@ -482,7 +497,7 @@ const ProductionOrderCreate: React.FC = () => {
         setValue,
         getValues,
         reset,
-        formState: { errors },
+        formState: { errors, isDirty: rhfIsDirty },
     } = useForm<ProductionOrderFormValues>({
         resolver: zodResolver(productionOrderSchema) as any,
         defaultValues,
@@ -956,6 +971,21 @@ const ProductionOrderCreate: React.FC = () => {
 
 
 
+    useEffect(() => { isDirtyRef.current = rhfIsDirty; }, [rhfIsDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault(); e.stopPropagation();
+            if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
+            if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
+            else { navigate("/production-orders"); }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
+
     const submitLock = React.useRef(false);
 
     // ── Submit ──────────────────────────────────────────────────────────────────
@@ -1042,6 +1072,7 @@ const ProductionOrderCreate: React.FC = () => {
     };
 
     return (
+        <>
         <div className="max-w-[1024px] xl:mr-auto">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
@@ -1054,7 +1085,9 @@ const ProductionOrderCreate: React.FC = () => {
                 </div>
 
                 <form
+                    ref={formRef}
                     onSubmit={handleSubmit(onSubmit)}
+                    onKeyDown={handleFormKeyDown}
                     className="p-5 lg:p-6 space-y-6"
                     noValidate
                 >
@@ -1343,7 +1376,20 @@ const ProductionOrderCreate: React.FC = () => {
                     </div>
                 </form>
             </div>
-        </div >
+        </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+            onConfirm={() => { setSaveConfirmOpen(false); setTimeout(() => handleSubmitRef.current(), 150); }}
+            title="Unsaved Changes"
+            message="You have unsaved changes. Do you want to save before leaving?"
+            confirmText="Save"
+            cancelText="Discard"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            onCancel={() => { setSaveConfirmOpen(false); navigate("/production-orders"); }}
+        />
+    </>
     );
 };
 

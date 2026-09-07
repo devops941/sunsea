@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { FaSave, FaEraser, FaPlus } from "react-icons/fa";
+import { FaSave, FaEraser, FaPlus, FaCheck } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
-import OrderItemsTable from "../../../components/form/OrderItemsTable/OrderItemsTable";
+import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
+import AutocompleteInput, { type AutocompleteOption } from "../../../components/form/AutocompleteInput/AutocompleteInput";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import { salesProductService } from "../../../services/salesProductService";
 import { productService } from "../../../services/productService";
@@ -15,11 +18,6 @@ import { usePermission } from "../../../hooks/usePermission";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
 type ComponentItem = { productCode: string; quantity: string };
-
-const productLabel = (p: any) => {
-    const typeLabel = p.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production";
-    return `${p.productName}`;
-};
 
 const initialFormState = {
     salesProductName: "",
@@ -35,43 +33,52 @@ const SalesProductForm: React.FC = () => {
     const canSave = isEditMode ? can("sales_products.edit") : can("sales_products.create");
 
     const [formData, setFormData] = useState(initialFormState);
+    const [components, setComponents] = useState<ComponentItem[]>([{ productCode: "", quantity: "" }]);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [products, setProducts] = useState<any[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(false);
 
-    const {
-        control,
-        getValues,
-        setValue,
-        setError,
-        clearErrors,
-        formState: { errors: itemErrors },
-    } = useForm<{ items: ComponentItem[] }>({ defaultValues: { items: [] } });
-    const { fields, append, remove, replace } = useFieldArray({ control, name: "items" });
-    const currentItems = useWatch({ control, name: "items" }) || [];
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+    const formRef = useRef<HTMLFormElement>(null);
+    const handleSubmitRef = useRef<() => void>(() => {});
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
     const loadProducts = useCallback(() => {
-        productService.fetchAll().then(setProducts).catch(() => {});
+        productService.fetchAll().then((data: any) => {
+            const list = Array.isArray(data) ? data : Array.isArray(data?.products) ? data.products : Array.isArray(data?.data) ? data.data : [];
+            setProducts(list);
+        }).catch(() => {});
     }, []);
 
     useEffect(() => {
         loadProducts();
     }, [loadProducts]);
 
-    // Keep products dropdown fresh when a product is added/updated in another tab
     useSocketSync("product", undefined, loadProducts);
 
     const populateForm = useCallback((sp: any) => {
         setFormData({
             salesProductName: sp.salesProductName || "",
         });
-        replace((sp.components || []).map((it: any) => ({
-            productCode: String(it.componentProductId),
-            quantity: it.quantity != null ? String(it.quantity) : "",
-        })));
-    }, [replace]);
+        if (sp.components && sp.components.length > 0) {
+            setComponents(sp.components.map((it: any) => ({
+                productCode: String(it.componentProductId),
+                quantity: it.quantity != null ? String(it.quantity) : "",
+            })));
+        } else {
+            setComponents([{ productCode: "", quantity: "" }]);
+        }
+    }, []);
 
     useEffect(() => {
         if (isEditMode && id) {
@@ -89,52 +96,99 @@ const SalesProductForm: React.FC = () => {
                     .finally(() => setIsLoadingData(false));
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isEditMode, id]);
+    }, [isEditMode, id, location.state, navigate, populateForm]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        setIsDirty(true);
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
     };
 
-    const handleAddItem = () => append({ productCode: "", quantity: "" });
+    const handleAddComponent = useCallback(() => {
+        setComponents(prev => [...prev, { productCode: "", quantity: "" }]);
+        setIsDirty(true);
+    }, []);
+
+    const handleRemoveComponent = useCallback((index: number) => {
+        setComponents(prev => {
+            const next = prev.filter((_, i) => i !== index);
+            return next.length > 0 ? next : [{ productCode: "", quantity: "" }];
+        });
+        setIsDirty(true);
+    }, []);
 
     const validate = (): boolean => {
         const newErrors: Record<string, string> = {};
-        clearErrors();
 
-        if (!formData.salesProductName.trim()) newErrors.salesProductName = "Sales Product Name is required.";
-        const items = getValues("items");
-        if (items.length === 0) {
-            newErrors.items = "At least one component product is required.";
+        if (!formData.salesProductName.trim()) {
+            newErrors.salesProductName = "Sales Product Name is required.";
+        }
+
+        const filledRows = components.filter(it => (it.productCode && it.productCode.trim() !== "") || (it.quantity && it.quantity.trim() !== ""));
+
+        if (filledRows.length === 0) {
+            newErrors.components = "At least one component product is required.";
+            toast.error("At least one component product is required.");
         } else {
-            const ids = items.map(it => it.productCode).filter(Boolean);
-            if (new Set(ids).size !== ids.length) {
-                newErrors.items = "Duplicate component products are not allowed.";
-            }
-            items.forEach((it, index) => {
-                if (!it.productCode) setError(`items.${index}.productCode`, { type: "manual", message: "Required" });
-                if (!it.quantity || Number(it.quantity) <= 0) setError(`items.${index}.quantity`, { type: "manual", message: "Must be > 0" });
+            components.forEach((it, index) => {
+                if (it.productCode && (!it.quantity || Number(it.quantity) <= 0)) {
+                    newErrors[`components.${index}.quantity`] = "Must be > 0";
+                }
+                if (!it.productCode && it.quantity) {
+                    newErrors[`components.${index}.productCode`] = "Required";
+                }
             });
+
+            const validRows = components.filter(it => it.productCode && it.productCode.trim() !== "");
+            if (validRows.length === 0) {
+                newErrors.components = "At least one component product is required.";
+                toast.error("At least one component product is required.");
+            } else {
+                const selectedIds = validRows.map(it => it.productCode).filter(Boolean);
+                if (new Set(selectedIds).size !== selectedIds.length) {
+                    newErrors.components = "Duplicate component products are not allowed.";
+                    toast.error("Duplicate component products are not allowed.");
+                }
+            }
         }
 
         setErrors(newErrors);
-        if (Object.keys(newErrors).length > 0 || items.some(it => !it.productCode || !it.quantity || Number(it.quantity) <= 0)) {
-            toast.error(newErrors.items || newErrors.salesProductName || "Please fix the highlighted fields.");
-            return false;
-        }
-        return true;
+        return Object.keys(newErrors).length === 0;
     };
 
     const handleClear = () => {
         setFormData(initialFormState);
-        replace([]);
+        setComponents([{ productCode: "", quantity: "" }]);
         setErrors({});
-        clearErrors();
     };
+
+    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/sales-products");
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -145,11 +199,12 @@ const SalesProductForm: React.FC = () => {
         }
         if (!validate()) return;
 
+        const validRows = components.filter(it => it.productCode && it.productCode.trim() !== "");
         const payload: any = {
             salesProductName: formData.salesProductName,
-            components: getValues("items").map(it => ({
+            components: validRows.map(it => ({
                 componentProductId: Number(it.productCode),
-                quantity: Number(it.quantity),
+                quantity: Number(it.quantity) || 1,
             })),
         };
 
@@ -162,6 +217,7 @@ const SalesProductForm: React.FC = () => {
                 await salesProductService.create(payload);
                 toast.success("Sales Product created successfully!");
             }
+            setIsDirty(false);
             navigate("/sales-products");
         } catch (err: any) {
             toast.error(err?.response?.data?.message || (isEditMode ? "Failed to update Sales Product" : "Failed to create Sales Product"));
@@ -170,37 +226,116 @@ const SalesProductForm: React.FC = () => {
         }
     };
 
-    const componentProductOptions = useMemo(() => {
+    const productAutocompleteOptions: AutocompleteOption[] = useMemo(() => {
         return products
             .filter((p: any) => p.productType === "SALES_PRODUCTION")
             .map((p: any) => ({
                 value: String(p.id),
-                label: productLabel(p),
-                disabled: currentItems.some((it: any) => String(it.productCode) === String(p.id)),
+                label: p.productName || p.productCode || String(p.id),
+                info: p.productCode ? (
+                    <span className="text-[11px] font-semibold text-ink-subtle">
+                        {p.productCode}
+                    </span>
+                ) : undefined,
             }));
-    }, [products, currentItems]);
+    }, [products]);
+
+    const componentColumns: BusyColumn<ComponentItem>[] = useMemo(() => [
+        {
+            key: "productCode",
+            header: "Product",
+            width: "1fr",
+            render: (row: ComponentItem, index: number, update: (patch: Partial<ComponentItem>) => void) => {
+                const selectedInOtherRows = new Set(
+                    components
+                        .filter((_, i) => i !== index)
+                        .map(r => String(r.productCode))
+                        .filter(Boolean)
+                );
+                const opts = productAutocompleteOptions.map(o => ({
+                    ...o,
+                    disabled: selectedInOtherRows.has(o.value),
+                }));
+                return (
+                    <AutocompleteInput
+                        inline
+                        name={`components.${index}.productCode`}
+                        value={row?.productCode || ""}
+                        options={opts}
+                        placeholder="Type to search..."
+                        error={errors[`components.${index}.productCode`]}
+                        onChange={(pId) => {
+                            update({ productCode: pId });
+                            setIsDirty(true);
+                            setErrors(prev => {
+                                if (!prev[`components.${index}.productCode`] && !prev.components) return prev;
+                                const next = { ...prev };
+                                delete next[`components.${index}.productCode`];
+                                delete next.components;
+                                return next;
+                            });
+                            setTimeout(() => {
+                                const qtyCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                            }, 50);
+                        }}
+                    />
+                );
+            },
+        },
+        {
+            key: "quantity",
+            header: "Quantity",
+            width: "140px",
+            align: "center" as const,
+            render: (row: ComponentItem, index: number, update: (patch: Partial<ComponentItem>) => void) => {
+                return (
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        data-nav
+                        value={row?.quantity ?? ""}
+                        onChange={e => {
+                            const val = e.target.value.replace(/[^0-9]/g, "");
+                            update({ quantity: val });
+                            setIsDirty(true);
+                            setErrors(prev => {
+                                if (!prev[`components.${index}.quantity`] && !prev.components) return prev;
+                                const next = { ...prev };
+                                delete next[`components.${index}.quantity`];
+                                delete next.components;
+                                return next;
+                            });
+                        }}
+                        placeholder="0"
+                        className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0"
+                    />
+                );
+            },
+        },
+    ], [components, productAutocompleteOptions, errors]);
 
     if (isLoadingData) {
         return (
             <div className="flex justify-center items-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
+        <>
         <div className="w-full max-w-[1024px] xl:mr-auto">
             <div className="bg-card rounded-xl border border-line-soft shadow-xs">
-                <div className="px-6 py-4 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Sales Product" : "Create Sales Product"}</h2>
-                        <BackButton text="Back to List" to="/sales-products" />
-                    </div>
+                <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Sales Product" : "Create Sales Product"}</h2>
+                    <BackButton text="Back to List" to="/sales-products" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-6 py-4 space-y-4" noValidate>
                     <div>
-                        <h6 className="text-base font-semibold text-ink mb-3">Basic Information</h6>
+                        <h6 className="text-xs font-bold text-ink uppercase tracking-wide mb-2.5 pb-1.5 border-b border-line-soft">Basic Information</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <TextInput
                                 label="Sales Product Name"
@@ -216,31 +351,29 @@ const SalesProductForm: React.FC = () => {
                     </div>
 
                     <div className="pt-2">
-                        <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-ink m-0">
+                        <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-line-soft">
+                            <h6 className="text-xs font-bold text-ink uppercase tracking-wide m-0">
                                 Component Products <span className="text-rose-500 ml-1">*</span>
                             </h6>
-                            {canSave && (
-                                <CustomButton text="Add Component" icon={FaPlus} onClick={handleAddItem} type="button" size="sm" variant="secondary" />
-                            )}
                         </div>
-                        {fields.length > 0 ? (
-                            <OrderItemsTable
-                                control={control}
-                                fields={fields}
-                                errors={itemErrors}
-                                productOptions={componentProductOptions}
-                                remove={remove}
-                                editable={canSave}
-                            />
-                        ) : (
-                            <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.items ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-medium' : 'bg-card-2 border-line-soft text-ink-subtle'}`}>
-                                No components added. Click "Add Component" to specify what this sales product is assembled from.
-                            </div>
+
+                        {errors.components && (
+                            <p className="mb-2 text-[11px] text-rose-400 font-medium">{errors.components}</p>
                         )}
-                        {errors.items && fields.length > 0 && (
-                            <p className="mt-1.5 text-sm text-rose-400 font-medium">{errors.items}</p>
-                        )}
+
+                        <BusyItemsTable<ComponentItem>
+                            columns={componentColumns}
+                            rows={components}
+                            onChange={(newRows) => {
+                                setComponents(newRows);
+                                setIsDirty(true);
+                            }}
+                            emptyRow={{ productCode: "", quantity: "" }}
+                            onAdd={handleAddComponent}
+                            onRemove={handleRemoveComponent}
+                            editable={canSave}
+                            visibleRows={10}
+                        />
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-line-soft mt-4">
@@ -259,6 +392,25 @@ const SalesProductForm: React.FC = () => {
                 </form>
             </div>
         </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+            onConfirm={() => {
+                setSaveConfirmOpen(false);
+                setTimeout(() => {
+                    handleSubmitRef.current();
+                    setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                }, 150);
+            }}
+            title="Unsaved Changes"
+            message="You have unsaved changes. Do you want to save before leaving?"
+            confirmText="Save"
+            cancelText="Discard"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/sales-products"); }}
+        />
+        </>
     );
 };
 

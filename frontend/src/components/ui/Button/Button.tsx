@@ -10,6 +10,7 @@ interface CustomButtonProps {
   width?: string;
   disabled?: boolean;
   className?: string;
+  autoFocus?: boolean;
   onClick?: MouseEventHandler<HTMLButtonElement>;
 }
 
@@ -34,6 +35,7 @@ const Button = ({
   width = "fit-content",
   disabled = false,
   className = "",
+  autoFocus = false,
   onClick,
 }: CustomButtonProps) => {
   const { container, iconSize } = sizeClasses[size];
@@ -43,12 +45,14 @@ const Button = ({
       type={type}
       disabled={disabled}
       onClick={onClick}
+      autoFocus={autoFocus}
       style={{ width }}
       className={`
         inline-flex items-center justify-center gap-2
         border-none outline-none font-semibold
         transition-all duration-250 ease-in-out
         rounded-lg
+        focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent
         ${container}
         ${variantClasses[variant]}
         ${disabled

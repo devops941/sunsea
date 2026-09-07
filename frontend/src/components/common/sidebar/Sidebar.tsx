@@ -51,6 +51,49 @@ const Sidebar = () => {
     return false;
   }, [location.pathname]);
 
+  const isLeafActive = useCallback(
+    (item: any): boolean => {
+      if (!item.path) return false;
+      const [itemBasePath, itemQuery] = item.path.split("?");
+      const currentBasePath = location.pathname;
+      const currentQuery = location.search ? location.search.replace(/^\?/, "") : "";
+
+      // 1. If item has explicit query param (like ?action=add)
+      if (itemQuery) {
+        return currentBasePath === itemBasePath && currentQuery === itemQuery;
+      }
+
+      // 2. If current URL has query params (like ?action=add), and this item has NO query param,
+      // it should NOT match (e.g. /roles should not be active when on /roles?action=add)
+      if (currentQuery) {
+        return false;
+      }
+
+      // 3. Exact path match (e.g. /employees/create === /employees/create, or /employees === /employees)
+      if (currentBasePath === itemBasePath) return true;
+
+      // 4. Custom activePaths defined on the item
+      if (item.activePaths && Array.isArray(item.activePaths)) {
+        if (item.activePaths.some((p: string) => currentBasePath.startsWith(p))) return true;
+      }
+
+      // 5. Detail / edit page match (e.g. /employees/123 or /employees/123/edit matching /employees list)
+      // But NEVER match /create or /add as a sub-path of list!
+      if (
+        currentBasePath.startsWith(itemBasePath + "/") &&
+        !currentBasePath.endsWith("/create") &&
+        !currentBasePath.endsWith("/add") &&
+        !currentBasePath.includes("/create/") &&
+        !currentBasePath.includes("/add/")
+      ) {
+        return true;
+      }
+
+      return false;
+    },
+    [location.pathname, location.search]
+  );
+
   const toggleMenu = (menuTitle: string) => {
     setOpenMenu((prev) => (prev === menuTitle ? null : menuTitle));
     setOpenSubMenu(null); // Close inner menu when outer menu toggles
@@ -228,19 +271,24 @@ const Sidebar = () => {
                           {/* Child of Child */}
                           {openSubMenu === subMenu.title && (
                             <div className="mt-1 flex flex-col gap-1 border-l-2 border-black/10 ml-3 pl-2">
-                              {subMenu.children.map((child) =>
-                                child.path ? (
+                              {subMenu.children.map((child) => {
+                                const childActive = isLeafActive(child);
+                                return child.path ? (
                                   <NavLink
                                     key={child.path}
                                     to={child.path}
-                                    className={({ isActive }) =>
-                                      `no-underline px-3 py-2.5 rounded-lg text-[15px] font-bold leading-[1.334rem] transition-all duration-300 flex items-center gap-3 pl-5 ${isActive && child.path === location.pathname + location.search ? "!bg-nav-active !text-nav-active-fg font-bold" : "text-nav-fg"}`
-                                    }
+                                    end
+                                    className={`no-underline px-3 py-2.5 rounded-lg text-[15px] font-bold leading-[1.334rem] transition-all duration-300 flex items-center justify-between gap-2 pl-5 ${childActive ? "!bg-nav-active !text-nav-active-fg font-bold" : "text-nav-fg"}`}
                                   >
-                                    <span className={`transition-colors ${child.path === location.pathname + location.search ? "" : ""}`}>{child.title}</span>
+                                    <span className="transition-colors">{child.title}</span>
+                                    {(child as any).badge && (
+                                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${childActive ? "bg-white/20 text-white border-white/30" : "bg-black/10 text-nav-fg border-black/15"}`}>
+                                        {(child as any).badge}
+                                      </span>
+                                    )}
                                   </NavLink>
-                                ) : null
-                              )}
+                                ) : null;
+                              })}
                             </div>
                           )}
                         </>
@@ -249,11 +297,15 @@ const Sidebar = () => {
                           <NavLink
                             key={subMenu.path}
                             to={subMenu.path}
-                            className={({ isActive }) =>
-                              `no-underline px-3 py-2.5 rounded-lg text-[15px] font-bold leading-[1.334rem] transition-all duration-300 flex items-center gap-3 ${isActive ? "!bg-nav-active !text-nav-active-fg font-bold" : "text-nav-fg"}`
-                            }
+                            end
+                            className={`no-underline px-3 py-2.5 rounded-lg text-[15px] font-bold leading-[1.334rem] transition-all duration-300 flex items-center justify-between gap-2 ${isLeafActive(subMenu) ? "!bg-nav-active !text-nav-active-fg font-bold" : "text-nav-fg"}`}
                           >
-                            <span className={`transition-colors ${subMenu.path === location.pathname ? "" : ""}`}>{subMenu.title}</span>
+                            <span className="transition-colors">{subMenu.title}</span>
+                            {(subMenu as any).badge && (
+                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${isLeafActive(subMenu) ? "bg-white/20 text-white border-white/30" : "bg-black/10 text-nav-fg border-black/15"}`}>
+                                {(subMenu as any).badge}
+                              </span>
+                            )}
                           </NavLink>
                         )
                       )}

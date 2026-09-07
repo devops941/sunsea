@@ -35,6 +35,8 @@ const HorizontalNav = () => {
 
   // Dropdown portal state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const activeMenuIdRef = useRef<string | null>(null);
+  activeMenuIdRef.current = activeMenuId;
   const [activeSubMenuId, setActiveSubMenuId] = useState<string | null>(null);
   const [menuRect, setMenuRect] = useState<{ left: number; bottom: number }>({ left: 0, bottom: 0 });
 
@@ -53,11 +55,14 @@ const HorizontalNav = () => {
   // Click outside listener for navigation dropdown menus
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as Node;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
       const isInsideNav = navContainerRef.current?.contains(target);
       const isInsideDropdown = dropdownPortalRef.current?.contains(target);
+      const isInsideShortcutPanel = target.closest?.("[data-shortcut-panel]") || target.closest?.("[data-shortcut-btn]");
 
-      if (!isInsideNav && !isInsideDropdown) {
+      if (!isInsideNav && !isInsideDropdown && !isInsideShortcutPanel) {
         setActiveMenuId(null);
         setActiveSubMenuId(null);
       }
@@ -190,6 +195,49 @@ const HorizontalNav = () => {
     return false;
   }, [location.pathname]);
 
+  const isLeafActive = useCallback(
+    (item: any): boolean => {
+      if (!item.path) return false;
+      const [itemBasePath, itemQuery] = item.path.split("?");
+      const currentBasePath = location.pathname;
+      const currentQuery = location.search ? location.search.replace(/^\?/, "") : "";
+
+      // 1. If item has explicit query param (like ?action=add)
+      if (itemQuery) {
+        return currentBasePath === itemBasePath && currentQuery === itemQuery;
+      }
+
+      // 2. If current URL has query params (like ?action=add), and this item has NO query param,
+      // it should NOT match (e.g. /roles should not be active when on /roles?action=add)
+      if (currentQuery) {
+        return false;
+      }
+
+      // 3. Exact path match (e.g. /employees/create === /employees/create, or /employees === /employees)
+      if (currentBasePath === itemBasePath) return true;
+
+      // 4. Custom activePaths defined on the item
+      if (item.activePaths && Array.isArray(item.activePaths)) {
+        if (item.activePaths.some((p: string) => currentBasePath.startsWith(p))) return true;
+      }
+
+      // 5. Detail / edit page match (e.g. /employees/123 or /employees/123/edit matching /employees list)
+      // But NEVER match /create or /add as a sub-path of list!
+      if (
+        currentBasePath.startsWith(itemBasePath + "/") &&
+        !currentBasePath.endsWith("/create") &&
+        !currentBasePath.endsWith("/add") &&
+        !currentBasePath.includes("/create/") &&
+        !currentBasePath.includes("/add/")
+      ) {
+        return true;
+      }
+
+      return false;
+    },
+    [location.pathname, location.search]
+  );
+
   const getInitials = (name?: string) => {
     if (!name) return "U";
     return name.trim().charAt(0).toUpperCase();
@@ -228,12 +276,16 @@ const HorizontalNav = () => {
     }, 60);
   }, []);
 
-  /** Open menu programmatically (e.g. from global shortcut Ctrl+A / Ctrl+T / Ctrl+D / Ctrl+Y / Alt+T) */
-  const openMenuByTitle = useCallback((title: string) => {
+  /** Open/toggle menu programmatically (e.g. from global shortcut Ctrl+A / Ctrl+T / Ctrl+D / Ctrl+Y / Alt+T or ShortcutPanel) */
+  const openMenuByTitle = useCallback((title: string, forceOpen: boolean = false) => {
     const navIdx = filteredSidebarItems.findIndex((m) => m.title.toLowerCase() === title.toLowerCase());
     if (navIdx === -1) return;
     const menu = filteredSidebarItems[navIdx];
     if (menu.children && menu.children.length > 0) {
+      if (!forceOpen && activeMenuIdRef.current?.toLowerCase() === menu.title.toLowerCase()) {
+        closeAll();
+        return;
+      }
       let el = navItemRefs.current[navIdx];
       if (!el && navContainerRef.current) {
         const items = navContainerRef.current.querySelectorAll<HTMLElement>('li > div[role="button"], li > a');
@@ -244,7 +296,7 @@ const HorizontalNav = () => {
         setMenuRect({ left: rect.left, bottom: rect.bottom });
       }
       activeNavIdxRef.current = navIdx;
-      setActiveMenuId((prev) => (prev === menu.title ? null : menu.title));
+      setActiveMenuId(menu.title);
       setActiveSubMenuId(null);
       focusFirstDropItem();
     } else {
@@ -256,7 +308,7 @@ const HorizontalNav = () => {
   useEffect(() => {
     const handleNavEvent = (e: any) => {
       if (e.detail?.menuTitle) {
-        openMenuByTitle(e.detail.menuTitle);
+        openMenuByTitle(e.detail.menuTitle, e.detail?.forceOpen ?? false);
       }
     };
     window.addEventListener("nav-open-menu", handleNavEvent);
@@ -499,74 +551,119 @@ const HorizontalNav = () => {
     }
   }, [activeMenuId, filteredSidebarItems, location.pathname]);
 
+  // Helper to find ancestor path in tree for a given title
+  const findAncestors = useCallback(
+    (items: any[], targetTitle: string, currentPath: string[] = []): string[] | null => {
+      for (const item of items) {
+        if (item.title === targetTitle) return currentPath;
+        if (item.children?.length) {
+          const found = findAncestors(item.children, targetTitle, [...currentPath, item.title]);
+          if (found !== null) return found;
+        }
+      }
+      return null;
+    },
+    []
+  );
+
+  // Helper to get all descendant titles of an item
+  const getDescendantTitles = useCallback((item: any): string[] => {
+    let titles: string[] = [];
+    if (item.children?.length) {
+      for (const child of item.children) {
+        titles.push(child.title);
+        titles = titles.concat(getDescendantTitles(child));
+      }
+    }
+    return titles;
+  }, []);
+
+  // Accordion toggle handler: Opening one dropdown closes all siblings / other branches
+  const handleToggleExpand = useCallback(
+    (item: any, forceState?: boolean) => {
+      const currentMenu = filteredSidebarItems.find((m) => m.title === activeMenuId);
+      if (!currentMenu) return;
+
+      setExpandedKeys((prev) => {
+        const isCurrentlyOpen = !!prev[item.title];
+        const willOpen = forceState !== undefined ? forceState : !isCurrentlyOpen;
+
+        if (!willOpen) {
+          // Collapse item and all its descendants
+          const next = { ...prev };
+          delete next[item.title];
+          const descendants = getDescendantTitles(item);
+          descendants.forEach((t) => delete next[t]);
+          return next;
+        } else {
+          // Expand item and its ancestors only (auto-collapses all siblings/unrelated branches)
+          const ancestors = findAncestors(currentMenu.children || [], item.title) || [];
+          const next: Record<string, boolean> = {};
+          ancestors.forEach((anc) => {
+            next[anc] = true;
+          });
+          next[item.title] = true;
+          return next;
+        }
+      });
+    },
+    [activeMenuId, filteredSidebarItems, findAncestors, getDescendantTitles]
+  );
+
   // Recursive Tree Node Renderer (Busy ERP Style Tree inside Card)
   const renderTreeItem = (item: any, depth = 0): React.ReactNode => {
     const hasChildren = !!item.children && item.children.length > 0;
     const isExpanded = !!expandedKeys[item.title];
-    const isItemActive = item.path
-      ? location.pathname === item.path ||
-        (item.activePaths && item.activePaths.some((p: string) => location.pathname.startsWith(p)))
-      : item.children
-        ? item.children.some(
-            (c: any) =>
-              (c.path &&
-                (location.pathname === c.path ||
-                  location.pathname.startsWith(c.path.split("?")[0]))) ||
-              (c.children &&
-                c.children.some(
-                  (sc: any) =>
-                    sc.path &&
-                    (location.pathname === sc.path ||
-                      location.pathname.startsWith(sc.path.split("?")[0]))
-                ))
-          )
-        : false;
 
     if (hasChildren) {
       return (
         <div key={item.title} className="select-none my-0.5">
-          {/* Parent Category / Master Header (NO left arrow for Parent & Child) */}
+          {/* Parent Category / Master Header */}
           <div
             role="button"
             tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
-              setExpandedKeys((prev) => ({ ...prev, [item.title]: !prev[item.title] }));
+              handleToggleExpand(item);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 e.stopPropagation();
-                setExpandedKeys((prev) => ({ ...prev, [item.title]: !prev[item.title] }));
+                handleToggleExpand(item);
               } else if (e.key === "ArrowRight") {
                 e.preventDefault();
                 e.stopPropagation();
-                setExpandedKeys((prev) => ({ ...prev, [item.title]: true }));
+                if (!isExpanded) {
+                  handleToggleExpand(item, true);
+                }
               } else if (e.key === "ArrowLeft") {
                 e.preventDefault();
                 e.stopPropagation();
-                setExpandedKeys((prev) => ({ ...prev, [item.title]: false }));
+                if (isExpanded) {
+                  handleToggleExpand(item, false);
+                }
               }
             }}
-            className={`w-full cursor-pointer px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-all duration-150 outline-none focus:bg-card-2 focus:ring-1 focus:ring-teal-400 group/parent ${
+            className={`w-full cursor-pointer px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-all duration-150 outline-none focus:ring-1 focus:ring-teal-500 group/parent ${
               isExpanded
-                ? "bg-card-2 text-accent font-bold"
-                : "text-ink-muted hover:bg-card-2 hover:text-ink font-semibold"
-            } ${depth === 0 ? "text-[13.5px] font-bold" : "text-[13px] font-semibold"}`}
+                ? "bg-teal-50 dark:bg-card-2 text-teal-800 dark:text-teal-300 font-bold border border-teal-200/80 dark:border-teal-800/50"
+                : "text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-card-2 hover:text-teal-700 dark:hover:text-white font-bold"
+            } ${depth === 0 ? "text-[14px] font-bold" : "text-[13px] font-bold"}`}
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className="tracking-tight truncate">{item.title}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {item.badge && (
-                <span className="text-[9.5px] font-mono font-bold text-slate-400 bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-700/60 shrink-0">
+                <span className="text-[9.5px] font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700/60 shrink-0">
                   {item.badge}
                 </span>
               )}
               {/* Subtle small chevron indicator on right */}
               <FaChevronRight
-                className={`text-[8px] text-slate-500 transition-transform duration-150 ${
-                  isExpanded ? "rotate-90 text-accent" : ""
+                className={`text-[9px] transition-transform duration-150 ${
+                  isExpanded ? "rotate-90 text-teal-700 dark:text-teal-400" : "text-slate-500 dark:text-slate-400 group-hover/parent:text-teal-700"
                 }`}
               />
             </div>
@@ -574,7 +671,7 @@ const HorizontalNav = () => {
 
           {/* Inline Expanded Children inside the card */}
           {isExpanded && (
-            <div className="ml-3 pl-2.5 my-0.5 border-l border-dashed border-slate-600/70 space-y-0.5 animate-in fade-in duration-150">
+            <div className="ml-3 pl-2.5 my-0.5 border-l-2 border-dashed border-slate-300 dark:border-slate-700 space-y-0.5 animate-in fade-in duration-150">
               {item.children?.map((child: any) => renderTreeItem(child, depth + 1))}
             </div>
           )}
@@ -582,34 +679,45 @@ const HorizontalNav = () => {
       );
     }
 
-    // Grandchild / Leaf Link (Add / List / direct item with tiny small indicator)
+    // Grandchild / Leaf Link (Add / List / direct item)
+    const active = isLeafActive(item);
+
     return (
       <div key={item.title + (item.path || "")} className="select-none my-0.5">
         {item.path && (
           <NavLink
             to={item.path}
+            end
             onClick={() => {
               closeAll();
             }}
-            className={({ isActive }) =>
-              `px-2.5 py-1 rounded-lg flex items-center justify-between no-underline transition-all duration-150 outline-none focus:bg-card-2 focus:ring-1 focus:ring-teal-400 group/link ${
-                isActive ||
-                (item.activePaths &&
-                  item.activePaths.some((p: string) => location.pathname.startsWith(p)))
-                  ? "bg-accent/15 text-accent font-bold"
-                  : "text-ink-muted hover:bg-card-2 hover:text-ink font-medium"
-              }`
-            }
+            className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between no-underline transition-all duration-150 outline-none focus:ring-1 focus:ring-teal-500 group/link ${
+              active
+                ? "bg-teal-600 text-white font-bold shadow-xs"
+                : "text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-card-2 hover:text-teal-700 dark:hover:text-white"
+            } ${depth === 0 ? "font-bold text-[14px]" : "font-semibold text-[13px]"}`}
           >
-            <div className="flex items-center gap-1.5 min-w-0">
-              {/* Tiny small arrow indicator only for grandchild / leaf items */}
-              <span className="text-[9px] text-emerald-400 font-bold shrink-0">
-                ▸
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Small arrow indicator only for nested leaf items (depth > 0) */}
+              {depth > 0 && (
+                <span
+                  className={`text-[10px] font-bold shrink-0 ${
+                    active ? "text-white" : "text-slate-500 dark:text-slate-400 group-hover/link:text-teal-600 dark:group-hover/link:text-teal-400"
+                  }`}
+                >
+                  ▸
+                </span>
+              )}
+              <span className={`truncate ${depth === 0 ? "text-[14px] font-bold" : "text-[13px] font-semibold"} ${active ? "text-white font-bold" : "text-slate-800 dark:text-slate-200 group-hover/link:text-teal-800 dark:group-hover/link:text-white"}`}>
+                {item.title}
               </span>
-              <span className="text-[12.5px] truncate">{item.title}</span>
             </div>
             {item.badge && (
-              <span className="text-[9.5px] font-mono font-bold text-slate-400 bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-700/60 shrink-0">
+              <span className={`text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                active 
+                  ? "text-teal-100 bg-teal-700 border-teal-500" 
+                  : "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 border-slate-300 dark:border-slate-700/60"
+              }`}>
                 {item.badge}
               </span>
             )}
@@ -620,7 +728,7 @@ const HorizontalNav = () => {
   };
 
   return (
-    <div className="w-full bg-slate-900/95 backdrop-blur-md text-white shadow-sm border-b border-slate-800/80 relative z-40 hidden lg:flex items-center justify-between px-3.5 py-1.5">
+    <div className="w-full bg-white dark:bg-slate-900/95 backdrop-blur-md text-slate-800 dark:text-white shadow-xs border-b border-slate-200/90 dark:border-slate-800/80 relative z-40 hidden lg:flex items-center justify-between px-3.5 py-1.5 transition-colors duration-200">
       
       {/* ── MIDDLE: Navigation Items ── */}
       <div className="flex-1 overflow-x-auto no-scrollbar" ref={navContainerRef}>
@@ -631,12 +739,12 @@ const HorizontalNav = () => {
             const hasChildren = !!menu.children && menu.children.length > 0;
             const isOpen = activeMenuId === menu.title;
 
-            const navItemClass = `cursor-pointer px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900 ${
+            const navItemClass = `cursor-pointer px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
               menuActive
                 ? "bg-teal-600 text-white font-bold shadow-xs"
                 : isOpen
-                  ? "bg-white/15 text-white font-bold"
-                  : "bg-transparent text-white hover:text-white hover:bg-white/10 font-bold"
+                  ? "bg-slate-100 text-teal-700 dark:bg-white/15 dark:text-white font-bold"
+                  : "bg-transparent text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-200 dark:hover:text-white dark:hover:bg-white/10 font-bold"
             }`;
 
             const getShortcutLabel = (title: string) => {
@@ -644,6 +752,8 @@ const HorizontalNav = () => {
                 case "dashboard": return "D";
                 case "administration": return "Alt+A";
                 case "transactions": return "Alt+T";
+                case "production": return "Alt+R";
+                case "inventory": return "Alt+I";
                 case "display": return "Alt+D";
                 case "payroll": return "Alt+P";
                 default: return "";
@@ -664,7 +774,7 @@ const HorizontalNav = () => {
                     className={navItemClass}
                   >
                     <span className="text-[13.5px] whitespace-nowrap select-none tracking-tight">{menu.title}</span>
-                    <FaChevronDown className={`text-[9px] transition-transform duration-200 ${isOpen ? "rotate-180" : ""} text-white`} />
+                    <FaChevronDown className={`text-[9px] transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${menuActive ? "text-white" : isOpen ? "text-teal-700 dark:text-white" : "text-slate-500 dark:text-slate-400"}`} />
                   </div>
                 ) : (
                   <NavLink
@@ -690,7 +800,7 @@ const HorizontalNav = () => {
         <LiveBadge size="xs" />
 
         {/* Theme Toggle Button */}
-        <ThemeToggle className="!w-8 !h-8 !rounded-full bg-slate-800/80 border border-slate-700/60 hover:bg-slate-700 shadow-xs" />
+        <ThemeToggle className="!w-8 !h-8 !rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200/80 text-slate-700 dark:bg-slate-800/80 dark:border-slate-700/60 dark:hover:bg-slate-700 dark:text-white shadow-xs" />
 
         {/* User Profile Card */}
         {user && (() => {
@@ -704,8 +814,8 @@ const HorizontalNav = () => {
                 title="Account Menu"
                 className={`flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-200 cursor-pointer ${
                   showProfileMenu 
-                    ? "bg-slate-800 border-teal-500/60 shadow-md shadow-teal-500/15" 
-                    : "bg-slate-800/80 hover:bg-slate-800 border-slate-700/60 hover:border-slate-600 shadow-xs"
+                    ? "bg-slate-100 border-teal-500/60 dark:bg-slate-800 shadow-md shadow-teal-500/15" 
+                    : "bg-slate-100/90 hover:bg-slate-200/80 border-slate-200/90 hover:border-slate-300 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:border-slate-700/60 dark:hover:border-slate-600 shadow-xs"
                 }`}
               >
                 {/* Round Avatar */}
@@ -717,7 +827,7 @@ const HorizontalNav = () => {
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}
-                      className="w-7 h-7 rounded-full object-cover border border-slate-700 shadow-xs" 
+                      className="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-700 shadow-xs" 
                     />
                   ) : (
                     <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-xs uppercase">
@@ -728,26 +838,26 @@ const HorizontalNav = () => {
 
                 {/* Two Stacked Lines */}
                 <div className="flex flex-col text-left leading-tight pr-0.5">
-                  <span className="font-bold text-xs text-white tracking-tight whitespace-nowrap">
+                  <span className="font-bold text-xs text-slate-800 dark:text-white tracking-tight whitespace-nowrap">
                     {name}
                   </span>
-                  <span className="text-[10px] font-medium text-slate-400 capitalize whitespace-nowrap">
+                  <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 capitalize whitespace-nowrap">
                     {role}
                   </span>
                 </div>
 
-                <FaChevronDown className={`text-[9px] transition-transform duration-200 ${showProfileMenu ? "rotate-180 text-teal-400" : "text-slate-400"}`} />
+                <FaChevronDown className={`text-[9px] transition-transform duration-200 ${showProfileMenu ? "rotate-180 text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"}`} />
               </button>
 
               {/* Interactive Profile Dropdown Menu */}
               {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-card border border-line-soft rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="p-2.5 rounded-xl bg-card-2 border border-line-soft mb-1.5 flex items-center gap-2.5">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-card border border-slate-200 dark:border-line-soft rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-card-2 border border-slate-200/90 dark:border-line-soft mb-1.5 flex items-center gap-2.5">
                     {avatarImage ? (
                       <img 
                         src={avatarImage} 
                         alt={name} 
-                        className="w-8 h-8 rounded-full object-cover border border-line-soft shadow-xs shrink-0" 
+                        className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-line-soft shadow-xs shrink-0" 
                       />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0 uppercase">
@@ -755,8 +865,8 @@ const HorizontalNav = () => {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="font-bold text-xs text-ink truncate">{name}</div>
-                      <div className="text-[10px] font-semibold text-teal-500 uppercase tracking-wider">{role}</div>
+                      <div className="font-bold text-xs text-slate-800 dark:text-ink truncate">{name}</div>
+                      <div className="text-[10px] font-semibold text-teal-600 dark:text-teal-500 uppercase tracking-wider">{role}</div>
                     </div>
                   </div>
 
@@ -767,13 +877,13 @@ const HorizontalNav = () => {
                         setShowProfileMenu(false);
                         navigate("/profile");
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-ink-muted hover:text-ink hover:bg-card-2 transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-slate-100 dark:hover:bg-card-2 transition-colors cursor-pointer text-left"
                     >
-                      <FiUser className="text-sm text-teal-500" />
+                      <FiUser className="text-sm text-teal-600 dark:text-teal-500" />
                       <span>My Profile</span>
                     </button>
 
-                    <div className="h-px bg-line-soft my-1" />
+                    <div className="h-px bg-slate-200 dark:bg-line-soft my-1" />
 
                     <button
                       type="button"
@@ -781,7 +891,7 @@ const HorizontalNav = () => {
                         setShowProfileMenu(false);
                         handleLogout();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
                     >
                       <FiLogOut className="text-sm" />
                       <span>Log Out</span>
@@ -802,7 +912,7 @@ const HorizontalNav = () => {
           className="fixed z-50 pt-2 animate-in fade-in slide-in-from-top-2 outline-none"
           style={{ top: `${menuRect.bottom}px`, left: `${menuRect.left}px` }}
         >
-          <div className="w-72 bg-card rounded-2xl shadow-2xl border border-line-soft p-2 max-h-[80vh] overflow-y-auto custom-scrollbar outline-none">
+          <div className="w-72 bg-white dark:bg-card rounded-2xl shadow-2xl border border-slate-200 dark:border-line-soft p-2 max-h-[80vh] overflow-y-auto custom-scrollbar outline-none">
             {activeMenuData.children.map((child) => renderTreeItem(child, 0))}
           </div>
         </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { FaArrowLeft, FaPlus } from "react-icons/fa";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { FaArrowLeft, FaPlus, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -17,6 +17,8 @@ import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
 import CreatableSelectInput from "../../../components/form/CreatableSelectInput/CreatableSelectInput";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 
 const addressSchema = z.object({
   addressLine1: z.string().min(1, "Address Line 1 is required"),
@@ -139,6 +141,7 @@ const CustomerFormPage: React.FC = () => {
 
   const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
   const [deleteGradeModalState, setDeleteGradeModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const { customerTypes, createCustomerType, updateCustomerType, deleteCustomerType, isLoading: isTypesLoading } = useCustomerTypes();
   const { customerGrades, isLoading: isGradesLoading, createCustomerGrade, updateCustomerGrade, deleteCustomerGrade } = useCustomerGrades();
@@ -149,7 +152,7 @@ const CustomerFormPage: React.FC = () => {
     watch,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
     defaultValues: initialFormData,
@@ -165,9 +168,111 @@ const CustomerFormPage: React.FC = () => {
     name: "transports"
   });
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+  // Focus a field by name using direct DOM query (works even when field.ref is
+  // not forwarded through CtrlText, which is the case for all Controller fields here).
+  const focusFieldByName = useCallback((name: string) => {
+    const el = formRef.current?.querySelector<HTMLElement>(
+      `input[name="${name}"][data-nav], [data-nav][name="${name}"]`
+    );
+    if (el) {
+      el.focus();
+      return true;
+    }
+    return false;
+  }, []);
+
+  // Focus the very first navigable field in the form.
+  const focusFirstField = useCallback(() => {
+    const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+    first?.focus();
+  }, []);
+
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  const openDiscardModal = useCallback(() => {
+    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+    setSaveConfirmOpen(true);
+  }, []);
+
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
+        lastFocusedElementRef.current.focus();
+      } else {
+        const firstInput = formRef.current?.querySelector<HTMLElement>(
+          "input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled])"
+        );
+        firstInput?.focus();
+      }
+    }, 50);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    navigate("/customers");
+  }, [navigate]);
+
+  const handleBack = useCallback(() => {
+    if (isDirty) {
+      openDiscardModal();
+    } else {
+      navigate("/customers");
+    }
+  }, [isDirty, openDiscardModal, navigate]);
+
+  // Keep refs in sync so the Esc handler always reads the latest values
+  // without needing to tear-down and re-register the listener on every render.
+  // This prevents the stale-closure bug where a second Esc press after a failed
+  // modal-save exits the page because the handler captured an outdated isDirty.
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  // Esc anywhere on the page — registered once, reads refs for fresh state.
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // If a dropdown is currently open (SelectInput portal), let it close first
+      if (document.querySelector("[data-select-portal]")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (saveConfirmOpenRef.current) {
+        handleResume();
+      } else if (isDirtyRef.current) {
+        openDiscardModal();
+      } else {
+        navigate("/customers");
+      }
+    };
+    window.addEventListener("keydown", handleEsc, { capture: true });
+    return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+  // Only stable callbacks + navigate here — volatile state is read via refs above.
+  }, [handleResume, openDiscardModal, navigate]);
+
   const handleRemoveAddress = (index: number) => {
     remove(index);
   };
+
+  // Auto-focus the first field whenever the form becomes visible.
+  // Edit mode: form is hidden behind a loading gate, so useFormKeyboardNav's
+  //   mount effect fires before the <form> is in the DOM → focus silently fails.
+  //   This effect re-fires when loading→false and focuses the first field.
+  // Create mode: loading is always false, so this fires on mount as a reliable
+  //   complement to the hook's 200 ms timer (handles cases where state updates
+  //   steal focus after the timer fires, e.g. setValue inside fetchCode).
+  useEffect(() => {
+    if (loading) return;
+    const timer = setTimeout(() => focusFirstField(), 250);
+    return () => clearTimeout(timer);
+  }, [loading, focusFirstField]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -217,6 +322,8 @@ const CustomerFormPage: React.FC = () => {
       } catch {
         // next-code fetch is non-critical; form remains editable
       }
+      // Return focus to the first field after clearing
+      setTimeout(() => focusFirstField(), 100);
     }
   };
 
@@ -260,6 +367,82 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
+  // Field order matches the visual layout — used to find which error field comes first.
+  const FIELD_ORDER: (keyof CustomerFormValues)[] = [
+    "firmName", "displayName", "customerGradeId", "customerTypeId",
+    "isActive", "phones", "email", "gstin",
+    "openingBalance", "openingBalanceType", "creditLimit", "creditDays",
+  ];
+
+  // Save from the discard modal: close modal first, then validate + submit.
+  // If validation fails → errors show on the form, first error field gets focus
+  //   so keyboard navigation works immediately.
+  // If validation passes → onSubmit saves and navigates away.
+  const handleSaveFromModal = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      handleSubmit(
+        onSubmit,
+        (fieldErrors) => {
+          toast.error("Required fields fill pannuga — please fill all required fields.");
+
+          // Walk the visual field order and focus the first one that has an error.
+          // focusFieldByName uses a direct DOM query (name attr + data-nav) so it
+          // works even though CtrlText does not forward field.ref to the input.
+          const firstErrorField = FIELD_ORDER.find((f) => fieldErrors[f]);
+          if (firstErrorField && focusFieldByName(firstErrorField)) {
+            formRef.current
+              ?.querySelector<HTMLElement>(`input[name="${firstErrorField}"]`)
+              ?.scrollIntoView({ block: "center", behavior: "smooth" });
+          } else {
+            // Address / transport errors — focus the first visible red-border input
+            const firstRedInput = formRef.current?.querySelector<HTMLElement>(
+              "input.border-red-500[data-nav]"
+            );
+            firstRedInput?.focus();
+            firstRedInput?.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
+        }
+      )();
+    }, 150);
+  }, [handleSubmit, onSubmit, focusFieldByName]);
+
+  // ── Global F-Keys / Shortcuts Integration (F2 / F9 / F8 / F5) ──
+  useFormShortcuts({
+    onSave: () => {
+      handleSubmit(onSubmit)();
+    },
+    onDelete: () => {
+      if (!isEditMode) {
+        handleClear();
+      }
+    },
+  });
+
+  // F5 Data Refresh
+  useEffect(() => {
+    const handleRefresh = async () => {
+      if (isEditMode && id) {
+        try {
+          setLoading(true);
+          const customer = await customerService.fetchById(id);
+          reset(mapCustomerToFormData(customer));
+          toast.info("Customer details refreshed");
+        } catch {
+          toast.error("Failed to reload customer details");
+        } finally {
+          setLoading(false);
+        }
+      } else if (!isEditMode) {
+        handleClear();
+        toast.info("Form reset");
+      }
+    };
+
+    window.addEventListener("fkey-refresh", handleRefresh);
+    return () => window.removeEventListener("fkey-refresh", handleRefresh);
+  }, [id, isEditMode, reset]);
+
 
 
   if (loading) {
@@ -278,11 +461,11 @@ const CustomerFormPage: React.FC = () => {
             text="Back to List"
             icon={FaArrowLeft}
             variant="secondary"
-            onClick={() => navigate("/customers")}
+            onClick={handleBack}
           />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-5" noValidate>
+        <form ref={formRef} onSubmit={handleSubmit(onSubmit)} onKeyDown={handleFormKeyDown} className="p-5 space-y-5" noValidate>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
             <Controller name="firmName" control={control} render={({ field }) => (
@@ -435,20 +618,20 @@ const CustomerFormPage: React.FC = () => {
               return (
                 <AddressForm
                   addressValue={watch(`addresses.0.address.addressLine1`)}
-                  onAddressChange={(v) => setValue(`addresses.0.address.addressLine1`, v, { shouldValidate: true })}
+                  onAddressChange={(v) => setValue(`addresses.0.address.addressLine1`, v, { shouldValidate: true, shouldDirty: true })}
                   addressError={fieldErrors?.addressLine1?.message}
                   countryValue="India"
                   stateValue={watch(`addresses.0.address.state`)}
                   onStateChange={(v) => {
-                    setValue(`addresses.0.address.state`, v, { shouldValidate: true });
-                    setValue(`addresses.0.address.city`, "", { shouldValidate: true });
+                    setValue(`addresses.0.address.state`, v, { shouldValidate: true, shouldDirty: true });
+                    setValue(`addresses.0.address.city`, "", { shouldValidate: true, shouldDirty: true });
                   }}
                   stateError={fieldErrors?.state?.message}
                   cityValue={watch(`addresses.0.address.city`)}
-                  onCityChange={(v) => setValue(`addresses.0.address.city`, v, { shouldValidate: true })}
+                  onCityChange={(v) => setValue(`addresses.0.address.city`, v, { shouldValidate: true, shouldDirty: true })}
                   cityError={fieldErrors?.city?.message}
                   pincodeValue={watch(`addresses.0.address.pincode`)}
-                  onPincodeChange={(v) => setValue(`addresses.0.address.pincode`, v, { shouldValidate: true })}
+                  onPincodeChange={(v) => setValue(`addresses.0.address.pincode`, v, { shouldValidate: true, shouldDirty: true })}
                   pincodeError={fieldErrors?.pincode?.message}
                   required
                 />
@@ -467,20 +650,20 @@ const CustomerFormPage: React.FC = () => {
                   </div>
                   <AddressForm
                     addressValue={watch(`addresses.${index}.address.addressLine1`)}
-                    onAddressChange={(v) => setValue(`addresses.${index}.address.addressLine1`, v, { shouldValidate: true })}
+                    onAddressChange={(v) => setValue(`addresses.${index}.address.addressLine1`, v, { shouldValidate: true, shouldDirty: true })}
                     addressError={fieldErrors?.addressLine1?.message}
                     countryValue="India"
                     stateValue={watch(`addresses.${index}.address.state`)}
                     onStateChange={(v) => {
-                      setValue(`addresses.${index}.address.state`, v, { shouldValidate: true });
-                      setValue(`addresses.${index}.address.city`, "", { shouldValidate: true });
+                      setValue(`addresses.${index}.address.state`, v, { shouldValidate: true, shouldDirty: true });
+                      setValue(`addresses.${index}.address.city`, "", { shouldValidate: true, shouldDirty: true });
                     }}
                     stateError={fieldErrors?.state?.message}
                     cityValue={watch(`addresses.${index}.address.city`)}
-                    onCityChange={(v) => setValue(`addresses.${index}.address.city`, v, { shouldValidate: true })}
+                    onCityChange={(v) => setValue(`addresses.${index}.address.city`, v, { shouldValidate: true, shouldDirty: true })}
                     cityError={fieldErrors?.city?.message}
                     pincodeValue={watch(`addresses.${index}.address.pincode`)}
-                    onPincodeChange={(v) => setValue(`addresses.${index}.address.pincode`, v, { shouldValidate: true })}
+                    onPincodeChange={(v) => setValue(`addresses.${index}.address.pincode`, v, { shouldValidate: true, shouldDirty: true })}
                     pincodeError={fieldErrors?.pincode?.message}
                     required
                   />
@@ -567,7 +750,7 @@ const CustomerFormPage: React.FC = () => {
             try {
               await deleteCustomerType(deleteModalState.idToDelete);
               if (watch("customerTypeId") === deleteModalState.idToDelete) {
-                setValue("customerTypeId", null as any, { shouldValidate: true });
+                setValue("customerTypeId", null as any, { shouldValidate: true, shouldDirty: true });
               }
             } catch (e) { /* Error handled in hook */ }
           }
@@ -586,7 +769,7 @@ const CustomerFormPage: React.FC = () => {
             try {
               await deleteCustomerGrade(deleteGradeModalState.idToDelete);
               if (watch("customerGradeId") === deleteGradeModalState.idToDelete) {
-                setValue("customerGradeId", null as any, { shouldValidate: true });
+                setValue("customerGradeId", null as any, { shouldValidate: true, shouldDirty: true });
               }
             } catch (e) { /* Error handled in hook */ }
           }
@@ -596,6 +779,24 @@ const CustomerFormPage: React.FC = () => {
         message="Are you sure you want to delete this customer grade?"
         confirmText="Delete"
         isDangerous={true}
+      />
+
+      {/* Back button / Esc key → Save or Discard */}
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved customer details will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        isDangerous={false}
+        defaultFocusCancel={false}
       />
     </div>
   );

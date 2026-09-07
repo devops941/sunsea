@@ -2,9 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
 /**
- * DatePickerCalendar — React + TypeScript + Tailwind CSS (medium size)
+ * DatePickerCalendar — React + TypeScript + Tailwind CSS
  * Drop-in replacement for a native <input type="date">.
- * Header has clickable month/year dropdowns for fast navigation.
+ * Includes comprehensive keyboard navigation:
+ *   - Arrow keys: Navigate days & weeks
+ *   - Enter / Space: Select focused date
+ *   - PageUp / PageDown: Previous / Next month (Shift for year)
+ *   - 't' / 'T': Select Today
+ *   - Escape: Close popover
  */
 
 export interface DatePickerCalendarProps {
@@ -124,8 +129,10 @@ export default function DatePickerCalendar({
 
   const [viewYear, setViewYear] = useState<number>((parsedValue || today).getFullYear());
   const [viewMonth, setViewMonth] = useState<number>((parsedValue || today).getMonth());
+  const [focusedDate, setFocusedDate] = useState<Date>(parsedValue || today);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const yearSelectRef = useRef<HTMLSelectElement>(null);
 
   const yearOptions = buildYearOptions(today);
@@ -136,6 +143,7 @@ export default function DatePickerCalendar({
     if (parsedValue) {
       setViewYear(parsedValue.getFullYear());
       setViewMonth(parsedValue.getMonth());
+      setFocusedDate(parsedValue);
     }
   }, [value]);
 
@@ -175,6 +183,7 @@ export default function DatePickerCalendar({
     if (isDisabled(date, parsedMinDate, parsedMaxDate)) return;
     const formatted = formatLocalDate(date);
     setInternalValue(date);
+    setFocusedDate(date);
     if (onChange) {
       onChange({
         target: {
@@ -189,13 +198,157 @@ export default function DatePickerCalendar({
   const goToday = (): void => {
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
+    setFocusedDate(today);
     handleSelect(today);
+  };
+
+  // ─── Keyboard Navigation Handler ──────────────────────────────────────────
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (disabled) return;
+
+    if (!open) {
+      if (e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setOpen(true);
+        const initialDate = selected || today;
+        setFocusedDate(initialDate);
+        setViewYear(initialDate.getFullYear());
+        setViewMonth(initialDate.getMonth());
+      }
+      return;
+    }
+
+    // When calendar is open:
+    switch (e.key) {
+      case "ArrowLeft": {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextD = new Date(focusedDate.getFullYear(), focusedDate.getMonth(), focusedDate.getDate() - 1);
+        setFocusedDate(nextD);
+        if (nextD.getMonth() !== viewMonth || nextD.getFullYear() !== viewYear) {
+          setViewMonth(nextD.getMonth());
+          setViewYear(nextD.getFullYear());
+        }
+        break;
+      }
+
+      case "ArrowRight": {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextD = new Date(focusedDate.getFullYear(), focusedDate.getMonth(), focusedDate.getDate() + 1);
+        setFocusedDate(nextD);
+        if (nextD.getMonth() !== viewMonth || nextD.getFullYear() !== viewYear) {
+          setViewMonth(nextD.getMonth());
+          setViewYear(nextD.getFullYear());
+        }
+        break;
+      }
+
+      case "ArrowUp": {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextD = new Date(focusedDate.getFullYear(), focusedDate.getMonth(), focusedDate.getDate() - 7);
+        setFocusedDate(nextD);
+        if (nextD.getMonth() !== viewMonth || nextD.getFullYear() !== viewYear) {
+          setViewMonth(nextD.getMonth());
+          setViewYear(nextD.getFullYear());
+        }
+        break;
+      }
+
+      case "ArrowDown": {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextD = new Date(focusedDate.getFullYear(), focusedDate.getMonth(), focusedDate.getDate() + 7);
+        setFocusedDate(nextD);
+        if (nextD.getMonth() !== viewMonth || nextD.getFullYear() !== viewYear) {
+          setViewMonth(nextD.getMonth());
+          setViewYear(nextD.getFullYear());
+        }
+        break;
+      }
+
+      case "PageUp": {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextD = e.shiftKey
+          ? new Date(focusedDate.getFullYear() - 1, focusedDate.getMonth(), focusedDate.getDate())
+          : new Date(focusedDate.getFullYear(), focusedDate.getMonth() - 1, focusedDate.getDate());
+        setFocusedDate(nextD);
+        setViewMonth(nextD.getMonth());
+        setViewYear(nextD.getFullYear());
+        break;
+      }
+
+      case "PageDown": {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextD = e.shiftKey
+          ? new Date(focusedDate.getFullYear() + 1, focusedDate.getMonth(), focusedDate.getDate())
+          : new Date(focusedDate.getFullYear(), focusedDate.getMonth() + 1, focusedDate.getDate());
+        setFocusedDate(nextD);
+        setViewMonth(nextD.getMonth());
+        setViewYear(nextD.getFullYear());
+        break;
+      }
+
+      case "Home": {
+        e.preventDefault();
+        e.stopPropagation();
+        const firstD = new Date(viewYear, viewMonth, 1);
+        setFocusedDate(firstD);
+        break;
+      }
+
+      case "End": {
+        e.preventDefault();
+        e.stopPropagation();
+        const lastD = new Date(viewYear, viewMonth + 1, 0);
+        setFocusedDate(lastD);
+        break;
+      }
+
+      case "t":
+      case "T": {
+        e.preventDefault();
+        e.stopPropagation();
+        goToday();
+        triggerRef.current?.focus();
+        break;
+      }
+
+      case "Enter":
+      case " ": {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSelect(focusedDate);
+        triggerRef.current?.focus();
+        break;
+      }
+
+      case "Escape": {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        triggerRef.current?.focus();
+        break;
+      }
+
+      case "Tab": {
+        setOpen(false);
+        break;
+      }
+    }
   };
 
   const cells = buildMonthGrid(viewYear, viewMonth);
 
   return (
-    <div ref={containerRef} className={`relative w-full group ${horizontal ? "flex items-center gap-3" : ""}`}>
+    <div
+      ref={containerRef}
+      className={`relative w-full group ${horizontal ? "flex items-center gap-3" : ""}`}
+      onKeyDown={handleKeyDown}
+    >
       {label && (
         <label
           className={`
@@ -218,10 +371,29 @@ export default function DatePickerCalendar({
       <div className={`relative ${horizontal ? "flex-1" : ""}`}>
         {/* Input trigger */}
         <button
+          ref={triggerRef}
           type="button"
+          name={name}
+          data-nav
           disabled={disabled}
-          onClick={() => setOpen((o) => !o)}
-          className={`flex w-full h-10 items-center justify-between rounded-md border px-4 text-sm font-semibold transition-all duration-250 outline-none text-left
+          tabIndex={disabled ? -1 : 0}
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-label={label || "Date Picker"}
+          onClick={() => {
+            if (!disabled) {
+              const willOpen = !open;
+              setOpen(willOpen);
+              if (willOpen) {
+                const initialDate = selected || today;
+                setFocusedDate(initialDate);
+                setViewYear(initialDate.getFullYear());
+                setViewMonth(initialDate.getMonth());
+              }
+            }
+          }}
+          className={`flex w-full h-10 items-center justify-between rounded-md border px-4 text-sm font-semibold transition-all duration-250 outline-none text-left cursor-pointer
             ${error
               ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
               : open
@@ -239,24 +411,32 @@ export default function DatePickerCalendar({
 
         {/* Popover */}
         {open && !disabled && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-60 rounded-xl border border-line-soft bg-card p-2 shadow-xl text-ink">
-
+          <div
+            tabIndex={-1}
+            className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-line-soft bg-card p-2.5 shadow-2xl text-ink animate-in fade-in zoom-in-95 duration-100"
+          >
             {/* Header: prev arrow | month select | year select | next arrow */}
-            <div className="mb-1 flex items-center justify-between gap-1">
+            <div className="mb-2 flex items-center justify-between gap-1">
               <button
                 type="button"
+                tabIndex={-1}
                 onClick={goPrevMonth}
                 aria-label="Previous month"
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-card-2 text-ink-muted hover:bg-card-2/80 hover:text-ink transition-colors"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-card-2 text-ink-muted hover:bg-card-2/80 hover:text-ink transition-colors cursor-pointer"
               >
-                <ChevronLeft size={14} />
+                <ChevronLeft size={15} />
               </button>
 
               {/* Month dropdown */}
               <select
+                tabIndex={0}
                 value={viewMonth}
-                onChange={(e) => setViewMonth(Number(e.target.value))}
-                className="flex-1 min-w-0 rounded border border-line-soft bg-card-2 px-1 py-0.5 text-[11px] font-semibold text-ink focus:outline-none focus:border-primary cursor-pointer"
+                onChange={(e) => {
+                  const m = Number(e.target.value);
+                  setViewMonth(m);
+                  setFocusedDate(new Date(viewYear, m, Math.min(focusedDate.getDate(), 28)));
+                }}
+                className="flex-1 min-w-0 rounded-lg border border-line-soft bg-card-2 px-1.5 py-1 text-xs font-bold text-ink focus:outline-none focus:border-primary cursor-pointer"
               >
                 {MONTHS.map((m, i) => (
                   <option key={m} value={i} className="bg-card text-ink">{m}</option>
@@ -265,10 +445,15 @@ export default function DatePickerCalendar({
 
               {/* Year dropdown */}
               <select
+                tabIndex={0}
                 ref={yearSelectRef}
                 value={viewYear}
-                onChange={(e) => setViewYear(Number(e.target.value))}
-                className="w-16 flex-shrink-0 rounded border border-line-soft bg-card-2 px-1 py-0.5 text-[11px] font-semibold text-ink focus:outline-none focus:border-primary cursor-pointer"
+                onChange={(e) => {
+                  const y = Number(e.target.value);
+                  setViewYear(y);
+                  setFocusedDate(new Date(y, viewMonth, Math.min(focusedDate.getDate(), 28)));
+                }}
+                className="w-20 flex-shrink-0 rounded-lg border border-line-soft bg-card-2 px-1.5 py-1 text-xs font-bold text-ink focus:outline-none focus:border-primary cursor-pointer"
               >
                 {yearOptions.map((y) => (
                   <option key={y} value={y} className="bg-card text-ink">{y}</option>
@@ -277,46 +462,52 @@ export default function DatePickerCalendar({
 
               <button
                 type="button"
+                tabIndex={-1}
                 onClick={goNextMonth}
                 aria-label="Next month"
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-card-2 text-ink-muted hover:bg-card-2/80 hover:text-ink transition-colors"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-card-2 text-ink-muted hover:bg-card-2/80 hover:text-ink transition-colors cursor-pointer"
               >
-                <ChevronRight size={14} />
+                <ChevronRight size={15} />
               </button>
             </div>
 
             {/* Weekday labels */}
-            <div className="mb-0.5 grid grid-cols-7">
+            <div className="mb-1 grid grid-cols-7">
               {WEEKDAYS.map((w) => (
-                <div key={w} className="pb-0.5 text-center text-[10px] font-semibold text-ink-subtle">
+                <div key={w} className="pb-1 text-center text-[11px] font-bold text-ink-subtle">
                   {w}
                 </div>
               ))}
             </div>
 
             {/* Day grid */}
-            <div className="grid grid-cols-7 gap-0.5">
+            <div className="grid grid-cols-7 gap-1">
               {cells.map(({ date, inMonth }, i) => {
                 const disabledCell = isDisabled(date, parsedMinDate, parsedMaxDate);
                 const isSelected = isSameDay(date, selected);
+                const isFocused = isSameDay(date, focusedDate);
                 const isToday = isSameDay(date, today);
 
                 return (
                   <button
                     key={i}
                     type="button"
+                    tabIndex={-1}
                     disabled={disabledCell}
                     onClick={() => handleSelect(date)}
-                    className={`aspect-square rounded text-[11px] transition
-                      ${disabledCell ? "cursor-not-allowed text-ink-subtle/40" : "cursor-pointer"}
+                    onMouseEnter={() => setFocusedDate(date)}
+                    className={`aspect-square rounded-lg text-xs transition flex items-center justify-center
+                      ${disabledCell ? "cursor-not-allowed text-ink-subtle/30" : "cursor-pointer"}
                       ${isSelected
                         ? "bg-primary font-bold text-white shadow-xs"
-                        : !disabledCell && inMonth
-                          ? "font-semibold text-ink hover:bg-primary/20"
-                          : !disabledCell
-                            ? "font-normal text-ink-subtle/60 hover:bg-primary/15"
-                            : ""}
-                      ${isToday && !isSelected ? "ring-1 ring-inset ring-primary font-bold text-primary" : ""}
+                        : isFocused
+                          ? "ring-2 ring-primary ring-offset-1 bg-primary/20 text-primary font-bold z-10"
+                          : !disabledCell && inMonth
+                            ? "font-semibold text-ink hover:bg-primary/15"
+                            : !disabledCell
+                              ? "font-normal text-ink-subtle/50 hover:bg-primary/10"
+                              : ""}
+                      ${isToday && !isSelected && !isFocused ? "border border-primary font-bold text-primary" : ""}
                     `}
                   >
                     {date.getDate()}
@@ -326,21 +517,31 @@ export default function DatePickerCalendar({
             </div>
 
             {/* Footer */}
-            <div className="mt-1.5 flex justify-between border-t border-line-soft pt-1.5">
-              <button
-                type="button"
-                onClick={goToday}
-                className="rounded px-1 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/15 transition-colors"
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded px-1 py-0.5 text-[10px] font-semibold text-ink-subtle hover:bg-card-2 hover:text-ink transition-colors"
-              >
-                Close
-              </button>
+            <div className="mt-2 flex items-center justify-between border-t border-line-soft pt-2">
+              <div className="text-[10px] text-ink-subtle font-medium">
+                <span className="text-primary font-bold">Arrows</span> Move • <span className="text-primary font-bold">Enter</span> Pick
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={goToday}
+                  className="rounded-lg px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/15 transition-colors cursor-pointer"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => {
+                    setOpen(false);
+                    triggerRef.current?.focus();
+                  }}
+                  className="rounded-lg px-2 py-0.5 text-[11px] font-semibold text-ink-subtle hover:bg-card-2 hover:text-ink transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -368,3 +569,4 @@ export function Demo() {
     </div>
   );
 }
+

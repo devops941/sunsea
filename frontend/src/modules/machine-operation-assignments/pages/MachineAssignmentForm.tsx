@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { FaSave, FaEraser, FaPlus, FaTimes } from "react-icons/fa";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { FaSave, FaEraser, FaPlus, FaTimes, FaCheck } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -7,10 +7,13 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import { machineService } from "../../../services/machineService";
 import { shiftService } from "../../../services/shiftService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 
 export const MachineAssignmentForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -66,6 +69,23 @@ export const MachineAssignmentForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [assignedShifts, setAssignedShifts] = useState<string[]>([]);
   const [employeesByRole, setEmployeesByRole] = useState<Record<string, any[]>>({});
+
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleSubmitRef = useRef<() => void>(() => {});
+  const isDirtyRef = useRef(false);
+  const saveConfirmOpenRef = useRef(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+  useFormShortcuts({
+    onSave: () => handleSubmitRef.current(),
+    onDelete: () => {
+      if (!isEdit) { setFormData(initialFormState); setErrors({}); setIsDirty(false); }
+    },
+  });
 
   const fetchRefData = useCallback(async () => {
     try {
@@ -188,6 +208,7 @@ export const MachineAssignmentForm: React.FC = () => {
       ...prev,
       operators: [...prev.operators, { roleId: "", employeeId: "" }]
     }));
+    setIsDirty(true);
   };
 
   const handleRemoveOperator = (index: number) => {
@@ -196,6 +217,7 @@ export const MachineAssignmentForm: React.FC = () => {
       ...prev,
       operators: prev.operators.filter((_, i) => i !== index)
     }));
+    setIsDirty(true);
   };
 
   const handleOperatorChange = (index: number, field: "roleId" | "employeeId", value: string) => {
@@ -206,10 +228,12 @@ export const MachineAssignmentForm: React.FC = () => {
       if (field === "roleId") newOps[index].employeeId = "";
       return { ...prev, operators: newOps };
     });
+    setIsDirty(true);
   };
 
   const handleMachineSelect = (selectedMachineId: string) => {
     setFormData((prev) => ({ ...prev, machineId: selectedMachineId }));
+    setIsDirty(true);
   };
 
   const validate = () => {
@@ -244,6 +268,7 @@ export const MachineAssignmentForm: React.FC = () => {
   const handleClear = () => {
     setFormData(initialFormState);
     setErrors({});
+    setIsDirty(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -271,6 +296,7 @@ export const MachineAssignmentForm: React.FC = () => {
         await machineOperationAssignmentService.createAssignment(payload);
         toast.success("Machine Operation Assignment created successfully!");
       }
+      setIsDirty(false);
       navigate("/machines/assignments");
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || "Failed to save assignment";
@@ -279,6 +305,61 @@ export const MachineAssignmentForm: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Sync handleSubmit ref on every render
+  handleSubmitRef.current = () => handleSubmit(new Event("submit") as any);
+
+  // Sync dirty/modal refs via useEffect to avoid stale closure on Escape
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  // Escape key — prompt discard if dirty
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (saveConfirmOpenRef.current) {
+        setSaveConfirmOpen(false);
+        setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+      } else if (isDirtyRef.current) {
+        lastFocusedRef.current = document.activeElement as HTMLElement;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate("/machines/assignments");
+      }
+    };
+    window.addEventListener("keydown", handleEscape, { capture: true });
+    return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+  }, [navigate]);
+
+  // F5 — reload assignment details
+  useEffect(() => {
+    const handleF5 = () => {
+      if (isEdit && id) {
+        machineOperationAssignmentService.getAssignmentById(id)
+          .then((res) => {
+            const data = res.data;
+            if (data) {
+              setFormData({
+                machineId: data.machineId || "",
+                shiftId: data.shiftId || "",
+                weekStartDate: data.weekStartDate ? data.weekStartDate.split("T")[0] : currentWeek.start,
+                weekEndDate: data.weekEndDate ? data.weekEndDate.split("T")[0] : currentWeek.end,
+                operators: data.operators ? data.operators.map((o: any) => ({ roleId: String(o.roleId), employeeId: String(o.employeeId) })) : [],
+                remarks: data.remarks || "",
+                isActive: data.isActive !== false,
+              });
+              setIsDirty(false);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("fkey-refresh", handleF5);
+    return () => window.removeEventListener("fkey-refresh", handleF5);
+  }, [isEdit, id]);
 
   if (initialLoading) {
     return (
@@ -292,7 +373,7 @@ export const MachineAssignmentForm: React.FC = () => {
 
   return (
     <div className="w-full max-w-[1024px] xl:mr-auto">
-      <form onSubmit={handleSubmit} noValidate>
+      <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
         <div className="w-full bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
             <h2 className="text-xl font-bold text-ink">
@@ -319,6 +400,7 @@ export const MachineAssignmentForm: React.FC = () => {
                     } else {
                       setFormData({ ...formData, weekStartDate: e.target.value });
                     }
+                    setIsDirty(true);
                   }}
                   error={errors.weekStartDate}
                 />
@@ -334,6 +416,7 @@ export const MachineAssignmentForm: React.FC = () => {
                     } else {
                       setFormData({ ...formData, weekEndDate: e.target.value });
                     }
+                    setIsDirty(true);
                   }}
                   error={errors.weekEndDate}
                 />
@@ -357,7 +440,7 @@ export const MachineAssignmentForm: React.FC = () => {
                   name="shiftId"
                   required
                   value={formData.shiftId}
-                  onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
+                  onChange={(e) => { setFormData({ ...formData, shiftId: e.target.value }); setIsDirty(true); }}
                   error={errors.shiftId}
                   options={[
                     { label: "-- Select Shift --", value: "" },
@@ -455,7 +538,7 @@ export const MachineAssignmentForm: React.FC = () => {
                 name="remarks"
                 placeholder="e.g. Weekly operator shift rotation"
                 value={formData.remarks}
-                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                onChange={(e) => { setFormData({ ...formData, remarks: e.target.value }); setIsDirty(true); }}
               />
             </div>
           </div>
@@ -477,6 +560,25 @@ export const MachineAssignmentForm: React.FC = () => {
           </div>
         </div>
       </form>
+
+      <CommonConfirmModal
+        show={saveConfirmOpen}
+        onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+        onConfirm={() => {
+          setSaveConfirmOpen(false);
+          setTimeout(() => {
+            handleSubmitRef.current();
+            setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+          }, 150);
+        }}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Do you want to save before leaving?"
+        confirmText="Save"
+        cancelText="Discard"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/machines/assignments"); }}
+      />
     </div>
   );
 };

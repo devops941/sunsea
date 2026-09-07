@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../../hooks/useTableKeyboardNav";
 
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
@@ -50,6 +51,8 @@ const InvoiceList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
+    const tableRef = useRef<HTMLDivElement>(null);
+    const [sortAsc, setSortAsc] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
@@ -71,7 +74,12 @@ const InvoiceList: React.FC = () => {
         fetcher,
     });
 
-    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onSort: () => setSortAsc((prev) => !prev),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => { if (can("invoice.create")) navigate("/invoice/create"); },
+    });
 
     const filteredData = useMemo(() => {
         if (!searchTerm) return allInvoices;
@@ -83,7 +91,16 @@ const InvoiceList: React.FC = () => {
         );
     }, [allInvoices, searchTerm]);
 
-    const data = filteredData.slice(
+    const sortedData = useMemo(() => {
+        if (!sortAsc) return filteredData;
+        return [...filteredData].sort((a, b) => {
+            const aName = (a.supplier?.legalName || a.supplier?.displayName || a.grnNumber || "").toLowerCase();
+            const bName = (b.supplier?.legalName || b.supplier?.displayName || b.grnNumber || "").toLowerCase();
+            return aName.localeCompare(bName);
+        });
+    }, [filteredData, sortAsc]);
+
+    const data = sortedData.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
     );
@@ -113,7 +130,7 @@ const InvoiceList: React.FC = () => {
         }
     };
 
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
 
     // CSV Export Configuration
     const { csvColumns, csvFilename } = useMemo(() => {
@@ -131,6 +148,13 @@ const InvoiceList: React.FC = () => {
         };
     }, []);
 
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: data.length,
+        onEnter: (i) => navigate(`/invoice/details/${data[i].id}`),
+        onEdit: (i) => navigate(`/invoice/edit/${data[i].id}`),
+        containerRef: tableRef,
+    });
+
     return (
         <div>
             <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
@@ -144,6 +168,7 @@ const InvoiceList: React.FC = () => {
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search invoices..."
+                            data-search-input
                         />
                         {can("invoice.export") && (
                             <ExportCSVButton
@@ -164,6 +189,7 @@ const InvoiceList: React.FC = () => {
                 </div>
 
                 {/* Table */}
+                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
                 <DataTable
                     data={data}
                     rowKey={(item) => item.id}
@@ -174,6 +200,8 @@ const InvoiceList: React.FC = () => {
                         totalPages,
                         onPageChange: (page) => setCurrentPage(page),
                     }}
+                    rowClassName={(_, i) => i === focusedIndex ? "ring-1 ring-inset ring-accent/40 bg-accent/5" : ""}
+                    onRowClick={(row, i) => { setFocusedIndex(i); tableRef.current?.focus({ preventScroll: true }); }}
                     columns={[
                         {
                             header: "#",
@@ -210,6 +238,7 @@ const InvoiceList: React.FC = () => {
                         },
                     ]}
                 />
+                </div>
             </div>
 
             {/* Delete Modal */}

@@ -1,6 +1,6 @@
-// src/pages/sales/QuotationForm/QuotationForm.tsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -12,6 +12,7 @@ import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../../components/form
 import type { BusyColumn, SundryRow } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import DateInput from "../../../components/form/DateInput/DateInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
@@ -20,6 +21,7 @@ import { useProducts } from "../../../hooks/useProducts";
 import { salesProductService } from "../../../services/salesProductService";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
+import { markStaleByPrefix } from "../../../hooks/useListCache";
 import { customerService } from "../../../services/customerService";
 import {
     ORDER_SOURCE_NEEDS_EMPLOYEE,
@@ -54,7 +56,7 @@ const orderItemSchema = z.object({
 
 const quotationSchema = z.object({
     id: z.number().optional(),
-    quotationNo: z.string().min(1, "Quotation No is required"),
+    quotationNo: z.string(),
     quotationDate: z.string().min(1, "Quotation Date is required"),
     validUntil: z.string().optional(),
     customerId: z.string().min(1, "Customer is required"),
@@ -358,7 +360,18 @@ const QuotationForm: React.FC = () => {
         name: "items",
     });
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const itemsTableRef = useRef<HTMLDivElement>(null);
+    const sundryTableRef = useRef<HTMLDivElement>(null);
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useFormShortcuts({
+        onSave: () => {
+            if (!isSubmitting && !isConfirming) {
+                handleSubmit((data) => onSubmit(data, false))();
+            }
+        },
+    });
 
     const { loadCustomers, customers, loading: customersLoading } = useCustomers();
     const { loadProducts, products, loading: productsLoading } = useProducts();
@@ -673,12 +686,29 @@ const QuotationForm: React.FC = () => {
                 const mob = Array.isArray(cust.mobile) && cust.mobile.length > 0
                     ? cust.mobile[0].number
                     : typeof cust.mobile === "string" ? cust.mobile : "";
-                if (mob && !getValues("mobile")) {
+                if (!getValues("mobile") && mob) {
                     setValue("mobile", mob);
                 }
             }
         }
     }, [customerId, customers, getValues, setValue]);
+
+    // ── Loading state ─────────────────────────────────────────────
+    const isLoading = customersLoading || productsLoading || salesProductsLoading || loadingOrder;
+
+    // Auto-focus the first navigable field once loading finishes.
+    // useFormKeyboardNav's own mount effect fires while the form is not yet
+    // rendered (loader is shown), so formRef.current is null at that point.
+    // This effect re-triggers the auto-focus when loading → false.
+    useEffect(() => {
+        if (!isLoading) {
+            const timer = setTimeout(() => {
+                const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+                first?.focus();
+            }, 200);
+            return () => clearTimeout(timer);
+        }
+    }, [isLoading]);
 
     // ─── Fetch customer's previous orders on customer change (create mode only) ──
     useEffect(() => {
@@ -895,7 +925,7 @@ const QuotationForm: React.FC = () => {
                         productId: Number(c.componentProductId),
                         salesProductId: spId,
                         quantity: Number(c.quantity),
-                        quotationUnitPrice: compUnitPrice && compUnitPrice > 0 ? Math.round(compUnitPrice * 100) / 100 : undefined,
+                        quotationUnitPrice: compUnitPrice != null && !isNaN(compUnitPrice) ? Math.max(0, Math.round(compUnitPrice * 100) / 100) : 0,
                         cgstRate: data.isInterState ? 0 : totalRate / 2,
                         sgstRate: data.isInterState ? 0 : totalRate / 2,
                         igstRate: data.isInterState ? totalRate : 0,
@@ -909,7 +939,7 @@ const QuotationForm: React.FC = () => {
             const currentQuotationId = idParam ? Number(idParam) : quotationIdRef.current;
 
             const payload: any = {
-                orderNo: data.quotationNo,
+                orderNo: data.quotationNo || undefined,
                 orderDate: new Date(data.quotationDate).toISOString(),
                 sourceSalesOrderId: selectedPrevOrderId || undefined,
                 expectedCompletionDate: data.validUntil ? new Date(data.validUntil).toISOString() : undefined,
@@ -944,6 +974,7 @@ const QuotationForm: React.FC = () => {
                 orderDiscountValue: data.orderDiscountValue,
                 billSundry: sundryRows.length > 0 ? sundryRows : null,
                 status: confirm ? "QUOTED" : "DRAFT",
+                isQuotation: true,
             };
 
             let response;
@@ -959,6 +990,10 @@ const QuotationForm: React.FC = () => {
             }
 
             const orderId = existingSalesOrderId || response.id;
+
+            // Invalidate caches so lists immediately show newly created / updated quotations
+            markStaleByPrefix("quotations:");
+            markStaleByPrefix("salesOrders:");
 
             if (confirm) {
                 toast.success("Quotation confirmed successfully!");
@@ -1041,6 +1076,15 @@ const QuotationForm: React.FC = () => {
                             const autoPrice = sp ? computeSalesProductUnitPrice(sp, products) : 0;
                             setValue(`items.${index}.unitPrice`, autoPrice > 0 ? String(autoPrice) : "");
                             setValue(`items.${index}.gstRate`, "");
+                            // Auto-focus Qty cell so user can enter quantity immediately
+                            setTimeout(() => {
+                                const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                if (qtyInput) {
+                                    qtyInput.focus();
+                                    qtyInput.select();
+                                }
+                            }, 50);
                         }}
                     />
                 );
@@ -1115,25 +1159,42 @@ const QuotationForm: React.FC = () => {
 
     // ─── Bill Sundry columns for BusyItemsTable ───────────────
     const sundryColumns: BusyColumn<SundryRow>[] = useMemo(() => {
-        const usedTypes = new Set(sundryRows.map(r => r.type));
         return [
             {
                 key: "type",
                 header: "Bill Sundry",
                 width: "1fr",
-                render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => (
-                    <select
-                        value={row.type}
-                        onChange={e => update({ type: e.target.value })}
-                        style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 13, color: "var(--color-ink)", cursor: "pointer" }}
-                    >
-                        {DEFAULT_SUNDRY_OPTIONS.map(o => (
-                            <option key={o.value} value={o.value} disabled={o.value !== row.type && usedTypes.has(o.value)}>
-                                {o.label}
-                            </option>
-                        ))}
-                    </select>
-                ),
+                render: (row: SundryRow, index: number, update: (patch: Partial<SundryRow>) => void) => {
+                    const opts: AutocompleteOption[] = DEFAULT_SUNDRY_OPTIONS.map(o => ({
+                        value: o.value,
+                        label: o.label,
+                    }));
+
+                    return (
+                        <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
+                            <AutocompleteInput
+                                inline
+                                name={`sundry.${index}.type`}
+                                value={row.type || ""}
+                                options={opts}
+                                placeholder="Select bill sundry..."
+                                onChange={val => {
+                                    update({ type: val });
+                                    setTimeout(() => {
+                                        const hasRate = val.startsWith("BILL_TAX") || val.startsWith("DISCOUNT");
+                                        const targetCol = hasRate ? 1 : 2;
+                                        const cell = sundryTableRef.current?.querySelector(`[data-r="${index}"][data-c="${targetCol}"]`) as HTMLElement | null;
+                                        const input = cell?.querySelector("input") as HTMLInputElement | null;
+                                        if (input) {
+                                            input.focus();
+                                            input.select?.();
+                                        }
+                                    }, 50);
+                                }}
+                            />
+                        </div>
+                    );
+                },
             },
             {
                 key: "rate",
@@ -1141,7 +1202,7 @@ const QuotationForm: React.FC = () => {
                 width: "100px",
                 align: "right" as const,
                 render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
-                    const hasRate = row.type.startsWith("BILL_TAX") || row.type.startsWith("DISCOUNT");
+                    const hasRate = Boolean(row.type && (row.type.startsWith("BILL_TAX") || row.type.startsWith("DISCOUNT")));
                     if (!hasRate) return null;
                     return (
                         <div className="flex items-center gap-0.5 w-full justify-end">
@@ -1184,13 +1245,11 @@ const QuotationForm: React.FC = () => {
                 },
             },
         ];
-    }, [sundryRows, totals.subtotal]);
+    }, [totals.subtotal]);
 
     const sundryEmptyRow: SundryRow = useMemo(() => {
-        const usedTypes = new Set(sundryRows.map(r => r.type));
-        const next = DEFAULT_SUNDRY_OPTIONS.find(o => !usedTypes.has(o.value))?.value ?? DEFAULT_SUNDRY_OPTIONS[0]?.value ?? "";
-        return { id: `${Date.now()}-${Math.random()}`, type: next, rate: "", amount: "" };
-    }, [sundryRows]);
+        return { id: `${Date.now()}-${Math.random()}`, type: "", rate: "", amount: "" };
+    }, []);
 
     // ─── Expanded Components for BusyItemsTable ──────────────
     const renderExpandedComponents = useCallback((_row: any, index: number) => {
@@ -1248,7 +1307,6 @@ const QuotationForm: React.FC = () => {
     }, [watchedItems, salesProducts, setValue]);
 
     // ─── Render ──────────────────────────────────────────────────
-    const isLoading = customersLoading || productsLoading || salesProductsLoading || loadingOrder;
     const billing = {
         addressLine1: watch("billingAddressLine1"),
         city: watch("billingCity"),
@@ -1261,8 +1319,6 @@ const QuotationForm: React.FC = () => {
         state: watch("shippingState"),
         pincode: watch("shippingPincode"),
     };
-
-
 
     if (isLoading) {
         return <CommonLoader text="Loading quotation..." fullScreen={false} />;
@@ -1281,7 +1337,14 @@ const QuotationForm: React.FC = () => {
                     <BackButton text="Back to List" />
                 </div>
 
-                <form className="px-5 py-2 space-y-2" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
+                <form
+                    ref={formRef}
+                    onKeyDown={handleFormKeyDown}
+                    data-escape-guarded
+                    className="px-5 py-2 space-y-2"
+                    onSubmit={handleSubmit((data) => onSubmit(data, false))}
+                    noValidate
+                >
                     <div className="flex flex-col lg:flex-row gap-2">
                         {/* ── Left: Form ── */}
                         <div className="w-full space-y-2">
@@ -1298,13 +1361,48 @@ const QuotationForm: React.FC = () => {
 
                             {/* ── Order Info ── */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+                                {/* Row 1: Date | Quotation No | Valid Until */}
                                 <Controller
                                     name="quotationDate"
                                     control={control}
                                     render={({ field: f }) => (
-                                        <AutocompleteInput label="Quotation Date" name={f.name} value={f.value} options={[]} required onChange={() => { }} placeholder={f.value} disabled error={errors.quotationDate?.message} />
+                                        <DateInput
+                                            label="Quotation Date"
+                                            name={f.name}
+                                            value={f.value}
+                                            onChange={f.onChange}
+                                            required
+                                            disabled={isEditMode}
+                                        />
                                     )}
                                 />
+                                <Controller
+                                    name="quotationNo"
+                                    control={control}
+                                    render={({ field: f }) => (
+                                        <CtrlText
+                                            field={f}
+                                            label="Quotation No"
+                                            placeholder={isEditMode ? "" : "Auto-generated"}
+                                            disabled={isEditMode}
+                                            error={errors.quotationNo?.message}
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name="validUntil"
+                                    control={control}
+                                    render={({ field: f }) => (
+                                        <DateInput
+                                            label="Valid Until"
+                                            name={f.name}
+                                            value={f.value ?? ""}
+                                            onChange={f.onChange}
+                                        />
+                                    )}
+                                />
+
+                                {/* Row 2: Customer | Select Sales Order (create mode only) */}
                                 <Controller
                                     name="customerId"
                                     control={control}
@@ -1329,8 +1427,16 @@ const QuotationForm: React.FC = () => {
                                         value={selectedPrevOrderId ? String(selectedPrevOrderId) : ""}
                                         options={prevOrderAutocompleteOptions}
                                         onChange={(val) => handleLoadFromPrevOrder(val ? Number(val) : null)}
-                                        placeholder={loadingCustomerOrders ? "Loading..." : customerOrders.length > 0 ? "Type to search order..." : "No pending sales orders"}
-                                        disabled={!customerId || customerOrders.length === 0}
+                                        placeholder={
+                                            !customerId
+                                                ? "Select a customer first"
+                                                : loadingCustomerOrders
+                                                ? "Loading orders..."
+                                                : customerOrders.length > 0
+                                                ? "Type to search order..."
+                                                : "No pending sales orders"
+                                        }
+                                        disabled={!customerId}
                                     />
                                 )}
                             </div>
@@ -1349,7 +1455,7 @@ const QuotationForm: React.FC = () => {
 
                             {/* ── Quotation Items (65%) + Bill Sundry (35%) ── */}
                             <div className="flex gap-3">
-                                <div className="w-[65%]">
+                                <div ref={itemsTableRef} className="w-[65%]">
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-sm font-semibold text-ink">Quotation Items</span>
                                     </div>
@@ -1369,9 +1475,37 @@ const QuotationForm: React.FC = () => {
                                             { colKey: "total", value: `₹${totals.subtotal.toFixed(2)}` },
                                         ]}
                                         visibleRows={10}
+                                        getFieldBeforeTable={() => {
+                                            const selOrder = document.getElementById("selectedPrevOrderId") as HTMLElement | null;
+                                            if (selOrder && !selOrder.hasAttribute("disabled") && !(selOrder as any).disabled) return selOrder;
+                                            const cust = document.getElementById("customerId") as HTMLElement | null;
+                                            if (cust && !cust.hasAttribute("disabled") && !(cust as any).disabled) return cust;
+                                            return document.querySelector('input[name="quotationDate"]') as HTMLElement | null;
+                                        }}
+                                        getFieldAfterTable={() => document.getElementById("btn-save-draft") || null}
+                                        onNavigateRight={(row) => {
+                                            const st = sundryTableRef.current;
+                                            if (!st) return false;
+                                            if (sundryRows.length === 0) {
+                                                setSundryRows([{ ...sundryEmptyRow }]);
+                                                setTimeout(() => {
+                                                    const firstCell = st.querySelector(`[data-r="0"][data-c="0"]`) as HTMLElement | null;
+                                                    const input = firstCell?.querySelector("input, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                                                    if (input) { input.focus(); }
+                                                    else if (firstCell) { firstCell.focus(); }
+                                                }, 40);
+                                                return true;
+                                            }
+                                            const targetRow = Math.min(row, Math.max(0, sundryRows.length - 1));
+                                            const cell = st.querySelector(`[data-r="${targetRow}"][data-c="0"]`) as HTMLElement | null;
+                                            const input = cell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                                            if (input) { input.focus(); return true; }
+                                            if (cell) { cell.focus(); return true; }
+                                            return false;
+                                        }}
                                     />
                                 </div>
-                                <div className="w-[35%]">
+                                <div ref={sundryTableRef} className="w-[35%]">
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-sm font-semibold text-ink">Bill Sundry</span>
                                     </div>
@@ -1387,6 +1521,7 @@ const QuotationForm: React.FC = () => {
                                                 colKey: "amount",
                                                 value: (() => {
                                                     const t = sundryRows.reduce((s, r) => {
+                                                        if (!r.type) return s;
                                                         const a = Number(r.amount) || 0;
                                                         const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
                                                         return s + (o?.sign === -1 ? -a : a);
@@ -1395,6 +1530,23 @@ const QuotationForm: React.FC = () => {
                                                 })(),
                                             },
                                         ]}
+                                        getFieldBeforeTable={() => {
+                                            const selOrder = document.getElementById("selectedPrevOrderId") as HTMLElement | null;
+                                            if (selOrder && !selOrder.hasAttribute("disabled") && !(selOrder as any).disabled) return selOrder;
+                                            const cust = document.getElementById("customerId") as HTMLElement | null;
+                                            return cust || null;
+                                        }}
+                                        getFieldAfterTable={() => document.getElementById("btn-save-draft") || null}
+                                        onNavigateLeft={(row) => {
+                                            const it = itemsTableRef.current;
+                                            if (!it) return false;
+                                            const targetRow = Math.min(row, Math.max(0, fields.length - 1));
+                                            const cell = it.querySelector(`[data-r="${targetRow}"][data-c="2"]`) as HTMLElement | null;
+                                            const input = cell?.querySelector("input, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                                            if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select(); return true; }
+                                            if (cell) { cell.focus(); return true; }
+                                            return false;
+                                        }}
                                     />
                                     {/* ── Full Amount ── */}
                                     <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
@@ -1402,6 +1554,7 @@ const QuotationForm: React.FC = () => {
                                             <span className="text-base font-bold text-blue-600">
                                                 ₹{(() => {
                                                     const sundryTotal = sundryRows.reduce((s, r) => {
+                                                        if (!r.type) return s;
                                                         const a = Number(r.amount) || 0;
                                                         const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
                                                         return s + (o?.sign === -1 ? -a : a);
@@ -1423,20 +1576,50 @@ const QuotationForm: React.FC = () => {
 
                 {/* ── Form Actions ── */}
                 <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
-                    <CustomButton
-                        text={isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
-                        variant="secondary"
+                    <button
+                        id="btn-save-draft"
                         type="button"
+                        data-nav
                         onClick={handleSubmit((data) => onSubmit(data, false))}
                         disabled={isSubmitting || isConfirming}
-                    />
-                    <CustomButton
-                        text={isConfirming ? "Confirming..." : "Confirm Order"}
-                        variant="primary"
+                        onKeyDown={(e) => {
+                            if (e.key === "ArrowRight") {
+                                e.preventDefault();
+                                document.getElementById("btn-confirm-order")?.focus();
+                            } else if (e.key === "ArrowUp") {
+                                e.preventDefault();
+                                const sundryCell = sundryTableRef.current?.querySelector(`[data-r="${Math.max(0, sundryRows.length - 1)}"][data-c="2"] input, [data-r="${Math.max(0, sundryRows.length - 1)}"][data-c="0"] select`) as HTMLElement | null;
+                                if (sundryCell) { sundryCell.focus(); return; }
+                                const itemCell = itemsTableRef.current?.querySelector(`[data-r="${Math.max(0, fields.length - 1)}"][data-c="2"] input`) as HTMLElement | null;
+                                itemCell?.focus();
+                            }
+                        }}
+                        className={`inline-flex items-center justify-center gap-2 border-none outline-none font-semibold transition-all duration-250 rounded-lg focus-visible:ring-2 focus-visible:ring-accent h-[38px] px-3.5 text-[13px] bg-card-2 text-ink border border-line-soft hover:bg-card hover:border-line shadow-xs ${isSubmitting || isConfirming ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                        {isSubmitting ? "Saving..." : (isEditMode ? "Update Draft" : "Save as Draft")}
+                    </button>
+                    <button
+                        id="btn-confirm-order"
                         type="button"
+                        data-nav
                         onClick={handleSubmit((data) => onSubmit(data, true))}
                         disabled={isSubmitting || isConfirming}
-                    />
+                        onKeyDown={(e) => {
+                            if (e.key === "ArrowLeft") {
+                                e.preventDefault();
+                                document.getElementById("btn-save-draft")?.focus();
+                            } else if (e.key === "ArrowUp") {
+                                e.preventDefault();
+                                const sundryCell = sundryTableRef.current?.querySelector(`[data-r="${Math.max(0, sundryRows.length - 1)}"][data-c="2"] input, [data-r="${Math.max(0, sundryRows.length - 1)}"][data-c="0"] select`) as HTMLElement | null;
+                                if (sundryCell) { sundryCell.focus(); return; }
+                                const itemCell = itemsTableRef.current?.querySelector(`[data-r="${Math.max(0, fields.length - 1)}"][data-c="2"] input`) as HTMLElement | null;
+                                itemCell?.focus();
+                            }
+                        }}
+                        className={`inline-flex items-center justify-center gap-2 border-none outline-none font-semibold transition-all duration-250 rounded-lg focus-visible:ring-2 focus-visible:ring-accent h-[38px] px-3.5 text-[13px] bg-gradient-to-r from-accent to-emerald-500 hover:from-accent/90 hover:to-emerald-500/90 text-white shadow-md shadow-accent/20 ${isSubmitting || isConfirming ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                        {isConfirming ? "Confirming..." : "Confirm Order"}
+                    </button>
                 </div>
 
             </div>

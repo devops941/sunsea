@@ -107,6 +107,8 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
 
       <div className="flex relative rounded-md h-10 border border-line-soft focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-card-2">
         <input
+          name={name}
+          data-nav
           type="number"
           value={displayValue}
           onChange={handleQtyChange}

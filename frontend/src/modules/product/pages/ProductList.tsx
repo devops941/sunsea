@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaPlus, FaCog } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaCog, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -18,6 +19,7 @@ import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { productService } from "../../../services/productService";
 import { useListCache } from "../../../hooks/useListCache";
@@ -33,6 +35,9 @@ import { getImageUrl } from "../../../utils/ImageUrls";
 import { categoryService } from "../../../services/categoryService";
 
 const ITEMS_PER_PAGE = 15;
+
+type SortOrder = "default" | "asc" | "desc";
+const PRODUCT_SORT_KEY = "sunsea_product_sort_name";
 
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
@@ -59,13 +64,58 @@ const ProductList: React.FC = () => {
 
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [categoryFilter, setCategoryFilter] = useState("");
+    const [activeFilter, setActiveFilter] = useState("");
+    const [draftCategoryFilter, setDraftCategoryFilter] = useState("");
+    const [draftActiveFilter, setDraftActiveFilter] = useState("");
     const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(PRODUCT_SORT_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            const next: SortOrder = prev === "default" ? "asc" : prev === "asc" ? "desc" : "default";
+            try { localStorage.setItem(PRODUCT_SORT_KEY, next); } catch (_) {}
+            return next;
+        });
+    }, []);
+
+    const activeFilterCount = [
+        categoryFilter !== "",
+        activeFilter !== "",
+    ].filter(Boolean).length;
+
+    const hasActiveFilters = activeFilterCount > 0;
+
+    const handleApplyFilters = useCallback(() => {
+        setCategoryFilter(draftCategoryFilter);
+        setActiveFilter(draftActiveFilter);
+        setCurrentPage(1);
+    }, [draftCategoryFilter, draftActiveFilter]);
+
+    const handleClearFilters = useCallback(() => {
+        setDraftCategoryFilter("");
+        setDraftActiveFilter("");
+        setCategoryFilter("");
+        setActiveFilter("");
+        setCurrentPage(1);
+    }, []);
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState<string | null>(null);
 
-    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => can("products.create") && navigate("/products/create"),
+        onSort: () => toggleSortOrder(),
+    });
     const [isDeleting, setIsDeleting] = useState(false);
 
     // Capacity change modal
@@ -125,10 +175,11 @@ const ProductList: React.FC = () => {
                 p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 p.productCode?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesCategory = !categoryFilter || String(p.categoryId) === categoryFilter;
-            return matchesSearch && matchesCategory;
+            const matchesActive = activeFilter === "" ||
+                (activeFilter === "true" ? p.isActive : !p.isActive);
+            return matchesSearch && matchesCategory && matchesActive;
         });
-    }, [products, searchTerm, categoryFilter]);
-
+    }, [products, searchTerm, categoryFilter, activeFilter]);
     useSocketSync("productCapacityHistory", undefined, () => {
         if (showViewModal && selectedProduct) {
             productCapacityHistoryService.fetchByProduct(Number(selectedProduct.id))
@@ -147,14 +198,10 @@ const ProductList: React.FC = () => {
         setCurrentPage(1);
     }, []);
 
-    const handleCategoryFilter = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setCategoryFilter(e.target.value);
-        setCurrentPage(1);
-    }, []);
-
     const handleView = useCallback(async (product: any) => {
         setSelectedProduct(product);
         setShowViewModal(true);
+        setTimeout(() => tableRef.current?.focus(), 50);
         setLoadingCapacity(true);
         try {
             const records = await productCapacityHistoryService.fetchByProduct(Number(product.id));
@@ -171,6 +218,8 @@ const ProductList: React.FC = () => {
             state: product,
         });
     }, [navigate]);
+
+    const tableRef = useRef<HTMLDivElement>(null);
 
     const openCapModal = useCallback((product: any) => {
         setCapProduct(product);
@@ -261,7 +310,16 @@ const ProductList: React.FC = () => {
         }
     };
 
-    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+    const sortedProducts = useMemo(() => {
+        if (sortOrder === "default") return filteredProducts;
+        return [...filteredProducts].sort((a, b) => {
+            const nameA = (a.productName || "").toLowerCase();
+            const nameB = (b.productName || "").toLowerCase();
+            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        });
+    }, [filteredProducts, sortOrder]);
+
+    const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ITEMS_PER_PAGE));
     const safeCurrentPage = Math.min(currentPage, totalPages);
     
     const fetchProductsForExport = useCallback(async () => {
@@ -289,7 +347,14 @@ const ProductList: React.FC = () => {
     }, []);
 
     const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedProducts = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedProducts = sortedProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: paginatedProducts.length,
+        onEnter: (i) => { const item = paginatedProducts[i]; if (item) handleView(item); },
+        onEdit: (i) => { const item = paginatedProducts[i]; if (item && can("products.edit")) handleEdit(item); },
+        containerRef: tableRef,
+    });
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -299,7 +364,29 @@ const ProductList: React.FC = () => {
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        { header: "Product Name", render: (product) => <span className="whitespace-nowrap">{product.productName}</span>, width: "200px" },
+        {
+            header: "Product Name",
+            width: "200px",
+            headerNode: (
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                    title={`Sort Alphabetically (F6) — ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A to Z" : "Z to A"}`}
+                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                >
+                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>PRODUCT NAME</span>
+                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                        {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                    </span>
+                    {sortOrder !== "default" && (
+                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                            {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                        </span>
+                    )}
+                </button>
+            ),
+            render: (product) => <span className="whitespace-nowrap">{product.productName}</span>,
+        },
         { header: "Category", render: (product) => product.category?.name || "-" },
         {
             header: "Product Type",
@@ -358,15 +445,6 @@ const ProductList: React.FC = () => {
                             <h2 className="text-2xl font-bold text-ink">Production Product</h2>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                            <div className="w-48">
-                                <SelectInput
-                                    name="categoryFilter"
-                                    value={categoryFilter}
-                                    onChange={handleCategoryFilter}
-                                    options={categoryOptions}
-                                    defaultOptionLabel="All Categories"
-                                />
-                            </div>
                             <div className="w-full md:w-64">
                                 <SearchInput
                                     value={searchTerm}
@@ -374,6 +452,51 @@ const ProductList: React.FC = () => {
                                     placeholder="Search product..."
                                 />
                             </div>
+
+                            {/* Filter Popover */}
+                            <FilterPopover
+                                activeFilterCount={activeFilterCount}
+                                hasActiveFilters={hasActiveFilters}
+                                onOpen={() => {
+                                    setDraftCategoryFilter(categoryFilter);
+                                    setDraftActiveFilter(activeFilter);
+                                }}
+                                onApply={handleApplyFilters}
+                                onClear={handleClearFilters}
+                            >
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                            Category
+                                        </label>
+                                        <SelectInput
+                                            name="categoryFilter"
+                                            value={draftCategoryFilter}
+                                            onChange={(e) => setDraftCategoryFilter(e.target.value)}
+                                            options={categoryOptions}
+                                            defaultOptionLabel="All Categories"
+                                            noMargin
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                            Status
+                                        </label>
+                                        <SelectInput
+                                            name="activeFilter"
+                                            value={draftActiveFilter}
+                                            onChange={(e) => setDraftActiveFilter(e.target.value)}
+                                            options={[
+                                                { label: "All Status", value: "" },
+                                                { label: "Active", value: "true" },
+                                                { label: "Inactive", value: "false" },
+                                            ]}
+                                            noMargin
+                                        />
+                                    </div>
+                                </div>
+                            </FilterPopover>
+
                             {can("products.export") && (
                                 <ExportCSVButton
                                     fetchData={fetchProductsForExport}
@@ -386,14 +509,43 @@ const ProductList: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Active filter chips */}
+                    {hasActiveFilters && (
+                        <div className="flex items-center gap-2 px-6 py-2.5 border-b border-line flex-wrap">
+                            <span className="text-xs text-ink-subtle">Active filters:</span>
+
+                            {categoryFilter && (
+                                <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                    Category: {categoryOptions.find((c) => c.value === categoryFilter)?.label || categoryFilter}
+                                    <FaTimes
+                                        className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                        onClick={() => { setCategoryFilter(""); setDraftCategoryFilter(""); setCurrentPage(1); }}
+                                    />
+                                </span>
+                            )}
+
+                            {activeFilter !== "" && (
+                                <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                    Status: {activeFilter === "true" ? "Active" : "Inactive"}
+                                    <FaTimes
+                                        className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                        onClick={() => { setActiveFilter(""); setDraftActiveFilter(""); setCurrentPage(1); }}
+                                    />
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     {/* View Table */}
-                    <div className="p-0">
+                    <div ref={tableRef} tabIndex={0} data-table-nav className="p-0 outline-none">
                         <DataTable
                             columns={columns}
                             data={paginatedProducts}
                             rowKey={(row) => row.id}
                             loading={loading}
                             emptyMessage="No products found."
+                            rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                            onRowClick={(item, i) => { setFocusedIndex(i); handleView(item); }}
                             pagination={totalPages > 1 ? {
                                 currentPage: safeCurrentPage,
                                 totalPages,

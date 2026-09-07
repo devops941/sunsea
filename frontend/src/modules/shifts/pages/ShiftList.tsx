@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaPlus } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -21,6 +22,8 @@ import { usePermission } from "../../../hooks/usePermission";
 import { useListCache } from "../../../hooks/useListCache";
 
 const ITEMS_PER_PAGE = 15;
+const SORT_STORAGE_KEY = "sunsea_shift_sort_name";
+type SortOrder = "default" | "asc" | "desc";
 
 const formatTime12h = (time24: string): string => {
     if (!time24) return "N/A";
@@ -60,6 +63,7 @@ const calculateWorkingHours = (startTime: string, endTime: string, breakDuration
 
 const ShiftList: React.FC = () => {
     const navigate = useNavigate();
+    const tableRef = useRef<HTMLDivElement>(null);
     const { can } = usePermission();
     const canCreateShift = can("shifts.create");
     const canEditShift = can("shifts.edit");
@@ -76,6 +80,38 @@ const ShiftList: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            let next: SortOrder = "default";
+            if (prev === "default") next = "asc";
+            else if (prev === "asc") next = "desc";
+            else next = "default";
+            try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+            return next;
+        });
+    }, []);
+
+    useEffect(() => {
+        const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+                e.preventDefault();
+                toggleSortOrder();
+            }
+        };
+        window.addEventListener("keydown", handleSortShortcut);
+        return () => window.removeEventListener("keydown", handleSortShortcut);
+    }, [toggleSortOrder]);
+
     const fetcher = useCallback(async (_signal: AbortSignal) => {
         const list = await shiftService.fetchAll();
         return { data: list, total: list.length };
@@ -87,7 +123,16 @@ const ShiftList: React.FC = () => {
         fetcher,
     });
 
-    usePageShortcuts({ onRefresh: () => refresh(), onDelete: () => setShowDeleteModal(true) });
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onSort: () => toggleSortOrder(),
+        onDelete: () => setShowDeleteModal(true),
+        onNew: () => canCreateShift && navigate("/shifts/create"),
+        onExport: () => {
+            const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+            exportBtn?.click();
+        },
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -101,9 +146,27 @@ const ShiftList: React.FC = () => {
         );
     }, [data, searchTerm]);
 
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const sortedData = useMemo(() => {
+        if (sortOrder === "default") return filteredData;
+        return [...filteredData].sort((a, b) => {
+            const nameA = (a.shiftName || "").trim().toLowerCase();
+            const nameB = (b.shiftName || "").trim().toLowerCase();
+            return sortOrder === "asc"
+                ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
+                : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+        });
+    }, [filteredData, sortOrder]);
+
+    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedData = sortedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: paginatedData.length,
+        onEnter: (i) => { const item = paginatedData[i]; if (item) { setSelectedItem(item); setShowViewModal(true); } },
+        onEdit: (i) => { const item = paginatedData[i]; if (item && canEditShift) handleOpenEdit(item); },
+        containerRef: tableRef,
+    });
 
     // CSV Export Configuration
     const { csvData, csvColumns, csvFilename } = useMemo(() => {
@@ -122,6 +185,12 @@ const ShiftList: React.FC = () => {
             csvFilename: `Shift_List_${new Date().toISOString().split("T")[0]}.csv`,
         };
     }, [data]);
+
+    const handleCloseViewModal = useCallback(() => {
+        setShowViewModal(false);
+        setSelectedItem(null);
+        setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+    }, []);
 
     const handleOpenView = useCallback((item: Shift) => {
         setSelectedItem(item);
@@ -199,12 +268,19 @@ const ShiftList: React.FC = () => {
                     </div>
 
                     {/* Table */}
-                    <div className="p-0 overflow-hidden rounded-b-2xl">
+                    <div
+                        ref={tableRef}
+                        tabIndex={0}
+                        data-table-nav
+                        className="p-0 overflow-hidden rounded-b-2xl outline-none"
+                    >
                         <DataTable
                             data={paginatedData}
                             rowKey={(item) => item.id}
                             loading={loading}
                             emptyMessage="No shifts found."
+                            rowClassName={(_row, index) => index === focusedIndex ? "bg-primary/8" : ""}
+                            onRowClick={(item, index) => { setFocusedIndex(index); tableRef.current?.focus({ preventScroll: true }); handleOpenView(item); }}
                             pagination={
                                 totalPages > 1
                                         ? {
@@ -217,7 +293,30 @@ const ShiftList: React.FC = () => {
                                 columns={[
                                     { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
                                     { header: "SHIFT CODE", accessor: "shiftCode" },
-                                    { header: "SHIFT NAME", accessor: "shiftName" },
+                                    {
+                                        header: "SHIFT NAME",
+                                        accessor: "shiftName",
+                                        headerNode: (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                                                title="Sort Alphabetically (F6)"
+                                                className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                            >
+                                                <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                                    Shift Name
+                                                </span>
+                                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                                                    {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                                                </span>
+                                                {sortOrder !== "default" && (
+                                                    <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                                        {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ),
+                                    },
                                     { header: "START TIME", render: (item) => formatTime12h(item.startTime) },
                                     { header: "END TIME", render: (item) => formatTime12h(item.endTime) },
                                     { header: "BREAK DURATION", render: (item) => item.breakDuration ? `${item.breakDuration} mins` : "N/A" },
@@ -242,7 +341,7 @@ const ShiftList: React.FC = () => {
                 {/* View Modal */}
                 <CommonViewModal
                     show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
+                    onHide={handleCloseViewModal}
                     modalTitle="Shift Details"
                     avatarText={selectedItem ? selectedItem.shiftName.charAt(0).toUpperCase() : ""}
                     headerTitle={selectedItem ? selectedItem.shiftName : ""}

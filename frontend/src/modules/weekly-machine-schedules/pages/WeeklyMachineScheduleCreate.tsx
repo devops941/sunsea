@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { FaSave, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
@@ -31,8 +33,37 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
     const [selectedOrders, setSelectedOrders] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
-    useFormShortcuts({});
+    const formRef = useRef<HTMLDivElement>(null);
+    const isDirtyRef = useRef(false);
+    const saveConfirmOpenRef = useRef(false);
+    const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+    useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    useFormShortcuts({ onSave: () => { if (!isSubmitting) handleSubmit(); } });
+
+    const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (saveConfirmOpenRef.current) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/weekly-machine-schedules");
+            }
+        };
+        document.addEventListener("keydown", handleEscape, true);
+        return () => document.removeEventListener("keydown", handleEscape, true);
+    }, [navigate]);
 
     useEffect(() => {
         const loadProductionOrders = async () => {
@@ -74,6 +105,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 const endDate = new Date(mondayDate);
                 endDate.setDate(mondayDate.getDate() + 6);
                 setWeekEndDate(`${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`);
+                setIsDirty(true);
             }
         } else {
             setWeekStartDate("");
@@ -108,6 +140,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
     const handleToggleSelect = (poId: string) => {
         setSelectedOrders(prev => ({ ...prev, [poId]: !prev[poId] }));
+        setIsDirty(true);
     };
 
     const handleSubmit = async () => {
@@ -161,7 +194,8 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     const selectedCount = Object.values(selectedOrders).filter(Boolean).length;
 
     return (
-        <div className="w-full bg-card rounded-2xl shadow-sm border border-line" style={{ maxWidth: 1200 }}>
+        <>
+        <div ref={formRef} onKeyDown={handleFormKeyDown} onInput={() => setIsDirty(true)} className="w-full bg-card rounded-2xl shadow-sm border border-line" style={{ maxWidth: 1200 }}>
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 border-b border-line">
                 <div>
@@ -285,6 +319,17 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 </div>
             )}
         </div>
+        <CommonConfirmModal
+            show={saveConfirmOpen}
+            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onConfirm={() => { setSaveConfirmOpen(false); navigate("/weekly-machine-schedules"); }}
+            title="Discard Changes?"
+            message="You have unsaved changes. Are you sure you want to leave without saving?"
+            confirmText="Discard"
+            confirmVariant="danger"
+            onCancel={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+        />
+        </>
     );
 };
 

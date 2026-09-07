@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FaSave, FaArrowLeft, FaPlus } from "react-icons/fa";
@@ -20,6 +21,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import IndiaPhoneInput, { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -58,7 +60,37 @@ const GoodsDispatchCreate: React.FC = () => {
     destinationStoreId: "",
   });
 
-  useFormShortcuts({});
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  const formRef = useRef<HTMLDivElement>(null);
+  const isDirtyRef = useRef(false);
+  const saveConfirmOpenRef = useRef(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  useFormShortcuts({ onSave: () => { if (!loading) handleSubmit(); } });
+
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (saveConfirmOpenRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (isDirtyRef.current) {
+        lastFocusedRef.current = document.activeElement as HTMLElement;
+        setSaveConfirmOpen(true);
+      } else {
+        navigate("/production/goods-dispatch");
+      }
+    };
+    document.addEventListener("keydown", handleEscape, true);
+    return () => document.removeEventListener("keydown", handleEscape, true);
+  }, [navigate]);
 
   useEffect(() => {
     dispatch(fetchEligibleOrders({}));
@@ -68,6 +100,7 @@ const GoodsDispatchCreate: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setIsDirty(true);
   };
 
   const handleSelectPO = (po: any) => {
@@ -93,6 +126,7 @@ const GoodsDispatchCreate: React.FC = () => {
     }
 
     setSelectedPOs((prev) => [...prev, { ...po, dispatchQty: po.pendingDispatchQty, remarks: "" }]);
+    setIsDirty(true);
   };
 
   const handleRemovePO = (productionOrderId: string) => {
@@ -294,7 +328,8 @@ const GoodsDispatchCreate: React.FC = () => {
   );
 
   return (
-    <div>
+    <>
+    <div ref={formRef} onKeyDown={handleFormKeyDown} onInput={() => setIsDirty(true)}>
       <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-line">
@@ -356,6 +391,17 @@ const GoodsDispatchCreate: React.FC = () => {
         </div>
       </div>
     </div>
+    <CommonConfirmModal
+      show={saveConfirmOpen}
+      onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+      onConfirm={() => { setSaveConfirmOpen(false); navigate("/production/goods-dispatch"); }}
+      title="Discard Changes?"
+      message="You have unsaved changes. Are you sure you want to leave without saving?"
+      confirmText="Discard"
+      confirmVariant="danger"
+      onCancel={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+    />
+    </>
   );
 };
 

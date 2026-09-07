@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { FaPlus } from "react-icons/fa";
+import { FaSave, FaUndo, FaCheck, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService } from "../../../../services/returnService";
 import { customerService } from "../../../../services/customerService";
 import { productService } from "../../../../services/productService";
 import { salesProductService } from "../../../../services/salesProductService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
-import SelectInput from "../../../../components/form/SelectInput/SelectInput";
-import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../../hooks/useFormKeyboardNav";
+import AutocompleteInput, { type AutocompleteOption } from "../../../../components/form/AutocompleteInput/AutocompleteInput";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
+import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CustomButton from "../../../../components/ui/Button/Button";
-import BackButton from "../../../../components/ui/BackButton/BackButton";
 import TextArea from "../../../../components/form/TextArea/TextArea";
-import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
-import TextInput from "../../../../components/form/TextInput/TextInput";
+import BusyItemsTable, { type BusyColumn } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 
 interface ReturnComponent {
   componentProductId: number;
@@ -25,33 +24,55 @@ interface ReturnComponent {
   weightPerPiece: number;
 }
 
-interface FormReturnRow {
-  productId: number;
-  salesInvoiceItemId?: string;
-  description: string;
+interface ReturnLineItem {
+  id: string;
+  productId: string;
+  productName: string;
   productCode?: string;
   productGroup?: string;
   quantity: number;
+  unitPrice: number;
   weight: number;
   uom: string;
   baseUoms?: string;
-  maxReturnable: number;
-  unitPrice: number;
   taxRate: number;
   reason?: string;
   components: ReturnComponent[];
+  amount: number;
 }
+
+const emptyReturnLine = (): ReturnLineItem => ({
+  id: crypto.randomUUID(),
+  productId: "",
+  productName: "",
+  productCode: "",
+  productGroup: "",
+  quantity: 1,
+  unitPrice: 0,
+  weight: 0,
+  uom: "kg",
+  baseUoms: "kg, g, t",
+  taxRate: 0,
+  reason: "Sales Return",
+  components: [],
+  amount: 0,
+});
 
 export const SalesReturnCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
   const isEditMode = Boolean(id);
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const itemsTableRef = useRef<HTMLDivElement>(null);
+  const handleFormKeyDown = useFormKeyboardNav(formRef);
+
   const { data: company } = useAppSelector((state) => state.company);
-  const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null);
+  const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState<boolean>(false);
 
   // Form states
   const [customerId, setCustomerId] = useState<string>("");
@@ -59,83 +80,116 @@ export const SalesReturnCreatePage: React.FC = () => {
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [salesProductsList, setSalesProductsList] = useState<any[]>([]);
   const [narration, setNarration] = useState<string>("");
-  const [returnRows, setReturnRows] = useState<FormReturnRow[]>([]);
+  const [lines, setLines] = useState<ReturnLineItem[]>([emptyReturnLine()]);
   const [originalReturnNo, setOriginalReturnNo] = useState<string>("");
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const loadFormData = async () => {
-      setLoading(true);
-      try {
-        const [cRes, pList, spList] = await Promise.all([
-          customerService.fetchAll({ page: 1, limit: 500 }),
-          productService.fetchAll(),
-          salesProductService.fetchAll(),
-        ]);
-        const cList = Array.isArray(cRes) ? cRes : cRes?.customers || [];
-        setCustomers(cList);
-        setAllProducts(pList || []);
-        setSalesProductsList(Array.isArray(spList) ? spList : []);
+  const focusFirstField = useCallback(() => {
+    setTimeout(() => {
+      const firstEl = formRef.current?.querySelector<HTMLElement>(
+        "[data-nav]:not([disabled])"
+      );
+      firstEl?.focus();
+    }, 100);
+  }, []);
 
-        // If edit mode, fetch the existing return
-        if (id) {
-          const ret = await returnService.fetchSalesReturnById(id);
-          if (ret) {
-            setCustomerId(ret.customerId);
-            setNarration(ret.narration || "");
-            setOriginalReturnNo(ret.returnNo || "");
+  const loadFormData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cRes, pList, spList] = await Promise.all([
+        customerService.fetchAll({ page: 1, limit: 500 }),
+        productService.fetchAll(),
+        salesProductService.fetchAll(),
+      ]);
+      const cList = Array.isArray(cRes) ? cRes : cRes?.customers || [];
+      setCustomers(cList);
+      setAllProducts(pList || []);
+      setSalesProductsList(Array.isArray(spList) ? spList : []);
 
-            if (ret.items && ret.items.length > 0) {
-              const rows: FormReturnRow[] = ret.items.map((item: any) => {
-                let uomCode = String(item.uom || "kg").toLowerCase();
-                if (uomCode === "ton" || uomCode === "tonne" || uomCode === "tons") uomCode = "t";
+      // If edit mode, fetch the existing return
+      if (id) {
+        const ret = await returnService.fetchSalesReturnById(id);
+        if (ret) {
+          setCustomerId(ret.customerId);
+          setNarration(ret.narration || "");
+          setOriginalReturnNo(ret.returnNo || "");
 
-                const prodObj = pList?.find((p: any) => Number(p.id) === Number(item.productId));
-                const groupName = (prodObj as any)?.category?.name || (prodObj as any)?.category?.categoryName || "Sales Group";
-                const rawBaseUom = (prodObj as any)?.baseUom || (prodObj as any)?.uom?.baseUom || (prodObj as any)?.weightUom || "kg, g, t";
+          if (ret.items && ret.items.length > 0) {
+            const loadedLines: ReturnLineItem[] = ret.items.map((item: any) => {
+              let uomCode = String(item.uom || "kg").toLowerCase();
+              if (uomCode === "ton" || uomCode === "tonne" || uomCode === "tons") uomCode = "t";
 
-                return {
-                  productId: Number(item.productId),
-                  salesInvoiceItemId: item.salesInvoiceItemId || undefined,
-                  description: item.product?.productName || prodObj?.productName || `Product #${item.productId}`,
-                  productCode: prodObj?.productCode || "",
-                  productGroup: groupName,
-                  quantity: Number(item.quantity || 0),
-                  weight: Number(item.weight || 0),
-                  uom: uomCode,
-                  baseUoms: rawBaseUom,
-                  maxReturnable: 999999,
-                  unitPrice: Number(item.unitPrice || 0),
-                  taxRate: Number(item.taxRate || 0),
-                  reason: item.reason || "Sales Return",
-                  components: [],
-                };
-              });
-              setReturnRows(rows);
-            }
+              const prodObj = pList?.find((p: any) => Number(p.id) === Number(item.productId));
+              const groupName = (prodObj as any)?.category?.name || (prodObj as any)?.category?.categoryName || "Sales Group";
+              const rawBaseUom = (prodObj as any)?.baseUom || (prodObj as any)?.uom?.baseUom || (prodObj as any)?.weightUom || "kg, g, t";
+              const q = Number(item.quantity || 0);
+              const up = Number(item.unitPrice || 0);
+
+              return {
+                id: crypto.randomUUID(),
+                productId: String(item.productId),
+                productName: item.product?.productName || prodObj?.productName || `Product #${item.productId}`,
+                productCode: prodObj?.productCode || "",
+                productGroup: groupName,
+                quantity: q,
+                weight: Number(item.weight || 0),
+                uom: uomCode,
+                baseUoms: rawBaseUom,
+                unitPrice: up,
+                taxRate: Number(item.taxRate || 0),
+                reason: item.reason || "Sales Return",
+                components: [],
+                amount: q * up,
+              };
+            });
+            setLines(loadedLines);
           }
         }
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load master data for Sales Return");
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load master data for Sales Return");
+    } finally {
+      setLoading(false);
+      focusFirstField();
+    }
+  }, [id, focusFirstField]);
 
+  useEffect(() => {
     loadFormData();
-  }, [id]);
+  }, [loadFormData]);
+
+  // Selected customer object and header info
+  const selectedCustomer = useMemo(() => {
+    return customers.find((c: any) => String(c.id) === String(customerId));
+  }, [customers, customerId]);
+
+  const customerHeaderInfo = useMemo(() => {
+    if (!selectedCustomer) return null;
+    const name = selectedCustomer.displayName || selectedCustomer.firmName || "";
+    const group = selectedCustomer.customerType?.name || selectedCustomer.billingCity || selectedCustomer.city || "";
+    const rawGrade = selectedCustomer.customerGrade?.name || selectedCustomer.grade || "";
+    const grade = rawGrade ? rawGrade.replace(/grade\s*/i, "").trim() : "";
+    const bal = Number(selectedCustomer.balanceAmount ?? selectedCustomer.netBalance ?? selectedCustomer.openingBalance ?? 0);
+    const bType = (selectedCustomer.balanceType || selectedCustomer.openingBalanceType || "").toString().toUpperCase();
+    const isDr = bType.startsWith("D");
+    const balLabel = bal ? `₹${bal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ${isDr ? "Dr" : "Cr"}` : "";
+
+    return { name, group, grade: grade ? `${grade} Grade` : "", balLabel, isDr };
+  }, [selectedCustomer]);
+
+  const getGradeName = useCallback(() => {
+    return selectedCustomer?.customerGrade?.name || selectedCustomer?.grade;
+  }, [selectedCustomer]);
 
   // Sales Products list with grade-based pricing from component products
   const availableSalesProducts = useMemo(() => {
-    const selectedCustomer = customers.find((c: any) => String(c.id) === String(customerId));
-    const gradeName = selectedCustomer?.customerGrade?.name || selectedCustomer?.grade;
+    const gradeName = getGradeName();
 
     return salesProductsList
       .filter((sp: any) => sp.isActive !== false)
       .map((sp: any) => {
-        // Calculate price from component products based on customer grade
         let totalPrice = 0;
         let defaultWeight = 0;
         const comps = sp.components || [];
@@ -154,7 +208,6 @@ export const SalesReturnCreatePage: React.FC = () => {
           }
         });
 
-        // Sum weight from all components
         comps.forEach((comp: any) => {
           const prod = comp.componentProduct || allProducts.find((p: any) => String(p.id) === String(comp.componentProductId));
           if (prod) {
@@ -175,55 +228,51 @@ export const SalesReturnCreatePage: React.FC = () => {
           components: comps,
         };
       });
-  }, [customerId, customers, allProducts, salesProductsList]);
+  }, [getGradeName, allProducts, salesProductsList]);
 
-  const createEmptyRow = (): FormReturnRow => ({
-    productId: 0,
-    description: "",
-    productCode: "",
-    productGroup: "",
-    quantity: 0,
-    weight: 0,
-    uom: "kg",
-    baseUoms: "kg, g, t",
-    maxReturnable: 999999,
-    unitPrice: 0,
-    taxRate: 0,
-    components: [],
-  });
+  // Customer Autocomplete options
+  const customerAutocompleteOptions: AutocompleteOption[] = useMemo(() => {
+    return customers.map((c: any) => {
+      const name = c.displayName || c.firmName || String(c.id);
+      const group = c.customerType?.name || c.billingCity || c.city || "—";
+      const rawGrade = c.customerGrade?.name || c.grade || "—";
+      const grade = rawGrade ? rawGrade.replace(/grade\s*/i, "").trim() : "—";
+      const bal = Number(c.balanceAmount ?? c.netBalance ?? c.openingBalance ?? 0);
+      const bType = (c.balanceType || c.openingBalanceType || "").toString().toUpperCase();
+      const isDr = bType.startsWith("D");
+      const balLabel = bal ? `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : "Cr"}` : "";
 
-  // When Customer changes on CREATE mode, initialize rows
-  useEffect(() => {
-    if (isEditMode) return;
-    if (!customerId) {
-      setReturnRows([]);
-      return;
-    }
-    if (returnRows.length === 0) {
-      setReturnRows([createEmptyRow()]);
-    } else {
-      setReturnRows((prev) =>
-        prev.map((row) => {
-          if (!row.productId) return row;
-          const found = availableSalesProducts.find((p) => p.productId === row.productId);
-          return found ? { ...row, unitPrice: found.unitPrice, baseUoms: found.baseUoms } : row;
-        })
-      );
-    }
-  }, [customerId, isEditMode]);
+      return {
+        value: String(c.id),
+        label: name,
+        selectedLabel: `${name}${grade !== "—" ? ` · ${grade}` : ""}${balLabel ? ` · ${balLabel}` : ""}`,
+        info: (
+          <div className="flex items-center gap-3 text-[11px]">
+            {group !== "—" && <span className="text-ink-subtle">{group}</span>}
+            {grade !== "—" && <span className="text-ink-subtle">{grade}</span>}
+            {balLabel && (
+              <span className={`font-semibold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>{balLabel}</span>
+            )}
+          </div>
+        ),
+      };
+    });
+  }, [customers]);
 
-  const handleAddRow = () => {
-    setReturnRows((prev) => [...prev, createEmptyRow()]);
-    if (errors.rows) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.rows;
-        return next;
-      });
-    }
-  };
+  // Product Autocomplete options for inline table
+  const productAutocompleteOptions: AutocompleteOption[] = useMemo(() => {
+    return availableSalesProducts.map((p) => ({
+      value: String(p.productId),
+      label: p.description,
+      info: (
+        <span className="text-[11px] text-ink-subtle font-mono">
+          ₹{Number(p.unitPrice).toFixed(2)}
+        </span>
+      ),
+    }));
+  }, [availableSalesProducts]);
 
-  const buildComponents = (sp: any): ReturnComponent[] => {
+  const buildComponents = useCallback((sp: any): ReturnComponent[] => {
     const comps = sp?.components || [];
     return comps.map((comp: any) => {
       const prod = comp.componentProduct || allProducts.find((p: any) => String(p.id) === String(comp.componentProductId));
@@ -235,10 +284,10 @@ export const SalesReturnCreatePage: React.FC = () => {
         weightPerPiece: Number(prod?.weightPerPiece || 0),
       };
     });
-  };
+  }, [allProducts]);
 
-  const recalcWeightAndPrice = (row: FormReturnRow, gradeName?: string): FormReturnRow => {
-    const included = row.components.filter((c) => c.included);
+  const recalcWeightAndPrice = useCallback((comps: ReturnComponent[], qty: number, gradeName?: string) => {
+    const included = comps.filter((c) => c.included);
     let totalWeight = 0;
     let totalPrice = 0;
 
@@ -256,137 +305,358 @@ export const SalesReturnCreatePage: React.FC = () => {
     });
 
     return {
-      ...row,
-      weight: totalWeight * row.quantity,
+      weight: totalWeight * qty,
       unitPrice: totalPrice,
     };
-  };
+  }, [allProducts]);
 
-  const getGradeName = () => {
-    const selectedCustomer = customers.find((c: any) => String(c.id) === String(customerId));
-    return selectedCustomer?.customerGrade?.name || selectedCustomer?.grade;
-  };
+  // Update line helper
+  const updateLine = useCallback((id: string, patch: Partial<ReturnLineItem>) => {
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.id !== id) return l;
+        const updated = { ...l, ...patch };
+        if (patch.quantity !== undefined || patch.unitPrice !== undefined) {
+          updated.amount = (Number(updated.quantity) || 0) * (Number(updated.unitPrice) || 0);
+        }
+        return updated;
+      })
+    );
+  }, []);
 
-  const handleProductSelect = (index: number, selectedProductIdStr: string) => {
-    const prodId = Number(selectedProductIdStr);
-    const found = availableSalesProducts.find((p) => p.productId === prodId);
-
-    setReturnRows((prev) => {
-      const updated = [...prev];
-      if (found) {
-        const qty = updated[index].quantity > 0 ? updated[index].quantity : 1;
-        const components = buildComponents(found);
-        let row: FormReturnRow = {
-          ...updated[index],
-          productId: found.productId,
-          description: found.description,
-          productCode: found.productCode,
-          productGroup: found.productGroup,
-          uom: found.uom || "kg",
-          baseUoms: found.baseUoms || "kg, g, t",
-          taxRate: found.taxRate,
-          quantity: qty,
-          components,
-          weight: 0,
-          unitPrice: 0,
-        };
-        row = recalcWeightAndPrice(row, getGradeName());
-        updated[index] = row;
-      } else {
-        updated[index] = {
-          ...updated[index],
-          productId: 0,
-          description: "",
-          productCode: "",
-          productGroup: "",
-          weight: 0,
-          uom: "kg",
-          baseUoms: "kg, g, t",
-          unitPrice: 0,
-          components: [],
-        };
-      }
-      return updated;
-    });
-
-    if (errors[`product_${index}`]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[`product_${index}`];
-        return next;
-      });
+  // When Customer changes on CREATE mode, re-price items or initialize rows
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!customerId) {
+      setLines([]);
+      return;
     }
-  };
-
-  const handleToggleComponent = (rowIndex: number, compIndex: number) => {
-    setReturnRows((prev) => {
-      const updated = [...prev];
-      const row = { ...updated[rowIndex] };
-      const comps = [...row.components];
-      comps[compIndex] = { ...comps[compIndex], included: !comps[compIndex].included };
-      row.components = comps;
-      updated[rowIndex] = recalcWeightAndPrice(row, getGradeName());
-      return updated;
-    });
-  };
-
-  const handleRowFieldChange = (index: number, field: "quantity" | "weight" | "unitPrice", value: number) => {
-    setReturnRows((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: Math.max(0, value) };
-
-      // Auto-recalculate weight when quantity changes
-      if (field === "quantity" && updated[index].components.length > 0) {
-        updated[index] = recalcWeightAndPrice(updated[index], getGradeName());
-      }
-
-      return updated;
-    });
-
-    if (field === "quantity" && errors[`qty_${index}`]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[`qty_${index}`];
-        return next;
-      });
+    if (lines.length === 0) {
+      setLines([emptyReturnLine()]);
+    } else {
+      const gradeName = getGradeName();
+      setLines((prev) =>
+        prev.map((l) => {
+          if (!l.productId) return l;
+          const found = availableSalesProducts.find((p) => String(p.productId) === l.productId);
+          if (found && l.components.length > 0) {
+            const { weight, unitPrice } = recalcWeightAndPrice(l.components, l.quantity, gradeName);
+            return {
+              ...l,
+              unitPrice,
+              weight,
+              amount: l.quantity * unitPrice,
+            };
+          }
+          return l;
+        })
+      );
     }
-    if (field === "weight" && errors[`weight_${index}`]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[`weight_${index}`];
-        return next;
-      });
-    }
-    if (field === "unitPrice" && errors[`unitPrice_${index}`]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[`unitPrice_${index}`];
-        return next;
-      });
-    }
-  };
+  }, [customerId, isEditMode, availableSalesProducts, getGradeName, recalcWeightAndPrice]);
 
-  const handleRowUomChange = (index: number, uom: string) => {
-    setReturnRows((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], uom };
-      return updated;
-    });
-  };
-
-  const handleRemoveRow = (index: number) => {
-    setReturnRows((prev) => {
-      const filtered = prev.filter((_, i) => i !== index);
-      return filtered.length === 0 ? [createEmptyRow()] : filtered;
-    });
-  };
-
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setCustomerId("");
-    setReturnRows([]);
+    setLines([emptyReturnLine()]);
     setNarration("");
     setErrors({});
-  };
+    focusFirstField();
+  }, [focusFirstField]);
+
+  // ── Global F-Keys / Shortcuts Integration (F2 / F9 Save, F8 Clear, F5 Refresh) ──
+  useFormShortcuts({
+    onSave: () => {
+      if (!submitting) {
+        handleSubmit();
+      }
+    },
+    onDelete: () => {
+      if (!isEditMode) {
+        handleReset();
+      }
+    },
+  });
+
+  // F5 Data Refresh
+  useEffect(() => {
+    const handleRefresh = async () => {
+      if (isEditMode && id) {
+        await loadFormData();
+        toast.info("Sales return refreshed");
+      } else if (!isEditMode) {
+        handleReset();
+        toast.info("Form reset");
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F5") {
+        e.preventDefault();
+        handleRefresh();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEditMode, id, loadFormData, handleReset]);
+
+  // Discard changes confirmation modal logic on Esc or Back
+  const isFormDirty = Boolean(
+    customerId ||
+    lines.some((r) => r.productId && r.quantity > 0) ||
+    narration
+  );
+
+  const handleBack = useCallback(() => {
+    if (isFormDirty) {
+      setSaveConfirmOpen(true);
+    } else {
+      navigate("/sales-returns");
+    }
+  }, [isFormDirty, navigate]);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    navigate("/sales-returns");
+  }, [navigate]);
+
+  const handleSaveFromModal = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      handleSubmit();
+    }, 150);
+  }, []);
+
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+    focusFirstField();
+  }, [focusFirstField]);
+
+  // ── Return Columns for BusyItemsTable ──
+  const returnColumns: BusyColumn<ReturnLineItem>[] = useMemo(() => {
+    return [
+      {
+        key: "productId",
+        header: "Product",
+        width: "1fr",
+        render: (row: ReturnLineItem, index: number) => {
+          if (isEditMode && row.productName && !availableSalesProducts.some((p) => String(p.productId) === row.productId)) {
+            return (
+              <div tabIndex={0} className="flex items-center w-full px-2 text-[13px] text-ink font-medium">
+                {row.productName}
+              </div>
+            );
+          }
+          return (
+            <AutocompleteInput
+              inline
+              name={`item-${row.id}`}
+              value={row.productId}
+              options={productAutocompleteOptions}
+              placeholder="Type to search product..."
+              onChange={(val) => {
+                const found = availableSalesProducts.find((p) => String(p.productId) === String(val));
+                if (found) {
+                  const comps = buildComponents(found);
+                  const gradeName = getGradeName();
+                  const qty = row.quantity > 0 ? row.quantity : 1;
+                  const { weight, unitPrice } = recalcWeightAndPrice(comps, qty, gradeName);
+
+                  updateLine(row.id, {
+                    productId: String(found.productId),
+                    productName: found.description,
+                    productCode: found.productCode,
+                    unitPrice,
+                    weight,
+                    uom: found.uom || "kg",
+                    baseUoms: found.baseUoms || "kg, g, t",
+                    taxRate: found.taxRate || 0,
+                    components: comps,
+                    quantity: qty,
+                    amount: qty * unitPrice,
+                  });
+                } else {
+                  updateLine(row.id, {
+                    productId: "",
+                    productName: "",
+                    productCode: "",
+                    unitPrice: 0,
+                    weight: 0,
+                    components: [],
+                    amount: 0,
+                  });
+                }
+
+                if (errors.lines) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.lines;
+                    return next;
+                  });
+                }
+
+                // Auto-focus next cell (Qty) immediately
+                setTimeout(() => {
+                  const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                  const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                  if (qtyInput) {
+                    qtyInput.focus();
+                    qtyInput.select?.();
+                  }
+                }, 50);
+              }}
+            />
+          );
+        },
+      },
+      {
+        key: "quantity",
+        header: "Qty",
+        width: "80px",
+        align: "center" as const,
+        render: (row: ReturnLineItem) => (
+          <div className="flex items-center justify-center w-full h-full relative">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={row.quantity === 0 && !row.productId ? "" : row.quantity}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, "");
+                const q = val === "" ? 0 : Number(val);
+                const gradeName = getGradeName();
+                let w = row.weight;
+                if (row.components && row.components.length > 0) {
+                  const calc = recalcWeightAndPrice(row.components, q, gradeName);
+                  w = calc.weight;
+                }
+                updateLine(row.id, {
+                  quantity: q,
+                  weight: w,
+                  amount: q * row.unitPrice,
+                });
+              }}
+              className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full"
+              placeholder="0"
+            />
+          </div>
+        ),
+      },
+      {
+        key: "unitPrice",
+        header: "Unit Price",
+        width: "110px",
+        align: "right" as const,
+        render: (row: ReturnLineItem) => (
+          <input
+            type="text"
+            inputMode="decimal"
+            value={row.unitPrice === 0 && !row.productId ? "" : row.unitPrice}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9.]/g, "");
+              const p = val === "" ? 0 : Number(val);
+              updateLine(row.id, {
+                unitPrice: p,
+                amount: row.quantity * p,
+              });
+            }}
+            className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full"
+            placeholder="0.00"
+          />
+        ),
+      },
+      {
+        key: "weight",
+        header: "Weight (KG)",
+        width: "100px",
+        align: "center" as const,
+        render: (row: ReturnLineItem) => (
+          <input
+            type="text"
+            inputMode="decimal"
+            value={row.weight === 0 && !row.productId ? "" : row.weight}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9.]/g, "");
+              const w = val === "" ? 0 : Number(val);
+              updateLine(row.id, { weight: w });
+            }}
+            className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full"
+            placeholder="0"
+          />
+        ),
+      },
+      {
+        key: "amount",
+        header: "Total",
+        width: "120px",
+        align: "right" as const,
+        render: (row: ReturnLineItem) => {
+          if (row.amount <= 0) return <span className="text-[13px] text-ink-subtle">—</span>;
+          return (
+            <div className="text-right pr-1">
+              <span className="text-emerald-500 text-[13px] font-bold">₹{row.amount.toFixed(2)}</span>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [availableSalesProducts, isEditMode, productAutocompleteOptions, buildComponents, getGradeName, recalcWeightAndPrice, updateLine, errors.lines]);
+
+  // ── Expanded Component rows inside BusyItemsTable ──
+  const renderExpandedComponents = useCallback(
+    (row: ReturnLineItem, _index: number) => {
+      if (!row.components || row.components.length === 0) return null;
+      const gradeName = getGradeName();
+
+      return (
+        <div className="px-4 py-2">
+          <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
+            <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
+              <div className="w-4" />
+              <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+              <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+              <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
+            </div>
+            {row.components.map((comp, compIdx) => (
+              <div
+                key={comp.componentProductId}
+                className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={comp.included}
+                  onChange={() => {
+                    const comps = [...row.components];
+                    comps[compIdx] = { ...comps[compIdx], included: !comps[compIdx].included };
+                    const { weight, unitPrice } = recalcWeightAndPrice(comps, row.quantity, gradeName);
+                    updateLine(row.id, {
+                      components: comps,
+                      weight,
+                      unitPrice,
+                      amount: row.quantity * unitPrice,
+                    });
+                  }}
+                  className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
+                />
+                <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
+                  {comp.productName}
+                </span>
+                <span className="text-[11px] text-ink-subtle text-center w-12">x{comp.perUnit}</span>
+                <span className="text-xs text-ink font-medium text-center">
+                  {comp.included ? comp.perUnit * row.quantity : 0}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    },
+    [getGradeName, recalcWeightAndPrice, updateLine]
+  );
+
+  const expandedLineIndex = useMemo(() => {
+    if (!expandedLineId) return null;
+    const idx = lines.findIndex((l) => l.id === expandedLineId);
+    return idx >= 0 ? idx : null;
+  }, [expandedLineId, lines]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -395,24 +665,10 @@ export const SalesReturnCreatePage: React.FC = () => {
       newErrors.customerId = "Please select a customer";
     }
 
-    if (returnRows.length === 0) {
-      newErrors.rows = "At least one line item is required";
+    const activeItems = lines.filter((l) => l.productId && Number(l.quantity) > 0);
+    if (activeItems.length === 0) {
+      newErrors.lines = "At least one return line item with quantity > 0 is required";
     }
-
-    returnRows.forEach((row, idx) => {
-      if (!row.productId || row.productId === 0) {
-        newErrors[`product_${idx}`] = "Please select a product";
-      }
-      if (!row.quantity || row.quantity <= 0) {
-        newErrors[`qty_${idx}`] = "Qty must be > 0";
-      }
-      if (!row.weight || row.weight <= 0) {
-        newErrors[`weight_${idx}`] = "Weight must be > 0";
-      }
-      if (row.unitPrice === undefined || row.unitPrice === null || row.unitPrice < 0) {
-        newErrors[`unitPrice_${idx}`] = "Price required";
-      }
-    });
 
     setErrors(newErrors);
 
@@ -434,7 +690,7 @@ export const SalesReturnCreatePage: React.FC = () => {
       return;
     }
 
-    const activeReturnItems = returnRows.filter((r) => r.productId > 0 && r.quantity > 0);
+    const activeReturnItems = lines.filter((l) => l.productId && Number(l.quantity) > 0);
 
     setSubmitting(true);
 
@@ -443,7 +699,7 @@ export const SalesReturnCreatePage: React.FC = () => {
     const expandedItems: { productId: number; quantity: number; weight: number; uom: string; unitPrice: number; taxRate: number; reason: string }[] = [];
 
     activeReturnItems.forEach((r) => {
-      const includedComps = r.components.filter((c) => c.included);
+      const includedComps = (r.components || []).filter((c) => c.included);
 
       if (includedComps.length > 0) {
         // Distribute user's entered unitPrice proportionally across components
@@ -473,21 +729,21 @@ export const SalesReturnCreatePage: React.FC = () => {
             productId: comp.componentProductId,
             quantity: r.quantity * comp.perUnit,
             weight: comp.weightPerPiece * comp.perUnit * r.quantity,
-            uom: r.uom,
+            uom: r.uom || "kg",
             unitPrice: Math.round(compUnitPrice * 100) / 100,
-            taxRate: r.taxRate,
+            taxRate: r.taxRate || 0,
             reason: r.reason || "Sales Return",
           });
         });
       } else {
         // No components — use as-is
         expandedItems.push({
-          productId: r.productId,
+          productId: Number(r.productId),
           quantity: r.quantity,
           weight: r.weight,
-          uom: r.uom,
+          uom: r.uom || "kg",
           unitPrice: r.unitPrice,
-          taxRate: r.taxRate,
+          taxRate: r.taxRate || 0,
           reason: r.reason || "Sales Return",
         });
       }
@@ -526,254 +782,191 @@ export const SalesReturnCreatePage: React.FC = () => {
     );
   }
 
+  const totalQty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+  const totalAmount = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+
   return (
-    <div className="max-w-[1400px] xl:mr-auto">
+    <div className="max-w-[1150px] xl:mr-auto">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 border-b border-line">
           <h3 className="text-lg font-bold text-ink">
             {isEditMode ? `Edit Sales Return` : "New Sales Return (Credit Note)"}
             {isEditMode && originalReturnNo && (
               <span className="text-purple-400 text-sm ml-1">*{originalReturnNo}</span>
             )}
           </h3>
-          <BackButton text="Back to List" to="/sales-returns" />
+          <CustomButton
+            text="Back to List"
+            icon={FaArrowLeft}
+            variant="secondary"
+            onClick={handleBack}
+          />
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Customer + Refund Mode */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
-            <div>
-              <SelectInput
-                label="Customer"
-                name="customerId"
-                value={customerId}
-                required
-                error={errors.customerId}
-                defaultOptionLabel="Select Customer"
-                searchable
-                options={customers.map((c: any) => {
-                  const name = c.displayName || c.firmName;
-                  const rawGrade = c.customerGrade?.name || c.grade || "";
-                  const gradeShort = rawGrade ? rawGrade.replace(/grade\s*/i, "").trim() : "";
-                  const gradeTag = gradeShort ? `(${gradeShort})` : null;
+        <form
+          ref={formRef}
+          onKeyDown={handleFormKeyDown}
+          data-escape-guarded
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+          noValidate
+        >
+          <div className="p-6 space-y-4">
+            {/* Customer Select */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="w-full">
+                <AutocompleteInput
+                  label="Customer"
+                  name="customerId"
+                  required
+                  value={customerId}
+                  error={errors.customerId}
+                  options={customerAutocompleteOptions}
+                  placeholder="Type to search customer..."
+                  onChange={(val) => {
+                    setCustomerId(val);
+                    if (errors.customerId) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.customerId;
+                        return next;
+                      });
+                    }
+                  }}
+                />
+              </div>
+            </div>
 
-                  const location = c.billingCity || c.city || c.shippingCity || c.customerType?.name;
-                  const locationTag = location ? `(${location.toLowerCase()})` : null;
+            {/* Error message for line items */}
+            {errors.lines && (
+              <div className="text-red-500 text-xs mb-2 bg-red-500/10 p-2 rounded-md border border-red-500/20">
+                {errors.lines}
+              </div>
+            )}
 
-                  const parts = [name, gradeTag, locationTag].filter(Boolean);
-                  return { label: parts.join(" - "), value: String(c.id) };
-                })}
-                onChange={(e) => {
-                  setCustomerId(e.target.value);
-                  if (errors.customerId) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.customerId;
-                      return next;
-                    });
-                  }
+            {/* BusyItemsTable for Return Items matching Sales Invoice */}
+            <div ref={itemsTableRef} className="w-full space-y-1.5">
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-ink">Invoice Items</span>
+                  {customerHeaderInfo && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="px-2 py-0.5 rounded bg-card-2 border border-line-soft font-semibold text-ink">
+                        {customerHeaderInfo.name}
+                      </span>
+                      {customerHeaderInfo.group && (
+                        <span className="text-ink-subtle text-[11px]">{customerHeaderInfo.group}</span>
+                      )}
+                      {customerHeaderInfo.grade && (
+                        <span className="text-ink-subtle text-[11px]">{customerHeaderInfo.grade}</span>
+                      )}
+                      {customerHeaderInfo.balLabel && (
+                        <span className={`text-[11px] font-semibold ${customerHeaderInfo.isDr ? "text-rose-500" : "text-emerald-500"}`}>
+                          {customerHeaderInfo.balLabel}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <BusyItemsTable
+                columns={returnColumns}
+                rows={lines}
+                onAdd={() => setLines((prev) => [...prev, emptyReturnLine()])}
+                onRemove={(i) => setLines((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev))}
+                editable={!isEditMode && lines.length > 1}
+                expandable
+                canExpand={(row) => Boolean(row.components && row.components.length > 0)}
+                expandedIndex={expandedLineIndex}
+                onExpandToggle={(i) => {
+                  const lineId = lines[i]?.id;
+                  setExpandedLineId(expandedLineId === lineId ? null : lineId);
+                }}
+                renderExpandedRow={renderExpandedComponents}
+                showTotals={[
+                  { colKey: "quantity", value: totalQty },
+                  { colKey: "amount", value: `₹${totalAmount.toFixed(2)}` },
+                ]}
+                visibleRows={10}
+                getFieldBeforeTable={() => {
+                  const cust = document.querySelector('input[name="customerId"]') as HTMLElement | null;
+                  return cust;
+                }}
+                getFieldAfterTable={() => {
+                  const notes = document.querySelector('textarea[name="narration"]') as HTMLElement | null;
+                  if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
+                  return document.querySelector('button[type="submit"]') as HTMLElement | null;
                 }}
               />
             </div>
 
-          </div>
-
-          {/* Items Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">
-                Return Line Items <span className="text-red-500">*</span>
-                <span className="text-ink-muted font-normal normal-case ml-1 text-xs">(Select sales products and specify quantities to return)</span>
-              </h4>
-              <CustomButton
-                type="button"
-                text="Add Item"
-                icon={FaPlus}
-                variant="secondary"
-                onClick={handleAddRow}
+            {/* Narration */}
+            <div className="w-full sm:w-1/2 mt-3">
+              <TextArea
+                label="Narration"
+                name="narration"
+                value={narration}
+                placeholder="Enter narration..."
+                rows={2}
+                onChange={(e: any) => setNarration(e.target.value)}
               />
             </div>
-
-            {errors.rows && (
-              <p className="text-red-500 text-sm mb-2">{errors.rows}</p>
-            )}
-
-            <div className="border border-line-soft rounded-xl overflow-hidden bg-card">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="bg-card-2 border-b border-line-soft">
-                    <th className="py-2 pl-3 pr-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-8">#</th>
-                    <th className="py-2 px-1 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide">Sales Product</th>
-                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-20">Qty</th>
-                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-40">Weight / UOM</th>
-                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Unit Price</th>
-                    <th className="py-2 px-1 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-28">Total</th>
-                    <th className="py-2 px-1 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {returnRows.map((row, idx) => {
-                    const lineTot = row.quantity * row.unitPrice;
-                    const hasComponents = row.components.length > 0;
-                    const isExpanded = expandedItemIndex === idx;
-
-                    return (
-                      <React.Fragment key={idx}>
-                        <tr className="border-b border-line-soft bg-card hover:bg-card-2/40">
-                          <td className="py-2 pl-3 pr-1 text-ink-subtle font-medium">{idx + 1}</td>
-                          <td className="py-1 px-1">
-                            <div className="flex items-center gap-1">
-                              {hasComponents && (
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedItemIndex(isExpanded ? null : idx)}
-                                  className="p-0.5 rounded text-ink-subtle hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
-                                >
-                                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </button>
-                              )}
-                              <SelectInput
-                                hideLabel
-                                label=""
-                                name={`product-${idx}`}
-                                value={row.productId ? String(row.productId) : ""}
-                                defaultOptionLabel="-- Select Product --"
-                                searchable
-                                error={errors[`product_${idx}`]}
-                                options={availableSalesProducts.map((p) => {
-                                  const usedByOther = returnRows.some((r, i) => i !== idx && r.productId === p.productId);
-                                  return { label: p.description, value: String(p.productId), disabled: usedByOther };
-                                })}
-                                onChange={(e) => handleProductSelect(idx, e.target.value)}
-                              />
-                            </div>
-                          </td>
-                          <td className="py-1 px-1 w-20">
-                            <TextInput
-                              name={`qty-${idx}`}
-                              type="number"
-                              value={row.quantity ? String(row.quantity) : ""}
-                              min="0"
-                              preventNegative
-                              onChange={(e: any) =>
-                                handleRowFieldChange(idx, "quantity", parseFloat(e.target.value) || 0)
-                              }
-                              error={errors[`qty_${idx}`]}
-                            />
-                          </td>
-                          <td className="py-1 px-1 w-40">
-                            <QuantityInput
-                              hideLabel
-                              name={`weight-${idx}`}
-                              value={row.weight === 0 ? "" : row.weight}
-                              baseUoms={row.baseUoms || "kg, g, t"}
-                              uom={row.uom || "kg"}
-                              error={errors[`weight_${idx}`]}
-                              onChange={(e: any) =>
-                                handleRowFieldChange(idx, "weight", parseFloat(e.target.value) || 0)
-                              }
-                              onUomChange={(newUom: string) => handleRowUomChange(idx, newUom)}
-                            />
-                          </td>
-                          <td className="py-1 px-1 w-28">
-                            <TextInput
-                              name={`unitPrice-${idx}`}
-                              type="number"
-                              value={row.unitPrice ? String(row.unitPrice) : ""}
-                              min="0"
-                              step="0.01"
-                              preventNegative
-                              onChange={(e: any) =>
-                                handleRowFieldChange(idx, "unitPrice", parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0"
-                              error={errors[`unitPrice_${idx}`]}
-                            />
-                          </td>
-                          <td className="py-2 px-1 text-right font-bold whitespace-nowrap">
-                            {lineTot > 0 ? (
-                              <span className="text-emerald-500 text-sm">₹{lineTot.toFixed(2)}</span>
-                            ) : "—"}
-                          </td>
-                          <td className="py-1 px-1 w-10 text-center">
-                            <DeleteButton onClick={() => handleRemoveRow(idx)} />
-                          </td>
-                        </tr>
-                        {/* Component sub-rows */}
-                        {hasComponents && isExpanded && (
-                          <tr className="bg-card-2/50">
-                            <td></td>
-                            <td colSpan={6} className="px-3 py-2">
-                              <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
-                                <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
-                                  <div className="w-4" />
-                                  <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
-                                  <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
-                                  <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
-                                </div>
-                                {row.components.map((comp, compIdx) => (
-                                  <div
-                                    key={comp.componentProductId}
-                                    className={`grid grid-cols-[auto_1fr_auto_80px] gap-2 items-center px-3 py-1.5 border-b border-line-soft last:border-b-0 ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={comp.included}
-                                      onChange={() => handleToggleComponent(idx, compIdx)}
-                                      className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
-                                    />
-                                    <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
-                                      {comp.productName}
-                                    </span>
-                                    <span className="text-[11px] text-ink-subtle text-center w-12">x{comp.perUnit}</span>
-                                    <span className="text-xs text-ink font-medium text-center">
-                                      {comp.included ? comp.perUnit * row.quantity : 0}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
           </div>
 
-          {/* Narration */}
-          <div className="w-full sm:w-1/2 mt-3">
-            <TextArea
-              label="Narration"
-              name="narration"
-              value={narration}
-              placeholder="Enter narration..."
-              rows={2}
-              onChange={(e: any) => setNarration(e.target.value)}
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-line">
+            {!isEditMode && (
+              <CustomButton
+                text="Clear Form"
+                type="button"
+                variant="secondary"
+                icon={FaUndo}
+                onClick={handleReset}
+                disabled={submitting}
+              />
+            )}
+            <CustomButton
+              text="Cancel"
+              type="button"
+              variant="secondary"
+              onClick={handleBack}
+              disabled={submitting}
+            />
+            <CustomButton
+              text={submitting ? "Saving..." : isEditMode ? "Update Return" : "Confirm Return"}
+              icon={FaSave}
+              type="submit"
+              disabled={submitting}
+              variant="primary"
             />
           </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
-          <CustomButton
-            text="Clear"
-            variant="danger"
-            onClick={handleReset}
-            disabled={submitting}
-          />
-          <CustomButton
-            text={submitting ? "Saving..." : isEditMode ? "Update Return" : "Confirm Return"}
-            onClick={handleSubmit}
-            disabled={submitting}
-          />
-        </div>
+        </form>
       </div>
+
+      {/* Discard / Save Confirmation Modal on Esc or Back */}
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved sales return details will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={FaCheck}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
   );
 };
 
 export default SalesReturnCreatePage;
+

@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../hooks/usePageShortcuts";
-import { FaPlus, FaTrash, FaEye, FaWhatsapp } from "react-icons/fa";
+import { useTableKeyboardNav } from "../../hooks/useTableKeyboardNav";
+import { FaPlus, FaSort, FaArrowUp, FaArrowDown, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -24,6 +25,9 @@ import { usePermission } from "../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 15;
 
+type SortOrder = "default" | "asc" | "desc";
+const SORT_STORAGE_KEY = "sunsea_sales_invoice_sort";
+
 const getMobileFromCustomer = (cust: any) => {
     if (!cust) return "";
     const m = cust.mobile;
@@ -34,26 +38,18 @@ const getMobileFromCustomer = (cust: any) => {
     return "";
 };
 
-const calculateSalesPendingAmount = (item: any) => {
-    const status = (item.status || "").toUpperCase();
-    if (status === "PAID" || status === "CLOSED") return 0;
-    const net = Number(item.grandTotal || 0);
-    const rawPayments = Array.isArray(item.payments)
-        ? item.payments
-        : (typeof item.payments === "string" ? JSON.parse(item.payments || "[]") : []);
-    const paid = rawPayments.reduce((sum: number, p: any) => sum + Number(p?.amount || 0), 0);
-    const pending = net - paid;
-    return pending > 0 ? pending : 0;
-};
-
 const INVOICE_CACHE_PREFIX = "salesInvoices:";
 
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
+    const tableRef = useRef<HTMLDivElement>(null);
     const { can } = usePermission();
     const canSendWhatsappEmail = can("sales-invoices.whatsapp-email") || can("sales-invoices.whatsapp_email");
+    const canCreate = can("sales-invoices.create");
     const canEdit = can("sales-invoices.edit");
     const canDelete = can("sales-invoices.delete");
+    const canExport = can("sales-invoices.export");
+
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -78,6 +74,44 @@ const SalesInvoiceList: React.FC = () => {
     const [whatsappMessage, setWhatsappMessage] = useState("");
     const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
+    // ── Alphabetical / Column Sorting with localStorage persistence ──────────
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            let next: SortOrder = "default";
+            if (prev === "default") next = "asc";
+            else if (prev === "asc") next = "desc";
+            else next = "default";
+            try {
+                localStorage.setItem(SORT_STORAGE_KEY, next);
+            } catch (_) {}
+            return next;
+        });
+    }, []);
+
+    // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
+    useEffect(() => {
+        const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+                return;
+            }
+            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+                e.preventDefault();
+                toggleSortOrder();
+            }
+        };
+        window.addEventListener("keydown", handleSortShortcut);
+        return () => window.removeEventListener("keydown", handleSortShortcut);
+    }, [toggleSortOrder]);
+
     // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -95,17 +129,75 @@ const SalesInvoiceList: React.FC = () => {
         return { data: response.data || [], total: response.total ?? 0 };
     }, [currentPage, debouncedSearch]);
 
-    const { data, total, loading, refresh } = useListCache({
+    const { data: rawData, total, loading, refresh } = useListCache({
         cacheKey,
         socketModule: "salesInvoice",
         fetcher,
         enabled: can("sales-invoices.view"),
     });
 
+    // Client-side sorted invoices based on sortOrder
+    const data = useMemo(() => {
+        if (!rawData || !Array.isArray(rawData)) return [];
+        if (sortOrder === "default") return rawData;
+
+        return [...rawData].sort((a: any, b: any) => {
+            const nameA = (a.customer?.displayName || a.customer?.firmName || a.invoiceNo || "").trim().toLowerCase();
+            const nameB = (b.customer?.displayName || b.customer?.firmName || b.invoiceNo || "").trim().toLowerCase();
+            if (sortOrder === "asc") {
+                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+            } else {
+                return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+            }
+        });
+    }, [rawData, sortOrder]);
+
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
+
+    const handleEdit = useCallback((invoice: any) => {
+        if (invoice && invoice.status !== "PAID" && canEdit) {
+            navigate(`/sales-invoices/edit/${invoice.id}`);
+        }
+    }, [canEdit, navigate]);
+
+    const handleOpenView = useCallback((item: any) => {
+        navigate(`/sales-invoices/details/${item.id}`);
+    }, [navigate]);
+
+    // ── Table keyboard navigation (Arrow keys, Enter to view, E to edit) ────
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: data?.length ?? 0,
+        onEnter: (i) => {
+            const invoice = data?.[i];
+            if (invoice) handleOpenView(invoice);
+        },
+        onEdit: (i) => {
+            const invoice = data?.[i];
+            if (invoice) handleEdit(invoice);
+        },
+        containerRef: tableRef,
+    });
+
+    // ── Page Shortcuts (F5 refresh, F6 sort, F8 delete, Ins new, Ctrl+Shift+E export) ──
+    usePageShortcuts({
+        onRefresh: () => refresh(),
+        onSort: () => toggleSortOrder(),
+        onDelete: () => {
+            const item = data?.[focusedIndex];
+            if (item && canDelete) {
+                setItemToDelete(item.id);
+                setShowDeleteModal(true);
+            }
+        },
+        onNew: () => canCreate && navigate("/sales-invoices/create"),
+        onExport: () => {
+            const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+            exportBtn?.click();
+        },
+    });
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete === null) return;
@@ -117,6 +209,7 @@ const SalesInvoiceList: React.FC = () => {
             setItemToDelete(null);
             markStaleByPrefix(INVOICE_CACHE_PREFIX);
             refresh();
+            setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
         } catch (error: any) {
             console.error("Delete error:", error);
             toast.error(error?.response?.data?.message || "Failed to delete invoice");
@@ -166,6 +259,7 @@ const SalesInvoiceList: React.FC = () => {
 
             toast.success("Email sent successfully!");
             setShowEmailModal(false);
+            setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
         } catch (err: any) {
             console.error(err);
             toast.error(err?.response?.data?.message || "Failed to send email");
@@ -216,23 +310,13 @@ const SalesInvoiceList: React.FC = () => {
 
             toast.success("WhatsApp message sent successfully!");
             setShowWhatsappModal(false);
+            setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
         } catch (err: any) {
             console.error(err);
             toast.error(err?.response?.data?.message || "Failed to send WhatsApp message");
         } finally {
             setSendingWhatsapp(false);
         }
-    };
-
-    const handleOpenView = async (item: any) => {
-        navigate(`/sales-invoices/details/${item.id}`);
-        // try {
-        //     const details = await salesInvoiceService.fetchById(item.id);
-        //     setSelectedItem(details);
-        //     setShowViewModal(true);
-        // } catch (error) {
-        //     toast.error("Failed to load invoice details");
-        // }
     };
 
     const fetchSalesInvoicesForExport = useCallback(async () => {
@@ -260,6 +344,7 @@ const SalesInvoiceList: React.FC = () => {
             header: "#",
             width: "60px",
             render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+            align: "center",
         },
         {
             header: "INVOICE NO",
@@ -269,51 +354,81 @@ const SalesInvoiceList: React.FC = () => {
             header: "INVOICE DATE",
             render: (item) => <span className="text-ink-muted">{formatDate(item.invoiceDate)}</span>,
         },
-        // {
-        //     header: "DUE DATE",
-        //     render: (item) => <span className="text-ink-muted">{formatDate(item.dueDate)}</span>,
-        // },
         {
             header: "CUSTOMER",
+            headerNode: (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSortOrder();
+                    }}
+                    title={`Sort Alphabetically: ${
+                        sortOrder === "default"
+                            ? "Default Order"
+                            : sortOrder === "asc"
+                            ? "A to Z (Ascending)"
+                            : "Z to A (Descending)"
+                    } (Click or press F6)`}
+                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                >
+                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                        CUSTOMER
+                    </span>
+                    <span
+                        className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
+                            sortOrder === "asc" || sortOrder === "desc"
+                                ? "bg-primary/20 text-primary scale-110"
+                                : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+                        }`}
+                    >
+                        {sortOrder === "asc" ? (
+                            <FaArrowUp size={10} />
+                        ) : sortOrder === "desc" ? (
+                            <FaArrowDown size={10} />
+                        ) : (
+                            <FaSort size={10} />
+                        )}
+                    </span>
+                    {sortOrder !== "default" && (
+                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                            {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                        </span>
+                    )}
+                </button>
+            ),
             render: (item) => <span className="font-medium text-ink-muted">{item.customer?.displayName || item.customer?.firmName || "N/A"}</span>,
         },
         {
             header: "SUB TOTAL",
             render: (item) => <span className="font-semibold text-ink-muted">{formatCurrency(item.subTotal)}</span>,
+            align: "right",
         },
         {
             header: "TAX AMOUNT",
             render: (item) => <span className="font-medium text-ink-subtle">{formatCurrency(item.taxTotal)}</span>,
+            align: "right",
         },
         {
             header: "NET AMOUNT",
             render: (item) => <span className="font-bold text-emerald-600">{formatCurrency(item.grandTotal)}</span>,
+            align: "right",
         },
-        // {
-        //     header: "PENDING PAYMENT",
-        //     render: (item) => {
-        //         const pending = calculateSalesPendingAmount(item);
-        //         return (
-        //             <span className={`font-semibold ${pending > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
-        //                 {formatCurrency(pending)}
-        //             </span>
-        //         );
-        //     },
-        // },
         {
             header: "STATUS",
             render: () => <StatusBadge status="INVOICED" />,
+            align: "center",
         },
         {
             header: "ACTIONS",
-            width: "250px",   // was 160px — too tight for 5 icons + gaps
+            width: "250px",
             render: (item) => (
-                <div className="flex justify-start items-center gap-1.5 whitespace-nowrap">
+                <div className="flex justify-center items-center gap-1.5 whitespace-nowrap">
                     {canSendWhatsappEmail && <EmailButton onClick={() => handleOpenEmailModal(item)} />}
                     {canSendWhatsappEmail && <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />}
                     <ViewButton onClick={() => handleOpenView(item)} />
                     {item.status !== "PAID" && canEdit && (
-                        <EditButton onClick={() => navigate(`/sales-invoices/edit/${item.id}`)} />
+                        <EditButton onClick={() => handleEdit(item)} />
                     )}
                     {canDelete && (
                         <DeleteButton onClick={() => {
@@ -323,7 +438,7 @@ const SalesInvoiceList: React.FC = () => {
                     )}
                 </div>
             ),
-            align: "left"
+            align: "center",
         },
     ];
 
@@ -342,7 +457,7 @@ const SalesInvoiceList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search invoices..."
                         />
-                        {can("sales-invoices.export") && (
+                        {canExport && (
                             <ExportCSVButton
                                 fetchData={fetchSalesInvoicesForExport}
                                 columns={csvColumns}
@@ -350,9 +465,9 @@ const SalesInvoiceList: React.FC = () => {
                                 text="Export"
                             />
                         )}
-                        {can("sales-invoices.create") && (
+                        {canCreate && (
                             <CustomButton
-                                text="Create Invoice"
+                                text="Add Sales Invoice"
                                 icon={FaPlus}
                                 onClick={() => navigate("/sales-invoices/create")}
                             />
@@ -360,25 +475,45 @@ const SalesInvoiceList: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Table */}
-                <DataTable
-                    columns={columns}
-                    data={data}
-                    rowKey={(item) => item.id}
-                    loading={loading}
-                    emptyMessage="No invoices found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: setCurrentPage,
-                    }}
-                />
+                {/* Table with Keyboard Navigation */}
+                <div
+                    ref={tableRef}
+                    tabIndex={0}
+                    data-table-nav
+                    className="p-0 outline-none"
+                >
+                    <DataTable
+                        columns={columns}
+                        data={data}
+                        rowKey={(item) => item.id}
+                        loading={loading}
+                        emptyMessage="No invoices found."
+                        rowClassName={(_row, index) =>
+                            index === focusedIndex
+                                ? "bg-primary/8"
+                                : ""
+                        }
+                        onRowClick={(item, index) => {
+                            setFocusedIndex(index);
+                            tableRef.current?.focus({ preventScroll: true });
+                            handleOpenView(item);
+                        }}
+                        pagination={{
+                            currentPage,
+                            totalPages,
+                            onPageChange: (page) => setCurrentPage(page),
+                        }}
+                    />
+                </div>
             </div>
 
             {/* View Modal */}
             <CommonViewModal
                 show={showViewModal}
-                onHide={() => setShowViewModal(false)}
+                onHide={() => {
+                    setShowViewModal(false);
+                    setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+                }}
                 modalTitle="Sales Invoice details"
                 avatarText={selectedItem ? selectedItem.invoiceNo.charAt(0).toUpperCase() : ""}
                 headerTitle={selectedItem ? selectedItem.invoiceNo : ""}
@@ -441,7 +576,10 @@ const SalesInvoiceList: React.FC = () => {
             {/* Delete Confirmation Modal */}
             <CommonConfirmModal
                 show={showDeleteModal}
-                onHide={() => setShowDeleteModal(false)}
+                onHide={() => {
+                    setShowDeleteModal(false);
+                    setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+                }}
                 onConfirm={handleDeleteConfirm}
                 title="Delete Invoice"
                 message="Are you sure you want to delete this invoice? This action cannot be undone."
@@ -451,7 +589,10 @@ const SalesInvoiceList: React.FC = () => {
 
             <CommonConfirmModal
                 show={showEmailModal}
-                onHide={() => setShowEmailModal(false)}
+                onHide={() => {
+                    setShowEmailModal(false);
+                    setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+                }}
                 onConfirm={handleSendEmail}
                 title="Send Email"
                 message={`Are you sure you want to send the invoice to ${recipientEmail || "this customer"}?`}
@@ -465,7 +606,10 @@ const SalesInvoiceList: React.FC = () => {
 
             <CommonConfirmModal
                 show={showWhatsappModal}
-                onHide={() => setShowWhatsappModal(false)}
+                onHide={() => {
+                    setShowWhatsappModal(false);
+                    setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
+                }}
                 onConfirm={handleSendWhatsapp}
                 title="Send WhatsApp"
                 message={

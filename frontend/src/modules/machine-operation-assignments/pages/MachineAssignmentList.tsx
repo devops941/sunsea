@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   FaPlus,
   FaToggleOn,
@@ -10,6 +10,7 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 import { useListCache } from "../../../hooks/useListCache";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -33,6 +34,7 @@ const ITEMS_PER_PAGE = 15;
 
 const MachineAssignmentList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
+  const tableRef = useRef<HTMLDivElement>(null);
   const { can } = usePermission();
   const canCreateAssignment = can("machine-assignments.create");
   const canEditAssignment = can("machine-assignments.edit");
@@ -97,7 +99,14 @@ const MachineAssignmentList: React.FC = () => {
     fetcher,
   });
 
-  usePageShortcuts({ onRefresh: () => refresh() });
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onNew: () => canCreateAssignment && navigate("/machines/assignments/create"),
+    onExport: () => {
+      const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+      exportBtn?.click();
+    },
+  });
 
   const filteredAssignments = useMemo(() => {
     return allAssignments.filter((item: any) => {
@@ -134,6 +143,13 @@ const MachineAssignmentList: React.FC = () => {
   const totalPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedData = filteredAssignments.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: paginatedData.length,
+    onEnter: (i) => { const item = paginatedData[i]; if (item) setViewModalData(item); },
+    onEdit: (i) => { const item = paginatedData[i]; if (item && canEditAssignment) handleOpenEdit(item); },
+    containerRef: tableRef,
+  });
 
   const handleOpenCreate = () => {
     navigate("/machines/assignments/create");
@@ -274,12 +290,14 @@ const MachineAssignmentList: React.FC = () => {
         </div>
 
         {/* Table Content */}
-        <div className="p-0 overflow-hidden rounded-b-2xl">
+        <div ref={tableRef} tabIndex={0} data-table-nav className="p-0 overflow-hidden rounded-b-2xl outline-none">
           <DataTable
             data={paginatedData}
             rowKey={(item: any) => item.id}
             loading={loading}
             emptyMessage="No machine operation assignments found."
+            rowClassName={(_row: any, index: number) => index === focusedIndex ? "bg-primary/8" : ""}
+            onRowClick={(item: any, index: number) => { setFocusedIndex(index); tableRef.current?.focus({ preventScroll: true }); setViewModalData(item); }}
             pagination={{
               currentPage,
               totalPages,
