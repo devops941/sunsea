@@ -9,33 +9,68 @@ class ExpenseService {
     data: any,
     currentUser: { userId: string; companyId: string }
   ) {
-    // Check if expense number already exists for this company
-    const existingExpense = await prisma.expense.findFirst({
-      where: {
-        companyId: currentUser.companyId,
-        expenseNumber: data.expenseNumber,
-      },
-    });
-
-    if (existingExpense) {
-      throw new ApiError(409, `Expense number '${data.expenseNumber}' already exists for this company.`);
+    // Client-supplied expenseNumber path — legacy imports / manual overrides.
+    // Reject duplicates upfront so the caller sees a clean 409 instead of a
+    // cryptic Prisma unique-constraint error.
+    if (data.expenseNumber) {
+      const existingExpense = await prisma.expense.findFirst({
+        where: {
+          companyId: currentUser.companyId,
+          expenseNumber: data.expenseNumber,
+        },
+      });
+      if (existingExpense) {
+        throw new ApiError(409, `Expense number '${data.expenseNumber}' already exists for this company.`);
+      }
     }
 
-    const newExpense = await prisma.expense.create({
-      data: {
-        ...data,
-        date: data.date ? new Date(data.date) : undefined,
-        amount: data.amount !== undefined ? Number(data.amount) : undefined,
-        supplierId: data.supplierId ? Number(data.supplierId) : null,
-        companyId: currentUser.companyId,
-        createdBy: currentUser.userId,
-      },
-      include: {
-        supplier: true,
-      },
+    // Auto-generate expenseNumber (with retry-on-collision) when the client
+    // omits it — safer than the "fetch-then-post" pattern which raced when
+    // multiple rows were saved in the same batch.
+    const buildData = async () => ({
+      ...data,
+      expenseNumber: data.expenseNumber || (await this.getNextExpenseNumber(currentUser.companyId)),
+      date: data.date ? new Date(data.date) : undefined,
+      amount: data.amount !== undefined ? Number(data.amount) : undefined,
+      supplierId: data.supplierId ? Number(data.supplierId) : null,
+      // Golden-Rule ledger picks. Both are optional so legacy callers keep
+      // working — postExpenseVoucher below falls back to system defaults.
+      debitLedgerId: data.debitLedgerId ? Number(data.debitLedgerId) : null,
+      creditLedgerId: data.creditLedgerId ? Number(data.creditLedgerId) : null,
+      // Defaults for optional-but-required-in-schema fields.
+      expenseCategory: data.expenseCategory || "General",
+      paymentMethod: data.paymentMethod || "Cash",
+      companyId: currentUser.companyId,
+      createdBy: currentUser.userId,
     });
 
-    // Post a direct EXPENSE voucher to the correct Cash/Bank ledger
+    // Retry loop — if getNextExpenseNumber races with a concurrent insert,
+    // Prisma throws P2002 (unique constraint) on `(companyId, expenseNumber)`.
+    // Recompute the next number and try again. Cap at 5 retries to avoid
+    // infinite loop on genuine schema issues.
+    let newExpense: any = null;
+    let lastErr: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const payload = await buildData();
+        newExpense = await prisma.expense.create({
+          data: payload,
+          include: { supplier: true },
+        });
+        break;
+      } catch (err: any) {
+        lastErr = err;
+        // P2002 = unique constraint violation. Only retry when NO explicit
+        // expenseNumber was supplied (else the caller wants THAT exact number).
+        if (err?.code === "P2002" && !data.expenseNumber) continue;
+        throw err;
+      }
+    }
+    if (!newExpense) throw lastErr;
+
+    // Post the double-entry EXPENSE voucher. Posting engine reads the two
+    // ledger IDs off the expense row when present; otherwise it falls back
+    // to EXP-001 + paymentMethod-guessed cash/bank ledger.
     try {
       const { voucherPostingService } = require("../accounts/voucherPosting.service");
       await voucherPostingService.postExpenseVoucher(newExpense.id, data.paymentMethod);
@@ -43,26 +78,12 @@ class ExpenseService {
       console.error("[Expense Voucher Posting Error]: Failed to post expense voucher", voucherErr);
     }
 
-    // Also create a Petty Cash entry for petty cash tracking (record-keeping only, no voucher posting)
-    try {
-      const pcEntryNo = `PC-EXP-${newExpense.expenseNumber}`;
-      await prisma.pettyCashEntry.create({
-        data: {
-          entryNo: pcEntryNo,
-          entryDate: newExpense.date || new Date(),
-          category: newExpense.expenseCategory || "General Expense",
-          description: `Expense (${newExpense.expenseNumber}): ${newExpense.expense}`,
-          amount: newExpense.amount,
-          type: "OUT",
-          paidTo: newExpense.supplier?.legalName || null,
-          receiptNo: newExpense.receiptInvoice || newExpense.expenseNumber,
-          companyId: currentUser.companyId,
-          createdBy: currentUser.userId,
-        },
-      });
-    } catch (pcErr) {
-      console.error("[Petty Cash Sync Error]: Failed to create petty cash entry for expense", pcErr);
-    }
+    // NOTE: We used to also create a `PC-EXP-*` PettyCashEntry here for
+    // "record-keeping". That was a double-post — the sync sweep later
+    // posted it AGAIN as a PETTY_CASH voucher, inflating expense totals on
+    // TB/P&L. The EXPENSE voucher above already hits Petty Cash on the Cr
+    // side (when Petty Cash is picked as the payment ledger), so the extra
+    // PC entry is redundant. Removed. See git history for the old block.
 
     return newExpense;
   }
@@ -172,6 +193,8 @@ class ExpenseService {
       ...(data.date && { date: new Date(data.date) }),
       ...(data.amount !== undefined && { amount: Number(data.amount) }),
       ...(data.supplierId !== undefined && { supplierId: data.supplierId ? Number(data.supplierId) : null }),
+      ...(data.debitLedgerId !== undefined && { debitLedgerId: data.debitLedgerId ? Number(data.debitLedgerId) : null }),
+      ...(data.creditLedgerId !== undefined && { creditLedgerId: data.creditLedgerId ? Number(data.creditLedgerId) : null }),
     };
 
     const updatedExpense = await prisma.expense.update({
@@ -197,23 +220,9 @@ class ExpenseService {
       console.error("[Expense Voucher Update Error]:", voucherErr);
     }
 
-    // Update corresponding petty cash entry if exists
-    try {
-      const pcEntryNo = `PC-EXP-${updatedExpense.expenseNumber}`;
-      await prisma.pettyCashEntry.updateMany({
-        where: { entryNo: pcEntryNo },
-        data: {
-          entryDate: updatedExpense.date,
-          category: updatedExpense.expenseCategory || "General Expense",
-          description: `Expense (${updatedExpense.expenseNumber}): ${updatedExpense.expense}`,
-          amount: updatedExpense.amount,
-          paidTo: updatedExpense.supplier?.legalName || null,
-          receiptNo: updatedExpense.receiptInvoice || updatedExpense.expenseNumber,
-        },
-      });
-    } catch (pcErr) {
-      console.error("[Petty Cash Update Error]:", pcErr);
-    }
+    // NOTE: PC-EXP-* petty cash sync removed (see createExpense comment).
+    // The EXPENSE voucher's Cr side already lands on Petty Cash when that
+    // ledger is selected — no separate PC entry needed.
 
     return updatedExpense;
   }
@@ -237,14 +246,14 @@ class ExpenseService {
       console.error("[Expense Voucher Delete Error]:", voucherErr);
     }
 
-    // Delete corresponding petty cash entry if exists
+    // Legacy cleanup: older records may still have a PC-EXP-* entry from
+    // the previous double-post design. Sweep them so deleting an old
+    // expense doesn't leave an orphan petty cash row.
     try {
       const pcEntryNo = `PC-EXP-${expense.expenseNumber}`;
-      await prisma.pettyCashEntry.deleteMany({
-        where: { entryNo: pcEntryNo },
-      });
+      await prisma.pettyCashEntry.deleteMany({ where: { entryNo: pcEntryNo } });
     } catch (pcErr) {
-      console.error("[Petty Cash Delete Error]:", pcErr);
+      console.error("[Legacy PC-EXP Cleanup Error]:", pcErr);
     }
 
     return prisma.expense.delete({
@@ -253,29 +262,28 @@ class ExpenseService {
   }
 
   /**
-   * Generates the next sequential expense code.
+   * Generates the next sequential expense code — scans every EXP-N row in
+   * this company, takes MAX(N) + 1. Ignores rows whose number doesn't match
+   * the EXP-\d+ pattern (custom / legacy formats) so they never bump the
+   * sequential counter or produce nonsense fallbacks like "PC-EXP-abc-001".
    */
   async getNextExpenseNumber(companyId: string) {
-    const lastExpense = await prisma.expense.findFirst({
-      where: { companyId },
-      orderBy: {
-        createdAt: "desc",
+    const rows = await prisma.expense.findMany({
+      where: {
+        companyId,
+        expenseNumber: { startsWith: "EXP-" },
       },
+      select: { expenseNumber: true },
     });
 
-    if (!lastExpense) {
-      return "EXP-001";
+    let maxN = 0;
+    for (const r of rows) {
+      const m = r.expenseNumber.match(/^EXP-(\d+)$/);
+      if (!m) continue;
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n) && n > maxN) maxN = n;
     }
-
-    const lastCode = lastExpense.expenseNumber;
-    const match = lastCode.match(/EXP-(\d+)/);
-
-    if (!match) {
-      return `${lastCode}-001`;
-    }
-
-    const nextNum = parseInt(match[1], 10) + 1;
-    return `EXP-${String(nextNum).padStart(3, "0")}`;
+    return `EXP-${String(maxN + 1).padStart(3, "0")}`;
   }
 }
 

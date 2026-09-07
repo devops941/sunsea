@@ -29,5 +29,16 @@ export const getVouchersQuerySchema = z.object({
   search: z.string().optional(),
 });
 
+// Update payload — same shape as create but everything (except items) is
+// optional. Items, when supplied, fully REPLACE the existing journal items
+// (delete-then-recreate inside a transaction) because journal items don't
+// have a natural business identity we can diff on.
+export const updateVoucherSchema = z.object({
+  date: z.string().optional(),
+  narration: z.string().max(500).optional().nullable(),
+  items: z.array(createVoucherItemSchema).min(1).optional(),
+});
+
 export type CreateVoucherInput = z.infer<typeof createVoucherSchema>;
+export type UpdateVoucherInput = z.infer<typeof updateVoucherSchema>;
 export type GetVouchersQueryInput = z.infer<typeof getVouchersQuerySchema>;

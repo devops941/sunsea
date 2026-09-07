@@ -100,6 +100,24 @@ export const voucherService = {
     return response.data?.data;
   },
 
+  /**
+   * Update an existing voucher (Busy-style List → Modify flow).
+   * Items, when supplied, fully REPLACE existing journal items on the
+   * server. Voucher id + voucherNo stay the same so ledger history remains
+   * connected via id.
+   */
+  updateVoucher: async (
+    id: number,
+    data: {
+      date?: string;
+      narration?: string | null;
+      items?: CreateVoucherDto["items"];
+    }
+  ): Promise<Voucher> => {
+    const response = await apiClient.patch(`/vouchers/${id}`, data);
+    return response.data?.data;
+  },
+
   /** Peek the next sequential voucher number that would be assigned for a given type. */
   fetchNextVoucherNo: async (type: VoucherType): Promise<string> => {
     const response = await apiClient.get("/vouchers/next-no", { params: { type } });
@@ -137,9 +155,24 @@ const SHORT_PREFIX_BY_TYPE_LETTER: Record<string, string> = {
 
 export function displayVoucherNo(voucherNo: string | undefined | null): string {
   if (!voucherNo) return "";
-  const m = voucherNo.match(/^([A-Z]+)-(\d+)$/);
-  if (!m) return voucherNo;
-  const [, prefix, num] = m;
-  const shortPrefix = SHORT_PREFIX_BY_TYPE_LETTER[prefix] ?? `${prefix}-`;
-  return `${shortPrefix}${num}`;
+  // Fast path — clean sequential format like "PAY-2", "RCT-5".
+  const clean = voucherNo.match(/^([A-Z]+)-(\d+)$/);
+  if (clean) {
+    const [, prefix, num] = clean;
+    const shortPrefix = SHORT_PREFIX_BY_TYPE_LETTER[prefix] ?? `${prefix}-`;
+    return `${shortPrefix}${num}`;
+  }
+  // Multi-segment invoice numbers like "SLS-INV-2026-27-0001" (from the Sales
+  // module) — take the FIRST alphabetic prefix (used for short-prefix lookup)
+  // and the LAST numeric segment (the actual sequence). Preserves original
+  // leading zeros so users still see "0001" not "1" if they typed it that way.
+  const multi = voucherNo.match(/^([A-Z]+)-.*?-(\d+)$/);
+  if (multi) {
+    const [, prefix, num] = multi;
+    const shortPrefix = SHORT_PREFIX_BY_TYPE_LETTER[prefix] ?? `${prefix}-`;
+    const trimmed = String(parseInt(num, 10));
+    return `${shortPrefix}${trimmed}`;
+  }
+  // Anything else — return as-is so nothing looks broken.
+  return voucherNo;
 }

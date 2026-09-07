@@ -53,10 +53,13 @@ const storeSchema = z.object({
         .trim()
         .min(1, "Store Category is required"),
 
+    // Store Incharge is optional — a store can be created without an
+    // assigned incharge and updated later.
     inchargeId: z
         .string()
         .trim()
-        .min(1, "Store Incharge is required"),
+        .optional()
+        .or(z.literal("")),
 
     locationDesc: z
         .string()
@@ -408,7 +411,6 @@ const StorageStoreForm: React.FC = () => {
                                             value: emp.id?.toString() || ""
                                         }))
                                 ]}
-                                required
                                 error={errors.inchargeId}
                                 onChange={handleChange}
                             />

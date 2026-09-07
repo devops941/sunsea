@@ -7,7 +7,10 @@ export const businessPlaceSchema = z.object({
   type: z.enum(["HEAD_OFFICE", "BRANCH_OFFICE", "FACTORY", "WAREHOUSE", "RETAIL_STORE"]),
   gstPlaceCode: z.string().max(2).optional().nullable(),
   phone: z.string().max(20).optional().nullable(),
-  email: z.string().email("Invalid email format").max(120).or(z.literal("")).optional().nullable(),
+  // Free-text (max 120). Format check removed on user request — operators
+  // sometimes leave placeholder values like "123" during draft onboarding
+  // and don't want a hard block; the field is already optional/nullable.
+  email: z.string().max(120).optional().nullable(),
   isHeadOffice: z.boolean().default(false),
   isActive: z.boolean().default(true),
   address: z.any().optional().nullable(),
@@ -21,7 +24,10 @@ export const updateCompanySchema = z.object({
   currencyCode: z.string().max(3).optional().nullable(),
   phone: z.string().max(20).optional().nullable(),
   mobile: z.any().optional().nullable(),
-  email: z.string().email("Invalid email format").max(120).or(z.literal("")).optional().nullable(),
+  // Free-text (max 120). Format check removed on user request — operators
+  // sometimes leave placeholder values like "123" during draft onboarding
+  // and don't want a hard block; the field is already optional/nullable.
+  email: z.string().max(120).optional().nullable(),
   website: z.string().url("Invalid URL format").max(200).or(z.literal("")).optional().nullable(),
   logoUrl: z.string().optional().nullable(),
   faviconUrl: z.string().optional().nullable(),

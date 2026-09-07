@@ -265,6 +265,19 @@ export class AccountsController {
     }
   }
 
+  async getDayBook(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await accountsService.getDayBook({
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+      });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getProfitAndLoss(req: Request, res: Response, next: NextFunction) {
     try {
       const { startDate, endDate, showZeroBalance } = req.query;

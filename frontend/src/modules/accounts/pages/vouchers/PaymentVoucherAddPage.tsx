@@ -11,7 +11,8 @@ import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useL
 
 interface PaymentRow {
   id: number;
-  debitLedgerId: string;
+  debitLedgerId: string;      // Party being paid (customer / supplier / expense)
+  paymentModeId: string;      // Which bank / cash this row uses (per-row!)
   amount: string;
   narration: string;
 }
@@ -25,16 +26,23 @@ const INITIAL_ROW_COUNT = 17;
 const makeEmptyRow = (): PaymentRow => ({
   id: rowCounter++,
   debitLedgerId: "",
+  paymentModeId: "",
   amount: "",
   narration: "",
 });
+
+// Busy-style ACTIVE-CELL highlight — the currently focused input turns
+// black with white text, so the operator always knows which cell is
+// receiving keystrokes. Applied via a class shared across all editable
+// cells. `focus-within` covers the LedgerSearchInput case where the
+// visible <input> is wrapped in a div.
+const ACTIVE_CELL = "focus:bg-slate-900 focus:text-white focus:font-semibold";
 
 const PaymentVoucherAddPage: React.FC = () => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [creditLedgerId, setCreditLedgerId] = useState("");
   const [mainNarration, setMainNarration] = useState("");
   const [nextVoucherNo, setNextVoucherNo] = useState<string>("");
 
@@ -57,6 +65,7 @@ const PaymentVoucherAddPage: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
   const [rows, setRows] = useState<PaymentRow[]>(() =>
     Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow)
   );
@@ -73,53 +82,11 @@ const PaymentVoucherAddPage: React.FC = () => {
     fetcher: ledgersFetcher,
   });
 
-  const paidFromLedger = ledgers.find((l) => String(l.id) === creditLedgerId);
-
-  // Cur.Bal for the selected Payment Mode account, as of the entry date.
-  // Fetched from the ledger statement (closingBalance up to that date).
-  // For an ASSET ledger (bank/cash), positive = Dr (money in hand),
-  // negative = Cr (overdraft). Busy shows "0.08 Dr" / "999.92 Cr".
-  const [paidFromBalance, setPaidFromBalance] = useState<number | null>(null);
-  const [balanceLoading, setBalanceLoading] = useState(false);
-
-  useEffect(() => {
-    if (!creditLedgerId) {
-      setPaidFromBalance(null);
-      return;
-    }
-    let cancelled = false;
-    setBalanceLoading(true);
-    accountService
-      .fetchStatement(parseInt(creditLedgerId, 10), { endDate: date })
-      .then((res) => {
-        if (!cancelled) setPaidFromBalance(res.closingBalance ?? 0);
-      })
-      .catch(() => {
-        if (!cancelled) setPaidFromBalance(null);
-      })
-      .finally(() => {
-        if (!cancelled) setBalanceLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [creditLedgerId, date]);
-
-  const formatBalance = (bal: number) => {
-    const abs = Math.abs(bal).toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    return `${abs} ${bal >= 0 ? "Dr" : "Cr"}`;
-  };
-
   // Busy-style keyboard navigation. Every editable cell is tagged with
-  // data-cell="rowIdx-field". focusCell() queries the container and focuses
-  // the input inside. LedgerSearchInput cells are wrapped in a div, so we
-  // pick the underlying <input>.
+  // data-cell="rowIdx-field".
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const focusCell = (rowIdx: number, field: "account" | "amount" | "narration") => {
+  const focusCell = (rowIdx: number, field: "account" | "paymentMode" | "amount" | "narration") => {
     if (!tableRef.current) return;
     const wrap = tableRef.current.querySelector<HTMLElement>(
       `[data-cell="${rowIdx}-${field}"]`
@@ -147,10 +114,8 @@ const PaymentVoucherAddPage: React.FC = () => {
   const handleNarrationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      // Last row → add a new one, then focus its account
       if (rowIdx === rows.length - 1) {
         addRow();
-        // Wait for React to render the new row before focusing
         setTimeout(() => focusCell(rowIdx + 1, "account"), 0);
       } else {
         focusCell(rowIdx + 1, "account");
@@ -159,13 +124,24 @@ const PaymentVoucherAddPage: React.FC = () => {
   };
 
   const updateRow = (id: number, field: keyof PaymentRow, value: string) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const next = { ...r, [field]: value };
+        // If the operator clears the Account (first cell), reset the whole
+        // row — leaving orphan amount / narration / payment-mode after a
+        // deleted account was misleading ("0 valid entries" with 2,63,708
+        // still visible in the total). Row now returns to a truly empty state.
+        if (field === "debitLedgerId" && !value) {
+          next.paymentModeId = "";
+          next.amount = "";
+          next.narration = "";
+        }
+        return next;
+      })
+    );
   };
 
-  // Busy behaviour: after save, wipe the entry rows so the operator can key
-  // the next voucher without leaving the page. Date + Payment Mode are kept
-  // (batch data-entry keeps the same bank / same day). Vch No is re-fetched
-  // so the top shows the next sequential number ready to go.
   const resetFormForNext = () => {
     setMainNarration("");
     setRows(Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow));
@@ -177,11 +153,13 @@ const PaymentVoucherAddPage: React.FC = () => {
   };
 
   const totalAmount = rows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
-  const validCount = rows.filter((r) => r.debitLedgerId && parseFloat(r.amount) > 0).length;
+  const validCount = rows.filter(
+    (r) => r.debitLedgerId && r.paymentModeId && parseFloat(r.amount) > 0
+  ).length;
 
-  // Busy rule: row N is editable only if all rows 0..N-1 have account+amount.
-  // The first "unlocked" row is the current data-entry frontier.
-  const isRowComplete = (r: PaymentRow) => !!r.debitLedgerId && parseFloat(r.amount) > 0;
+  // Row N is editable only if all rows 0..N-1 have account + payment mode + amount.
+  const isRowComplete = (r: PaymentRow) =>
+    !!r.debitLedgerId && !!r.paymentModeId && parseFloat(r.amount) > 0;
   const isRowUnlocked = (idx: number): boolean => {
     for (let i = 0; i < idx; i++) {
       if (!isRowComplete(rows[i])) return false;
@@ -192,38 +170,19 @@ const PaymentVoucherAddPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!creditLedgerId) {
-      toast.error("Select 'Payment Mode' (Bank / Cash) account");
-      return;
-    }
-
-    const validRows = rows.filter((r) => r.debitLedgerId && parseFloat(r.amount) > 0);
+    const validRows = rows.filter(
+      (r) => r.debitLedgerId && r.paymentModeId && parseFloat(r.amount) > 0
+    );
     if (validRows.length === 0) {
-      toast.error("Add at least one payment entry with account and amount");
+      toast.error("Add at least one payment entry with account + payment mode + amount");
       return;
     }
 
     for (const r of validRows) {
-      if (r.debitLedgerId === creditLedgerId) {
-        toast.error("'Paid To' and 'Payment Mode' cannot be the same account");
+      if (r.debitLedgerId === r.paymentModeId) {
+        toast.error("'Paid To' and 'Payment Mode' cannot be the same account in a row");
         return;
       }
-    }
-
-    // Busy-style negative-balance guard: if the total we are about to pay
-    // out exceeds the current Payment Mode balance, ask the user to confirm.
-    // (Non-blocking — user can proceed, matching Busy's Yes/No dialog.)
-    const total = validRows.reduce((s, r) => s + parseFloat(r.amount), 0);
-    if (paidFromBalance !== null && total > paidFromBalance) {
-      const shortfall = total - paidFromBalance;
-      const shortfallStr = shortfall.toLocaleString("en-IN", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-      const proceed = window.confirm(
-        `Cash / Bank balance is going negative ( Rs. -${shortfallStr} ).\n\nWould you like to continue?`
-      );
-      if (!proceed) return;
     }
 
     setSubmitting(true);
@@ -234,14 +193,12 @@ const PaymentVoucherAddPage: React.FC = () => {
         narration: mainNarration || "Payment Voucher",
         items: validRows.map((r) => ({
           debitLedgerId: parseInt(r.debitLedgerId, 10),
-          creditLedgerId: parseInt(creditLedgerId, 10),
+          creditLedgerId: parseInt(r.paymentModeId, 10),
           debitAmount: parseFloat(r.amount),
           creditAmount: parseFloat(r.amount),
           narration: r.narration || mainNarration || "Payment",
         })),
       });
-      // Optimistic list update — the Payment Register cache gets the new
-      // voucher immediately, so navigating back shows it with no reload.
       if (created?.id) {
         prependToListCacheByPrefix<Voucher>("accounts:payment-vouchers:", created);
       }
@@ -256,7 +213,7 @@ const PaymentVoucherAddPage: React.FC = () => {
 
   return (
     <div className="p-3">
-      <div className="w-full lg:w-5xl max-w-full">
+      <div className="w-full lg:w-6xl max-w-full">
         <form
           onSubmit={handleSubmit}
           className="bg-card border border-line rounded-md overflow-hidden shadow-sm"
@@ -266,12 +223,8 @@ const PaymentVoucherAddPage: React.FC = () => {
             Add Payment Voucher
           </div>
 
-          {/* Top meta section — Busy layout: compact labels + inline values */}
+          {/* Top meta section */}
           <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-3 gap-y-1.5 text-[11px] items-center">
-            {/* Voucher Series (readonly)
-            <label className="col-span-2 text-ink-subtle font-semibold">Voucher Series</label>
-            <div className="col-span-4 text-ink font-semibold">Main</div> */}
-
             <label className="col-span-2 text-ink-subtle font-semibold">Date</label>
             <div className="col-span-4">
               <DatePickerCalendar name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -280,21 +233,6 @@ const PaymentVoucherAddPage: React.FC = () => {
             <label className="col-span-2 text-ink-subtle font-semibold">Vch No.</label>
             <div className="col-span-4 text-ink font-mono font-bold text-[12px]">
               {nextVoucherNo ? displayVoucherNo(nextVoucherNo) : "…"}
-            </div>
-
-            {/* Payment Mode (bank/cash) */}
-            <label className="col-span-2 text-ink-subtle font-semibold">Payment Mode</label>
-            <div className="col-span-4">
-              <LedgerSearchInput
-                value={creditLedgerId}
-                ledgers={ledgers}
-                onChange={setCreditLedgerId}
-                placeholder="Search bank / cash..."
-                required
-                filterFn={isBankOrCashLedger}
-                accentColor="red-500"
-                onSelected={() => focusCell(0, "account")}
-              />
             </div>
 
             <label className="col-span-2 text-ink-subtle font-semibold">Narration</label>
@@ -310,28 +248,10 @@ const PaymentVoucherAddPage: React.FC = () => {
                     focusCell(0, "account");
                   }
                 }}
-                className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                className={`w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none ${ACTIVE_CELL}`}
               />
             </div>
-
-            {paidFromLedger && (
-              <div className="col-span-12 text-[10px] pt-0.5 flex items-center gap-3">
-                <span className="text-ink-subtle italic">
-                  ({paidFromLedger.name} — {paidFromLedger.group})
-                </span>
-                {balanceLoading ? (
-                  <span className="text-ink-subtle">Cur. Bal. = ...</span>
-                ) : paidFromBalance !== null ? (
-                  <span
-                    className={`font-mono font-semibold ${
-                      paidFromBalance < 0 ? "text-red-500" : "text-emerald-500"
-                    }`}
-                  >
-                    Cur. Bal. = {formatBalance(paidFromBalance)}
-                  </span>
-                ) : null}
-              </div>
-            )}
+            <div className="col-span-6" />
           </div>
 
           {/* Spreadsheet-style items grid */}
@@ -340,7 +260,8 @@ const PaymentVoucherAddPage: React.FC = () => {
               <thead>
                 <tr className="bg-card-2 text-ink font-bold border-b border-line">
                   <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
-                  <th className="px-2 py-1 text-left border-r border-line">Account</th>
+                  <th className="px-2 py-1 text-left border-r border-line">Account (Paid To)</th>
+                  <th className="w-48 px-2 py-1 text-left border-r border-line">Payment Mode (Bank / Cash)</th>
                   <th className="w-32 px-2 py-1 text-right border-r border-line">Amount (Rs.)</th>
                   <th className="px-2 py-1 text-left">Short Narration</th>
                 </tr>
@@ -366,6 +287,21 @@ const PaymentVoucherAddPage: React.FC = () => {
                           filterFn={(l) => !isBankOrCashLedger(l)}
                           accentColor="red-500"
                           variant="cell"
+                          onSelected={() => focusCell(idx, "paymentMode")}
+                          disabled={!unlocked}
+                        />
+                      </div>
+                    </td>
+                    <td className="w-48 px-0 py-0 border-r border-line">
+                      <div data-cell={`${idx}-paymentMode`}>
+                        <LedgerSearchInput
+                          value={row.paymentModeId}
+                          ledgers={ledgers}
+                          onChange={(val) => updateRow(row.id, "paymentModeId", val)}
+                          placeholder=""
+                          filterFn={isBankOrCashLedger}
+                          accentColor="red-500"
+                          variant="cell"
                           onSelected={() => focusCell(idx, "amount")}
                           disabled={!unlocked}
                         />
@@ -381,8 +317,11 @@ const PaymentVoucherAddPage: React.FC = () => {
                         value={row.amount}
                         onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                         onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                        // Select existing value on focus so typing replaces
+                        // it (Busy behaviour). Native spinner arrows hidden.
+                        onFocus={(e) => e.currentTarget.select()}
                         disabled={!unlocked}
-                        className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                        className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                       />
                     </td>
                     <td className="px-0 py-0">
@@ -393,8 +332,9 @@ const PaymentVoucherAddPage: React.FC = () => {
                         value={row.narration}
                         onChange={(e) => updateRow(row.id, "narration", e.target.value)}
                         onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                        onFocus={(e) => e.currentTarget.select()}
                         disabled={!unlocked}
-                        className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                        className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                       />
                     </td>
                   </tr>
@@ -403,7 +343,7 @@ const PaymentVoucherAddPage: React.FC = () => {
               </tbody>
               <tfoot>
                 <tr className="bg-card-2 border-t border-line">
-                  <td className="px-2 py-1 text-left" colSpan={2}>
+                  <td className="px-2 py-1 text-left" colSpan={3}>
                     <button
                       type="button"
                       onClick={addRow}

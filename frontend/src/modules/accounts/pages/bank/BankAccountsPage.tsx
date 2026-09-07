@@ -45,7 +45,9 @@ const BankAccountsPage: React.FC = () => {
   const [newCode, setNewCode] = useState("");
   const [newGroup, setNewGroup] = useState("Bank Accounts");
   const [newOpeningBalance, setNewOpeningBalance] = useState<string>("");
-  const [newOpeningDC, setNewOpeningDC] = useState<"D" | "C">("C");
+  // Default Dr because bank/cash are Assets — Real Account rule: "Debit what
+  // comes IN". Cr is only for the rare overdraft case (bank becomes a Liability).
+  const [newOpeningDC, setNewOpeningDC] = useState<"D" | "C">("D");
 
   // Edit-opening-balance modal state
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
@@ -118,7 +120,7 @@ const BankAccountsPage: React.FC = () => {
     setNewCode("");
     setNewGroup("Bank Accounts");
     setNewOpeningBalance("");
-    setNewOpeningDC("C");
+    setNewOpeningDC("D");
   };
 
   const handleAddBank = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -140,7 +142,8 @@ const BankAccountsPage: React.FC = () => {
         type: "ASSET",
         group: newGroup,
         openingBalance,
-        openingBalanceType: newOpeningDC === "C" ? "DEBIT" : "CREDIT",
+        // Direct D→DEBIT / C→CREDIT mapping. Was previously inverted.
+        openingBalanceType: newOpeningDC === "D" ? "DEBIT" : "CREDIT",
       });
       toast.success(
         openingBalance > 0
@@ -299,8 +302,11 @@ const BankAccountsPage: React.FC = () => {
                   acc.currentBalance >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}>
                   ₹{Math.abs(acc.currentBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  {/* Bank/Cash = ASSET, natural side is Dr. Positive balance
+                      shows (Dr), negative balance (overdraft/shortage) shows (Cr).
+                      The reverse mapping was flipping every card's label. */}
                   <span className="text-[10px] ml-1">
-                    {acc.currentBalance >= 0 ? "(Cr)" : "(Dr)"}
+                    {acc.currentBalance >= 0 ? "(Dr)" : "(Cr)"}
                   </span>
                 </p>
               </div>

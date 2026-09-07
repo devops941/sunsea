@@ -157,7 +157,7 @@ const CompanySettings: React.FC = () => {
     const newErrors: any = {};
     if (!formData.companyCode?.trim()) newErrors.companyCode = "Company code is required";
     if (!formData.legalName?.trim()) newErrors.legalName = "Legal name is required";
-    if (!formData.email?.trim()) newErrors.email = "Email is required";
+    // if (!formData.email?.trim()) newErrors.email = "Email is required";
     if (!formData.addressLine1?.trim()) newErrors.addressLine1 = "Address Line 1 is required";
     if (!formData.city?.trim()) newErrors.city = "City is required";
     if (!formData.state?.trim()) newErrors.state = "State is required";
@@ -375,7 +375,14 @@ const CompanySettings: React.FC = () => {
                       <h6 className="text-lg font-semibold text-ink m-0">Contact Details</h6>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
+                      <div>
+                        <TextInput label="Email Address" name="email" type="text" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email"  />
+                        {formData.email && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) && (
+                          <span className="text-[11px] text-amber-500 mt-1 block">
+                            ⚠ Doesn't look like an email — save allowed, but check the value.
+                          </span>
+                        )}
+                      </div>
                       <IndiaPhoneInput
                         multi
                         label="Mobile Numbers"
@@ -446,7 +453,14 @@ const CompanySettings: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
-                  <TextInput label="Email" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
+                  <div>
+                    <TextInput label="Email" name="email" type="text" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" />
+                    {formData.email && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) && (
+                      <span className="text-[11px] text-amber-500 mt-1 block">
+                        ⚠ Doesn't look like an email — save allowed, but check the value.
+                      </span>
+                    )}
+                  </div>
                   <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
                 </div>
               </div>

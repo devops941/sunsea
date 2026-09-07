@@ -1,15 +1,15 @@
-import React, { useState, useCallback, useRef } from "react";
-import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { FaExchangeAlt, FaPlus } from "react-icons/fa";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { FaBookOpen, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { voucherService, type Voucher } from "../../../../services/voucherService";
+import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
-import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
+import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
+import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
+import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 
-// Each row: D = money LEAVES (Out → credited in journal), C = money ARRIVES (In → debited in journal)
-interface ContraRow {
+interface JournalRow {
   id: number;
   dc: "D" | "C";
   ledgerId: string;
@@ -20,7 +20,7 @@ interface ContraRow {
 let rowCounter = 1;
 const INITIAL_ROW_COUNT = 17;
 
-const makeEmptyRow = (idx: number): ContraRow => ({
+const makeEmptyRow = (idx: number): JournalRow => ({
   id: rowCounter++,
   dc: idx === 0 ? "D" : "C",
   ledgerId: "",
@@ -28,17 +28,85 @@ const makeEmptyRow = (idx: number): ContraRow => ({
   narration: "",
 });
 
-const buildEmptyRows = () =>
-  Array.from({ length: INITIAL_ROW_COUNT }, (_, i) => makeEmptyRow(i));
+const ACTIVE_CELL = "focus:bg-slate-900 focus:text-white focus:font-semibold";
 
-const ContraVoucherAddPage: React.FC = () => {
+const JournalEntryEditPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id: routeId } = useParams<{ id: string }>();
+  const id = routeId ? parseInt(routeId, 10) : NaN;
+
+  // Zero-loading: router state -> detail cache -> SWR fetch.
+  const preloaded = (location.state as { voucher?: Voucher } | null)?.voucher || null;
+  const cacheKey = `voucher-${id}`;
+
+  useEffect(() => {
+    if (preloaded && id && !isNaN(id)) updateDetailCache<Voucher>(cacheKey, preloaded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preloaded, cacheKey]);
+
+  const voucherFetcher = useCallback(
+    async (_signal: AbortSignal): Promise<Voucher> => {
+      const v = await voucherService.fetchVoucherById(id);
+      if (!v) throw new Error("Voucher not found");
+      return v;
+    },
+    [id]
+  );
+
+  const { data: cachedVoucher, loading: detailLoading } = useDetailCache<Voucher>({
+    cacheKey,
+    socketModule: "voucher",
+    socketMatchId: id,
+    fetcher: voucherFetcher,
+    enabled: !!id && !isNaN(id),
+  });
+
+  const effective = preloaded || cachedVoucher || getDetailFromCache<Voucher>(cacheKey);
+
+  const hydrateFromVoucher = (v: Voucher): JournalRow[] => {
+    const populated: JournalRow[] = (v.items || []).map((it) => {
+      const isDebit = it.debitLedgerId != null && Number(it.debitAmount || 0) > 0;
+      return {
+        id: rowCounter++,
+        dc: isDebit ? "D" : "C",
+        ledgerId: String(isDebit ? it.debitLedgerId : it.creditLedgerId),
+        amount: String(Number(isDebit ? it.debitAmount : it.creditAmount) || 0),
+        narration: it.narration || "",
+      };
+    });
+    while (populated.length < INITIAL_ROW_COUNT) populated.push(makeEmptyRow(populated.length));
+    return populated;
+  };
+
   const [submitting, setSubmitting] = useState(false);
+  const [voucher, setVoucher] = useState<Voucher | null>(effective);
+  const [date, setDate] = useState(() => (effective?.date || "").split("T")[0]);
+  const [mainNarration, setMainNarration] = useState(effective?.narration || "");
+  const [rows, setRows] = useState<JournalRow[]>(() =>
+    effective ? hydrateFromVoucher(effective) : []
+  );
 
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [mainNarration, setMainNarration] = useState("");
-  const [rows, setRows] = useState<ContraRow[]>(() => buildEmptyRows());
+  const lastAppliedIdRef = useRef<number | null>(effective?.id ?? null);
+  useEffect(() => {
+    if (!cachedVoucher) return;
+    if (lastAppliedIdRef.current === cachedVoucher.id && voucher) return;
+    setVoucher(cachedVoucher);
+    setDate((cachedVoucher.date || "").split("T")[0]);
+    setMainNarration(cachedVoucher.narration || "");
+    setRows(hydrateFromVoucher(cachedVoucher));
+    lastAppliedIdRef.current = cachedVoucher.id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cachedVoucher]);
 
-  useFormShortcuts({});
+  useEffect(() => {
+    if (!id || isNaN(id)) {
+      toast.error("Invalid voucher id");
+      navigate("/accounts/journal-entry");
+    }
+  }, [id, navigate]);
+
+  const loading = !effective && detailLoading;
 
   const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await accountService.fetchLedgers({ limit: 1000 });
@@ -91,7 +159,7 @@ const ContraVoucherAddPage: React.FC = () => {
     }
   };
 
-  const updateRow = (id: number, field: keyof ContraRow, value: string) => {
+  const updateRow = (id: number, field: keyof JournalRow, value: string) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
@@ -108,7 +176,7 @@ const ContraVoucherAddPage: React.FC = () => {
   const hasAnyAmount = totalDebit > 0 || totalCredit > 0;
   const validCount = rows.filter((r) => r.ledgerId && parseFloat(r.amount) > 0).length;
 
-  const isRowComplete = (r: ContraRow) => !!r.ledgerId && parseFloat(r.amount) > 0;
+  const isRowComplete = (r: JournalRow) => !!r.ledgerId && parseFloat(r.amount) > 0;
   const isRowUnlocked = (idx: number): boolean => {
     for (let i = 0; i < idx; i++) {
       if (!isRowComplete(rows[i])) return false;
@@ -116,13 +184,7 @@ const ContraVoucherAddPage: React.FC = () => {
     return true;
   };
 
-  const resetForm = () => {
-    setMainNarration("");
-    setRows(buildEmptyRows());
-    setTimeout(() => focusCell(0, "dc"), 0);
-  };
-
-  const handleSubmit = async (e: { preventDefault(): void }) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validRows = rows.filter((r) => r.ledgerId && parseFloat(r.amount) > 0);
@@ -135,12 +197,6 @@ const ContraVoucherAddPage: React.FC = () => {
       return;
     }
 
-    // Standard accounting mapping — matches the UI column headers exactly:
-    //   D  → Debit column shows the amount → posts as DEBIT
-    //   C  → Credit column shows the amount → posts as CREDIT
-    // Old code had this inverted ("D = Out = Credit posting"), which meant the
-    // ledger ended up on the opposite side of what the operator picked in the
-    // D/C selector. Every contra voucher was flipping bank vs cash Dr/Cr sign.
     const items = validRows.map((r) => {
       const amt = parseFloat(r.amount);
       const isDebit = r.dc === "D";
@@ -149,40 +205,46 @@ const ContraVoucherAddPage: React.FC = () => {
         creditLedgerId: !isDebit ? parseInt(r.ledgerId, 10) : null,
         debitAmount: isDebit ? amt : 0,
         creditAmount: !isDebit ? amt : 0,
-        narration: r.narration || mainNarration || "Contra Entry",
+        narration: r.narration || mainNarration || "Journal Entry",
       };
     });
 
     setSubmitting(true);
     try {
-      const created = await voucherService.createVoucher({
-        type: "CONTRA",
+      const updated = await voucherService.updateVoucher(id, {
         date,
-        narration: mainNarration || "Contra Entry",
+        narration: mainNarration || "Journal Entry",
         items,
       });
-      if (created?.id) {
-        prependToListCacheByPrefix<Voucher>("accounts:contra-vouchers:", created);
+      if (updated?.id) {
+        upsertInListCacheByPrefix<Voucher>(
+          "accounts:journal-vouchers:",
+          (v) => v.id === updated.id,
+          updated
+        );
+        updateDetailCache<Voucher>(`voucher-${updated.id}`, updated);
       }
-      toast.success("Contra voucher saved successfully");
-      resetForm();
+      toast.success("Journal voucher updated");
+      navigate("/accounts/journal-entry");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to save");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return <div className="p-6 text-center text-xs text-ink-subtle">Loading voucher...</div>;
+  }
+
   return (
     <div className="p-3">
       <div className="w-full lg:w-7xl max-w-full">
         <form onSubmit={handleSubmit} className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
-          {/* Title bar */}
-          <div className="bg-rose-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
-            Add Contra Voucher
+          <div className="bg-purple-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+            Modify Journal Voucher
           </div>
 
-          {/* Top meta */}
           <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[11px] items-center">
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Date</label>
             <div className="col-span-4">
@@ -190,15 +252,14 @@ const ContraVoucherAddPage: React.FC = () => {
             </div>
 
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Vch No.</label>
-            <div className="col-span-6 text-ink-subtle font-mono text-[11px] italic">
-              (auto)
+            <div className="col-span-6 text-ink font-mono font-bold text-[12px]">
+              {voucher ? displayVoucherNo(voucher.voucherNo) : "..."}
             </div>
 
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Narration</label>
             <div className="col-span-11">
               <input
                 type="text"
-                placeholder=""
                 value={mainNarration}
                 onChange={(e) => setMainNarration(e.target.value)}
                 onKeyDown={(e) => {
@@ -207,26 +268,20 @@ const ContraVoucherAddPage: React.FC = () => {
                     focusCell(0, "dc");
                   }
                 }}
-                className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none"
+                className={`w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-purple-500/40 focus:border-purple-500 focus:outline-none ${ACTIVE_CELL}`}
               />
             </div>
           </div>
 
-          {/* Spreadsheet table */}
           <div className="border-b border-line" ref={tableRef}>
             <table className="w-full text-[11px] border-collapse">
               <thead>
                 <tr className="bg-card-2 text-ink font-bold border-b border-line">
                   <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
-                  <th className="w-20 px-2 py-1 text-center border-r border-line">
-                    D / C
-                    <div className="text-[9px] font-normal text-ink-subtle normal-case tracking-normal">
-                      D=Out(↓) · C=In(↑)
-                    </div>
-                  </th>
-                  <th className="px-2 py-1 text-left border-r border-line">Account (Cash / Bank)</th>
-                  <th className="w-28 px-2 py-1 text-right border-r border-line text-red-400">Debit (Rs.)</th>
-                  <th className="w-28 px-2 py-1 text-right border-r border-line text-emerald-500">Credit (Rs.)</th>
+                  <th className="w-12 px-2 py-1 text-center border-r border-line">D/C</th>
+                  <th className="px-2 py-1 text-left border-r border-line">Account</th>
+                  <th className="w-28 px-2 py-1 text-right border-r border-line">Debit (Rs.)</th>
+                  <th className="w-28 px-2 py-1 text-right border-r border-line">Credit (Rs.)</th>
                   <th className="px-2 py-1 text-left">Short Narration</th>
                 </tr>
               </thead>
@@ -242,15 +297,13 @@ const ContraVoucherAddPage: React.FC = () => {
                       <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[11px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
                         {idx + 1}
                       </td>
-                      <td className="w-20 px-0 py-0 border-r border-line text-center">
+                      <td className="w-12 px-0 py-0 border-r border-line text-center">
                         <select
                           data-cell={`${idx}-dc`}
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
                           disabled={!unlocked}
-                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center focus:outline-none focus:bg-card-2/60 ${
-                            row.dc === "D" ? "text-red-400" : "text-emerald-500"
-                          } ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         >
                           <option value="D">D</option>
                           <option value="C">C</option>
@@ -263,8 +316,7 @@ const ContraVoucherAddPage: React.FC = () => {
                             ledgers={ledgers}
                             onChange={(val) => updateRow(row.id, "ledgerId", val)}
                             placeholder=""
-                            filterFn={isBankOrCashLedger}
-                            accentColor="rose-500"
+                            accentColor="purple-500"
                             variant="cell"
                             onSelected={() => focusCell(idx, "amount")}
                             disabled={!unlocked}
@@ -282,8 +334,9 @@ const ContraVoucherAddPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-red-400 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -300,8 +353,9 @@ const ContraVoucherAddPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-emerald-500 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -315,8 +369,9 @@ const ContraVoucherAddPage: React.FC = () => {
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
                           onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
-                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />
                       </td>
                     </tr>
@@ -329,15 +384,15 @@ const ContraVoucherAddPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={addRow}
-                      className="flex items-center gap-1 text-[10px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer"
+                      className="flex items-center gap-1 text-[10px] font-semibold text-purple-500 hover:text-purple-600 cursor-pointer"
                     >
                       <FaPlus className="w-2 h-2" /> Add Row
                     </button>
                   </td>
-                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-red-400 border-l border-line">
+                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-emerald-600 border-l border-line">
                     {totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-emerald-500 border-l border-line">
+                  <td className="w-28 px-2 py-1 text-right font-mono font-bold text-red-500 border-l border-line">
                     {totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-2 py-1 text-[10px] italic">
@@ -358,20 +413,15 @@ const ContraVoucherAddPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Bottom action bar */}
           <div className="px-3 py-2 flex items-center justify-between bg-card-2/40">
             <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
-              <FaExchangeAlt className="text-rose-500" />
-              <span>
-                <b className="text-red-400">D</b> = Debit (Amount ↓) &nbsp;·&nbsp;
-                <b className="text-emerald-500">C</b> = Credit (Amount ↑) &nbsp;·&nbsp;
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> to next
-              </span>
+              <FaBookOpen className="text-purple-500" />
+              <span>Modify existing voucher — items will be fully replaced on save</span>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={resetForm}
+                onClick={() => navigate("/accounts/journal-entry")}
                 className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
               >
                 Quit
@@ -379,7 +429,7 @@ const ContraVoucherAddPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold text-[11px] transition disabled:opacity-50 cursor-pointer"
+                className="px-5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-semibold text-[11px] transition disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Saving..." : "Save"}
               </button>
@@ -391,4 +441,4 @@ const ContraVoucherAddPage: React.FC = () => {
   );
 };
 
-export default ContraVoucherAddPage;
+export default JournalEntryEditPage;

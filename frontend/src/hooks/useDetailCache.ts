@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
 import { useSocket } from "../providers/SocketProvider";
 
 // ─── Internal cache store ─────────────────────────────────────────────────────
@@ -92,6 +93,92 @@ function del(key: string) {
   detailCache.delete(key);
   try { sessionStorage.removeItem(SESSION_PREFIX + key); } catch {}
   notifyDetail(key);
+}
+
+// ─── Global socket listener registry ──────────────────────────────────────────
+// Same rationale as in useListCache: per-mount listeners miss events that fire
+// while the detail page isn't visible. A persistent per-(socket, module)
+// listener marks matching detail cache entries stale so the next mount does a
+// silent refetch and the user sees the latest data with no flash.
+//
+// For details, an event's payload usually carries an `id`. We use that to
+// mark ONLY the matching cacheKey stale (typical convention: `${module}-${id}`).
+// If the payload has no id, we conservatively mark ALL keys under that module
+// stale — a rare fallback that's still cheap.
+const moduleToDetailKeys = new Map<string, Set<string>>();
+const registeredPerSocketDetail = new WeakMap<Socket, Set<string>>();
+
+function trackDetailKeyForModule(socketModule: string, cacheKey: string) {
+  let set = moduleToDetailKeys.get(socketModule);
+  if (!set) {
+    set = new Set();
+    moduleToDetailKeys.set(socketModule, set);
+  }
+  set.add(cacheKey);
+}
+
+function payloadId(payload: any): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const id = payload.id ?? payload._id;
+  return id != null ? String(id) : null;
+}
+
+/**
+ * When a socket event carries the FULL updated record, write it straight into
+ * the matching detail cache (`${module}-${id}`). This makes any mounted detail
+ * page re-render instantly with the new data — no refetch, no flash.
+ * If the payload is thin (id only or missing), fall back to a stale-mark
+ * so the next open / mounted refetch pull fresh data from the server.
+ */
+function applyDetailPayload(
+  socketModule: string,
+  event: "created" | "updated" | "deleted",
+  payload: any
+) {
+  const keys = moduleToDetailKeys.get(socketModule);
+  if (!keys) return;
+  const pid = payloadId(payload);
+
+  for (const key of Array.from(keys)) {
+    // Convention: detail cache keys end in `-${id}` (e.g. `voucher-42`,
+    // `salesOrder-7`). Only touch keys whose suffix matches this payload's id.
+    if (pid != null && !key.endsWith(`-${pid}`)) continue;
+
+    if (event === "deleted") {
+      del(key);
+      continue;
+    }
+
+    const hasFullPayload =
+      payload && typeof payload === "object" && Object.keys(payload).length > 1;
+    if (hasFullPayload) {
+      // Instant merge — write() bumps timestamp and notifies subscribers so
+      // any mounted useDetailCache re-renders immediately with fresh data.
+      write(key, payload);
+    } else {
+      const e = detailCache.get(key);
+      if (!e) continue;
+      detailCache.set(key, { ...e, timestamp: 0 });
+      try {
+        sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify({ ...e, timestamp: 0 }));
+      } catch { /* ignore */ }
+      notifyDetail(key);
+    }
+  }
+}
+
+function ensureGlobalDetailListener(socket: Socket, socketModule: string) {
+  let registered = registeredPerSocketDetail.get(socket);
+  if (!registered) {
+    registered = new Set();
+    registeredPerSocketDetail.set(socket, registered);
+  }
+  if (registered.has(socketModule)) return;
+  registered.add(socketModule);
+
+  socket.on(`${socketModule}:created`, (p: any) => applyDetailPayload(socketModule, "created", p));
+  socket.on(`${socketModule}:updated`, (p: any) => applyDetailPayload(socketModule, "updated", p));
+  socket.on(`${socketModule}:deleted`, (p: any) => applyDetailPayload(socketModule, "deleted", p));
 }
 
 // ─── useDetailCache ───────────────────────────────────────────────────────────
@@ -211,8 +298,14 @@ export function useDetailCache<T = any>({
   }, [doFetch]);
 
   // Socket live-sync — debounce burst events into single refetch.
+  // Also registers the persistent GLOBAL listener that keeps cache fresh
+  // even while this detail page is unmounted (see registry helpers above).
   useEffect(() => {
     if (!socket) return;
+
+    trackDetailKeyForModule(socketModule, cacheKey);
+    ensureGlobalDetailListener(socket, socketModule);
+
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onUpdated = (payload: any) => {
       const mid = socketMatchRef.current;
@@ -234,7 +327,7 @@ export function useDetailCache<T = any>({
       socket.off(`${socketModule}:updated`, onUpdated);
       socket.off(`${socketModule}:deleted`, onDeleted);
     };
-  }, [socket, socketModule, doFetch]);
+  }, [socket, socketModule, cacheKey, doFetch]);
 
   const refresh = useCallback(() => {
     del(cacheKeyRef.current);

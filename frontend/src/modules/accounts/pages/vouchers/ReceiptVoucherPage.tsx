@@ -81,6 +81,70 @@ const ReceiptVoucherPage: React.FC = () => {
     fetcher,
   });
 
+  // Busy-style auto-select the first row so Enter opens Modify immediately.
+  useEffect(() => {
+    if (panelOpen) return;
+    if (vouchers.length === 0) {
+      setSelectedRow(null);
+      return;
+    }
+    if (selectedRow == null || !vouchers.some((v) => v.id === selectedRow)) {
+      setSelectedRow(vouchers[0].id);
+    }
+  }, [vouchers, panelOpen, selectedRow]);
+
+  // Keep the highlighted row visible — minimum scroll, no smooth animation.
+  useEffect(() => {
+    if (selectedRow == null) return;
+    const el = document.querySelector<HTMLElement>(`[data-rct-row="${selectedRow}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [selectedRow]);
+
+  // Keyboard navigation on the list:
+  //   ↑ / ↓         move selection between vouchers
+  //   Home / End    jump to first / last voucher
+  //   PgUp / PgDn   jump 10 rows
+  //   Enter         open Modify page (with router-state preload)
+  useEffect(() => {
+    if (panelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (vouchers.length === 0) return;
+      const idx = selectedRow != null ? vouchers.findIndex((v) => v.id === selectedRow) : -1;
+
+      if (e.key === "Enter" && selectedRow != null) {
+        e.preventDefault();
+        const v = vouchers.find((x) => x.id === selectedRow);
+        navigate(`/accounts/receipt-voucher/edit/${selectedRow}`, { state: { voucher: v } });
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = vouchers[Math.min(idx + 1, vouchers.length - 1)];
+        if (next) setSelectedRow(next.id);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = vouchers[Math.max(idx - 1, 0)];
+        if (prev) setSelectedRow(prev.id);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setSelectedRow(vouchers[0].id);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setSelectedRow(vouchers[vouchers.length - 1].id);
+      } else if (e.key === "PageDown") {
+        e.preventDefault();
+        const start = idx < 0 ? 0 : idx;
+        setSelectedRow(vouchers[Math.min(start + 10, vouchers.length - 1)].id);
+      } else if (e.key === "PageUp") {
+        e.preventDefault();
+        const start = idx < 0 ? 0 : idx;
+        setSelectedRow(vouchers[Math.max(start - 10, 0)].id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panelOpen, selectedRow, vouchers, navigate]);
+
   const grandTotal = useMemo(
     () =>
       vouchers.reduce(
@@ -276,10 +340,17 @@ const ReceiptVoucherPage: React.FC = () => {
                   return (
                     <tr
                       key={v.id}
+                      data-rct-row={v.id}
                       onClick={() => setSelectedRow(v.id)}
+                      onDoubleClick={() =>
+                        navigate(`/accounts/receipt-voucher/edit/${v.id}`, {
+                          state: { voucher: v },
+                        })
+                      }
+                      title="Double-click (or Enter with row selected) to modify"
                       className={`border-b border-line-soft cursor-pointer ${
                         isSelected
-                          ? "bg-emerald-600/20 text-ink"
+                          ? "bg-emerald-600/25 text-ink ring-1 ring-emerald-500/40"
                           : rowIdx % 2 === 0
                             ? "hover:bg-card-2/70"
                             : "bg-card-2/20 hover:bg-card-2/70"
@@ -309,7 +380,16 @@ const ReceiptVoucherPage: React.FC = () => {
                       )}
                       {applied.showNarration && (
                         <td className="px-2 py-1 text-ink-subtle max-w-xs truncate">
-                          {v.narration || "-"}
+                          {/* Per-item short narration joined — matches
+                              Busy convention. Falls back to voucher-level
+                              narration only if items have none. */}
+                          {(() => {
+                            const shorts = (v.items || [])
+                              .map((i) => (i.narration || "").trim())
+                              .filter(Boolean);
+                            if (shorts.length > 0) return shorts.join(", ");
+                            return v.narration || "-";
+                          })()}
                         </td>
                       )}
                     </tr>

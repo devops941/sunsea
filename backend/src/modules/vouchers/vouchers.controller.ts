@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { VoucherType } from "@prisma/client";
 import { vouchersService } from "./vouchers.service";
-import { createVoucherSchema, getVouchersQuerySchema } from "./vouchers.types";
+import { createVoucherSchema, getVouchersQuerySchema, updateVoucherSchema } from "./vouchers.types";
 
 class VouchersController {
   async getVouchers(req: Request, res: Response, next: NextFunction) {
@@ -69,6 +69,29 @@ class VouchersController {
       next(error);
     }
   }
+  async updateVoucher(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      const input = updateVoucherSchema.parse(req.body);
+      const voucher = await vouchersService.updateVoucher(id, input);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("voucher:updated", voucher);
+        io.emit("accountLedger:updated", { source: "voucher" });
+      } catch (e) {}
+
+      return res.status(200).json({
+        success: true,
+        message: "Voucher updated successfully",
+        data: voucher,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteVoucher(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id as string, 10);
