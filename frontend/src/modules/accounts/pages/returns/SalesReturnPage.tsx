@@ -130,7 +130,6 @@ export const SalesReturnPage: React.FC = () => {
         const matchesSearch =
           r.returnNo?.toLowerCase().includes(term) ||
           r.customer?.firmName?.toLowerCase().includes(term) ||
-          r.customer?.displayName?.toLowerCase().includes(term) ||
           r.reason?.toLowerCase().includes(term) ||
           r.status?.toLowerCase().includes(term);
         if (!matchesSearch) return false;
@@ -253,7 +252,8 @@ export const SalesReturnPage: React.FC = () => {
       ),
     },
     {
-      header: (
+      header: "CUSTOMER",
+      headerNode: (
         <button
           type="button"
           onClick={toggleSortOrder}
@@ -287,7 +287,7 @@ export const SalesReturnPage: React.FC = () => {
         const gradeName = item.customer?.customerGrade?.name || item.customer?.grade;
         return (
           <div className="flex flex-col">
-            <span className="font-semibold text-ink">{item.customer?.firmName || item.customer?.displayName || "—"}</span>
+            <span className="font-semibold text-ink">{item.customer?.firmName || "—"}</span>
             {gradeName && (
               <span className="text-[11px] text-ink-subtle">Grade: {gradeName}</span>
             )}
