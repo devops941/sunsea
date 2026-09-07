@@ -196,7 +196,8 @@ const DashboardPage: React.FC = () => {
   const accSummaryList = accountsSummaryCache.data;
   const isSyncingAccounts = accountsSummaryCache.refreshing;
   const refreshAccountsSummary = accountsSummaryCache.refresh;
-  const accountsSummary = accSummaryList[0] || null;
+  const rawAccountsSummary = accSummaryList[0] || null;
+  const accountsSummary = rawAccountsSummary ? { ...rawAccountsSummary, alerts: rawAccountsSummary.alerts || [], recentTransactions: rawAccountsSummary.recentTransactions || [] } : null;
 
   usePageSocketSync(
     ["payment", "journalItem", "accountLedger", "salesInvoice", "grnInvoice", "pettyCashEntry"],
