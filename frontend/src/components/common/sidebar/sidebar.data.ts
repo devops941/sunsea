@@ -308,6 +308,16 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/accounts/contra-entry", permission: "vouchers.view" },
         ],
       },
+      // ── Expenses (replaces Petty Cash — source is user's pick per row) ──
+      {
+        title: "Expenses",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/expenses/add", permission: "vouchers.create" },
+          { title: "Modify", path: "/expenses/modify", permission: "vouchers.update" },
+          { title: "List", path: "/expenses", permission: "vouchers.view" },
+        ],
+      },
     ],
     activePaths: [
       "/sales-order",
@@ -321,6 +331,7 @@ export const sidebarItems: SidebarItem[] = [
       "/accounts/receipt-voucher",
       "/accounts/journal-entry",
       "/accounts/contra-entry",
+      "/expenses",
     ],
     permissionAny: [
       "sales-orders.view",
