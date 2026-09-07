@@ -141,6 +141,25 @@ class SalesInvoiceService {
 
     const computedStatus = "CONFIRMED";
 
+    // Calculate opening balance (customer's current net balance before this invoice)
+    let openingBalance = 0;
+    try {
+      const { receivableService } = require("../accounts/receivable.service");
+      const summaries = await receivableService.getReceivableSummaries({ customerId: data.customerId });
+      if (summaries && summaries.length > 0) {
+        openingBalance = Number(summaries[0].netBalance || 0);
+      } else {
+        const opBal = Number(customer.openingBalance || 0);
+        const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+        openingBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+      }
+    } catch {
+      const opBal = Number(customer.openingBalance || 0);
+      const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+      openingBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+    }
+    const closingBalance = openingBalance + grandTotal;
+
     const invoice = await prisma.$transaction(async (tx) => {
       // Increment invoice sequence number
       const settings = await tx.invoiceSetting.findUnique({
@@ -184,6 +203,8 @@ class SalesInvoiceService {
           totalDiscount,
           taxTotal,
           grandTotal,
+          openingBalance,
+          closingBalance,
           companyId: currentUser.companyId,
           createdBy: currentUser.userId,
           status: computedStatus,
@@ -687,6 +708,26 @@ class SalesInvoiceService {
 
       const grandTotal = updTaxableAmount + taxTotal + updChargeAdditions - updChargeDeductions + updBillSundryTotal;
 
+      // Calculate opening balance for update (customer balance after reverting old invoice)
+      let updOpeningBalance = 0;
+      try {
+        const { receivableService } = require("../accounts/receivable.service");
+        const summaries = await receivableService.getReceivableSummaries({ customerId: data.customerId });
+        if (summaries && summaries.length > 0) {
+          // Current net already has old invoice reverted (decrement happened above)
+          updOpeningBalance = Number(summaries[0].netBalance || 0);
+        } else {
+          const opBal = Number(customer.openingBalance || 0);
+          const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+          updOpeningBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+        }
+      } catch {
+        const opBal = Number(customer.openingBalance || 0);
+        const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+        updOpeningBalance = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+      }
+      const updClosingBalance = updOpeningBalance + grandTotal;
+
       const computedStatus = "CONFIRMED";
 
       // 6. Delete old invoice items and update record
@@ -714,6 +755,8 @@ class SalesInvoiceService {
           totalDiscount: updTotalDiscount,
           taxTotal,
           grandTotal,
+          openingBalance: updOpeningBalance,
+          closingBalance: updClosingBalance,
           status: computedStatus,
           payments: [] as any,
           items: { create: invoiceItems },

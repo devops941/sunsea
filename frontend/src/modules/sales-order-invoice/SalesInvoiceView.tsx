@@ -9,7 +9,7 @@ import { useSocketSync } from "../../hooks/useSocketSync";
 import CustomButton from "../../components/ui/Button/Button";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
 import { fetchCompany } from "../../features/company/companySlice";
-import { customerService } from "../../services/customerService";
+
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -80,8 +80,6 @@ const SalesInvoiceView: React.FC = () => {
     const [invoicesList, setInvoicesList] = useState<any[]>([]);
     const [loadingList, setLoadingList] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const [customerBalance, setCustomerBalance] = useState<{ amount: number; type: string } | null>(null);
-
     const { data: company } = useSelector((state: any) => state.company);
 
     useEffect(() => {
@@ -129,18 +127,6 @@ const SalesInvoiceView: React.FC = () => {
         loadDetail(id.toString());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [idParam]);
-
-    // Fetch customer balance when invoice loads
-    useEffect(() => {
-        if (!invoice?.customerId) { setCustomerBalance(null); return; }
-        customerService.fetchById(invoice.customerId)
-            .then((cust: any) => {
-                const bal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
-                const bType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
-                setCustomerBalance({ amount: bal, type: bType.startsWith("D") ? "Dr" : bType.startsWith("C") ? "Cr" : "" });
-            })
-            .catch(() => setCustomerBalance(null));
-    }, [invoice?.customerId, invoice?.id]);
 
     // Auto-navigate to first invoice only when there is no id at all
     useEffect(() => {
@@ -502,7 +488,7 @@ const SalesInvoiceView: React.FC = () => {
 
                                 {/* Header */}
                                 <div className="text-center border-b-[2px] border-black px-3 py-3">
-                                    <div className="text-base uppercase font-bold tracking-[3px]">Tax Invoice</div>
+                                    <div className="text-base uppercase font-bold tracking-[3px]">Invoice</div>
                                 </div>
 
                                 {/* Invoice meta block */}
@@ -700,33 +686,34 @@ const SalesInvoiceView: React.FC = () => {
                                 </div>
 
                                 {/* Customer Balance */}
-                                {customerBalance && (
+                                {invoice.openingBalance != null && (
                                     <div className="border-t border-black">
                                         {(() => {
-                                            const isDr = customerBalance.type === "Dr";
-                                            const invoiceAmt = grandTotal;
-                                            const closingRaw = isDr ? customerBalance.amount + invoiceAmt : customerBalance.amount - invoiceAmt;
-                                            const closingAbs = Math.abs(closingRaw);
-                                            const closingType = closingRaw > 0 ? (isDr ? "Dr" : "Cr") : closingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+                                            const ob = Number(invoice.openingBalance ?? 0);
+                                            const cb = Number(invoice.closingBalance ?? 0);
+                                            const obAbs = Math.abs(ob);
+                                            const obType = ob > 0 ? "Dr" : ob < 0 ? "Cr" : "";
+                                            const cbAbs = Math.abs(cb);
+                                            const cbType = cb > 0 ? "Dr" : cb < 0 ? "Cr" : "";
                                             return (
                                                 <table className="w-full text-[13px]">
                                                     <tbody>
                                                         <tr>
                                                             <td className="px-2 py-1 text-right">Opening Balance</td>
                                                             <td className="px-2 py-1 text-right w-[120px]">
-                                                                ₹{customerBalance.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {customerBalance.type}
+                                                                ₹{obAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {obType}
                                                             </td>
                                                         </tr>
                                                         <tr>
                                                             <td className="px-2 py-1 text-right">Invoice Amount</td>
                                                             <td className="px-2 py-1 text-right">
-                                                                ₹{invoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                                                ₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                                                             </td>
                                                         </tr>
                                                         <tr>
                                                             <td className="px-2 py-1 text-right font-bold text-[14px]">Closing Balance</td>
                                                             <td className="px-2 py-1 text-right font-bold text-[15px]">
-                                                                ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
+                                                                ₹{cbAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {cbType}
                                                             </td>
                                                         </tr>
                                                     </tbody>

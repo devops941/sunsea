@@ -1736,8 +1736,8 @@ const SalesInvoiceForm: React.FC = () => {
 
           {/* ── Notes ── */}
           <div className="w-full md:w-1/2">
-            <TextInput as="textarea" label="Notes" name="notes" rows={2} value={notes} disabled={isLocked}
-              onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." />
+            <TextInput as="textarea" label="Narration" name="notes" rows={2} value={notes} disabled={isLocked}
+              onChange={(e) => setNotes(e.target.value)} placeholder="Optional narration..." />
           </div>
 
           </div>{/* end full-width column */}

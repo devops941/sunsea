@@ -1627,6 +1627,8 @@ model SalesInvoice {
   transport      Json?                 @map("transport")
   numberOfBundle Int?                  @map("number_of_bundle")
   billSundry     Json?                 @map("bill_sundry")
+  openingBalance Decimal?              @map("opening_balance") @db.Decimal(14, 2)
+  closingBalance Decimal?              @map("closing_balance") @db.Decimal(14, 2)
   shippingAddressLine1 String?         @map("shipping_address_line1") @db.VarChar(255)
   shippingCity         String?         @map("shipping_city") @db.VarChar(100)
   shippingState        String?         @map("shipping_state") @db.VarChar(100)
