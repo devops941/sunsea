@@ -1,677 +1,592 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaUserFriends,
   FaSync,
-  FaChevronRight,
-  FaMoneyBillWave,
-  FaExclamationTriangle,
-  FaCheckCircle,
+  FaPrint,
+  FaDownload,
+  FaPlay,
+  FaSearch,
+  FaColumns,
+  FaTimes,
 } from "react-icons/fa";
-import { toast } from "react-toastify";
+import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import SelectInput from "../../../../components/form/SelectInput/SelectInput";
-import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
-import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
-import { receivableService, type CustomerReceivableSummary } from "../../../../services/receivableService";
-import { customerService } from "../../../../services/customerService";
-import { useListCache, prefetchCache } from "../../../../hooks/useListCache";
-import { usePermission } from "../../../../hooks/usePermission";
+import { useDetailCache } from "../../../../hooks/useDetailCache";
+import type { CustomerReceivableSummary } from "../../../../services/receivableService";
 
-type ColumnKey =
-  | "index"
-  | "code"
-  | "customer"
-  | "invoiced"
-  | "paid"
-  | "debit"
-  | "credit"
-  | "netBalance"
-  | "action";
+// ─── Options ────────────────────────────────────────────────────────
+type ShownBy = "name" | "code";
+type Options = {
+  shownBy: ShownBy;
+  showZeroBalance: boolean;
+  showOverdueOnly: boolean;
+  showType: boolean;
+  showOverdueColumns: boolean;
+};
 
-const ALL_COLUMNS: { id: ColumnKey; label: string; alwaysOn?: boolean }[] = [
-  { id: "index", label: "#", alwaysOn: true },
-  { id: "code", label: "Code" },
-  { id: "customer", label: "Customer", alwaysOn: true },
-  { id: "invoiced", label: "Invoiced" },
-  { id: "paid", label: "Paid" },
-  { id: "debit", label: "Debit" },
-  { id: "credit", label: "Credit" },
-  { id: "netBalance", label: "Net Balance", alwaysOn: true },
-  { id: "action", label: "Action", alwaysOn: true },
-];
+const OPTIONS_KEY = "sunsea:receivable:options:v1";
+const DEFAULT_OPTIONS: Options = {
+  shownBy: "name",
+  showZeroBalance: false,
+  showOverdueOnly: false,
+  showType: true,
+  showOverdueColumns: true,
+};
 
-export const AmountReceivablePage: React.FC = () => {
+const loadSaved = (): Partial<Options> | null => {
+  try { const raw = localStorage.getItem(OPTIONS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+};
+const save = (o: Options) => { try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(o)); } catch { /* ignore */ } };
+
+const fmt = (n: number) =>
+  Math.abs(n) < 0.01 ? "" : Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const displayDate = (iso: string) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+};
+const isoToday = () => new Date().toISOString().split("T")[0];
+
+const AmountReceivablePage: React.FC = () => {
   const navigate = useNavigate();
-  const { can } = usePermission();
 
-  // Applied filter state
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [asOnDate, setAsOnDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [customerId, setCustomerId] = useState<string>("");
-  const [search, setSearch] = useState<string>("");
-
-  // Draft filter state for Apply / Clear All
-  const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
-  const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
-  const [dateRangePreset, setDateRangePreset] = useState<string>("custom");
-  const [draftCustomerId, setDraftCustomerId] = useState<string>(customerId);
-  const [draftSearch, setDraftSearch] = useState<string>(search);
-
-  const [customersList, setCustomersList] = useState<any[]>([]);
-
-  // Row selection for status bar
-  const [selectedRow, setSelectedRow] = useState<string | number | null>(null);
-
-  // Column visibility (persisted)
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
-    const saved = localStorage.getItem("amountReceivableVisibleColumns_v2");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const valid = parsed.filter((id: string): id is ColumnKey =>
-            ALL_COLUMNS.some((c) => c.id === id)
-          );
-          if (valid.length > 0) return valid;
-        }
-      } catch {
-        return ALL_COLUMNS.map((c) => c.id);
-      }
-    }
-    return ALL_COLUMNS.map((c) => c.id);
+  // ─── Committed state ───────────────────────────────────────────
+  const [asOnDate, setAsOnDate] = useState<string>(isoToday());
+  const [options, setOptions] = useState<Options>(() => {
+    const saved = loadSaved();
+    return saved ? { ...DEFAULT_OPTIONS, ...saved } : DEFAULT_OPTIONS;
   });
-  const [colsMenuOpen, setColsMenuOpen] = useState(false);
+  useEffect(() => { save(options); }, [options]);
 
+  // ─── Options dialog ────────────────────────────────────────────
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(true);
+  const [draftAsOnDate, setDraftAsOnDate] = useState<string>(asOnDate);
+  const [draftOptions, setDraftOptions] = useState<Options>(options);
+  const setOpt = <K extends keyof Options>(k: K, v: Options[K]) =>
+    setDraftOptions((prev) => ({ ...prev, [k]: v }));
+
+  // ─── Inline row-search + Columns popover (table view only) ─────
+  // These are the "change filter" controls Busy shows in the table
+  // toolbar so the operator can re-narrow rows or toggle columns
+  // without re-opening the whole Options dialog.
+  const [rowSearch, setRowSearch] = useState<string>("");
+  const [showColumnsMenu, setShowColumnsMenu] = useState<boolean>(false);
+  const rowSearchRef = useRef<HTMLInputElement>(null);
+  const columnsMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    localStorage.setItem("amountReceivableVisibleColumns_v2", JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
-
-  const isVisible = (id: ColumnKey) => visibleColumns.includes(id);
-
-  // Load customers list for filter dropdown
-  useEffect(() => {
-    const loadCustomers = async () => {
-      try {
-        const res = await customerService.fetchAll({ limit: 10000 });
-        const list = Array.isArray(res) ? res : (res?.customers || []);
-        setCustomersList(list);
-      } catch (err) {
-        console.error("Failed to load customers dropdown", err);
-      }
+    if (!showColumnsMenu) return;
+    const onClick = (e: MouseEvent) => {
+      if (!columnsMenuRef.current?.contains(e.target as Node)) setShowColumnsMenu(false);
     };
-    loadCustomers();
-  }, []);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [showColumnsMenu]);
 
-  const cacheKey = `accounts:amount-receivable:${asOnDate}:${startDate}:${endDate}:${customerId}:${search}`;
+  useEffect(() => {
+    if (!showOptionsDialog) return;
+    setDraftAsOnDate(asOnDate);
+    setDraftOptions(options);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>('input[name="arAsOnDate"]')?.focus();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOptionsDialog]);
 
-  const fetcher = useCallback(
-    async (_signal: AbortSignal) => {
-      try {
-        const data = await receivableService.getReceivables({
-          asOnDate,
-          startDate,
-          endDate,
-          customerId,
-          search,
-          page: 1,
-          limit: 10000,
-        });
-        const list = Array.isArray(data) ? data : [];
-        return { data: list, total: list.length };
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load customer receivables");
-        throw err;
-      }
-    },
-    [asOnDate, startDate, endDate, customerId, search]
-  );
-
-  // Prefetch each customer's breakdown in the background when the list loads.
-  const onListSuccess = useCallback((list: CustomerReceivableSummary[]) => {
-    for (const c of list) {
-      const detailKey = `accounts:customer-breakdown-${c.customerId}::`;
-      prefetchCache(detailKey, async () => {
-        const data = await receivableService.getCustomerDetail(c.customerId, { startDate: "", endDate: "" });
-        return { data: data ? [data] : [], total: data ? 1 : 0 };
-      });
-    }
-  }, []);
-
-  const { data: receivables, loading, refreshing, refresh } = useListCache<CustomerReceivableSummary>({
+  // ─── Fetch (cached + socket-synced) ────────────────────────────
+  const cacheKey = `accounts:receivable:${asOnDate}`;
+  const fetcher = useCallback(async (signal: AbortSignal): Promise<CustomerReceivableSummary[]> => {
+    const res = await apiClient.get("/accounts/receivable", { params: { asOnDate }, signal });
+    const list = res.data?.data ?? res.data ?? [];
+    return Array.isArray(list) ? list : (list.data ?? []);
+  }, [asOnDate]);
+  const { data, loading, refreshing, refresh } = useDetailCache<CustomerReceivableSummary[]>({
     cacheKey,
     socketModule: "voucher",
     fetcher,
-    onSuccess: onListSuccess,
   });
 
-  // Date range preset handler
-  const handleDateRangeChange = (val: string) => {
-    setDateRangePreset(val);
-    if (val === "custom") return;
-
-    const today = new Date();
-    let start = new Date();
-    let end = new Date();
-
-    if (val === "today") {
-      // both today
-    } else if (val === "yesterday") {
-      start.setDate(today.getDate() - 1);
-      end.setDate(today.getDate() - 1);
-    } else if (val === "last_week") {
-      start.setDate(today.getDate() - 7);
-    } else if (val === "last_month") {
-      start.setMonth(today.getMonth() - 1);
-    } else if (val === "last_6_months") {
-      start.setMonth(today.getMonth() - 6);
-    } else if (val === "last_year") {
-      start.setFullYear(today.getFullYear() - 1);
+  // ─── Filtered + sorted rows ────────────────────────────────────
+  const rows = useMemo<CustomerReceivableSummary[]>(() => {
+    let list = data ?? [];
+    if (!options.showZeroBalance) list = list.filter((r) => Math.abs(r.netBalance) > 0.01);
+    if (options.showOverdueOnly) list = list.filter((r) => r.isOverdue);
+    const q = rowSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((r) =>
+        (r.firmName || "").toLowerCase().includes(q) ||
+        (r.customerCode || "").toLowerCase().includes(q) ||
+        (r.customerType || "").toLowerCase().includes(q)
+      );
     }
-
-    setDraftStartDate(start.toISOString().split("T")[0]);
-    setDraftEndDate(end.toISOString().split("T")[0]);
-  };
-
-  const handleApplyFilters = () => {
-    setStartDate(draftStartDate);
-    setEndDate(draftEndDate);
-    setCustomerId(draftCustomerId);
-    setSearch(draftSearch);
-  };
-
-  const handleClearFilters = () => {
-    setDraftStartDate("");
-    setDraftEndDate("");
-    setDateRangePreset("custom");
-    setDraftCustomerId("");
-    setDraftSearch("");
-
-    setStartDate("");
-    setEndDate("");
-    setCustomerId("");
-    setSearch("");
-  };
-
-  const [sortBy, setSortBy] = useState<string>("activity");
-
-  const filteredCustomers = useMemo(() => {
-    // Only customers with a POSITIVE Dr balance actually owe us. A customer
-    // sitting on a Cr balance (they paid advance / credit note pending) is
-    // NOT a receivable — they've already paid. Hide them so this page only
-    // shows real dues. If the user needs to see credit-balance customers,
-    // that's a separate "Customer Advances" report.
-    const list = (Array.isArray(receivables) ? receivables : [])
-      .filter((c) => Number(c.balanceAsOnDate || 0) > 0.005);
-    if (sortBy === "activity") {
-      list.sort((a, b) => {
-        const aAct = (a.totalBilled || 0) + (a.totalPaid || 0);
-        const bAct = (b.totalBilled || 0) + (b.totalPaid || 0);
-        if (aAct !== bAct) return bAct - aAct;
-        return (b.balanceAsOnDate || 0) - (a.balanceAsOnDate || 0);
-      });
-    } else if (sortBy === "balance") {
-      list.sort((a, b) => (b.balanceAsOnDate || 0) - (a.balanceAsOnDate || 0));
-    } else if (sortBy === "overdue") {
-      list.sort((a, b) => {
-        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
-        return (b.overdueAmount || 0) - (a.overdueAmount || 0);
-      });
-    } else if (sortBy === "name") {
-      list.sort((a, b) => (a.firmName || "").localeCompare(b.firmName || ""));
-    }
-    return list;
-  }, [receivables, sortBy]);
-
-  // Dashboard Totals
-  const totals = useMemo(() => {
-    return filteredCustomers.reduce(
-      (acc, curr) => {
-        const d = curr.debit !== undefined ? curr.debit : (curr.openingBalance || 0) + (curr.totalBilled || 0);
-        const c = curr.credit !== undefined ? curr.credit : (curr.totalPaid || 0) + (curr.totalReturned || 0);
-        acc.totalOpening += curr.openingBalance || 0;
-        acc.totalBilled += curr.totalBilled || 0;
-        acc.totalPaid += curr.totalPaid || 0;
-        acc.totalDebit += d;
-        acc.totalCredit += c;
-        acc.totalNetBalance += curr.balanceAsOnDate || 0;
-        if (curr.isOverdue) acc.overdueCount += 1;
-        return acc;
-      },
-      { totalOpening: 0, totalBilled: 0, totalPaid: 0, totalDebit: 0, totalCredit: 0, totalNetBalance: 0, overdueCount: 0 }
+    return [...list].sort((a, b) =>
+      options.shownBy === "code"
+        ? (a.customerCode || "").localeCompare(b.customerCode || "")
+        : (a.firmName || "").localeCompare(b.firmName || "")
     );
-  }, [filteredCustomers]);
+  }, [data, options.showZeroBalance, options.showOverdueOnly, options.shownBy, rowSearch]);
 
-  // CSV Export dataset configuration
-  const { csvData, csvColumns, csvFilename } = useMemo(() => {
-    const columns = [
-      { header: "Customer Code", accessor: (item: any) => item.customerCode },
-      { header: "Customer / Firm Name", accessor: (item: any) => item.firmName },
-      { header: "Customer Type", accessor: (item: any) => item.customerType || "CUSTOMER" },
-      { header: "GSTIN", accessor: (item: any) => item.gstin || "-" },
-      { header: "Phone", accessor: (item: any) => item.phone || "-" },
-      { header: "Opening Balance", accessor: (item: any) => item.openingBalance || 0 },
-      { header: "Invoiced Amount", accessor: (item: any) => item.totalBilled || 0 },
-      { header: "Paid / Received Amount", accessor: (item: any) => item.totalPaid || 0 },
-      { header: "Returned Amount", accessor: (item: any) => item.totalReturned || 0 },
-      { header: "Debit Amount", accessor: (item: any) => item.debit || 0 },
-      { header: "Credit Amount", accessor: (item: any) => item.credit || 0 },
-      { header: "Net Balance", accessor: (item: any) => item.balanceAsOnDate || 0 },
-      { header: "Overdue Amount", accessor: (item: any) => item.overdueAmount || 0 },
-      { header: "Is Overdue", accessor: (item: any) => (item.isOverdue ? "Yes" : "No") },
-    ];
+  const totals = useMemo(() => {
+    const debit = rows.reduce((s, r) => s + Math.max(r.netBalance, 0), 0);
+    const credit = rows.reduce((s, r) => s + Math.max(-r.netBalance, 0), 0);
+    const overdue = rows.reduce((s, r) => s + (r.overdueAmount || 0), 0);
+    return { debit, credit, overdue };
+  }, [rows]);
 
-    return {
-      csvData: filteredCustomers,
-      csvColumns: columns,
-      csvFilename: `Amount_Receivable_Report_${asOnDate}.csv`,
+  // ─── Commit + F2 + Esc ─────────────────────────────────────────
+  const commitOptions = useCallback(() => {
+    setAsOnDate(draftAsOnDate);
+    setOptions(draftOptions);
+    setShowOptionsDialog(false);
+  }, [draftAsOnDate, draftOptions]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F2" && showOptionsDialog) { e.preventDefault(); commitOptions(); }
+      else if (e.key === "F3" && !showOptionsDialog) {
+        // Busy convention: F3 focuses the inline row search.
+        e.preventDefault();
+        rowSearchRef.current?.focus();
+        rowSearchRef.current?.select();
+      }
+      else if (e.key === "Escape" && !showOptionsDialog) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        // Esc inside the search input just clears + blurs — doesn't
+        // re-open the filter dialog (which would surprise the operator).
+        if (e.target === rowSearchRef.current) {
+          e.preventDefault();
+          if (rowSearch) setRowSearch("");
+          else rowSearchRef.current?.blur();
+          return;
+        }
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setShowOptionsDialog(true);
+      }
     };
-  }, [filteredCustomers, asOnDate]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, commitOptions, rowSearch]);
 
+  // ─── Row keyboard nav ──────────────────────────────────────────
+  const [rowIdx, setRowIdx] = useState<number>(-1);
+  const rowIdxRef = useRef(rowIdx);
+  useEffect(() => { rowIdxRef.current = rowIdx; }, [rowIdx]);
+  useEffect(() => {
+    if (showOptionsDialog) return;
+    if (rowIdx < 0 && rows.length > 0) setRowIdx(0);
+  }, [showOptionsDialog, rows.length, rowIdx]);
+  useEffect(() => {
+    if (rowIdx < 0) return;
+    document.querySelector<HTMLElement>(`[data-ar-row="${rowIdx}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [rowIdx]);
+  useEffect(() => {
+    if (showOptionsDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const max = rows.length - 1;
+      const cur = rowIdxRef.current;
+      if (e.key === "ArrowDown") { e.preventDefault(); setRowIdx(Math.min(cur + 1, max)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setRowIdx(Math.max(cur - 1, 0)); }
+      else if (e.key === "Home") { e.preventDefault(); setRowIdx(0); }
+      else if (e.key === "End") { e.preventDefault(); setRowIdx(max); }
+      else if (e.key === "PageDown") { e.preventDefault(); setRowIdx(Math.min(cur + 10, max)); }
+      else if (e.key === "PageUp") { e.preventDefault(); setRowIdx(Math.max(cur - 10, 0)); }
+      else if (e.key === "Enter" && cur >= 0 && rows[cur]) {
+        e.preventDefault();
+        navigate(`/accounts/receivable/${rows[cur].customerId}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, rows, navigate]);
+
+  // ─── Print / Export ────────────────────────────────────────────
+  const handlePrint = () => window.print();
+  const exportCSV = () => {
+    if (!rows.length) return;
+    const lines: string[][] = [];
+    lines.push(["Amount Receivable"]);
+    lines.push(["As On:", displayDate(asOnDate)]);
+    lines.push([]);
+    const header = ["Customer"];
+    if (options.showType) header.push("Type");
+    header.push("Debit", "Credit", "Net Balance");
+    if (options.showOverdueColumns) header.push("Overdue", "Days");
+    lines.push(header);
+    for (const r of rows) {
+      const line: string[] = [options.shownBy === "code" ? r.customerCode : r.firmName];
+      if (options.showType) line.push(r.customerType || "");
+      line.push(fmt(Math.max(r.netBalance, 0)), fmt(Math.max(-r.netBalance, 0)), fmt(r.netBalance));
+      if (options.showOverdueColumns) line.push(fmt(r.overdueAmount || 0), r.isOverdue ? String(r.dueDays) : "");
+      lines.push(line);
+    }
+    lines.push([]);
+    const totalLine: string[] = ["TOTAL"];
+    if (options.showType) totalLine.push("");
+    totalLine.push(fmt(totals.debit), fmt(totals.credit), fmt(totals.debit - totals.credit));
+    if (options.showOverdueColumns) totalLine.push(fmt(totals.overdue), "");
+    lines.push(totalLine);
+    const csv = lines.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `amount-receivable-${asOnDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ─── Render ────────────────────────────────────────────────────
   return (
-    <div className="p-3 flex gap-3 w-full items-start font-sans text-ink">
-      <div className="flex-1 space-y-2 min-w-0 max-w-7xl">
-
-        {/* Single-row header — filters + actions */}
-        <div className="bg-card rounded-md border border-line shadow-sm px-3 py-2 flex flex-wrap items-end gap-2">
-          <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
-            <SelectInput
-              name="dateRangePreset"
-              value={dateRangePreset}
-              options={DATE_RANGE_OPTIONS}
-              hideLabel
-              searchable={false}
-              onChange={(e) => handleDateRangeChange(e.target.value)}
-            />
-          </div>
-
-          <div className="w-[120px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
-            <DatePickerCalendar
-              name="draftStartDate"
-              value={draftStartDate}
-              onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
-            />
-          </div>
-
-          <div className="w-[120px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
-            <DatePickerCalendar
-              name="draftEndDate"
-              value={draftEndDate}
-              onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
-            />
-          </div>
-
-          <div className="w-[220px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Search</label>
+    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+      {!showOptionsDialog && (
+      <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
+        <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+          <FaUserFriends className="text-red-500 text-sm" /> Amount Receivable
+        </h3>
+        <span className="text-[11px] text-ink-muted">
+          As On <b className="text-ink">{displayDate(asOnDate)}</b>
+          <span className="text-ink-subtle"> · </span>
+          <b className="text-ink">{rows.length} customer{rows.length === 1 ? "" : "s"}</b>
+        </span>
+        {refreshing && (
+          <span className="flex items-center gap-1 text-[10px] text-red-400">
+            <FaSync className="animate-spin" /> Syncing…
+          </span>
+        )}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {/* Inline row search — F3 to focus, matches Busy's Search-F3. */}
+          <div className="relative">
+            <FaSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-ink-subtle" />
             <input
+              ref={rowSearchRef}
               type="text"
-              className="w-full px-2 py-1.5 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
-              value={draftSearch}
-              onChange={(e) => setDraftSearch(e.target.value)}
-              placeholder="Code / Name..."
+              value={rowSearch}
+              onChange={(e) => setRowSearch(e.target.value)}
+              placeholder="Search name/code…"
+              className="w-40 pl-6 pr-6 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
             />
-          </div>
-
-          <div className="w-[160px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Customer</label>
-            <SelectInput
-              name="draftCustomerId"
-              value={draftCustomerId}
-              options={customersList.map(c => ({ label: c.firmName || c.displayName || c.customerCode, value: c.id }))}
-              defaultOptionLabel="All Customers"
-              hideLabel
-              searchable
-              onChange={(e) => setDraftCustomerId(e.target.value)}
-            />
-          </div>
-
-          <button
-            onClick={handleClearFilters}
-            className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card rounded border border-line"
-          >
-            Clear
-          </button>
-          <button
-            onClick={handleApplyFilters}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded"
-          >
-            Apply
-          </button>
-
-          <div className="flex items-center gap-1.5 ml-auto">
-            <button
-              onClick={refresh}
-              className="flex items-center gap-1 px-2 py-1.5 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line"
-              title="Refresh"
-            >
-              <FaSync className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
-            </button>
-            {(can("receivable.export") || can("accounts.export")) && (
-              <ExportCSVButton
-                data={csvData}
-                columns={csvColumns}
-                filename={csvFilename}
-                text="Export"
-              />
+            {rowSearch && (
+              <button
+                onClick={() => setRowSearch("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[10px]"
+                title="Clear"
+              >
+                <FaTimes />
+              </button>
             )}
           </div>
-        </div>
 
-        {/* Table card — Busy density */}
-        <div
-          className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
-          style={{ height: "calc(100vh - 240px)" }}
-        >
-          {/* Table toolbar row */}
-          <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between gap-2 shrink-0">
-            <h2 className="text-xs font-semibold text-ink">Customer Receivables</h2>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <label className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Sort:</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-2 py-1 border border-line rounded text-[11px] bg-card text-ink focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="activity">Recent Activity</option>
-                  <option value="balance">Highest Balance</option>
-                  <option value="overdue">Overdue First</option>
-                  <option value="name">Name (A-Z)</option>
-                </select>
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => setColsMenuOpen((o) => !o)}
-                  className="px-2 py-1 border border-line rounded text-[11px] bg-card text-ink hover:bg-card-2 cursor-pointer"
-                >
-                  Columns ▾
-                </button>
-                {colsMenuOpen && (
-                  <div className="absolute right-0 mt-1 z-20 w-52 bg-card border border-line rounded-md shadow-lg p-2 space-y-1">
-                    {ALL_COLUMNS.map((c) => (
-                      <label
-                        key={c.id}
-                        className={`flex items-center gap-2 px-1.5 py-1 rounded text-[11px] ${c.alwaysOn ? "opacity-60 cursor-not-allowed" : "hover:bg-card-2 cursor-pointer"}`}
-                      >
-                        <input
-                          type="checkbox"
-                          disabled={c.alwaysOn}
-                          checked={isVisible(c.id)}
-                          onChange={(e) => {
-                            if (c.alwaysOn) return;
-                            setVisibleColumns((prev) =>
-                              e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)
-                            );
-                          }}
-                        />
-                        <span className="text-ink">{c.label}</span>
-                      </label>
-                    ))}
-                    <div className="pt-1 mt-1 border-t border-line-soft flex justify-end">
-                      <button
-                        onClick={() => setColsMenuOpen(false)}
-                        className="text-[10px] text-ink-subtle hover:text-ink px-2 py-0.5"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span className="text-[11px] text-ink-subtle font-mono">Total: {filteredCustomers.length}</span>
-            </div>
-          </div>
-
-          {filteredCustomers.length === 0 ? (
-            <div className="p-8 text-center text-xs text-ink-subtle flex-1">
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <FaSync className="animate-spin text-blue-600 text-[10px]" />
-                  Loading customer receivables…
-                </span>
-              ) : (
-                "No customer receivables matching the selected filter criteria."
-              )}
-            </div>
-          ) : (
-            <div className="overflow-auto flex-1">
-              <table className="w-full text-left text-[11px] text-ink-muted border-collapse">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-card-2 text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
-                    {isVisible("index") && <th className="px-2 py-1.5 border-r border-line w-10 text-center">#</th>}
-                    {isVisible("code") && <th className="px-2 py-1.5 border-r border-line w-24">Code</th>}
-                    {isVisible("customer") && <th className="px-2 py-1.5 border-r border-line">Customer</th>}
-                    {isVisible("invoiced") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Invoiced</th>}
-                    {isVisible("paid") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Paid</th>}
-                    {isVisible("debit") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Debit</th>}
-                    {isVisible("credit") && <th className="px-2 py-1.5 border-r border-line w-28 text-right">Credit</th>}
-                    {isVisible("netBalance") && <th className="px-2 py-1.5 border-r border-line w-32 text-right">Net Balance</th>}
-                    {isVisible("action") && <th className="px-2 py-1.5 w-20 text-center">Action</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.map((item: any, rowIdx: number) => {
-                    const isSelected = selectedRow === item.customerId;
-                    const bal = Number(item.balanceAsOnDate || 0);
-                    const balAbs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    return (
-                      <tr
-                        key={item.customerId}
-                        onClick={() => setSelectedRow(item.customerId)}
-                        className={`border-b border-line-soft cursor-pointer ${
-                          isSelected
-                            ? "bg-blue-500/20 text-ink"
-                            : rowIdx % 2 === 0
-                              ? "hover:bg-card-2/70"
-                              : "bg-card-2/20 hover:bg-card-2/70"
-                        }`}
-                      >
-                        {isVisible("index") && (
-                          <td className="px-2 py-1 border-r border-line-soft text-center font-mono text-[11px] text-ink-subtle">
-                            {rowIdx + 1}
-                          </td>
-                        )}
-                        {isVisible("code") && (
-                          <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-blue-500">
-                            {item.customerCode || "-"}
-                          </td>
-                        )}
-                        {isVisible("customer") && (
-                          <td className="px-2 py-1 border-r border-line-soft">
-                            <div className="font-bold text-ink uppercase truncate">{item.firmName}</div>
-                            {item.gstin && (
-                              <div className="text-[10px] text-ink-subtle font-mono">GST: {item.gstin}</div>
-                            )}
-                          </td>
-                        )}
-                        {isVisible("invoiced") && (
-                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono">
-                            ₹{(item.totalBilled || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        )}
-                        {isVisible("paid") && (
-                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono">
-                            ₹{(item.totalPaid || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        )}
-                        {isVisible("debit") && (
-                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-blue-700">
-                            ₹{(item.debit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        )}
-                        {isVisible("credit") && (
-                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono">
-                            ₹{(item.credit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        )}
-                        {isVisible("netBalance") && (
-                          <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-bold whitespace-nowrap">
-                            {Math.abs(bal) < 0.005 ? (
-                              <span className="text-ink">₹0.00</span>
-                            ) : bal > 0 ? (
-                              <span className="text-ink">₹{balAbs} <span className="text-[10px] text-ink-subtle">Dr</span></span>
-                            ) : (
-                              <span className="text-emerald-500">₹{balAbs} <span className="text-[10px] text-emerald-500/70">Cr</span></span>
-                            )}
-                          </td>
-                        )}
-                        {isVisible("action") && (
-                          <td className="px-2 py-1 text-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/accounts/receivable/${item.customerId}`);
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded text-[11px] border border-blue-200"
-                            >
-                              View <FaChevronRight size={8} />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                  {/* Busy-style empty filler rows */}
-                  {Array.from({ length: Math.max(0, 25 - filteredCustomers.length) }).map((_, i) => (
-                    <tr key={`empty-${i}`} className="border-b border-line-soft">
-                      {isVisible("index") && <td className="px-2 py-1 border-r border-line-soft">&nbsp;</td>}
-                      {isVisible("code") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("customer") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("invoiced") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("paid") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("debit") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("credit") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("netBalance") && <td className="px-2 py-1 border-r border-line-soft"></td>}
-                      {isVisible("action") && <td className="px-2 py-1"></td>}
-                    </tr>
-                  ))}
-                </tbody>
-                {/* Sticky footer with grand totals */}
-                <tfoot className="sticky bottom-0 z-10 bg-card-2 border-t-2 border-line">
-                  <tr>
-                    <td
-                      colSpan={
-                        (isVisible("index") ? 1 : 0) +
-                        (isVisible("code") ? 1 : 0) +
-                        (isVisible("customer") ? 1 : 0)
-                      }
-                      className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide border-r border-line"
+          {/* Columns — toggle column visibility inline. */}
+          <div className="relative" ref={columnsMenuRef}>
+            <button
+              onClick={() => setShowColumnsMenu((s) => !s)}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+              title="Show / hide columns"
+            >
+              <FaColumns className="text-[10px]" /> Columns
+            </button>
+            {showColumnsMenu && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-line rounded shadow-2xl z-30 py-1 text-[11px]">
+                {([
+                  { key: "showType", label: "Type" },
+                  { key: "showOverdueColumns", label: "Overdue / Days" },
+                ] as { key: "showType" | "showOverdueColumns"; label: string }[]).map((c) => {
+                  const on = options[c.key] as boolean;
+                  return (
+                    <button
+                      key={c.key}
+                      onClick={() => setOptions((p) => ({ ...p, [c.key]: !on }))}
+                      className={`w-full flex items-center gap-2 px-3 py-1 text-left hover:bg-card-2 ${
+                        on ? "text-ink" : "text-ink-subtle"
+                      }`}
                     >
-                      Grand Total ({filteredCustomers.length})
-                    </td>
-                    {isVisible("invoiced") && (
-                      <td className="px-2 py-1.5 text-right font-mono font-bold text-ink border-r border-line">
-                        ₹{totals.totalBilled.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    )}
-                    {isVisible("paid") && (
-                      <td className="px-2 py-1.5 text-right font-mono font-bold text-ink border-r border-line">
-                        ₹{totals.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    )}
-                    {isVisible("debit") && (
-                      <td className="px-2 py-1.5 text-right font-mono font-bold text-blue-700 border-r border-line">
-                        ₹{totals.totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    )}
-                    {isVisible("credit") && (
-                      <td className="px-2 py-1.5 text-right font-mono font-bold text-ink border-r border-line">
-                        ₹{totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    )}
-                    {isVisible("netBalance") && (
-                      <td className="px-2 py-1.5 text-right font-mono font-bold text-blue-600 border-r border-line">
-                        ₹{Math.abs(totals.totalNetBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        <span className="text-[10px] ml-1">{totals.totalNetBalance >= 0 ? "Dr" : "Cr"}</span>
-                      </td>
-                    )}
-                    {isVisible("action") && <td></td>}
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-
-          {/* Busy-style status bar */}
-          <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[10px] font-mono text-ink-subtle shrink-0">
-            <div className="flex gap-4">
-              <span>
-                Entry No: <b className="text-ink">{filteredCustomers.length > 0 ? 1 : 0} / {filteredCustomers.length}</b>
-              </span>
-              <span>
-                Row No: <b className="text-ink">
-                  {selectedRow
-                    ? filteredCustomers.findIndex((v: any) => v.customerId === selectedRow) + 1
-                    : (filteredCustomers.length > 0 ? 1 : 0)}
-                  {" / "}{filteredCustomers.length}
-                </b>
-              </span>
-            </div>
-            <div className="flex gap-3 uppercase tracking-wide">
-              <span>Customers: <b className="text-ink">{filteredCustomers.length}</b></span>
-              <span>Overdue: <b className="text-amber-600">{totals.overdueCount}</b></span>
-            </div>
+                      <span className="w-3 text-center">{on ? "✓" : ""}</span>
+                      <span>{c.label}</span>
+                    </button>
+                  );
+                })}
+                <div className="border-t border-line my-1"></div>
+                {([
+                  { key: "showZeroBalance", label: "Show Zero Balance" },
+                  { key: "showOverdueOnly", label: "Show Only Overdue" },
+                ] as { key: "showZeroBalance" | "showOverdueOnly"; label: string }[]).map((c) => {
+                  const on = options[c.key] as boolean;
+                  return (
+                    <button
+                      key={c.key}
+                      onClick={() => setOptions((p) => ({ ...p, [c.key]: !on }))}
+                      className={`w-full flex items-center gap-2 px-3 py-1 text-left hover:bg-card-2 ${
+                        on ? "text-ink" : "text-ink-subtle"
+                      }`}
+                    >
+                      <span className="w-3 text-center">{on ? "✓" : ""}</span>
+                      <span>{c.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
+
+          <button
+            onClick={() => setShowOptionsDialog(true)}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            title="Change filters (Esc)"
+          >
+            Filters
+          </button>
+          <button onClick={handlePrint} disabled={!data}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaPrint /> Print
+          </button>
+          <button onClick={exportCSV} disabled={!data}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaDownload /> Export
+          </button>
+          <button onClick={refresh} disabled={refreshing}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
+          </button>
         </div>
       </div>
+      )}
 
-      {/* Right sidebar — 4 summary stats. Amounts render on their own row so
-         crores-scale values never squeeze the label or overflow the card. */}
-      <aside className="w-[240px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden">
-        <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
-          <FaUserFriends className="text-blue-600 text-xs" /> Summary
+      {!showOptionsDialog && (
+        <>
+          {!data && loading && (
+            <div className="bg-card border border-line rounded p-12 text-center text-xs text-ink-subtle">Loading…</div>
+          )}
+          {!data && !loading && (
+            <div className="bg-card border border-line rounded p-12 text-center text-xs text-ink-subtle">
+              <FaUserFriends className="text-red-500/40 text-3xl mx-auto mb-2" />
+              No customers with outstanding balances.
+            </div>
+          )}
+          {data && (
+            <div
+              className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
+              style={{ height: "calc(100vh - 200px)" }}
+            >
+              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0 flex items-center justify-between">
+                <span>As On : <b className="text-ink">{displayDate(asOnDate)}</b></span>
+                <span className="text-ink font-semibold">
+                  {options.showOverdueOnly ? "Overdue Only" : "All Receivables"}
+                </span>
+              </div>
+
+              <div className="overflow-auto flex-1 min-h-0">
+                <table className="w-full text-left border-collapse table-fixed">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-head border-b-2 border-line">
+                      <th className="px-3 py-1 text-[11px] font-bold text-ink border-r border-line bg-head w-[36%]">
+                        {options.shownBy === "code" ? "Code / Customer" : "Customer"}
+                      </th>
+                      {options.showType && (
+                        <th className="px-3 py-1 text-[11px] font-bold text-ink border-r border-line bg-head w-[14%]">Type</th>
+                      )}
+                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Debit</th>
+                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Credit</th>
+                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Net Balance</th>
+                      {options.showOverdueColumns && (
+                        <>
+                          <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[10%]">Overdue</th>
+                          <th className="px-3 py-1 text-[11px] font-bold text-right text-ink bg-head w-[8%]">Days</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => {
+                      const isHl = rowIdx === i;
+                      const cls = isHl ? "bg-black text-white" : "";
+                      const debit = Math.max(r.netBalance, 0);
+                      const credit = Math.max(-r.netBalance, 0);
+                      return (
+                        <tr
+                          key={r.customerId}
+                          data-ar-row={i}
+                          onClick={() => setRowIdx(i)}
+                          onDoubleClick={() => navigate(`/accounts/receivable/${r.customerId}`)}
+                          className="border-b border-line-soft/60 hover:bg-card-2/40 cursor-pointer"
+                          title="Double-click (or Enter) to drill into customer breakdown"
+                        >
+                          <td className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 uppercase ${cls}`}>
+                            {options.shownBy === "code" ? (
+                              <>
+                                <span className="font-mono text-[10px] text-ink-subtle mr-2">{r.customerCode}</span>
+                                {r.firmName}
+                              </>
+                            ) : (
+                              r.firmName
+                            )}
+                          </td>
+                          {options.showType && (
+                            <td className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 uppercase text-ink-muted ${cls}`}>
+                              {r.customerType || ""}
+                            </td>
+                          )}
+                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
+                            {fmt(debit)}
+                          </td>
+                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
+                            {fmt(credit)}
+                          </td>
+                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono font-semibold border-r border-line-soft/50 ${
+                            !isHl && r.netBalance > 0 ? "text-emerald-600" :
+                            !isHl && r.netBalance < 0 ? "text-red-600" :
+                            ""
+                          } ${cls}`}>
+                            {fmt(Math.abs(r.netBalance))}
+                          </td>
+                          {options.showOverdueColumns && (
+                            <>
+                              <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${
+                                !isHl && (r.overdueAmount || 0) > 0 ? "text-red-600" : ""
+                              } ${cls}`}>
+                                {fmt(r.overdueAmount || 0)}
+                              </td>
+                              <td className={`px-3 py-0.5 text-[11px] text-right font-mono ${
+                                !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
+                              } ${cls}`}>
+                                {r.isOverdue ? r.dueDays : ""}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
+                    {Array.from({ length: Math.max(0, 25 - rows.length) }).map((_, i) => (
+                      <tr key={`ar-empty-${i}`} className="border-b border-line-soft/60">
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        {options.showType && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        {options.showOverdueColumns && (
+                          <>
+                            <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                            <td className="px-3 py-0.5">&nbsp;</td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="sticky bottom-0 z-10">
+                    <tr className="bg-card-2 border-t-2 border-line">
+                      <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
+                      {options.showType && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
+                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.debit)}</td>
+                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit)}</td>
+                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.debit - totals.credit)}</td>
+                      {options.showOverdueColumns && (
+                        <>
+                          <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-red-600 border-r border-line bg-card-2">{fmt(totals.overdue)}</td>
+                          <td className="px-3 py-1 bg-card-2">&nbsp;</td>
+                        </>
+                      )}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div className="px-3 py-1 text-[10px] border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0 italic text-ink-subtle">
+                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
+                <span className="ml-auto not-italic text-red-600 font-semibold">
+                  Overdue: ₹{fmt(totals.overdue)}
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ─── Options Dialog ────────────────────────────────────── */}
+      {showOptionsDialog && (
+        <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
+          <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
+            <div className="text-white text-[11px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center shrink-0">
+              Amount Receivable
+            </div>
+
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+              <label className="col-span-6 text-ink-subtle font-semibold">Report Date</label>
+              <div className="col-span-6">
+                <DatePickerCalendar
+                  name="arAsOnDate"
+                  value={draftAsOnDate}
+                  onChange={(e) => setDraftAsOnDate(e.target.value)}
+                />
+              </div>
+
+              <label className="col-span-9 text-ink-subtle font-semibold">Account to be shown by</label>
+              <div className="col-span-3">
+                <select
+                  value={draftOptions.shownBy}
+                  onChange={(e) => setOpt("shownBy", e.target.value as ShownBy)}
+                  className="w-full px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                >
+                  <option value="name">Name</option>
+                  <option value="code">Code</option>
+                </select>
+              </div>
+
+              {(() => {
+                type Row = { key: "showZeroBalance" | "showOverdueOnly" | "showType" | "showOverdueColumns"; label: string };
+                const rows: Row[] = [
+                  { key: "showZeroBalance", label: "Show Zero Balance Customers ?" },
+                  { key: "showOverdueOnly", label: "Show Only Overdue ?" },
+                  { key: "showType", label: "Show Type Column ?" },
+                  { key: "showOverdueColumns", label: "Show Overdue Columns ?" },
+                ];
+                return rows.map((r) => (
+                  <React.Fragment key={r.key}>
+                    <label className="col-span-9 font-semibold text-ink-subtle">{r.label}</label>
+                    <div className="col-span-3">
+                      <select
+                        value={(draftOptions[r.key] as boolean) ? "Y" : "N"}
+                        onChange={(e) => setOpt(r.key, (e.target.value === "Y") as any)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const tabbables = Array.from(
+                              document.querySelectorAll<HTMLElement>(
+                                'input:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]'
+                              )
+                            ).filter((el) => el.getAttribute("tabindex") !== "-1");
+                            const idx = tabbables.indexOf(e.currentTarget);
+                            if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
+                          }
+                        }}
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                      >
+                        <option value="Y">Y</option>
+                        <option value="N">N</option>
+                      </select>
+                    </div>
+                  </React.Fragment>
+                ));
+              })()}
+            </div>
+
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+              <span className="text-ink-subtle italic">
+                Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
+              </span>
+              <button
+                onClick={commitOptions}
+                className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+              >
+                <FaPlay className="text-[9px]" /> OK (F2)
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="divide-y divide-line-soft">
-          <div className="px-3 py-2 bg-blue-500/5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <FaMoneyBillWave className="text-blue-600 text-[10px]" />
-              <span className="text-[11px] font-semibold text-ink-muted">Total Receivable</span>
-            </div>
-            {(() => {
-              const bal = Number(totals.totalNetBalance || 0);
-              const abs = Math.abs(bal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              if (Math.abs(bal) < 0.005) {
-                return <div className="text-sm font-mono font-bold text-ink break-all leading-tight">₹0.00</div>;
-              }
-              return (
-                <div className={`text-sm font-mono font-bold break-all leading-tight ${bal >= 0 ? "text-blue-600" : "text-emerald-500"}`}>
-                  ₹{abs} <span className="text-[9px] font-sans">{bal >= 0 ? "Dr" : "Cr"}</span>
-                </div>
-              );
-            })()}
-          </div>
-
-          <div className="px-3 py-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <FaUserFriends className="text-indigo-600 text-[10px]" />
-              <span className="text-[11px] font-semibold text-ink-muted">Customers</span>
-            </div>
-            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">{filteredCustomers.length}</div>
-          </div>
-
-          <div className="px-3 py-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <FaExclamationTriangle className="text-amber-600 text-[10px]" />
-              <span className="text-[11px] font-semibold text-ink-muted">Overdue</span>
-            </div>
-            <div className="text-sm font-mono font-bold text-amber-600 break-all leading-tight">{totals.overdueCount}</div>
-          </div>
-
-          <div className="px-3 py-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <FaCheckCircle className="text-emerald-600 text-[10px]" />
-              <span className="text-[11px] font-semibold text-ink-muted">Total Debit</span>
-            </div>
-            <div className="text-sm font-mono font-bold text-ink break-all leading-tight">
-              ₹{totals.totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
-        </div>
-      </aside>
+      )}
     </div>
   );
 };
