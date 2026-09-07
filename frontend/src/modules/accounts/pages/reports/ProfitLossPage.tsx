@@ -1,24 +1,16 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
-  FaSync,
-  FaDownload,
-  FaArrowUp,
-  FaArrowDown,
   FaChartLine,
+  FaSync,
   FaPrint,
-  FaChevronRight,
-  FaChevronDown,
-  FaFolderOpen,
-  FaListUl,
-  FaSortAlphaDown,
-  FaSitemap,
-  FaFileAlt,
-  FaCalendarAlt,
+  FaDownload,
+  FaPlay,
 } from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
 
+// ─── Backend response shape ─────────────────────────────────────────
 interface PLAccount {
   ledgerId: number;
   code: string;
@@ -28,7 +20,6 @@ interface PLAccount {
   totalCredit: number;
   netAmount: number;
 }
-
 interface PLData {
   startDate: string | null;
   endDate: string | null;
@@ -40,563 +31,640 @@ interface PLData {
   isProfit: boolean;
 }
 
-interface PLPeriodAccount {
-  ledgerId: number;
-  code: string;
-  name: string;
-  group: string;
-  perPeriod: number[];
-  total: number;
-}
-
-interface PLPeriodData {
-  groupBy: "month" | "quarter";
-  startDate: string;
-  endDate: string;
-  periods: Array<{ key: string; label: string }>;
-  incomeAccounts: PLPeriodAccount[];
-  expenseAccounts: PLPeriodAccount[];
-  totalIncomePerPeriod: number[];
-  totalExpensePerPeriod: number[];
-  netPerPeriod: number[];
-  totalIncome: number;
-  totalExpense: number;
-  netProfit: number;
-  isProfit: boolean;
-}
-
-type PLVariant =
-  | "alpha-summary"
-  | "alpha-detailed"
-  | "grouped-summary"
-  | "grouped-detailed"
-  | "hierarchical"
-  | "monthly"
-  | "quarterly";
-
-const VARIANT_MAP: Record<PLVariant, { label: string; layout: "alpha" | "grouped" | "hierarchical" | "monthly" | "quarterly"; detailed: boolean }> = {
-  "alpha-summary": { label: "Alphabetical · Summary", layout: "alpha", detailed: false },
-  "alpha-detailed": { label: "Alphabetical · Detailed", layout: "alpha", detailed: true },
-  "grouped-summary": { label: "Grouped · Summary", layout: "grouped", detailed: false },
-  "grouped-detailed": { label: "Grouped · Detailed", layout: "grouped", detailed: true },
-  "hierarchical": { label: "Hierarchical", layout: "hierarchical", detailed: true },
-  "monthly": { label: "Monthly Trend", layout: "monthly", detailed: false },
-  "quarterly": { label: "Quarterly Trend", layout: "quarterly", detailed: false },
+// ─── Options (Busy filter parity — only the toggles that actually do something) ──
+type Options = {
+  showSecondLevelGroups: boolean;
+  groupsAndAmountsInColumns: boolean;
+  showZeroBalance: boolean;
+  scaleFactor: 1 | 10 | 100 | 1000 | 10000 | 100000 | 10000000;
 };
 
-const fmt = (n: number) =>
-  n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const OPTIONS_KEY = "sunsea:profit-loss:options:v1";
 
-export const ProfitLossPage: React.FC = () => {
-  const currentYear = new Date().getFullYear();
-  const fyStart = `${currentYear}-04-01`;
-  const today = new Date().toISOString().split("T")[0];
-  const [startDate, setStartDate] = useState<string>(fyStart);
-  const [endDate, setEndDate] = useState<string>(today);
-  const [showZeroBalance, setShowZeroBalance] = useState<boolean>(false);
-  const [variant, setVariant] = useState<PLVariant>("grouped-summary");
-  const [expandSection, setExpandSection] = useState(true);
-  const activeConfig = VARIANT_MAP[variant];
+const isoDate = (d: Date) => d.toISOString().split("T")[0];
+const today = new Date();
+const fyStartYear = today.getMonth() < 3 ? today.getFullYear() - 1 : today.getFullYear();
+const DEFAULT_START = isoDate(new Date(fyStartYear, 3, 1));
+const DEFAULT_END = isoDate(today);
 
-  const isPeriodMode = activeConfig.layout === "monthly" || activeConfig.layout === "quarterly";
-  const cacheKey = isPeriodMode
-    ? `accounts:profit-loss:period:${startDate}:${endDate}:${activeConfig.layout}`
-    : `accounts:profit-loss:${startDate}:${endDate}:${showZeroBalance}`;
+const DEFAULT_OPTIONS: Options = {
+  showSecondLevelGroups: true,
+  groupsAndAmountsInColumns: true,
+  showZeroBalance: false,
+  scaleFactor: 1,
+};
 
+const loadSavedOptions = (): Partial<Options> | null => {
+  try {
+    const raw = localStorage.getItem(OPTIONS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+};
+const saveOptions = (opts: Options) => {
+  try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(opts)); } catch { /* ignore */ }
+};
+
+const fmt = (n: number, scale = 1) => {
+  const v = n / scale;
+  return Math.abs(v).toLocaleString("en-IN", {
+    minimumFractionDigits: scale === 1 ? 2 : 0,
+    maximumFractionDigits: scale === 1 ? 2 : 0,
+  });
+};
+
+const displayDate = (iso: string) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+};
+
+// ─── Ledger → Trading vs P&L bucket rules ───────────────────────────
+// Busy splits the P&L statement into two tiers:
+//   • Trading A/c (top):  Opening Stock + Purchase + Direct Exp   →  Closing Stock + Sales + Direct Income
+//                         balancing entry is Gross Profit (or Gross Loss on Cr).
+//   • P&L A/c    (below): Indirect Exp  →  Gross Profit b/d + Indirect Income
+//                         balancing entry is Nett Profit (or Nett Loss on Cr).
+//
+// Classification is done by the ledger's group name (case-insensitive
+// substring match) so a fresh company with "Direct Expenses", "Purchase
+// Accounts", etc. maps out of the box. Anything that doesn't match a
+// Trading category falls through to Indirect — safe default.
+const isTradingDr = (g: string) =>
+  /opening.*stock|stock.*opening|purchase|direct.*expens/i.test(g);
+const isTradingCr = (g: string) =>
+  /closing.*stock|stock.*closing|(^|\W)sales?(\W|$)|direct.*incom/i.test(g);
+
+// ─── Section groupings (Busy header labels) ─────────────────────────
+// Assign a canonical section header per bucketed ledger, so items collapse
+// under the standard labels the operator expects to see (PURCHASE,
+// DIRECT EXPENSES, INDIRECT EXP, SALES, etc.) rather than the raw group
+// names each ledger was created with.
+const canonSection = (g: string): string => {
+  const s = g || "Other";
+  if (/opening.*stock|stock.*opening/i.test(s)) return "Opening Stock";
+  if (/purchase/i.test(s)) return "PURCHASE";
+  if (/direct.*expens/i.test(s)) return "DIRECT EXPENSES";
+  if (/closing.*stock|stock.*closing/i.test(s)) return "Closing Stock";
+  if (/direct.*incom/i.test(s)) return "DIRECT INCOME";
+  if (/(^|\W)sales?(\W|$)/i.test(s)) return "SALES";
+  return s;
+};
+
+const ProfitLossPage: React.FC = () => {
+  // ─── Committed state ────────────────────────────────────────────
+  const [startDate, setStartDate] = useState<string>(DEFAULT_START);
+  const [endDate, setEndDate] = useState<string>(DEFAULT_END);
+  const [options, setOptions] = useState<Options>(() => {
+    const saved = loadSavedOptions();
+    return saved ? { ...DEFAULT_OPTIONS, ...saved } : DEFAULT_OPTIONS;
+  });
+  useEffect(() => { saveOptions(options); }, [options]);
+
+  // ─── Options dialog ─────────────────────────────────────────────
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(true);
+  const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
+  const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
+  const [draftOptions, setDraftOptions] = useState<Options>(options);
+  const setOpt = <K extends keyof Options>(k: K, v: Options[K]) =>
+    setDraftOptions((prev) => ({ ...prev, [k]: v }));
+
+  useEffect(() => {
+    if (!showOptionsDialog) return;
+    setDraftStartDate(startDate);
+    setDraftEndDate(endDate);
+    setDraftOptions(options);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>('input[name="plStartDate"]')?.focus();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOptionsDialog]);
+
+  // ─── Fetch — cached + socket-synced ─────────────────────────────
+  const cacheKey = `accounts:profit-loss:${startDate}:${endDate}:${options.showZeroBalance}`;
   const fetcher = useCallback(
-    async (signal: AbortSignal): Promise<PLData | PLPeriodData> => {
-      if (isPeriodMode) {
-        const params = new URLSearchParams();
-        params.set("startDate", startDate);
-        params.set("endDate", endDate);
-        params.set("groupBy", activeConfig.layout === "monthly" ? "month" : "quarter");
-        const res = await apiClient.get(`/accounts/profit-loss/by-period?${params.toString()}`, { signal });
-        return res.data.data as PLPeriodData;
-      }
-      const params = new URLSearchParams();
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      params.set("showZeroBalance", String(showZeroBalance));
+    async (signal: AbortSignal): Promise<PLData> => {
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        showZeroBalance: String(options.showZeroBalance),
+      });
       const res = await apiClient.get(`/accounts/profit-loss?${params.toString()}`, { signal });
       return res.data.data as PLData;
     },
-    [isPeriodMode, startDate, endDate, showZeroBalance, activeConfig.layout]
+    [startDate, endDate, options.showZeroBalance]
   );
-
-  const { data: cached, loading, refreshing, refresh } = useDetailCache<PLData | PLPeriodData>({
+  const { data, loading, refreshing, refresh } = useDetailCache<PLData>({
     cacheKey,
     socketModule: "voucher",
     fetcher,
   });
 
-  const data = !isPeriodMode ? (cached as PLData | null) : null;
-  const periodData = isPeriodMode ? (cached as PLPeriodData | null) : null;
+  // ─── Commit / F2 / Esc ──────────────────────────────────────────
+  const commitOptions = useCallback(() => {
+    setStartDate(draftStartDate);
+    setEndDate(draftEndDate);
+    setOptions(draftOptions);
+    setShowOptionsDialog(false);
+  }, [draftStartDate, draftEndDate, draftOptions]);
 
-  const handleVariantClick = (v: PLVariant) => setVariant(v);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F2" && showOptionsDialog) {
+        e.preventDefault();
+        commitOptions();
+      } else if (e.key === "Escape" && !showOptionsDialog) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setShowOptionsDialog(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, commitOptions]);
 
-  const filteredData = useMemo(() => {
+  // ─── Derived view — Trading + P&L buckets ───────────────────────
+  type Bucket = { section: string; items: PLAccount[]; total: number };
+  const view = useMemo(() => {
     if (!data) return null;
-    let income = showZeroBalance ? data.incomeAccounts : data.incomeAccounts.filter((a) => Math.abs(a.netAmount) > 0.01);
-    let expense = showZeroBalance ? data.expenseAccounts : data.expenseAccounts.filter((a) => Math.abs(a.netAmount) > 0.01);
-    if (activeConfig.layout === "alpha") {
-      income = [...income].sort((a, b) => a.name.localeCompare(b.name));
-      expense = [...expense].sort((a, b) => a.name.localeCompare(b.name));
+    const bucketBy = (items: PLAccount[], keyOf: (g: string) => string) => {
+      const map: Record<string, PLAccount[]> = {};
+      for (const a of items) {
+        const k = keyOf(a.group);
+        if (!map[k]) map[k] = [];
+        map[k].push(a);
+      }
+      return Object.entries(map)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([section, list]) => ({
+          section,
+          items: list.sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+          total: list.reduce((s, i) => s + i.netAmount, 0),
+        })) as Bucket[];
+    };
+
+    // Split expense/income into Trading vs Indirect
+    const tradingDrAccts = data.expenseAccounts.filter((a) => isTradingDr(a.group));
+    const indirectExpAccts = data.expenseAccounts.filter((a) => !isTradingDr(a.group));
+    const tradingCrAccts = data.incomeAccounts.filter((a) => isTradingCr(a.group));
+    const indirectIncAccts = data.incomeAccounts.filter((a) => !isTradingCr(a.group));
+
+    const tradingDrGroups = bucketBy(tradingDrAccts, canonSection);
+    const tradingCrGroups = bucketBy(tradingCrAccts, canonSection);
+    const indirectExpGroups = bucketBy(indirectExpAccts, (g) => (g || "INDIRECT EXP").toUpperCase());
+    const indirectIncGroups = bucketBy(indirectIncAccts, (g) => (g || "INDIRECT INCOME").toUpperCase());
+
+    const tradingDrTotal = tradingDrGroups.reduce((s, g) => s + g.total, 0);
+    const tradingCrTotal = tradingCrGroups.reduce((s, g) => s + g.total, 0);
+    const grossProfit = tradingCrTotal - tradingDrTotal; // Dr side balancing entry if > 0
+    // If gross loss, Cr side gets the balancing entry instead.
+    const tradingDrClosingTotal = tradingDrTotal + Math.max(grossProfit, 0);
+    const tradingCrClosingTotal = tradingCrTotal + Math.max(-grossProfit, 0);
+
+    const indirectExpTotal = indirectExpGroups.reduce((s, g) => s + g.total, 0);
+    const indirectIncTotal = indirectIncGroups.reduce((s, g) => s + g.total, 0);
+    // P&L side inputs: Cr side gets Gross Profit b/d (or "" if gross loss) +
+    // Indirect Income; Dr side gets Indirect Exp + Nett Profit balancing.
+    const grossProfitBd = Math.max(grossProfit, 0);
+    const grossLossBd = Math.max(-grossProfit, 0);
+    const pnlCrInput = grossProfitBd + indirectIncTotal;   // credits available
+    const pnlDrInput = grossLossBd + indirectExpTotal;      // debits demanded
+    const netProfit = pnlCrInput - pnlDrInput;              // Dr balancing if > 0 (profit)
+    const pnlDrClosingTotal = pnlDrInput + Math.max(netProfit, 0);
+    const pnlCrClosingTotal = pnlCrInput + Math.max(-netProfit, 0);
+
+    return {
+      tradingDrGroups,
+      tradingCrGroups,
+      grossProfit,       // > 0 → gross profit; < 0 → gross loss
+      tradingDrClosingTotal,
+      tradingCrClosingTotal,
+      indirectExpGroups,
+      indirectIncGroups,
+      grossProfitBd,
+      grossLossBd,
+      netProfit,         // > 0 → net profit (dr side); < 0 → net loss (cr side)
+      pnlDrClosingTotal,
+      pnlCrClosingTotal,
+    };
+  }, [data]);
+
+  // ─── Flat row nav (arrow keys + left/right toggle sides) ────────
+  type Side = "L" | "R";
+  const [nav, setNav] = useState<{ side: Side; idx: number }>({ side: "L", idx: -1 });
+  const navRef = useRef(nav);
+  useEffect(() => { navRef.current = nav; }, [nav]);
+
+  type FlatRow = { kind: "section" | "item" | "total" | "sub"; name: string; balance: number; sign?: "dr" | "cr" };
+  const { leftRows, rightRows } = useMemo(() => {
+    if (!view) return { leftRows: [] as FlatRow[], rightRows: [] as FlatRow[] };
+
+    const L: FlatRow[] = [];
+    const R: FlatRow[] = [];
+
+    const emitBucket = (arr: FlatRow[], groups: Bucket[]) => {
+      for (const g of groups) {
+        arr.push({ kind: "section", name: g.section, balance: g.total });
+        if (options.showSecondLevelGroups) {
+          for (const it of g.items) {
+            arr.push({ kind: "item", name: it.name, balance: it.netAmount });
+          }
+        }
+      }
+    };
+
+    // Trading tier — Dr side
+    emitBucket(L, view.tradingDrGroups);
+    if (view.grossProfit > 0) L.push({ kind: "sub", name: "Gross Profit", balance: view.grossProfit });
+
+    // Trading tier — Cr side
+    emitBucket(R, view.tradingCrGroups);
+    if (view.grossProfit < 0) R.push({ kind: "sub", name: "Gross Loss", balance: -view.grossProfit });
+
+    // Trading totals row on both sides
+    L.push({ kind: "total", name: "Total", balance: view.tradingDrClosingTotal });
+    R.push({ kind: "total", name: "Total", balance: view.tradingCrClosingTotal });
+
+    // ── P&L tier ─────────────────────────────────────────────
+    // Cr side inputs
+    if (view.grossProfitBd > 0) R.push({ kind: "sub", name: "Gross Profit b/d", balance: view.grossProfitBd });
+    if (view.grossLossBd > 0) L.push({ kind: "sub", name: "Gross Loss b/d", balance: view.grossLossBd });
+    // Indirect groups
+    emitBucket(L, view.indirectExpGroups);
+    emitBucket(R, view.indirectIncGroups);
+    // Balancing net profit / net loss
+    if (view.netProfit > 0) L.push({ kind: "sub", name: "Nett Profit", balance: view.netProfit });
+    if (view.netProfit < 0) R.push({ kind: "sub", name: "Nett Loss", balance: -view.netProfit });
+
+    // Final totals
+    L.push({ kind: "total", name: "Total", balance: view.pnlDrClosingTotal });
+    R.push({ kind: "total", name: "Total", balance: view.pnlCrClosingTotal });
+
+    return { leftRows: L, rightRows: R };
+  }, [view, options.showSecondLevelGroups]);
+
+  useEffect(() => {
+    if (showOptionsDialog) return;
+    if (nav.idx < 0 && (leftRows.length > 0 || rightRows.length > 0)) {
+      setNav({ side: leftRows.length > 0 ? "L" : "R", idx: 0 });
     }
-    return { ...data, incomeAccounts: income, expenseAccounts: expense };
-  }, [data, showZeroBalance, activeConfig.layout]);
+  }, [showOptionsDialog, leftRows.length, rightRows.length, nav.idx]);
+  useEffect(() => {
+    if (nav.idx < 0) return;
+    const row = document.querySelector<HTMLElement>(`[data-pl-row="${nav.side}-${nav.idx}"]`);
+    if (row) row.scrollIntoView({ block: "nearest" });
+  }, [nav]);
 
-  const groupItems = (items: PLAccount[]): Array<[string, PLAccount[]]> => {
-    const buckets: Record<string, PLAccount[]> = {};
-    items.forEach((it) => {
-      const g = it.group || "Others";
-      if (!buckets[g]) buckets[g] = [];
-      buckets[g].push(it);
-    });
-    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b));
-  };
+  useEffect(() => {
+    if (showOptionsDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const cur = navRef.current;
+      const sideRows = cur.side === "L" ? leftRows : rightRows;
+      const maxIdx = sideRows.length - 1;
+      if (e.key === "ArrowDown") { e.preventDefault(); setNav({ ...cur, idx: Math.min(cur.idx + 1, maxIdx) }); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setNav({ ...cur, idx: Math.max(cur.idx - 1, 0) }); }
+      else if (e.key === "ArrowRight" && cur.side === "L") {
+        e.preventDefault();
+        setNav({ side: "R", idx: Math.min(cur.idx, rightRows.length - 1) });
+      }
+      else if (e.key === "ArrowLeft" && cur.side === "R") {
+        e.preventDefault();
+        setNav({ side: "L", idx: Math.min(cur.idx, leftRows.length - 1) });
+      }
+      else if (e.key === "Home") { e.preventDefault(); setNav({ ...cur, idx: 0 }); }
+      else if (e.key === "End") { e.preventDefault(); setNav({ ...cur, idx: maxIdx }); }
+      else if (e.key === "PageDown") { e.preventDefault(); setNav({ ...cur, idx: Math.min(cur.idx + 10, maxIdx) }); }
+      else if (e.key === "PageUp") { e.preventDefault(); setNav({ ...cur, idx: Math.max(cur.idx - 10, 0) }); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, leftRows.length, rightRows.length]);
 
+  // ─── Print / Export ─────────────────────────────────────────────
   const handlePrint = () => window.print();
-
   const exportCSV = () => {
-    if (!filteredData) return;
+    if (!view) return;
     const lines: string[][] = [];
-    lines.push(["Profit & Loss Statement - " + activeConfig.label]);
-    lines.push([`Period: ${startDate} to ${endDate}`]);
+    lines.push(["Profit & Loss A/c"]);
+    lines.push(["For the period ending", displayDate(endDate)]);
     lines.push([]);
-    lines.push(["INCOME"]);
-    lines.push(["Code", "Name", "Group", "Amount"]);
-    filteredData.incomeAccounts.forEach((a) =>
-      lines.push([a.code, a.name, a.group, a.netAmount.toFixed(2)])
-    );
-    lines.push(["", "Total Income", "", filteredData.totalIncome.toFixed(2)]);
-    lines.push([]);
-    lines.push(["EXPENSES"]);
-    lines.push(["Code", "Name", "Group", "Amount"]);
-    filteredData.expenseAccounts.forEach((a) =>
-      lines.push([a.code, a.name, a.group, a.netAmount.toFixed(2)])
-    );
-    lines.push(["", "Total Expenses", "", filteredData.totalExpense.toFixed(2)]);
-    lines.push([]);
-    lines.push([
-      "",
-      filteredData.isProfit ? "Net Profit" : "Net Loss",
-      "",
-      Math.abs(filteredData.netProfit).toFixed(2),
-    ]);
-
+    lines.push(["DEBIT (Rs.)", "Amount", "CREDIT (Rs.)", "Amount"]);
+    const maxLen = Math.max(leftRows.length, rightRows.length);
+    for (let i = 0; i < maxLen; i++) {
+      const L = leftRows[i];
+      const R = rightRows[i];
+      lines.push([
+        L ? L.name : "",
+        L ? (L.balance / options.scaleFactor).toFixed(2) : "",
+        R ? R.name : "",
+        R ? (R.balance / options.scaleFactor).toFixed(2) : "",
+      ]);
+    }
     const csv = lines.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `profit-loss-${variant}-${endDate}.csv`;
+    a.download = `profit-loss-${startDate}-to-${endDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const menuItem = (v: PLVariant, icon: React.ReactNode) => (
-    <button
-      key={v}
-      onClick={() => handleVariantClick(v)}
-      className={`w-full text-left px-2 py-1 text-[11px] flex items-center gap-2 rounded transition-colors ${
-        variant === v ? "bg-emerald-500/15 text-emerald-400 font-semibold" : "text-ink-muted hover:bg-card-2/60"
-      }`}
-    >
-      <span className="text-[9px] opacity-70">{icon}</span>
-      {VARIANT_MAP[v].label}
-    </button>
-  );
-
-  const renderRow = (a: PLAccount, isIncome: boolean, indent = false) => (
-    <tr key={`${isIncome ? "inc" : "exp"}-${a.ledgerId}`} className="hover:bg-card-2 border-b border-line-soft">
-      {activeConfig.detailed && (
-        <td className="px-3 py-1 text-[11px] font-mono text-ink-subtle">{a.code}</td>
-      )}
-      <td className={`px-3 py-1 text-xs text-ink ${indent ? "pl-6" : ""}`}>{a.name}</td>
-      {activeConfig.detailed && (
-        <td className="px-3 py-1 text-[11px] text-ink-muted">{a.group}</td>
-      )}
-      <td className={`px-3 py-1 text-right text-xs font-mono ${isIncome ? "text-emerald-500" : "text-red-500"}`}>
-        {fmt(a.netAmount)}
-      </td>
-    </tr>
-  );
-
-  const renderSection = (items: PLAccount[], isIncome: boolean) => {
-    const groups = activeConfig.layout === "grouped" || activeConfig.layout === "hierarchical" ? groupItems(items) : null;
-    if (!groups) {
-      // Alphabetical / flat rendering
-      return items.map((a) => renderRow(a, isIncome, false));
-    }
-    return groups.flatMap(([gname, gitems]) => {
-      const gtotal = gitems.reduce((s, i) => s + i.netAmount, 0);
-      return [
-        <tr key={`grp-${isIncome ? "i" : "e"}-${gname}`} className="bg-card-2/60">
-          <td colSpan={activeConfig.detailed ? 3 : 1} className="px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-ink">
-            {activeConfig.layout === "hierarchical" && <FaSitemap className="inline mr-1 text-[9px]" />}
-            {gname}
-          </td>
-          <td className="px-3 py-1 text-right text-[11px] font-mono font-bold text-ink">
-            {fmt(gtotal)}
-          </td>
-        </tr>,
-        ...gitems.map((a) => renderRow(a, isIncome, true)),
-      ];
-    });
-  };
-
+  // ─── Render ─────────────────────────────────────────────────────
   return (
-    <div className="p-3 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
-      {/* LEFT SIDEBAR */}
-      <aside className="w-[240px] shrink-0 bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2">
-          <FaChartLine className="text-emerald-500 text-xs" />
-          <h2 className="text-xs font-bold text-ink">Profit & Loss</h2>
-        </div>
-        <div className="p-2 space-y-2 text-xs overflow-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
-          <div>
-            <button
-              onClick={() => setExpandSection((x) => !x)}
-              className="w-full flex items-center gap-1.5 text-[11px] font-bold text-ink px-1 py-1 hover:bg-card-2/60 rounded"
-            >
-              {expandSection ? <FaChevronDown className="text-[9px] text-ink-subtle" /> : <FaChevronRight className="text-[9px] text-ink-subtle" />}
-              <FaFolderOpen className="text-[10px] text-emerald-400" />
-              Report Variants
-            </button>
-            {expandSection && (
-              <div className="ml-2 mt-1 space-y-0.5 border-l border-line-soft pl-2">
-                {menuItem("alpha-summary", <FaSortAlphaDown />)}
-                {menuItem("alpha-detailed", <FaListUl />)}
-                {menuItem("grouped-summary", <FaFolderOpen />)}
-                {menuItem("grouped-detailed", <FaListUl />)}
-                {menuItem("hierarchical", <FaSitemap />)}
-                <div className="pt-1 border-t border-line-soft mt-1"></div>
-                {menuItem("monthly", <FaCalendarAlt />)}
-                {menuItem("quarterly", <FaCalendarAlt />)}
-              </div>
+    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+      {/* Top action bar — hidden while filter dialog is open. */}
+      {!showOptionsDialog && (
+      <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
+        <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+          <FaChartLine className="text-red-500 text-sm" /> Profit &amp; Loss A/c
+        </h3>
+        {view && (
+          <span className="text-[11px] text-ink-muted">
+            For the period ending <b className="text-ink">{displayDate(endDate)}</b>
+            {options.scaleFactor > 1 && (
+              <span className="ml-2 text-ink-subtle">· Scale × {options.scaleFactor.toLocaleString("en-IN")}</span>
             )}
-          </div>
-
-          <div className="border-t border-line-soft my-2"></div>
-
-          <div className="text-[10px] text-ink-subtle italic px-1">
-            <FaFileAlt className="inline mr-1" /> Click a variant to load
-          </div>
+          </span>
+        )}
+        {refreshing && (
+          <span className="flex items-center gap-1 text-[10px] text-red-400">
+            <FaSync className="animate-spin" /> Syncing…
+          </span>
+        )}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={() => setShowOptionsDialog(true)}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            title="Change filters (Esc)"
+          >
+            Filters
+          </button>
+          <button onClick={handlePrint} disabled={!data}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaPrint /> Print
+          </button>
+          <button onClick={exportCSV} disabled={!data}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaDownload /> Export
+          </button>
+          <button onClick={refresh} disabled={refreshing}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
+          </button>
         </div>
-      </aside>
-
-      {/* RIGHT PANEL */}
-      <div className="flex-1 min-w-0 space-y-3">
-        {/* Options bar */}
-        <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-3 sticky top-0 z-20">
-          <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
-            <FaChartLine className="text-emerald-500 text-sm" /> P&amp;L
-            <span className="text-[10px] font-medium text-ink-subtle uppercase tracking-wide">
-              · {activeConfig.label}
-            </span>
-          </h3>
-
-          <div className="flex items-center gap-1.5">
-            <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
-            <div className="w-[130px]">
-              <DatePickerCalendar
-                name="startDate"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                placeholder="Start"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
-            <div className="w-[130px]">
-              <DatePickerCalendar
-                name="endDate"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                placeholder="End"
-              />
-            </div>
-          </div>
-
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={showZeroBalance} onChange={(e) => setShowZeroBalance(e.target.checked)}
-              className="w-3.5 h-3.5 accent-emerald-500" />
-            <span className="text-xs text-ink-muted">Show Zero Balance</span>
-          </label>
-
-          {refreshing && (
-            <span className="flex items-center gap-1 text-[10px] text-emerald-400">
-              <FaSync className="animate-spin" /> Syncing…
-            </span>
-          )}
-
-          <div className="flex items-center gap-1.5 ml-auto">
-            <button onClick={handlePrint} disabled={!cached}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaPrint /> Print
-            </button>
-            <button onClick={exportCSV} disabled={!cached}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaDownload /> Export
-            </button>
-            <button onClick={refresh} disabled={refreshing}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaSync className={refreshing ? "animate-spin text-emerald-500" : ""} /> Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Body — cache-first render (no full-page loading blocker). */}
-        {!filteredData && !periodData && !loading && (
-          <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
-            <FaChartLine className="text-emerald-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">No data for the selected variant</div>
-            <div className="text-[11px]">Selected: <b>{activeConfig.label}</b> · {startDate} to {endDate}</div>
-          </div>
-        )}
-
-        {(activeConfig.layout === "monthly" || activeConfig.layout === "quarterly") && periodData && (
-          <>
-            <div className="text-[11px] text-ink-muted px-1">
-              Period: <b className="text-ink">{startDate}</b> to <b className="text-ink">{endDate}</b> · <b className="text-ink">{activeConfig.label}</b> · {periodData.periods.length} periods
-            </div>
-
-            <div className="bg-card border border-line rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 200px)" }}>
-              <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b-2 border-line sticky top-0 z-10">
-                    <tr>
-                      <th className="px-3 py-1.5 bg-head sticky left-0 z-20 min-w-[200px]">Account</th>
-                      {periodData.periods.map((p) => (
-                        <th key={p.key} className="px-2 py-1.5 bg-head text-right min-w-[100px]">{p.label}</th>
-                      ))}
-                      <th className="px-3 py-1.5 bg-head text-right min-w-[120px] font-bold">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Income section */}
-                    <tr className="bg-card-2">
-                      <td colSpan={periodData.periods.length + 2} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-500">
-                        <FaArrowUp className="inline mr-1.5 text-[10px]" /> Revenue / Income
-                      </td>
-                    </tr>
-                    {periodData.incomeAccounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={periodData.periods.length + 2} className="p-4 text-center text-[11px] text-ink-subtle">No income</td>
-                      </tr>
-                    ) : (
-                      periodData.incomeAccounts.map((a) => (
-                        <tr key={`inc-${a.ledgerId}`} className="hover:bg-card-2/50 border-b border-line-soft">
-                          <td className="px-3 py-1 text-ink sticky left-0 bg-card">{a.name}</td>
-                          {a.perPeriod.map((v, i) => (
-                            <td key={i} className="px-2 py-1 text-right font-mono text-emerald-500">
-                              {Math.abs(v) < 0.01 ? "" : fmt(v)}
-                            </td>
-                          ))}
-                          <td className="px-3 py-1 text-right font-mono font-semibold text-emerald-500">
-                            {fmt(a.total)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                    <tr className="bg-card-2 font-semibold border-t border-line">
-                      <td className="px-3 py-1.5 text-emerald-500 uppercase tracking-wide text-xs sticky left-0 bg-card-2">
-                        Total Revenue
-                      </td>
-                      {periodData.totalIncomePerPeriod.map((v, i) => (
-                        <td key={i} className="px-2 py-1.5 text-right font-mono text-emerald-500 text-xs">
-                          {Math.abs(v) < 0.01 ? "" : fmt(v)}
-                        </td>
-                      ))}
-                      <td className="px-3 py-1.5 text-right font-mono font-bold text-emerald-500 text-sm">
-                        ₹{fmt(periodData.totalIncome)}
-                      </td>
-                    </tr>
-
-                    {/* Expense section */}
-                    <tr className="bg-card-2">
-                      <td colSpan={periodData.periods.length + 2} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-red-500">
-                        <FaArrowDown className="inline mr-1.5 text-[10px]" /> Expenses
-                      </td>
-                    </tr>
-                    {periodData.expenseAccounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={periodData.periods.length + 2} className="p-4 text-center text-[11px] text-ink-subtle">No expenses</td>
-                      </tr>
-                    ) : (
-                      periodData.expenseAccounts.map((a) => (
-                        <tr key={`exp-${a.ledgerId}`} className="hover:bg-card-2/50 border-b border-line-soft">
-                          <td className="px-3 py-1 text-ink sticky left-0 bg-card">{a.name}</td>
-                          {a.perPeriod.map((v, i) => (
-                            <td key={i} className="px-2 py-1 text-right font-mono text-red-400">
-                              {Math.abs(v) < 0.01 ? "" : fmt(v)}
-                            </td>
-                          ))}
-                          <td className="px-3 py-1 text-right font-mono font-semibold text-red-500">
-                            {fmt(a.total)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                    <tr className="bg-card-2 font-semibold border-t border-line">
-                      <td className="px-3 py-1.5 text-red-500 uppercase tracking-wide text-xs sticky left-0 bg-card-2">
-                        Total Expenses
-                      </td>
-                      {periodData.totalExpensePerPeriod.map((v, i) => (
-                        <td key={i} className="px-2 py-1.5 text-right font-mono text-red-500 text-xs">
-                          {Math.abs(v) < 0.01 ? "" : fmt(v)}
-                        </td>
-                      ))}
-                      <td className="px-3 py-1.5 text-right font-mono font-bold text-red-500 text-sm">
-                        ₹{fmt(periodData.totalExpense)}
-                      </td>
-                    </tr>
-
-                    {/* Net P&L per period */}
-                    <tr className="bg-card-2 border-t-2 border-line font-bold">
-                      <td className="px-3 py-2 uppercase tracking-wide text-xs sticky left-0 bg-card-2 text-ink">
-                        Net Profit / (Loss)
-                      </td>
-                      {periodData.netPerPeriod.map((v, i) => (
-                        <td key={i} className={`px-2 py-2 text-right font-mono text-xs ${v >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                          {Math.abs(v) < 0.01 ? "" : `${v >= 0 ? "+" : "-"}${fmt(Math.abs(v))}`}
-                        </td>
-                      ))}
-                      <td className={`px-3 py-2 text-right font-mono text-sm ${periodData.isProfit ? "text-emerald-500" : "text-red-500"}`}>
-                        {periodData.isProfit ? "+" : "-"}₹{fmt(Math.abs(periodData.netProfit))}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {filteredData && (activeConfig.layout !== "monthly" && activeConfig.layout !== "quarterly") && (
-          <>
-            <div className="text-[11px] text-ink-muted px-1">
-              Period: <b className="text-ink">{startDate}</b> to <b className="text-ink">{endDate}</b> · <b className="text-ink">{activeConfig.label}</b>
-            </div>
-
-            <div className="bg-card border border-line rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 200px)" }}>
-              <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b-2 border-line sticky top-0 z-10">
-                    <tr>
-                      {activeConfig.detailed && <th className="px-3 py-1.5 bg-head w-[80px]">Code</th>}
-                      <th className="px-3 py-1.5 bg-head">Account</th>
-                      {activeConfig.detailed && <th className="px-3 py-1.5 bg-head">Group</th>}
-                      <th className="px-3 py-1.5 bg-head text-right w-[140px]">Amount (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Revenue */}
-                    <tr className="bg-card-2">
-                      <td colSpan={activeConfig.detailed ? 4 : 2} className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-emerald-500">
-                        <FaArrowUp className="inline mr-1.5 text-[10px]" /> Revenue / Income
-                      </td>
-                    </tr>
-                    {filteredData.incomeAccounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={activeConfig.detailed ? 4 : 2} className="p-4 text-center text-xs text-ink-subtle">No income entries</td>
-                      </tr>
-                    ) : (
-                      renderSection(filteredData.incomeAccounts, true)
-                    )}
-                    <tr className="bg-card-2 font-semibold border-t border-line">
-                      <td colSpan={activeConfig.detailed ? 3 : 1} className="px-3 py-1.5 text-emerald-500 uppercase tracking-wide text-xs">
-                        Total Revenue
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-mono text-emerald-500 text-sm">
-                        ₹{fmt(filteredData.totalIncome)}
-                      </td>
-                    </tr>
-
-                    {/* Expenses */}
-                    <tr className="bg-card-2">
-                      <td colSpan={activeConfig.detailed ? 4 : 2} className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-red-500">
-                        <FaArrowDown className="inline mr-1.5 text-[10px]" /> Expenses
-                      </td>
-                    </tr>
-                    {filteredData.expenseAccounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={activeConfig.detailed ? 4 : 2} className="p-4 text-center text-xs text-ink-subtle">No expense entries</td>
-                      </tr>
-                    ) : (
-                      renderSection(filteredData.expenseAccounts, false)
-                    )}
-                    <tr className="bg-card-2 font-semibold border-t border-line">
-                      <td colSpan={activeConfig.detailed ? 3 : 1} className="px-3 py-1.5 text-red-500 uppercase tracking-wide text-xs">
-                        Total Expenses
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-mono text-red-500 text-sm">
-                        ₹{fmt(filteredData.totalExpense)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Sticky footer */}
-              <div className="shrink-0 border-t-2 border-line bg-card-2 px-3 py-2 flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wide text-ink">
-                  {filteredData.isProfit ? "Net Profit" : "Net Loss"}
-                  <span className="ml-2 text-[10px] font-normal text-ink-subtle normal-case tracking-normal">
-                    ({startDate} to {endDate})
-                  </span>
-                </span>
-                <span className={`text-sm font-mono font-bold ${filteredData.isProfit ? "text-emerald-500" : "text-red-500"}`}>
-                  {filteredData.isProfit ? "+" : "-"}₹{fmt(Math.abs(filteredData.netProfit))}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
       </div>
+      )}
 
-      {/* Right sidebar — Summary. Amounts render on their own row so
-         crores-scale values never squeeze the label or overflow the card. */}
-      {filteredData && (
-        <aside className="w-[220px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden self-start">
-          <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
-            <FaChartLine className="text-emerald-500 text-xs" /> Summary
+      {/* ─── T-Format Table (Busy-style) ────────────────────────── */}
+      {!showOptionsDialog && (
+        <>
+          {!view && loading && (
+            <div className="bg-card border border-line rounded p-12 text-center text-xs text-ink-subtle">
+              Loading…
+            </div>
+          )}
+          {!view && !loading && (
+            <div className="bg-card border border-line rounded p-12 text-center text-xs text-ink-subtle">
+              <FaChartLine className="text-red-500/40 text-3xl mx-auto mb-2" />
+              No data for the selected period.
+            </div>
+          )}
+          {view && (
+            <div
+              className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
+              style={{ height: "calc(100vh - 200px)" }}
+            >
+              {/* "For the period ending" strip */}
+              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0">
+                For the period ending <b className="text-ink">{displayDate(endDate)}</b>
+              </div>
+
+              <div className="overflow-auto flex-1 min-h-0">
+                <table className="w-full text-left border-collapse table-fixed">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-head border-b-2 border-line">
+                      <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>D E B I T &nbsp;(Rs.)</th>
+                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                      <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>C R E D I T &nbsp;(Rs.)</th>
+                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const maxLen = Math.max(leftRows.length, rightRows.length);
+                      const rows: React.ReactElement[] = [];
+                      for (let i = 0; i < maxLen; i++) {
+                        const L = leftRows[i];
+                        const R = rightRows[i];
+                        const lHl = nav.side === "L" && nav.idx === i;
+                        const rHl = nav.side === "R" && nav.idx === i;
+
+                        const rowClassL = (r?: FlatRow) => {
+                          if (!r) return "text-ink-muted";
+                          if (r.kind === "section") return "font-bold uppercase text-ink";
+                          if (r.kind === "total") return "font-bold uppercase text-ink bg-card-2";
+                          if (r.kind === "sub") return "font-bold text-emerald-600";
+                          return "pl-6 text-ink-muted";
+                        };
+                        const amtClassL = (r?: FlatRow) => {
+                          if (!r) return "text-ink-muted";
+                          if (r.kind === "section") return "font-bold text-ink";
+                          if (r.kind === "total") return "font-bold text-ink bg-card-2";
+                          if (r.kind === "sub") return "font-bold text-emerald-600";
+                          return "text-ink-muted";
+                        };
+                        const rowClassR = rowClassL;
+                        const amtClassR = amtClassL;
+
+                        rows.push(
+                          <tr key={`plrow-${i}`} className="border-b border-line-soft/60 hover:bg-card-2/40">
+                            {/* LEFT (Debit) */}
+                            {L ? (
+                              <>
+                                <td
+                                  data-pl-row={`L-${i}`}
+                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${rowClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
+                                >
+                                  {L.name}
+                                </td>
+                                <td
+                                  className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${amtClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
+                                >
+                                  {L.balance !== 0 && fmt(Math.abs(L.balance), options.scaleFactor)}
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                                <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                              </>
+                            )}
+                            {/* RIGHT (Credit) */}
+                            {R ? (
+                              <>
+                                <td
+                                  data-pl-row={`R-${i}`}
+                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${rowClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
+                                >
+                                  {R.name}
+                                </td>
+                                <td
+                                  className={`px-3 py-0.5 text-[11px] text-right font-mono ${amtClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
+                                >
+                                  {R.balance !== 0 && fmt(Math.abs(R.balance), options.scaleFactor)}
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-3 py-0.5">&nbsp;</td>
+                                <td className="px-3 py-0.5">&nbsp;</td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      }
+                      // Filler rows so the grid always looks full.
+                      const need = Math.max(0, 25 - maxLen);
+                      for (let i = 0; i < need; i++) {
+                        rows.push(
+                          <tr key={`plempty-${i}`} className="border-b border-line-soft/60">
+                            <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                            <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                            <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                            <td className="px-3 py-0.5">&nbsp;</td>
+                          </tr>
+                        );
+                      }
+                      return rows;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer strip */}
+              <div className="px-3 py-1 text-[10px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
+                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">← →</kbd> switch</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Home / End</kbd> jump</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
+                <span className="ml-auto">
+                  {view.netProfit >= 0 ? (
+                    <span className="text-emerald-600 font-semibold">Nett Profit: ₹{fmt(Math.abs(view.netProfit), options.scaleFactor)}</span>
+                  ) : (
+                    <span className="text-red-600 font-semibold">Nett Loss: ₹{fmt(Math.abs(view.netProfit), options.scaleFactor)}</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ─── Options Dialog (Busy-style) ────────────────────────── */}
+      {showOptionsDialog && (
+        <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
+          <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
+            <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
+              <span className="flex-1 text-center">Profit &amp; Loss A/c</span>
+            </div>
+
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+              <label className="col-span-6 text-ink-subtle font-semibold">Starting Date</label>
+              <div className="col-span-6">
+                <DatePickerCalendar
+                  name="plStartDate"
+                  value={draftStartDate}
+                  onChange={(e) => setDraftStartDate(e.target.value)}
+                />
+              </div>
+
+              <label className="col-span-6 text-ink-subtle font-semibold">Ending Date</label>
+              <div className="col-span-6">
+                <DatePickerCalendar
+                  name="plEndDate"
+                  value={draftEndDate}
+                  onChange={(e) => setDraftEndDate(e.target.value)}
+                />
+              </div>
+
+              {(() => {
+                type Row = { key: keyof Options; label: string };
+                const rows: Row[] = [
+                  { key: "showSecondLevelGroups", label: "Show Second Level Group Details" },
+                  { key: "groupsAndAmountsInColumns", label: "Show Groups and Amounts in separate columns" },
+                  { key: "showZeroBalance", label: "Show Zero Balance Masters During Drill Down" },
+                ];
+                return rows.map((r) => (
+                  <React.Fragment key={r.key}>
+                    <label className="col-span-9 font-semibold text-ink-subtle">{r.label}</label>
+                    <div className="col-span-3">
+                      <select
+                        value={(draftOptions[r.key] as boolean) ? "Y" : "N"}
+                        onChange={(e) => setOpt(r.key, (e.target.value === "Y") as any)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const tabbables = Array.from(
+                              document.querySelectorAll<HTMLElement>(
+                                'input:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]'
+                              )
+                            ).filter((el) => el.getAttribute("tabindex") !== "-1");
+                            const idx = tabbables.indexOf(e.currentTarget);
+                            if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
+                          }
+                        }}
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                      >
+                        <option value="Y">Y</option>
+                        <option value="N">N</option>
+                      </select>
+                    </div>
+                  </React.Fragment>
+                ));
+              })()}
+
+              <label className="col-span-6 text-ink-subtle font-semibold">Specify Scale Factor</label>
+              <div className="col-span-6">
+                <select
+                  value={String(draftOptions.scaleFactor)}
+                  onChange={(e) => setOpt("scaleFactor", Number(e.target.value) as Options["scaleFactor"])}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitOptions();
+                    }
+                  }}
+                  className="w-[110px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                >
+                  <option value="1">1</option>
+                  <option value="10">10</option>
+                  <option value="100">100</option>
+                  <option value="1000">1,000</option>
+                  <option value="10000">10,000</option>
+                  <option value="100000">1 Lakh</option>
+                  <option value="10000000">1 Crore</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+              <span className="text-ink-subtle italic">
+                Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={commitOptions}
+                  className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                >
+                  <FaPlay className="text-[9px]" /> OK (F2)
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="divide-y divide-line-soft">
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Income</div>
-              <div className="text-sm font-mono font-bold text-emerald-500 break-all leading-tight">
-                ₹{fmt(filteredData.totalIncome)}
-              </div>
-            </div>
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Expenses</div>
-              <div className="text-sm font-mono font-bold text-red-500 break-all leading-tight">
-                ₹{fmt(filteredData.totalExpense)}
-              </div>
-            </div>
-            <div className={`px-3 py-2 ${filteredData.isProfit ? "bg-emerald-500/5" : "bg-red-500/5"}`}>
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">
-                Net {filteredData.isProfit ? "Profit" : "Loss"}
-              </div>
-              <div className={`text-sm font-mono font-bold break-all leading-tight ${filteredData.isProfit ? "text-emerald-500" : "text-red-500"}`}>
-                {filteredData.isProfit ? "+" : "-"}₹{fmt(Math.abs(filteredData.netProfit))}
-              </div>
-            </div>
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Period</div>
-              <div className="text-[11px] font-mono text-ink break-all leading-tight">
-                {startDate}
-              </div>
-              <div className="text-[10px] text-ink-subtle">to</div>
-              <div className="text-[11px] font-mono text-ink break-all leading-tight">
-                {endDate}
-              </div>
-            </div>
-          </div>
-        </aside>
+        </div>
       )}
     </div>
   );

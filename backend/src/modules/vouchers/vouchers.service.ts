@@ -193,12 +193,55 @@ class VouchersService {
 
   private async enrichVouchers(vouchers: any[]) {
     try {
+      // Explicit `select` — only pull the fields the mapping below actually
+      // reads. Two reasons:
+      //   1. Query is a full-table scan (no where clause) so trimming
+      //      columns is a real perf win on large datasets.
+      //   2. Insulates the enrichment path from schema drift on unused
+      //      columns (e.g. shipping_address_line1 declared in schema but
+      //      missing in DB → previously blew up with P2022).
       const [allGrnInvoices, allSalesInvoices] = await Promise.all([
         prisma.grnInvoice.findMany({
-          include: { supplier: true, store: true, items: true },
+          select: {
+            id: true,
+            grnNumber: true,
+            invoiceNo: true,
+            supplierId: true,
+            paymentStatus: true,
+            payments: true,
+            supplier: { select: { legalName: true, displayName: true } },
+            store: { select: { storeName: true, storeId: true } },
+            items: {
+              select: {
+                description: true,
+                uom: true,
+                quantity: true,
+                unitPrice: true,
+                tax: true,
+                lineTotal: true,
+              },
+            },
+          },
         }),
         prisma.salesInvoice.findMany({
-          include: { customer: true, items: { include: { product: true } } },
+          select: {
+            id: true,
+            invoiceNo: true,
+            status: true,
+            payments: true,
+            customer: { select: { firmName: true } },
+            items: {
+              select: {
+                description: true,
+                uom: true,
+                quantity: true,
+                unitPrice: true,
+                tax: true,
+                lineTotal: true,
+                product: { select: { productName: true, productCode: true } },
+              },
+            },
+          },
         }),
       ]);
 
@@ -290,7 +333,7 @@ class VouchersService {
               id: inv.id,
               invoiceNo: inv.invoiceNo,
               customerName: inv.customer?.firmName || "-",
-              status: inv.paymentStatus || "POSTED",
+              status: inv.status || "POSTED",
               items: (inv.items || []).map((i: any) => ({
                 description: i.description || i.product?.productName || i.product?.skuCode || (i as any).productName || "Item",
                 uom: i.uom || i.product?.uom || "Units",
