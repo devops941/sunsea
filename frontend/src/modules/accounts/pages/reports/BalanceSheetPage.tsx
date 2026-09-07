@@ -1,23 +1,16 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   FaBalanceScale,
   FaSync,
-  FaCheckCircle,
-  FaExclamationTriangle,
   FaPrint,
   FaDownload,
-  FaChevronRight,
-  FaChevronDown,
-  FaFolderOpen,
-  FaListUl,
-  FaColumns,
-  FaTh,
-  FaFileAlt,
-  FaSitemap,
+  FaPlay,
 } from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
+import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
+// ─── Types (backend response shape) ──────────────────────────────────
 interface BSItem {
   code: string;
   name: string;
@@ -36,48 +29,103 @@ interface BalanceSheetData {
   isBalanced: boolean;
 }
 
-type BSVariant =
-  | "horizontal-summary"
-  | "horizontal-detailed"
-  | "vertical-summary"
-  | "vertical-detailed"
-  | "grouped-hierarchical"
-  | "flat-alphabetical";
-
-const VARIANT_MAP: Record<BSVariant, { label: string; layout: "horizontal" | "vertical" | "hierarchical" | "flat"; detailed: boolean }> = {
-  "horizontal-summary": { label: "Horizontal · Summary", layout: "horizontal", detailed: false },
-  "horizontal-detailed": { label: "Horizontal · Detailed", layout: "horizontal", detailed: true },
-  "vertical-summary": { label: "Vertical · Summary", layout: "vertical", detailed: false },
-  "vertical-detailed": { label: "Vertical · Detailed", layout: "vertical", detailed: true },
-  "grouped-hierarchical": { label: "Hierarchical · Grouped", layout: "hierarchical", detailed: true },
-  "flat-alphabetical": { label: "Flat · Alphabetical", layout: "flat", detailed: true },
+// ─── Options (Busy filter parity) ────────────────────────────────────
+type Options = {
+  showSecondLevelGroups: boolean;    // Show Second Level Group Details
+  groupsAndAmountsInColumns: boolean;// Show Groups and Amounts in separate columns
+  showZeroBalance: boolean;          // Show Zero Balance Masters During Drill Down
+  skipPnlForPeriod: boolean;         // Skip 'P/L for the period' ?
+  scaleFactor: 1 | 10 | 100 | 1000 | 10000 | 100000 | 10000000; // Specify Scale Factor
 };
 
-const fmt = (n: number) =>
-  Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const OPTIONS_KEY = "sunsea:balance-sheet:options:v1";
+
+const isoDate = (d: Date) => d.toISOString().split("T")[0];
+const today = new Date();
+const fyStartYear = today.getMonth() < 3 ? today.getFullYear() - 1 : today.getFullYear();
+const DEFAULT_START = isoDate(new Date(fyStartYear, 3, 1));
+const DEFAULT_END = isoDate(today);
+
+const DEFAULT_OPTIONS: Options = {
+  showSecondLevelGroups: true,
+  groupsAndAmountsInColumns: true,
+  showZeroBalance: false,
+  skipPnlForPeriod: false,
+  scaleFactor: 1,
+};
+
+const loadSavedOptions = (): Partial<Options> | null => {
+  try {
+    const raw = localStorage.getItem(OPTIONS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+};
+const saveOptions = (opts: Options) => {
+  try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(opts)); } catch { /* ignore */ }
+};
+
+// Divide amount by scale factor for display; keep 2 decimals when scale=1,
+// else round to whole units (Busy convention for scaled reports).
+const fmt = (n: number, scale: number = 1) => {
+  const v = n / scale;
+  return Math.abs(v).toLocaleString("en-IN", {
+    minimumFractionDigits: scale === 1 ? 2 : 0,
+    maximumFractionDigits: scale === 1 ? 2 : 0,
+  });
+};
+
+const displayDate = (iso: string) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+};
 
 const BalanceSheetPage: React.FC = () => {
-  const today = new Date().toISOString().split("T")[0];
-  const [asOnDate, setAsOnDate] = useState<string>(today);
-  const [showZeroBalance, setShowZeroBalance] = useState<boolean>(false);
-  const [variant, setVariant] = useState<BSVariant>("horizontal-summary");
-  const [expandSection, setExpandSection] = useState(true);
-  const activeConfig = VARIANT_MAP[variant];
+  // ─── Committed state (drives the fetch + table render) ──────────────
+  const [startDate, setStartDate] = useState<string>(DEFAULT_START);
+  const [endDate, setEndDate] = useState<string>(DEFAULT_END);
+  const [options, setOptions] = useState<Options>(() => {
+    const saved = loadSavedOptions();
+    return saved ? { ...DEFAULT_OPTIONS, ...saved } : DEFAULT_OPTIONS;
+  });
+  // Persist on every change so next open starts with the last-picked values.
+  useEffect(() => { saveOptions(options); }, [options]);
 
-  const groupByCategoryParam = activeConfig.layout !== "flat";
-  const cacheKey = `accounts:balance-sheet:${asOnDate}:${showZeroBalance}:${groupByCategoryParam}`;
+  // ─── Options dialog (opens on mount, closes after F2/OK) ────────────
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(true);
+  const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
+  const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
+  const [draftOptions, setDraftOptions] = useState<Options>(options);
+  const setOpt = <K extends keyof Options>(k: K, v: Options[K]) =>
+    setDraftOptions((prev) => ({ ...prev, [k]: v }));
+
+  // Focus first field (Starting Date) whenever the dialog opens.
+  useEffect(() => {
+    if (!showOptionsDialog) return;
+    setDraftStartDate(startDate);
+    setDraftEndDate(endDate);
+    setDraftOptions(options);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>('input[name="bsStartDate"]')?.focus();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOptionsDialog]);
+
+  // ─── Fetch — cached + socket-synced ─────────────────────────────────
+  const groupByCategoryParam = options.groupsAndAmountsInColumns || options.showSecondLevelGroups;
+  const cacheKey = `accounts:balance-sheet:${endDate}:${options.showZeroBalance}:${groupByCategoryParam}`;
 
   const fetcher = useCallback(
     async (signal: AbortSignal): Promise<BalanceSheetData> => {
       const params = new URLSearchParams({
-        ...(asOnDate ? { asOnDate } : {}),
-        showZeroBalance: String(showZeroBalance),
+        asOnDate: endDate,
+        showZeroBalance: String(options.showZeroBalance),
         groupByCategory: String(groupByCategoryParam),
       });
       const res = await apiClient.get(`/accounts/balance-sheet?${params.toString()}`, { signal });
       return res.data.data as BalanceSheetData;
     },
-    [asOnDate, showZeroBalance, groupByCategoryParam]
+    [endDate, options.showZeroBalance, groupByCategoryParam]
   );
 
   const { data, loading, refreshing, refresh } = useDetailCache<BalanceSheetData>({
@@ -86,449 +134,511 @@ const BalanceSheetPage: React.FC = () => {
     fetcher,
   });
 
-  const handleVariantClick = (v: BSVariant) => setVariant(v);
+  // ─── Commit / Apply (F2) ────────────────────────────────────────────
+  const commitOptions = useCallback(() => {
+    setStartDate(draftStartDate);
+    setEndDate(draftEndDate);
+    setOptions(draftOptions);
+    setShowOptionsDialog(false);
+  }, [draftStartDate, draftEndDate, draftOptions]);
 
-  const filterItems = (items: BSItem[]) =>
-    showZeroBalance ? items : items.filter((i) => Math.abs(i.balance) > 0.01);
-
-  const view = useMemo(() => {
-    if (!data) return null;
-    const assets = filterItems(data.assets);
-    const liabilities = filterItems(data.liabilities);
-    const equity = filterItems(data.equity);
-    const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
-    const totalLiabilities = liabilities.reduce((s, l) => s + l.balance, 0);
-    const totalEquity = equity.reduce((s, e) => s + e.balance, 0);
-    return {
-      assets,
-      liabilities,
-      equity,
-      totalAssets,
-      totalLiabilities,
-      totalEquity,
-      totalLiabilitiesAndEquity: totalLiabilities + totalEquity,
-      isBalanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01,
+  // F2 anywhere while dialog is open → submit; Esc while table is
+  // visible → re-open dialog (Busy convention).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F2" && showOptionsDialog) {
+        e.preventDefault();
+        commitOptions();
+      } else if (e.key === "Escape" && !showOptionsDialog) {
+        // Only reopen if focus isn't inside a text input consuming Esc
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setShowOptionsDialog(true);
+      }
     };
-  }, [data, showZeroBalance]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, commitOptions]);
 
-  const groupItems = (items: BSItem[]): Record<string, BSItem[]> => {
+  // ─── Derived T-format view (LIABILITIES + EQUITY on left, ASSETS on right) ──
+  const groupItems = (items: BSItem[]): Array<{ group: string; items: BSItem[]; groupTotal: number }> => {
     const buckets: Record<string, BSItem[]> = {};
     items.forEach((it) => {
       const g = it.group || "Others";
       if (!buckets[g]) buckets[g] = [];
       buckets[g].push(it);
     });
-    return buckets;
+    return Object.entries(buckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([group, gitems]) => ({
+        group,
+        items: gitems.sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+        groupTotal: gitems.reduce((s, i) => s + i.balance, 0),
+      }));
   };
 
-  const handlePrint = () => window.print();
+  const view = useMemo(() => {
+    if (!data) return null;
+    // Left side: liabilities + equity groups. Skip P/L for the period rows
+    // when that toggle is on (Busy: hides "Profit for the period" row).
+    let equityForLeft = data.equity;
+    if (options.skipPnlForPeriod) {
+      equityForLeft = data.equity.filter((it) =>
+        !/profit.*loss|net profit|net loss/i.test(it.name || "") && it.code !== "NET-PNL"
+      );
+    }
+    const leftGroups = [
+      ...groupItems(data.liabilities),
+      ...groupItems(equityForLeft),
+    ].sort((a, b) => a.group.localeCompare(b.group));
 
+    const rightGroups = groupItems(data.assets);
+
+    const leftTotal = leftGroups.reduce((s, g) => s + g.groupTotal, 0);
+    const rightTotal = rightGroups.reduce((s, g) => s + g.groupTotal, 0);
+
+    return {
+      leftGroups,
+      rightGroups,
+      leftTotal,
+      rightTotal,
+      isBalanced: Math.abs(leftTotal - rightTotal) < 0.01,
+    };
+  }, [data, options.skipPnlForPeriod]);
+
+  // ─── Row navigation — column-aware ─────────────────────────────────
+  // Down/Up walks WITHIN the current side; Left/Right jumps between the
+  // LIABILITIES and ASSETS columns (matching Busy's T-format flow).
+  //   nav.side  = "L" or "R"
+  //   nav.idx   = row index within that side's flat rows
+  type Side = "L" | "R";
+  const [nav, setNav] = useState<{ side: Side; idx: number }>({ side: "L", idx: -1 });
+  const navRef = useRef(nav);
+  useEffect(() => { navRef.current = nav; }, [nav]);
+
+  // Build the per-side flat row lists (used for both keyboard bounds AND for
+  // rendering). Kept here (not inside the render) so length is available for
+  // key handlers without re-computing.
+  type FlatRow = { kind: "group" | "item"; name: string; balance: number; code?: string };
+  const { leftRows, rightRows } = useMemo(() => {
+    if (!view) return { leftRows: [] as FlatRow[], rightRows: [] as FlatRow[] };
+    const expand = (g: { group: string; items: BSItem[]; groupTotal: number }): FlatRow[] => [
+      { kind: "group", name: g.group, balance: g.groupTotal },
+      ...(options.showSecondLevelGroups
+        ? g.items.map((i) => ({ kind: "item" as const, name: i.name, balance: i.balance, code: i.code }))
+        : []),
+    ];
+    return {
+      leftRows: view.leftGroups.flatMap(expand),
+      rightRows: view.rightGroups.flatMap(expand),
+    };
+  }, [view, options.showSecondLevelGroups]);
+
+  // Auto-select first row when table becomes visible.
+  useEffect(() => {
+    if (showOptionsDialog) return;
+    if (nav.idx < 0 && (leftRows.length > 0 || rightRows.length > 0)) {
+      setNav({ side: leftRows.length > 0 ? "L" : "R", idx: 0 });
+    }
+  }, [showOptionsDialog, leftRows.length, rightRows.length, nav.idx]);
+  // Scroll highlighted row into view (min-scroll pattern, same as ledger).
+  useEffect(() => {
+    if (nav.idx < 0) return;
+    const row = document.querySelector<HTMLElement>(`[data-bs-row="${nav.side}-${nav.idx}"]`);
+    if (row) row.scrollIntoView({ block: "nearest" });
+  }, [nav]);
+
+  // Table arrow-key handler — only active while the dialog is closed.
+  useEffect(() => {
+    if (showOptionsDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const cur = navRef.current;
+      const sideRows = cur.side === "L" ? leftRows : rightRows;
+      const maxIdx = sideRows.length - 1;
+      if (e.key === "ArrowDown") { e.preventDefault(); setNav({ ...cur, idx: Math.min(cur.idx + 1, maxIdx) }); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setNav({ ...cur, idx: Math.max(cur.idx - 1, 0) }); }
+      else if (e.key === "ArrowRight" && cur.side === "L") {
+        e.preventDefault();
+        setNav({ side: "R", idx: Math.min(cur.idx, rightRows.length - 1) });
+      }
+      else if (e.key === "ArrowLeft" && cur.side === "R") {
+        e.preventDefault();
+        setNav({ side: "L", idx: Math.min(cur.idx, leftRows.length - 1) });
+      }
+      else if (e.key === "Home") { e.preventDefault(); setNav({ ...cur, idx: 0 }); }
+      else if (e.key === "End") { e.preventDefault(); setNav({ ...cur, idx: maxIdx }); }
+      else if (e.key === "PageDown") { e.preventDefault(); setNav({ ...cur, idx: Math.min(cur.idx + 10, maxIdx) }); }
+      else if (e.key === "PageUp") { e.preventDefault(); setNav({ ...cur, idx: Math.max(cur.idx - 10, 0) }); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOptionsDialog, leftRows.length, rightRows.length]);
+
+  // ─── Export / Print ─────────────────────────────────────────────────
+  const handlePrint = () => window.print();
   const exportCSV = () => {
     if (!view) return;
     const lines: string[][] = [];
-    lines.push(["Balance Sheet - " + activeConfig.label]);
-    lines.push(["As on:", asOnDate]);
+    lines.push(["Balance Sheet"]);
+    lines.push(["At the end of:", displayDate(endDate)]);
     lines.push([]);
-    ["Assets", "Liabilities", "Equity"].forEach((section) => {
-      const items = section === "Assets" ? view.assets : section === "Liabilities" ? view.liabilities : view.equity;
-      const total = section === "Assets" ? view.totalAssets : section === "Liabilities" ? view.totalLiabilities : view.totalEquity;
-      lines.push([section.toUpperCase()]);
-      lines.push(["Name", "Group", "Amount"]);
-      items.forEach((it) => lines.push([it.name, it.group, it.balance.toFixed(2)]));
-      lines.push(["", `Total ${section}`, total.toFixed(2)]);
-      lines.push([]);
-    });
-    lines.push(["", "Total Liabilities + Equity", view.totalLiabilitiesAndEquity.toFixed(2)]);
+    lines.push(["LIABILITIES", "Amount", "ASSETS", "Amount"]);
+    const maxRows = Math.max(view.leftGroups.length, view.rightGroups.length);
+    for (let i = 0; i < maxRows; i++) {
+      const l = view.leftGroups[i];
+      const r = view.rightGroups[i];
+      lines.push([
+        l ? l.group : "",
+        l ? (l.groupTotal / options.scaleFactor).toFixed(2) : "",
+        r ? r.group : "",
+        r ? (r.groupTotal / options.scaleFactor).toFixed(2) : "",
+      ]);
+    }
+    lines.push([]);
+    lines.push(["Total", (view.leftTotal / options.scaleFactor).toFixed(2), "Total", (view.rightTotal / options.scaleFactor).toFixed(2)]);
     const csv = lines.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `balance-sheet-${variant}-${asOnDate}.csv`;
+    a.download = `balance-sheet-${endDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const menuItem = (v: BSVariant, icon: React.ReactNode) => (
-    <button
-      key={v}
-      onClick={() => handleVariantClick(v)}
-      className={`w-full text-left px-2 py-1 text-[11px] flex items-center gap-2 rounded transition-colors ${
-        variant === v ? "bg-teal-500/15 text-teal-400 font-semibold" : "text-ink-muted hover:bg-card-2/60"
-      }`}
-    >
-      <span className="text-[9px] opacity-70">{icon}</span>
-      {VARIANT_MAP[v].label}
-    </button>
-  );
-
-  const renderSectionTable = (title: string, items: BSItem[], total: number, accentColor: string) => {
-    if (activeConfig.detailed) {
-      const groups = groupItems(items);
-      return (
-        <div className="bg-card border border-line rounded-lg overflow-hidden">
-          <div className={`px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between`}>
-            <h3 className={`text-xs font-bold uppercase tracking-wide ${accentColor}`}>{title}</h3>
-            <span className={`text-sm font-mono font-bold ${accentColor}`}>₹{fmt(total)}</span>
-          </div>
-          {items.length === 0 ? (
-            <div className="p-6 text-center text-xs text-ink-subtle">No entries</div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b border-line">
-                <tr>
-                  <th className="px-3 py-1.5">Account</th>
-                  <th className="px-3 py-1.5 text-right w-[140px]">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-soft">
-                {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([gname, gitems]) => {
-                  const gtotal = gitems.reduce((s, i) => s + i.balance, 0);
-                  // Profit & Loss row: green if profit (positive), red if loss (negative)
-                  const isPnlGroup = /profit.*loss|net profit/i.test(gname);
-                  const gtotalClass = isPnlGroup
-                    ? (gtotal >= 0 ? "text-emerald-500" : "text-red-500")
-                    : "text-ink";
-                  return (
-                    <React.Fragment key={gname}>
-                      {activeConfig.layout === "hierarchical" && (
-                        <tr className="bg-card-2/60">
-                          <td className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${isPnlGroup ? gtotalClass : "text-ink"}`}>{gname}</td>
-                          <td className={`px-3 py-1 text-right text-[11px] font-mono font-bold ${gtotalClass}`}>
-                            {isPnlGroup && gtotal < 0 ? "-" : ""}₹{fmt(Math.abs(gtotal))}
-                          </td>
-                        </tr>
-                      )}
-                      {gitems.map((it) => {
-                        const isPnlItem = /net profit|profit.*loss/i.test(it.name || "") || it.code === "NET-PNL";
-                        const itClass = isPnlItem
-                          ? (it.balance >= 0 ? "text-emerald-500" : "text-red-500")
-                          : "text-ink";
-                        return (
-                          <tr key={it.code} className="hover:bg-card-2 transition-colors">
-                            <td className={`py-1 text-xs ${itClass} ${activeConfig.layout === "hierarchical" ? "pl-6 pr-3" : "px-3"}`}>
-                              {isPnlItem ? (it.balance >= 0 ? "Net Profit" : "Net Loss") : it.name}
-                            </td>
-                            <td className={`px-3 py-1 text-right text-xs font-mono ${itClass}`}>
-                              {isPnlItem && it.balance < 0 ? "-" : ""}₹{fmt(Math.abs(it.balance))}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-card-2 border-t-2 border-line font-bold">
-                  <td className="px-3 py-1.5 text-xs uppercase tracking-wide text-ink">Total {title}</td>
-                  <td className={`px-3 py-1.5 text-right text-sm font-mono ${accentColor}`}>₹{fmt(total)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </div>
-      );
-    }
-
-    // Summary mode — only show group totals (not individual accounts)
-    const groups = groupItems(items);
-    return (
-      <div className="bg-card border border-line rounded-lg overflow-hidden">
-        <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between">
-          <h3 className={`text-xs font-bold uppercase tracking-wide ${accentColor}`}>{title}</h3>
-          <span className={`text-sm font-mono font-bold ${accentColor}`}>₹{fmt(total)}</span>
-        </div>
-        {items.length === 0 ? (
-          <div className="p-6 text-center text-xs text-ink-subtle">No entries</div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <tbody className="divide-y divide-line-soft">
-              {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([gname, gitems]) => {
-                const gtotal = gitems.reduce((s, i) => s + i.balance, 0);
-                // Profit & Loss row: green if profit, red if loss
-                const isPnl = /profit.*loss|net profit/i.test(gname);
-                const cls = isPnl
-                  ? (gtotal >= 0 ? "text-emerald-500 font-bold" : "text-red-500 font-bold")
-                  : "text-ink";
-                const label = isPnl ? (gtotal >= 0 ? "Profit & Loss (Net Profit)" : "Profit & Loss (Net Loss)") : gname;
-                return (
-                  <tr key={gname} className="hover:bg-card-2 transition-colors">
-                    <td className={`px-3 py-1.5 text-xs font-semibold ${cls}`}>{label}</td>
-                    <td className={`px-3 py-1.5 text-right text-xs font-mono ${cls}`}>
-                      {isPnl && gtotal < 0 ? "-" : ""}₹{fmt(Math.abs(gtotal))}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="bg-card-2 border-t-2 border-line font-bold">
-                <td className="px-3 py-1.5 text-xs uppercase tracking-wide text-ink">Total {title}</td>
-                <td className={`px-3 py-1.5 text-right text-sm font-mono ${accentColor}`}>₹{fmt(total)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
-      </div>
-    );
-  };
-
-  const renderFlatAlphabetical = (v: NonNullable<typeof view>) => {
-    const all = [
-      ...v.assets.map((i) => ({ ...i, section: "Asset" })),
-      ...v.liabilities.map((i) => ({ ...i, section: "Liability" })),
-      ...v.equity.map((i) => ({ ...i, section: "Equity" })),
-    ].sort((a, b) => a.name.localeCompare(b.name));
-
-    return (
-      <div className="bg-card border border-line rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 200px)" }}>
-        <div className="px-3 py-1.5 border-b border-line bg-card-2/50 text-[11px] shrink-0 flex items-center justify-between">
-          <span className="text-ink-subtle">Flat alphabetical view · {all.length} accounts</span>
-        </div>
-        <div className="overflow-auto flex-1 min-h-0">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-head text-ink text-[10px] uppercase tracking-wide font-bold border-b-2 border-line sticky top-0 z-10">
-              <tr>
-                <th className="px-3 py-1.5 bg-head">Account</th>
-                <th className="px-3 py-1.5 bg-head">Section</th>
-                <th className="px-3 py-1.5 bg-head">Group</th>
-                <th className="px-3 py-1.5 bg-head text-right w-[140px]">Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {all.map((it) => {
-                const isPnl = /net profit|profit.*loss/i.test(it.name || "") || it.code === "NET-PNL";
-                const cls = isPnl
-                  ? (it.balance >= 0 ? "text-emerald-500 font-bold" : "text-red-500 font-bold")
-                  : "text-ink";
-                return (
-                  <tr key={`${it.section}-${it.code}`} className="hover:bg-card-2/50 border-b border-line-soft">
-                    <td className={`px-3 py-1 text-xs ${cls}`}>
-                      {isPnl ? (it.balance >= 0 ? "Net Profit" : "Net Loss") : it.name}
-                    </td>
-                    <td className="px-3 py-1 text-[11px]">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                        it.section === "Asset" ? "bg-blue-500/10 text-blue-500" :
-                        it.section === "Liability" ? "bg-red-500/10 text-red-500" :
-                        "bg-purple-500/10 text-purple-500"
-                      }`}>{it.section}</span>
-                    </td>
-                    <td className="px-3 py-1 text-[11px] text-ink-muted">{it.group}</td>
-                    <td className={`px-3 py-1 text-right text-xs font-mono ${cls}`}>
-                      {isPnl && it.balance < 0 ? "-" : ""}₹{fmt(Math.abs(it.balance))}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
+  // ─── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="p-3 font-sans text-ink flex gap-3" style={{ minHeight: "calc(100vh - 100px)" }}>
-      {/* LEFT SIDEBAR */}
-      <aside className="w-[240px] shrink-0 bg-card rounded-lg border border-line overflow-hidden">
-        <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center gap-2">
-          <FaBalanceScale className="text-teal-500 text-xs" />
-          <h2 className="text-xs font-bold text-ink">Balance Sheet</h2>
-        </div>
-        <div className="p-2 space-y-2 text-xs overflow-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
-          <div>
-            <button
-              onClick={() => setExpandSection((x) => !x)}
-              className="w-full flex items-center gap-1.5 text-[11px] font-bold text-ink px-1 py-1 hover:bg-card-2/60 rounded"
-            >
-              {expandSection ? <FaChevronDown className="text-[9px] text-ink-subtle" /> : <FaChevronRight className="text-[9px] text-ink-subtle" />}
-              <FaFolderOpen className="text-[10px] text-teal-400" />
-              Report Variants
-            </button>
-            {expandSection && (
-              <div className="ml-2 mt-1 space-y-0.5 border-l border-line-soft pl-2">
-                {menuItem("horizontal-summary", <FaColumns />)}
-                {menuItem("horizontal-detailed", <FaListUl />)}
-                {menuItem("vertical-summary", <FaTh />)}
-                {menuItem("vertical-detailed", <FaListUl />)}
-                {menuItem("grouped-hierarchical", <FaSitemap />)}
-                {menuItem("flat-alphabetical", <FaFileAlt />)}
-              </div>
-            )}
-          </div>
-
-          <div className="border-t border-line-soft my-2"></div>
-
-          <div className="text-[10px] text-ink-subtle italic px-1">
-            <FaFileAlt className="inline mr-1" /> Click a variant to switch layout
-          </div>
-        </div>
-      </aside>
-
-      {/* RIGHT PANEL */}
-      <div className="flex-1 min-w-0 space-y-3">
-        {/* Options bar */}
-        <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-3 sticky top-0 z-20">
-          <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
-            <FaBalanceScale className="text-teal-500 text-sm" /> Balance Sheet
-            <span className="text-[10px] font-medium text-ink-subtle uppercase tracking-wide">
-              · {activeConfig.label}
-            </span>
-          </h3>
-
-          <div className="flex items-center gap-1.5">
-            <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">As on Date</label>
-            <input
-              type="date"
-              value={asOnDate}
-              onChange={(e) => setAsOnDate(e.target.value)}
-              className="w-[130px] px-2 py-1 border border-line bg-card rounded text-xs text-ink focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500 focus:outline-none"
-            />
-          </div>
-
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={showZeroBalance} onChange={(e) => setShowZeroBalance(e.target.checked)}
-              className="w-3.5 h-3.5 accent-teal-500" />
-            <span className="text-xs text-ink-muted">Show Zero Balance</span>
-          </label>
-
-          {refreshing && (
-            <span className="flex items-center gap-1 text-[10px] text-teal-400">
-              <FaSync className="animate-spin" /> Syncing…
-            </span>
-          )}
-
-          <div className="flex items-center gap-1.5 ml-auto">
-            <button onClick={handlePrint} disabled={!data}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaPrint /> Print
-            </button>
-            <button onClick={exportCSV} disabled={!data}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaDownload /> Export
-            </button>
-            <button onClick={refresh} disabled={refreshing}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line disabled:opacity-50">
-              <FaSync className={refreshing ? "animate-spin text-teal-500" : ""} /> Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Report body — cache-first render (no loading blocker). */}
-        {!view && !loading && (
-          <div className="bg-card border border-line rounded-lg p-12 text-center text-xs text-ink-subtle">
-            <FaBalanceScale className="text-teal-500/40 text-3xl mx-auto mb-2" />
-            <div className="text-sm text-ink-muted font-semibold mb-1">No data for the selected variant</div>
-            <div className="text-[11px]">Selected: <b>{activeConfig.label}</b></div>
-          </div>
-        )}
-
+    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+      {/* Top action bar — hidden while the filter dialog is open so the
+         background stays clean (matches Busy: opening the filter clears the
+         screen and shows only the filter card). */}
+      {!showOptionsDialog && (
+      <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
+        <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+          <FaBalanceScale className="text-red-500 text-sm" /> Balance Sheet
+        </h3>
         {view && (
-          <>
-            {/* Meta banner */}
-            <div className="text-[11px] text-ink-muted px-1">
-              As on <b className="text-ink">{new Date(asOnDate).toLocaleDateString("en-IN")}</b> · <b className="text-ink">{activeConfig.label}</b>
-            </div>
-
-            {/* Body renders based on layout */}
-            {activeConfig.layout === "flat" ? (
-              renderFlatAlphabetical(view)
-            ) : activeConfig.layout === "vertical" ? (
-              <div className="space-y-3">
-                {renderSectionTable("Assets", view.assets, view.totalAssets, "text-blue-500")}
-                {renderSectionTable("Liabilities", view.liabilities, view.totalLiabilities, "text-red-500")}
-                {renderSectionTable("Equity", view.equity, view.totalEquity, "text-purple-500")}
-                <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wide text-ink">Total Liabilities + Equity</span>
-                  <span className="text-sm font-mono font-bold text-ink">₹{fmt(view.totalLiabilitiesAndEquity)}</span>
-                </div>
-              </div>
-            ) : (
-              // horizontal or hierarchical
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div className="space-y-3">
-                  {renderSectionTable("Assets", view.assets, view.totalAssets, "text-blue-500")}
-                </div>
-                <div className="space-y-3">
-                  {renderSectionTable("Liabilities", view.liabilities, view.totalLiabilities, "text-red-500")}
-                  {renderSectionTable("Equity", view.equity, view.totalEquity, "text-purple-500")}
-                  <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wide text-ink">Total Liabilities + Equity</span>
-                    <span className="text-sm font-mono font-bold text-ink">₹{fmt(view.totalLiabilitiesAndEquity)}</span>
-                  </div>
-                </div>
-              </div>
+          <span className="text-[11px] text-ink-muted">
+            At the end of <b className="text-ink">{displayDate(endDate)}</b>
+            {options.scaleFactor > 1 && (
+              <span className="ml-2 text-ink-subtle">· Scale × {options.scaleFactor.toLocaleString("en-IN")}</span>
             )}
-
-            {/* Balance status footer */}
-            <div className="bg-card border border-line rounded-lg px-3 py-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-ink">Balance Check</span>
-              {view.isBalanced ? (
-                <span className="flex items-center gap-1.5 text-[11px] text-teal-500 font-semibold">
-                  <FaCheckCircle /> Balanced — Assets = Liabilities + Equity (₹{fmt(view.totalAssets)})
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-[11px] text-red-500 font-semibold">
-                  <FaExclamationTriangle /> Not balanced · Diff: ₹{fmt(Math.abs(view.totalAssets - view.totalLiabilitiesAndEquity))}
-                </span>
-              )}
-            </div>
-          </>
+          </span>
         )}
+        {refreshing && (
+          <span className="flex items-center gap-1 text-[10px] text-red-400">
+            <FaSync className="animate-spin" /> Syncing…
+          </span>
+        )}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={() => setShowOptionsDialog(true)}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            title="Change filters (Esc)"
+          >
+            Filters
+          </button>
+          <button onClick={handlePrint} disabled={!data}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaPrint /> Print
+          </button>
+          <button onClick={exportCSV} disabled={!data}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaDownload /> Export
+          </button>
+          <button onClick={refresh} disabled={refreshing}
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
+          </button>
+        </div>
       </div>
+      )}
 
-      {/* Right sidebar — Summary. Amounts render on their own row so
-         crores-scale values never squeeze the label or overflow the card. */}
-      {view && (
-        <aside className="w-[220px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden self-start">
-          <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
-            <FaBalanceScale className="text-teal-500 text-xs" /> Summary
+      {/* ─── T-Format Table (Busy-style) ─────────────────────────────── */}
+      {!showOptionsDialog && (
+        <>
+          {!view && loading && (
+            <div className="bg-card border border-line rounded p-12 text-center text-xs text-ink-subtle">
+              Loading…
+            </div>
+          )}
+          {!view && !loading && (
+            <div className="bg-card border border-line rounded p-12 text-center text-xs text-ink-subtle">
+              <FaBalanceScale className="text-red-500/40 text-3xl mx-auto mb-2" />
+              No data for the selected period.
+            </div>
+          )}
+          {view && (
+            <div
+              className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
+              style={{ height: "calc(100vh - 200px)" }}
+            >
+              {/* "At the end of : date" strip */}
+              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0">
+                At the end of : <b className="text-ink">{displayDate(endDate)}</b>
+              </div>
+
+              {/* Scrollable body — sticky header + sticky footer keep totals
+                 pinned as the operator arrow-keys through long ledgers. */}
+              <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full text-left border-collapse table-fixed">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-head border-b-2 border-line">
+                    <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>L I A B I L I T I E S</th>
+                    <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                    <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>A S S E T S</th>
+                    <th className="px-3 py-1 text-[11px] font-bold text-right text-ink w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    // Zip left & right rows for the T layout. leftRows /
+                    // rightRows are memoised at the component level (used by
+                    // both the render and the keyboard nav handler).
+                    const maxLen = Math.max(leftRows.length, rightRows.length);
+                    const rows: React.ReactElement[] = [];
+                    for (let i = 0; i < maxLen; i++) {
+                      const L = leftRows[i];
+                      const R = rightRows[i];
+                      const lHl = nav.side === "L" && nav.idx === i;
+                      const rHl = nav.side === "R" && nav.idx === i;
+
+                      const isLPnl = L && /profit.*loss|net profit|net loss/i.test(L.name);
+                      const lPnlClass = isLPnl
+                        ? (L!.balance >= 0 ? "text-emerald-600" : "text-red-600")
+                        : "text-ink";
+
+                      rows.push(
+                        <tr key={`row-${i}`} className="border-b border-line-soft/60 hover:bg-card-2/40">
+                          {/* LEFT SIDE */}
+                          {L ? (
+                            <>
+                              <td
+                                data-bs-row={`L-${i}`}
+                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${
+                                  L.kind === "group"
+                                    ? `font-bold uppercase ${isLPnl ? lPnlClass : "text-ink"}`
+                                    : "pl-6 text-ink-muted"
+                                } ${lHl ? "bg-black text-white" : ""}`}
+                              >
+                                {L.name}
+                              </td>
+                              <td
+                                className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${
+                                  L.kind === "group" ? `font-bold ${lPnlClass}` : "text-ink-muted"
+                                } ${lHl ? "bg-black text-white" : ""}`}
+                              >
+                                {L.balance !== 0 && (
+                                  <>{L.balance < 0 && isLPnl ? "-" : ""}{fmt(Math.abs(L.balance), options.scaleFactor)}</>
+                                )}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                              <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                            </>
+                          )}
+                          {/* RIGHT SIDE */}
+                          {R ? (
+                            <>
+                              <td
+                                data-bs-row={`R-${i}`}
+                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${
+                                  R.kind === "group"
+                                    ? "font-bold uppercase text-ink"
+                                    : "pl-6 text-ink-muted"
+                                } ${rHl ? "bg-black text-white" : ""}`}
+                              >
+                                {R.name}
+                              </td>
+                              <td
+                                className={`px-3 py-0.5 text-[11px] text-right font-mono ${
+                                  R.kind === "group" ? "font-bold text-ink" : "text-ink-muted"
+                                } ${rHl ? "bg-black text-white" : ""}`}
+                              >
+                                {R.balance !== 0 && fmt(Math.abs(R.balance), options.scaleFactor)}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-0.5">&nbsp;</td>
+                              <td className="px-3 py-0.5">&nbsp;</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    }
+                    return rows;
+                  })()}
+                  {/* Filler rows so the grid always looks full even when
+                     the data is sparse — matches the Payment/Receipt list
+                     pages' Busy-style layout. */}
+                  {(() => {
+                    const maxLen = Math.max(leftRows.length, rightRows.length);
+                    const need = Math.max(0, 25 - maxLen);
+                    return Array.from({ length: need }).map((_, i) => (
+                      <tr key={`empty-${i}`} className="border-b border-line-soft/60">
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        <td className="px-3 py-0.5">&nbsp;</td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+                <tfoot className="sticky bottom-0 z-10">
+                  <tr className="bg-card-2 border-t-2 border-line">
+                    <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">Total</td>
+                    <td className={`px-3 py-1 text-[12px] text-right font-mono font-bold border-r border-line bg-card-2 ${view.isBalanced ? "text-ink" : "text-red-600"}`}>
+                      {fmt(view.leftTotal, options.scaleFactor)}
+                    </td>
+                    <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">Total</td>
+                    <td className={`px-3 py-1 text-[12px] text-right font-mono font-bold bg-card-2 ${view.isBalanced ? "text-ink" : "text-red-600"}`}>
+                      {fmt(view.rightTotal, options.scaleFactor)}
+                    </td>
+                  </tr>
+                  {!view.isBalanced && (
+                    <tr className="bg-red-500/5">
+                      <td colSpan={4} className="px-3 py-1 text-[11px] text-center text-red-600 font-semibold bg-red-500/5">
+                        Not balanced · Difference: ₹{fmt(Math.abs(view.leftTotal - view.rightTotal), options.scaleFactor)}
+                      </td>
+                    </tr>
+                  )}
+                </tfoot>
+              </table>
+              </div>
+
+              <div className="px-3 py-1 text-[10px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
+                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Home / End</kbd> jump</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
+                <span className="ml-auto">[ Esc - Quit ] [ Enter - Details ]</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ─── Options Dialog (Busy-style) ─────────────────────────────── */}
+      {showOptionsDialog && (
+        <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
+          <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
+            {/* Red header */}
+            <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
+              <span className="flex-1 text-center">Balance Sheet</span>
+            </div>
+
+            {/* Body — 12-col grid, compact Busy density */}
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+              {/* Starting Date */}
+              <label className="col-span-6 text-ink-subtle font-semibold">Starting Date</label>
+              <div className="col-span-6">
+                <DatePickerCalendar
+                  name="bsStartDate"
+                  value={draftStartDate}
+                  onChange={(e) => setDraftStartDate(e.target.value)}
+                />
+              </div>
+
+              {/* Ending Date */}
+              <label className="col-span-6 text-ink-subtle font-semibold">Ending Date</label>
+              <div className="col-span-6">
+                <DatePickerCalendar
+                  name="bsEndDate"
+                  value={draftEndDate}
+                  onChange={(e) => setDraftEndDate(e.target.value)}
+                />
+              </div>
+
+              {/* Y/N toggles — Busy layout: label (col-9) + Y/N select (col-3). */}
+              {(() => {
+                type Row = { key: keyof Options; label: string };
+                const rows: Row[] = [
+                  { key: "showSecondLevelGroups", label: "Show Second Level Group Details" },
+                  { key: "groupsAndAmountsInColumns", label: "Show Groups and Amounts in separate columns" },
+                  { key: "showZeroBalance", label: "Show Zero Balance Masters During Drill Down" },
+                  { key: "skipPnlForPeriod", label: "Skip 'P/L for the period' ?" },
+                ];
+                return rows.map((r) => (
+                  <React.Fragment key={r.key}>
+                    <label className="col-span-9 font-semibold text-ink-subtle">
+                      {r.label}
+                    </label>
+                    <div className="col-span-3">
+                      <select
+                        value={(draftOptions[r.key] as boolean) ? "Y" : "N"}
+                        onChange={(e) => setOpt(r.key, (e.target.value === "Y") as any)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const tabbables = Array.from(
+                              document.querySelectorAll<HTMLElement>(
+                                'input:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]'
+                              )
+                            ).filter((el) => el.getAttribute("tabindex") !== "-1");
+                            const idx = tabbables.indexOf(e.currentTarget);
+                            if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
+                          }
+                        }}
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                      >
+                        <option value="Y">Y</option>
+                        <option value="N">N</option>
+                      </select>
+                    </div>
+                  </React.Fragment>
+                ));
+              })()}
+
+              {/* Specify Scale Factor */}
+              <label className="col-span-6 text-ink-subtle font-semibold">Specify Scale Factor</label>
+              <div className="col-span-6">
+                <select
+                  value={String(draftOptions.scaleFactor)}
+                  onChange={(e) => setOpt("scaleFactor", Number(e.target.value) as Options["scaleFactor"])}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitOptions();
+                    }
+                  }}
+                  className="w-[110px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                >
+                  <option value="1">1</option>
+                  <option value="10">10</option>
+                  <option value="100">100</option>
+                  <option value="1000">1,000</option>
+                  <option value="10000">10,000</option>
+                  <option value="100000">1 Lakh</option>
+                  <option value="10000000">1 Crore</option>
+                </select>
+              </div>
+
+              {/* Cur. String (Busy placeholder — grayed) */}
+              <label className="col-span-6 text-ink-subtle/50 font-semibold italic">Cur. String</label>
+              <div className="col-span-6 text-[10px] text-ink-subtle/50 italic">—</div>
+            </div>
+
+            {/* Footer — OK(F2) button + hint */}
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+              <span className="text-ink-subtle italic">
+                Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={commitOptions}
+                  className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                >
+                  <FaPlay className="text-[9px]" /> OK (F2)
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="divide-y divide-line-soft">
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Assets</div>
-              <div className="text-sm font-mono font-bold text-blue-500 break-all leading-tight">
-                ₹{fmt(view.totalAssets)}
-              </div>
-            </div>
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Liabilities</div>
-              <div className="text-sm font-mono font-bold text-red-500 break-all leading-tight">
-                ₹{fmt(view.totalLiabilities)}
-              </div>
-            </div>
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Equity</div>
-              <div className="text-sm font-mono font-bold text-purple-500 break-all leading-tight">
-                ₹{fmt(view.totalEquity)}
-              </div>
-            </div>
-            <div className="px-3 py-2">
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Liabilities + Equity</div>
-              <div className="text-sm font-mono font-bold text-ink break-all leading-tight">
-                ₹{fmt(view.totalLiabilitiesAndEquity)}
-              </div>
-            </div>
-            <div className={`px-3 py-2 ${view.isBalanced ? "bg-teal-500/5" : "bg-red-500/5"}`}>
-              <div className="text-[11px] font-semibold text-ink-muted mb-1">Balance Check</div>
-              {view.isBalanced ? (
-                <div className="text-[12px] font-semibold text-teal-500 flex items-center gap-1">
-                  <FaCheckCircle className="text-[10px]" /> Balanced
-                </div>
-              ) : (
-                <>
-                  <div className="text-[12px] font-semibold text-red-500 flex items-center gap-1 mb-1">
-                    <FaExclamationTriangle className="text-[10px]" /> Not balanced
-                  </div>
-                  <div className="text-[11px] font-mono font-bold text-red-500 break-all leading-tight">
-                    ₹{fmt(Math.abs(view.totalAssets - view.totalLiabilitiesAndEquity))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </aside>
+        </div>
       )}
     </div>
   );
