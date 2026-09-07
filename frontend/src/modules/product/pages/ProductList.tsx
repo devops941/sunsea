@@ -321,17 +321,28 @@ const ProductList: React.FC = () => {
 
     const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ITEMS_PER_PAGE));
     const safeCurrentPage = Math.min(currentPage, totalPages);
-    
     const fetchProductsForExport = useCallback(async () => {
         const res = await productService.fetchAll();
         return Array.isArray(res) ? res : [];
     }, []);
 
+    const getProductCategoryName = useCallback((prod: any) => {
+        if (!prod) return "N/A";
+        if (prod.category?.name) return prod.category.name;
+        if (prod.category?.categoryName) return prod.category.categoryName;
+        if (typeof prod.category === "string" && prod.category) return prod.category;
+        if (prod.categoryId) {
+            const found = categoryOptions.find((c: any) => c.value === String(prod.categoryId));
+            if (found?.label) return found.label;
+        }
+        return "N/A";
+    }, [categoryOptions]);
+
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
             { header: "Product Code", accessor: (item: any) => item.productCode },
             { header: "Product Name", accessor: (item: any) => item.productName },
-            { header: "Category", accessor: (item: any) => item.category?.name || "—" },
+            { header: "Category", accessor: (item: any) => getProductCategoryName(item) !== "N/A" ? getProductCategoryName(item) : "—" },
             {
                 header: "Weight / Piece",
                 accessor: (item: any) =>
@@ -344,7 +355,7 @@ const ProductList: React.FC = () => {
             csvColumns: columns,
             csvFilename: `Production_Product_List_${new Date().toISOString().split("T")[0]}.csv`,
         };
-    }, []);
+    }, [getProductCategoryName]);
 
     const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
     const paginatedProducts = sortedProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -387,7 +398,7 @@ const ProductList: React.FC = () => {
             ),
             render: (product) => <span className="whitespace-nowrap">{product.productName}</span>,
         },
-        { header: "Category", render: (product) => product.category?.name || "-" },
+        { header: "Category", render: (product) => getProductCategoryName(product) !== "N/A" ? getProductCategoryName(product) : "-" },
         {
             header: "Product Type",
             render: (product) => (
@@ -499,7 +510,7 @@ const ProductList: React.FC = () => {
 
                             {can("products.export") && (
                                 <ExportCSVButton
-                                    fetchData={fetchProductsForExport}
+                                    data={products}
                                     columns={csvColumns}
                                     filename={csvFilename}
                                     text="Export"
@@ -567,6 +578,7 @@ const ProductList: React.FC = () => {
                             fields: [
                                 { label: "Product Name", value: selectedProduct.productName },
                                 { label: "Product Code", value: selectedProduct.productCode },
+                                { label: "Category", value: getProductCategoryName(selectedProduct) },
                                 { label: "Product Type", value: selectedProduct.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production" },
                                 {
                                     label: "Weight per Piece", value: (() => {

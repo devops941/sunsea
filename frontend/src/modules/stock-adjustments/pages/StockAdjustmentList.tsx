@@ -84,11 +84,7 @@ const getAdjustmentDisplayReason = (item: any) => {
   }
 
   if (item.reason && item.reason.trim()) {
-    const r = item.reason.trim();
-    const label = getReasonLabel(r);
-    if (label !== r || r.toLowerCase() === "other") {
-      return label;
-    }
+    return getReasonLabel(item.reason.trim());
   }
 
   return "—";
@@ -500,8 +496,9 @@ const StockAdjustmentList: React.FC = () => {
               header: "PRODUCT",
               width: "minmax(160px, 1.5fr)",
               render: (item) => {
-                const product = item.productionOrder?.productItem || item.items?.[0]?.product;
-                const rawMaterial = item.items?.[0]?.rawMaterial;
+                const firstItem = item.items?.[0];
+                const product = item.productionOrder?.productItem || firstItem?.product;
+                const rawMaterial = firstItem?.rawMaterial;
 
                 if (product?.productName) {
                   return (
@@ -523,6 +520,33 @@ const StockAdjustmentList: React.FC = () => {
                     <div>
                       <div className="font-semibold text-sm text-ink">
                         {rawMaterial.materialName}
+                      </div>
+                      <div className="text-xs text-ink-subtle font-mono">
+                        {rawMaterial.rawMaterialId || firstItem?.rawMaterialId}
+                      </div>
+                      {item.items && item.items.length > 1 && (
+                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                      )}
+                    </div>
+                  );
+                }
+                if (firstItem?.rawMaterialId) {
+                  return (
+                    <div>
+                      <div className="font-semibold text-sm text-ink">
+                        {firstItem.rawMaterialId}
+                      </div>
+                      {item.items && item.items.length > 1 && (
+                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                      )}
+                    </div>
+                  );
+                }
+                if (firstItem?.productItemId) {
+                  return (
+                    <div>
+                      <div className="font-semibold text-sm text-ink">
+                        Product #{String(firstItem.productItemId)}
                       </div>
                       {item.items && item.items.length > 1 && (
                         <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>

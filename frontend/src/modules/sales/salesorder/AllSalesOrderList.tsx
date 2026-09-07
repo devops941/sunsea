@@ -20,7 +20,7 @@ import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
-import { FiClipboard } from "react-icons/fi";
+import { FiClipboard, FiCheck } from "react-icons/fi";
 import { SalesOrderDeliveryEstimate } from "../../../components/salesOrder/SalesOrderDeliveryEstimate";
 import { useListCache, markStaleByPrefix } from "../../../hooks/useListCache";
 import { usePermission } from "../../../hooks/usePermission";
@@ -143,17 +143,105 @@ const AllSalesOrderList: React.FC = () => {
         });
     }, []);
 
+    const REMARKS_STORAGE_KEY = "sunsea_salesorder_estimate_remarks";
+
     const [showEstimateModal, setShowEstimateModal] = useState(false);
     const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
     const [loadingEstimate, setLoadingEstimate] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
-    // Remarks typed by the user — outer key = orderId, inner key = itemId
-    // Persists across close/reopen of the same order
-    const [remarksMap, setRemarksMap] = useState<Record<number, Record<string | number, string>>>({});
 
-    // Convenience: remarks for the currently open order
-    const itemRemarks: Record<string | number, string> =
-        estimateOrder?.id ? (remarksMap[estimateOrder.id] ?? {}) : {};
+    // Remarks persisted across browser sessions via localStorage
+    const [remarksMap, setRemarksMap] = useState<Record<number, Record<string | number, string>>>(() => {
+        try {
+            const saved = localStorage.getItem(REMARKS_STORAGE_KEY);
+            return saved ? JSON.parse(saved) : {};
+        } catch (_) {
+            return {};
+        }
+    });
+
+    // Draft remarks for active editing session inside the open modal
+    const [draftRemarks, setDraftRemarks] = useState<Record<string | number, string>>({});
+    const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+
+    // Check if user made modifications compared to saved remarks
+    const isRemarksDirty = useMemo(() => {
+        if (!estimateOrder?.id) return false;
+        const saved = remarksMap[estimateOrder.id] || {};
+        const allKeys = new Set([...Object.keys(saved), ...Object.keys(draftRemarks)]);
+        for (const k of allKeys) {
+            const dVal = (draftRemarks[k] ?? "").trim();
+            const sVal = (saved[k] ?? "").trim();
+            if (dVal !== sVal) return true;
+        }
+        return false;
+    }, [estimateOrder?.id, remarksMap, draftRemarks]);
+
+    const handleRequestCloseEstimate = useCallback(() => {
+        if (isRemarksDirty) {
+            setShowSaveConfirmModal(true);
+        } else {
+            setShowEstimateModal(false);
+        }
+    }, [isRemarksDirty]);
+
+    const handleConfirmSaveAndClose = useCallback(() => {
+        if (estimateOrder?.id) {
+            const updated = {
+                ...remarksMap,
+                [estimateOrder.id]: { ...draftRemarks },
+            };
+            setRemarksMap(updated);
+            try {
+                localStorage.setItem(REMARKS_STORAGE_KEY, JSON.stringify(updated));
+            } catch (_) {}
+            toast.success("Remarks saved successfully!");
+        }
+        setShowSaveConfirmModal(false);
+        setShowEstimateModal(false);
+    }, [estimateOrder?.id, remarksMap, draftRemarks]);
+
+    const handleDiscardAndClose = useCallback(() => {
+        setDraftRemarks({});
+        setShowSaveConfirmModal(false);
+        setShowEstimateModal(false);
+        toast.info("Changes discarded.");
+    }, []);
+
+    const handleCancelClose = useCallback(() => {
+        setShowSaveConfirmModal(false);
+    }, []);
+
+    const handleSaveRemarksDirectly = useCallback(() => {
+        if (estimateOrder?.id) {
+            const updated = {
+                ...remarksMap,
+                [estimateOrder.id]: { ...draftRemarks },
+            };
+            setRemarksMap(updated);
+            try {
+                localStorage.setItem(REMARKS_STORAGE_KEY, JSON.stringify(updated));
+            } catch (_) {}
+            toast.success("Remarks saved successfully!");
+        }
+    }, [estimateOrder?.id, remarksMap, draftRemarks]);
+
+    // Handle Escape key to prompt or close when modal is open
+    useEffect(() => {
+        if (!showEstimateModal) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                if (showSaveConfirmModal) return;
+                e.preventDefault();
+                e.stopPropagation();
+                handleRequestCloseEstimate();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [showEstimateModal, showSaveConfirmModal, handleRequestCloseEstimate]);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
@@ -242,10 +330,13 @@ const AllSalesOrderList: React.FC = () => {
     };
 
     const handleOpenEstimate = async (salesOrderId: number) => {
-        // Do NOT reset remarks — preserve previously typed values for this order
         setLoadingEstimate(true);
         setShowEstimateModal(true);
         setEstimateOrder(null);
+        // Load saved remarks into draft
+        const saved = remarksMap[salesOrderId] || {};
+        setDraftRemarks({ ...saved });
+
         try {
             const [orderData, salesProducts] = await Promise.all([
                 salesOrderService.fetchById(salesOrderId),
@@ -275,8 +366,8 @@ const AllSalesOrderList: React.FC = () => {
               items: estimateOrder.items?.map((item: any) => ({
                   ...item,
                   remarks:
-                      itemRemarks[item.id] !== undefined
-                          ? itemRemarks[item.id]
+                      draftRemarks[item.id] !== undefined
+                          ? draftRemarks[item.id]
                           : item.remarks ?? "",
               })),
           }
@@ -586,20 +677,41 @@ const AllSalesOrderList: React.FC = () => {
                             width: "210px",
                             align: "center",
                             render: (item) => (
-                                <div className="flex items-center justify-center gap-2">
-                                    <ViewButton onClick={() => handleOpenView(item.id)} />
+                                <div
+                                    className="flex items-center justify-center gap-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <ViewButton
+                                        onClick={() => handleOpenView(item.id)}
+                                    />
                                     <IconButton
                                         icon={FiClipboard}
                                         variant="info"
                                         size="sm"
                                         title="Print / View Sales Order"
-                                        onClick={() => handleOpenEstimate(item.id)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenEstimate(item.id);
+                                        }}
                                     />
                                     {item.status === "DRAFT" && (
                                         <>
-                                        
-                                            {can("sales-orders.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                            {can("sales-orders.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                            {can("sales-orders.edit") && (
+                                                <EditButton
+                                                    onClick={(e) => {
+                                                        e?.stopPropagation();
+                                                        handleOpenEdit(item);
+                                                    }}
+                                                />
+                                            )}
+                                            {can("sales-orders.delete") && (
+                                                <DeleteButton
+                                                    onClick={(e) => {
+                                                        e?.stopPropagation();
+                                                        triggerDelete(item.id);
+                                                    }}
+                                                />
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -617,7 +729,16 @@ const AllSalesOrderList: React.FC = () => {
                 <style>{`
                     @media print {
                         @page { size: A4 portrait; margin: 8mm; }
-                        body * { visibility: hidden !important; }
+                        html, body {
+                            background: #fff !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                        }
+                        body * {
+                            visibility: hidden !important;
+                        }
                         #print-only-estimate-section,
                         #print-only-estimate-section * {
                             visibility: visible !important;
@@ -625,11 +746,20 @@ const AllSalesOrderList: React.FC = () => {
                             print-color-adjust: exact;
                         }
                         #print-only-estimate-section {
-                            position: fixed !important;
+                            position: absolute !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 100% !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
                             display: block !important;
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
+                            page-break-after: avoid !important;
+                            break-after: avoid !important;
+                        }
+                        .no-print {
+                            display: none !important;
                         }
                     }
                 `}</style>
@@ -637,7 +767,7 @@ const AllSalesOrderList: React.FC = () => {
                     {/* Backdrop */}
                     <div
                         className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
-                        onClick={() => setShowEstimateModal(false)}
+                        onClick={handleRequestCloseEstimate}
                     />
 
                     {/* Modal Wrapper */}
@@ -649,7 +779,7 @@ const AllSalesOrderList: React.FC = () => {
                                     Sales Order Confirmation
                                 </h3>
                                 <button
-                                    onClick={() => setShowEstimateModal(false)}
+                                    onClick={handleRequestCloseEstimate}
                                     className="rounded-lg p-1 text-ink-subtle hover:bg-card-2 hover:text-ink-muted transition-colors"
                                 >
                                     <FaTimes size={18} />
@@ -669,14 +799,11 @@ const AllSalesOrderList: React.FC = () => {
                                         company={company}
                                         formatDate={formatDate}
                                         isEditable={true}
-                                        itemRemarks={itemRemarks}
+                                        itemRemarks={draftRemarks}
                                         onItemRemarksChange={(id, val) =>
-                                            setRemarksMap((prev) => ({
+                                            setDraftRemarks((prev) => ({
                                                 ...prev,
-                                                [estimateOrder.id]: {
-                                                    ...(prev[estimateOrder.id] ?? {}),
-                                                    [id]: val,
-                                                },
+                                                [id]: val,
                                             }))
                                         }
                                     />
@@ -688,9 +815,23 @@ const AllSalesOrderList: React.FC = () => {
                             </div>
 
                             {/* Footer */}
-                            <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-end">
+                            <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-between">
+                                <div>
+                                    {isRemarksDirty && (
+                                        <span className="text-xs text-amber-500 font-semibold flex items-center gap-1.5 animate-pulse">
+                                            ● Unsaved changes in remarks
+                                        </span>
+                                    )}
+                                </div>
                                 {estimateOrder && (
                                     <div className="flex gap-2">
+                                        <CustomButton
+                                            text="Save Remarks"
+                                            icon={FiCheck}
+                                            onClick={handleSaveRemarksDirectly}
+                                            variant="primary"
+                                            disabled={!isRemarksDirty}
+                                        />
                                         <CustomButton
                                             text="Print"
                                             icon={FaPrint}
@@ -701,7 +842,7 @@ const AllSalesOrderList: React.FC = () => {
                                             text={generatingPdf ? "Downloading..." : "Download PDF"}
                                             icon={FaDownload}
                                             onClick={() => generatePdf("download")}
-                                            variant="primary"
+                                            variant="secondary"
                                             disabled={generatingPdf}
                                         />
                                     </div>
@@ -734,6 +875,23 @@ const AllSalesOrderList: React.FC = () => {
                     />
                 </div>
             )}
+
+            {/* Unsaved Remarks Confirmation Modal (2 Options: Discard & Save) */}
+            <CommonConfirmModal
+                show={showSaveConfirmModal}
+                onHide={handleCancelClose}
+                onCancel={handleDiscardAndClose}
+                onConfirm={handleConfirmSaveAndClose}
+                title="Save Remarks Changes?"
+                message="You have modified the Remarks. Do you want to save the changes before closing?"
+                warningText=""
+                confirmText="Save"
+                cancelText="Discard"
+                cancelVariant="danger"
+                confirmVariant="primary"
+                confirmIcon={FiCheck}
+                isDangerous={false}
+            />
 
             {/* Delete Modal */}
             <CommonConfirmModal

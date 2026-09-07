@@ -34,6 +34,11 @@ class GoodsDispatchController {
       typeof value === "bigint" ? value.toString() : value
     ));
     getIO().emit("goodsDispatch:created", safeDispatch);
+    try {
+      getIO().emit("finishedGoodsStock:updated", { source: "goodsDispatch" });
+      getIO().emit("product:updated", { source: "goodsDispatch" });
+      getIO().emit("inventory:stockUpdated", { source: "goodsDispatch" });
+    } catch (_) {}
 
     return res.status(201).json(
       new ApiResponse("Goods Dispatch created successfully", dispatch)
@@ -73,6 +78,11 @@ class GoodsDispatchController {
       typeof value === "bigint" ? value.toString() : value
     ));
     getIO().emit("goodsDispatch:updated", safeDispatch);
+    try {
+      getIO().emit("finishedGoodsStock:updated", { source: "goodsDispatch" });
+      getIO().emit("product:updated", { source: "goodsDispatch" });
+      getIO().emit("inventory:stockUpdated", { source: "goodsDispatch" });
+    } catch (_) {}
 
     return res.status(200).json(
       new ApiResponse("Gate approval processed successfully", dispatch)
@@ -91,6 +101,11 @@ class GoodsDispatchController {
       typeof value === "bigint" ? value.toString() : value
     ));
     getIO().emit("goodsDispatch:updated", safeDispatch);
+    try {
+      getIO().emit("finishedGoodsStock:updated", { source: "goodsDispatch" });
+      getIO().emit("product:updated", { source: "goodsDispatch" });
+      getIO().emit("inventory:stockUpdated", { source: "goodsDispatch" });
+    } catch (_) {}
 
     return res.status(200).json(
       new ApiResponse("Store receipt processed successfully", dispatch)

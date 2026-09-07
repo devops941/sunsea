@@ -71,10 +71,18 @@ const dashboardController = {
           orderBy: { createdAt: "desc" },
         }).catch(() => []),
 
-        // Products — id, name, code for report
+        // Products — id, name, code, minimumQty, rate, uom, category
         prisma.product.findMany({
           where: { isActive: true },
-          select: { id: true, productName: true, productCode: true },
+          select: {
+            id: true,
+            productName: true,
+            productCode: true,
+            minimumQty: true,
+            rate: true,
+            uom: { select: { id: true, uomName: true, uomCode: true } },
+            category: { select: { id: true, name: true } },
+          },
           orderBy: { productName: "asc" },
         }).catch(() => []),
 
@@ -106,9 +114,19 @@ const dashboardController = {
             materialName: true,
             baseUom: true,
             onHandQty: true,
+            reservedQty: true,
+            minimumStock: true,
+            reorderLevel: true,
+            rate: true,
             storeId: true,
-            store: { select: { storeName: true } },
-          }
+            categoryId: true,
+            category: { select: { id: true, name: true } },
+            store: { select: { storeId: true, storeName: true } },
+            itemType: true,
+            isActive: true,
+            status: true,
+          },
+          orderBy: { rawMaterialId: "asc" },
         }).catch(() => []),
 
         // Finished Goods Stocks
@@ -117,9 +135,19 @@ const dashboardController = {
             onHandQty: true,
             productItemId: true,
             storeId: true,
-            product: { select: { productName: true } },
-            store: { select: { storeName: true } }
-          }
+            product: {
+              select: {
+                id: true,
+                productName: true,
+                productCode: true,
+                minimumQty: true,
+                rate: true,
+                uom: { select: { id: true, uomName: true, uomCode: true } },
+                category: { select: { id: true, name: true } },
+              },
+            },
+            store: { select: { storeId: true, storeName: true } },
+          },
         }).catch(() => []),
 
         // Daily Plans
@@ -145,6 +173,7 @@ const dashboardController = {
         prisma.salesInvoice.findMany({
           select: {
             id: true,
+            salesOrderId: true,
             grandTotal: true,
             payments: true,
             status: true,

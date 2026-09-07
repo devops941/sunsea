@@ -288,7 +288,8 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             <div
               tabIndex={0}
               data-nav
-              className="w-full text-[13px] truncate cursor-pointer h-full flex items-center justify-between gap-2 outline-none text-ink select-none px-1"
+              {...(dataNavDefault ? { "data-nav-default": "true" } : {})}
+              className="w-full text-[13px] truncate cursor-pointer h-full flex items-center justify-between gap-2 outline-none text-ink select-none px-1 focus:ring-1 focus:ring-primary/60 rounded-xs"
               onClick={() => {
                 setIsFocused(true);
                 setSearch("");

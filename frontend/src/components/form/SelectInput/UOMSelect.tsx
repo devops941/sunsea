@@ -56,6 +56,75 @@ const NavInput = (props: any) => {
   );
 };
 
+/**
+ * Wrapper that gives the react-select multi-select a proper [data-nav] stop
+ * compatible with useFormKeyboardNav.
+ *
+ * Problem: react-select calls e.preventDefault() for ALL keyboard events
+ * (Enter, Arrow keys) even when the menu is closed, so the form nav hook
+ * always sees defaultPrevented=true and never moves focus.
+ *
+ * Fix: the wrapper div is the actual [data-nav] stop. On focus it redirects
+ * to the react-select input inside. On keydown it dispatches a clean Enter
+ * event when the menu is closed so form nav can move to the next field.
+ */
+const UOMMultiNavWrapper: React.FC<{ children: React.ReactNode; disabled?: boolean }> = ({
+  children,
+  disabled,
+}) => {
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const focusInternalInput = React.useCallback(() => {
+    const input = wrapperRef.current?.querySelector<HTMLInputElement>("input:not([type='hidden'])");
+    input?.focus();
+  }, []);
+
+  const handleWrapperKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      // When menu is closed, Enter should move to next form field (not open the menu).
+      // react-select has already called e.preventDefault() inside its own handler
+      // before this bubbles, so we need to re-dispatch a fresh event on the form.
+      if (e.key === "Enter" && !menuOpen && !disabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Dispatch a new keydown Enter on the form container so useFormKeyboardNav fires
+        const form = wrapperRef.current?.closest("form");
+        if (form) {
+          form.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+        }
+      }
+    },
+    [menuOpen, disabled]
+  );
+
+  // Clone children to inject onMenuOpen/onMenuClose tracking
+  const childWithTracking = React.Children.map(children, (child) => {
+    if (!React.isValidElement(child)) return child;
+    return React.cloneElement(child as React.ReactElement<any>, {
+      onMenuOpen: () => setMenuOpen(true),
+      onMenuClose: () => setMenuOpen(false),
+    });
+  });
+
+  return (
+    <div
+      ref={wrapperRef}
+      data-nav
+      tabIndex={disabled ? -1 : 0}
+      onFocus={(e) => {
+        // When form nav focuses the wrapper div, redirect into the react-select input
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          focusInternalInput();
+        }
+      }}
+      onKeyDown={handleWrapperKeyDown}
+    >
+      {childWithTracking}
+    </div>
+  );
+};
+
 const CustomSingleSelect = ({
   value,
   onChange,
@@ -506,7 +575,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   <Select
                     isMulti
                     menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                    closeMenuOnSelect={true}
+                    closeMenuOnSelect={false}
                     blurInputOnSelect={false}
                     isDisabled={disabled}
                     options={options}
@@ -585,33 +654,35 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                 .filter(Boolean);
 
               return (
-                <Select
-                  isMulti
-                  menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                  closeMenuOnSelect={true}
-                  blurInputOnSelect={false}
-                  isDisabled={disabled}
-                  options={options}
-                  value={selectedOptions}
-                  placeholder={placeholder}
-                  components={{ MultiValue: SortableMultiValue, Input: NavInput }}
-                  {...({
-                    onReorder: (dragIndex: number, hoverIndex: number) => {
-                      const newValues = [...currentValueArray];
-                      const [dragged] = newValues.splice(dragIndex, 1);
-                      newValues.splice(hoverIndex, 0, dragged);
-                      const newValueStr = newValues.join(",");
-                      if (customOnChange) customOnChange(newValueStr);
-                    }
-                  } as any)}
-                  styles={selectStyles(!!error)}
-                  onChange={(selected: any) => {
-                    if (customOnChange) {
-                      const newValue = selected ? selected.map((s: any) => s.value).join(",") : "";
-                      customOnChange(newValue);
-                    }
-                  }}
-                />
+                <UOMMultiNavWrapper disabled={disabled}>
+                  <Select
+                    isMulti
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                    closeMenuOnSelect={false}
+                    blurInputOnSelect={false}
+                    isDisabled={disabled}
+                    options={options}
+                    value={selectedOptions}
+                    placeholder={placeholder}
+                    components={{ MultiValue: SortableMultiValue }}
+                    {...({
+                      onReorder: (dragIndex: number, hoverIndex: number) => {
+                        const newValues = [...currentValueArray];
+                        const [dragged] = newValues.splice(dragIndex, 1);
+                        newValues.splice(hoverIndex, 0, dragged);
+                        const newValueStr = newValues.join(",");
+                        if (customOnChange) customOnChange(newValueStr);
+                      }
+                    } as any)}
+                    styles={selectStyles(!!error)}
+                    onChange={(selected: any) => {
+                      if (customOnChange) {
+                        const newValue = selected ? selected.map((s: any) => s.value).join(",") : "";
+                        customOnChange(newValue);
+                      }
+                    }}
+                  />
+                </UOMMultiNavWrapper>
               );
             })()
           ) : (

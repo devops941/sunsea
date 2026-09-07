@@ -70,10 +70,10 @@ export class StockAdjustmentService {
     });
 
     if (targetStatus === "APPROVED") {
-      return await this.approveStockAdjustment(created.id, "APPROVED", "Auto-approved on creation", userId);
+      await this.approveStockAdjustment(created.id, "APPROVED", "Auto-approved on creation", userId);
     }
 
-    return created;
+    return await this.getStockAdjustmentById(created.id);
   }
 
   static async getStockAdjustments(filters: any) {
@@ -115,14 +115,23 @@ export class StockAdjustmentService {
               id: true,
               itemType: true,
               rawMaterialId: true,
+              productItemId: true,
               currentQty: true,
               adjustedQty: true,
               difference: true,
               storeId: true,
               remarks: true,
-              rawMaterial: { select: { materialName: true, baseUom: true } },
-              store: { select: { storeName: true } },
-              product: { select: { productName: true, productCode: true } },
+              rawMaterial: { select: { rawMaterialId: true, materialName: true, baseUom: true } },
+              store: { select: { storeId: true, storeName: true } },
+              product: {
+                select: {
+                  id: true,
+                  productName: true,
+                  productCode: true,
+                  uom: { select: { uomCode: true, uomName: true } },
+                  category: { select: { name: true } },
+                },
+              },
             },
           },
         },
@@ -276,12 +285,9 @@ export class StockAdjustmentService {
           })),
         });
       }
-
-      return tx.stockAdjustment.findUnique({
-        where: { id: BigInt(id) },
-        include: { items: true },
-      });
     });
+
+    return await this.getStockAdjustmentById(id);
   }
 
   static async approveStockAdjustment(id: bigint | number | string, status: string, reason: string | undefined, userId: string) {
@@ -394,7 +400,7 @@ export class StockAdjustmentService {
         });
       }
 
-      return tx.stockAdjustment.update({
+      await tx.stockAdjustment.update({
         where: { id: BigInt(id) },
         data: {
           status: "APPROVED",
@@ -403,10 +409,10 @@ export class StockAdjustmentService {
           updatedBy: userId,
         },
       });
-    }).then((result) => {
-      try { getIO().emit("inventory:stockUpdated", { type: "stock_adjustment" }); } catch (_) {}
-      return result;
     });
+
+    try { getIO().emit("inventory:stockUpdated", { type: "stock_adjustment" }); } catch (_) {}
+    return await this.getStockAdjustmentById(id);
   }
 
   static async deleteStockAdjustment(id: bigint | number | string) {

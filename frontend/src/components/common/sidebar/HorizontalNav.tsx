@@ -9,6 +9,7 @@ import { FiLogOut, FiUser } from "react-icons/fi";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ThemeToggle from "../ThemeToggle";
 import LiveBadge from "../../../components/ui/LiveBadge/LiveBadge";
+import { SHORTCUTS } from "../../../config/shortcuts";
 
 const HorizontalNav = () => {
   const { can } = usePermission();
@@ -44,6 +45,17 @@ const HorizontalNav = () => {
   useEffect(() => {
     setActiveSubMenuId(null);
   }, [activeMenuId]);
+
+  // Live lookup from SHORTCUTS config to guarantee badges always reflect the latest shortcuts
+  const shortcutBadgeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    SHORTCUTS.forEach((sc) => {
+      if (sc.route && sc.keyLabel) {
+        map[sc.route] = sc.keyLabel;
+      }
+    });
+    return map;
+  }, []);
 
   // Close menus on route change
   useEffect(() => {
@@ -177,27 +189,9 @@ const HorizontalNav = () => {
     return filteredSidebarItems.find((m) => m.title === activeMenuId);
   }, [activeMenuId, filteredSidebarItems]);
 
-  const isMenuActive = useCallback((menu: any): boolean => {
-    if (menu.path && location.pathname === menu.path) return true;
-    if (menu.activePaths && menu.activePaths.some((p: string) => location.pathname.startsWith(p))) {
-      return true;
-    }
-    if (menu.children) {
-      return menu.children.some((child: any) => {
-        if (child.path && (location.pathname === child.path || location.pathname.startsWith(child.path.split('?')[0]))) return true;
-        if (child.activePaths && child.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
-        if (child.children) {
-          return isMenuActive(child);
-        }
-        return false;
-      });
-    }
-    return false;
-  }, [location.pathname]);
-
   const isLeafActive = useCallback(
     (item: any): boolean => {
-      if (!item.path) return false;
+      if (!item || !item.path) return false;
       const [itemBasePath, itemQuery] = item.path.split("?");
       const currentBasePath = location.pathname;
       const currentQuery = location.search ? location.search.replace(/^\?/, "") : "";
@@ -218,11 +212,24 @@ const HorizontalNav = () => {
 
       // 4. Custom activePaths defined on the item
       if (item.activePaths && Array.isArray(item.activePaths)) {
-        if (item.activePaths.some((p: string) => currentBasePath.startsWith(p))) return true;
+        if (
+          item.activePaths.some((p: string) => {
+            if (currentBasePath === p) return true;
+            if (currentBasePath.startsWith(p + "/")) {
+              const nextSegment = currentBasePath.slice(p.length + 1).split("/")[0];
+              return /^\d+$/.test(nextSegment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nextSegment);
+            }
+            return false;
+          })
+        ) {
+          return true;
+        }
       }
 
       // 5. Detail / edit page match (e.g. /employees/123 or /employees/123/edit matching /employees list)
       // But NEVER match /create or /add as a sub-path of list!
+      // Also NEVER match if the next segment is a named sub-route (e.g. /machines/assignments
+      // must NOT make /machines list active — only /machines/123 should).
       if (
         currentBasePath.startsWith(itemBasePath + "/") &&
         !currentBasePath.endsWith("/create") &&
@@ -230,12 +237,40 @@ const HorizontalNav = () => {
         !currentBasePath.includes("/create/") &&
         !currentBasePath.includes("/add/")
       ) {
-        return true;
+        const nextSegment = currentBasePath.slice(itemBasePath.length + 1).split("/")[0];
+        // Only activate if the next segment is a numeric ID or UUID — not a named route word
+        const isId = /^\d+$/.test(nextSegment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nextSegment);
+        if (isId) return true;
       }
 
       return false;
     },
     [location.pathname, location.search]
+  );
+
+  const isItemOrDescendantActive = useCallback(
+    (item: any): boolean => {
+      if (!item) return false;
+      if (isLeafActive(item)) return true;
+      if (item.activePaths && Array.isArray(item.activePaths)) {
+        if (item.activePaths.some((p: string) => location.pathname === p || location.pathname.startsWith(p + "/"))) {
+          return true;
+        }
+      }
+      if (item.children && Array.isArray(item.children)) {
+        return item.children.some((child: any) => isItemOrDescendantActive(child));
+      }
+      return false;
+    },
+    [isLeafActive, location.pathname]
+  );
+
+  const isMenuActive = useCallback(
+    (menu: any): boolean => {
+      if (!menu) return false;
+      return isItemOrDescendantActive(menu);
+    },
+    [isItemOrDescendantActive]
   );
 
   const getInitials = (name?: string) => {
@@ -517,14 +552,7 @@ const HorizontalNav = () => {
       const checkActive = (items: any[]) => {
         items.forEach((child) => {
           if (child.children?.length) {
-            const isChildActive = child.children.some(
-              (sc: any) =>
-                (sc.path && location.pathname.startsWith(sc.path.split("?")[0])) ||
-                (sc.children &&
-                  sc.children.some(
-                    (ssc: any) => ssc.path && location.pathname.startsWith(ssc.path.split("?")[0])
-                  ))
-            );
+            const isChildActive = child.children.some((sc: any) => isItemOrDescendantActive(sc));
             if (isChildActive) {
               initial[child.title] = true;
               hasActive = true;
@@ -549,7 +577,7 @@ const HorizontalNav = () => {
       }
       setExpandedKeys(initial);
     }
-  }, [activeMenuId, filteredSidebarItems, location.pathname]);
+  }, [activeMenuId, filteredSidebarItems, isItemOrDescendantActive]);
 
   // Helper to find ancestor path in tree for a given title
   const findAncestors = useCallback(
@@ -655,11 +683,15 @@ const HorizontalNav = () => {
               <span className="tracking-tight truncate">{item.title}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              {item.badge && (
-                <span className="text-[9.5px] font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700/60 shrink-0">
-                  {item.badge}
-                </span>
-              )}
+              {(() => {
+                const displayBadge = (item.path && shortcutBadgeMap[item.path]) || item.badge;
+                if (!displayBadge) return null;
+                return (
+                  <span className="text-[9.5px] font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700/60 shrink-0">
+                    {displayBadge}
+                  </span>
+                );
+              })()}
               {/* Subtle small chevron indicator on right */}
               <FaChevronRight
                 className={`text-[9px] transition-transform duration-150 ${
@@ -712,15 +744,19 @@ const HorizontalNav = () => {
                 {item.title}
               </span>
             </div>
-            {item.badge && (
-              <span className={`text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${
-                active 
-                  ? "text-teal-100 bg-teal-700 border-teal-500" 
-                  : "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 border-slate-300 dark:border-slate-700/60"
-              }`}>
-                {item.badge}
-              </span>
-            )}
+            {(() => {
+              const displayBadge = (item.path && shortcutBadgeMap[item.path]) || item.badge;
+              if (!displayBadge) return null;
+              return (
+                <span className={`text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                  active 
+                    ? "text-teal-100 bg-teal-700 border-teal-500" 
+                    : "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 border-slate-300 dark:border-slate-700/60"
+                }`}>
+                  {displayBadge}
+                </span>
+              );
+            })()}
           </NavLink>
         )}
       </div>
@@ -749,7 +785,7 @@ const HorizontalNav = () => {
 
             const getShortcutLabel = (title: string) => {
               switch (title.toLowerCase()) {
-                case "dashboard": return "D";
+                case "dashboard": return "Ctrl+D";
                 case "administration": return "Alt+A";
                 case "transactions": return "Alt+T";
                 case "production": return "Alt+R";
