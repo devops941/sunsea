@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { useListCache, invalidateCache } from "../../../../hooks/useListCache";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Contra filter — same defaults as Journal per Busy's convention:
 // Voucher Series = <<-ALL->>, all display toggles = N.
@@ -431,12 +432,12 @@ const ContraVoucherPage: React.FC = () => {
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
                         {dr > 0
-                          ? dr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          ? formatAmount(dr)
                           : ""}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
                         {cr > 0
-                          ? cr.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          ? formatAmount(cr)
                           : ""}
                       </td>
                       {applied.showNarration && (
@@ -466,10 +467,10 @@ const ContraVoucherPage: React.FC = () => {
                     Page Total ({vouchers.length} vouchers · {flatRows.length} entries)
                   </td>
                   <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">
-                    {totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalDebit)}
                   </td>
                   <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">
-                    {totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalCredit)}
                   </td>
                   {applied.showNarration && <td></td>}
                 </tr>

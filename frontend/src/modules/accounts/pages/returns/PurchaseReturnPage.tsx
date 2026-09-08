@@ -20,6 +20,7 @@ import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSV
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { usePermission } from "../../../../hooks/usePermission";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 interface FormReturnRow {
   rawMaterialId: string;
@@ -447,7 +448,7 @@ export const PurchaseReturnPage: React.FC = () => {
       header: "GRAND TOTAL (₹)",
       render: (item) => (
         <span className="font-mono font-semibold text-indigo-500 whitespace-nowrap">
-          ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          ₹{formatAmount(Number(item.grandTotal))}
         </span>
       ),
       align: "right",
@@ -761,7 +762,7 @@ export const PurchaseReturnPage: React.FC = () => {
               {
                 label: "Grand Total",
                 value: selectedViewReturn
-                  ? `₹${Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                  ? `₹${formatAmount(Number(selectedViewReturn.grandTotal))}`
                   : "—",
               },
             ],

@@ -23,3 +23,9 @@ interface PriceableItem {
 export const getUnitPrice = (item: PriceableItem): string | number => {
     return item.product?.b2b ?? item.b2b ?? item.unitPrice ?? item.product?.mrp ?? 0;
 };
+
+export const formatAmount = (value: number) => {
+  return value % 1 === 0
+    ? value.toLocaleString("en-IN")
+    : value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};

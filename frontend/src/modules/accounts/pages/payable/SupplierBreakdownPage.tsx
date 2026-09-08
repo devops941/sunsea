@@ -21,6 +21,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableDetail } from "../../../../services/payableService";
 import { useListCache } from "../../../../hooks/useListCache";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 export const SupplierBreakdownPage: React.FC = () => {
   const { supplierId } = useParams<{ supplierId: string }>();
@@ -209,7 +210,7 @@ export const SupplierBreakdownPage: React.FC = () => {
       header: "INVOICE AMOUNT",
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-ink">
-          ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹ {formatAmount(item.amount)}
         </div>
       ),
     },
@@ -251,7 +252,7 @@ export const SupplierBreakdownPage: React.FC = () => {
       header: "AMOUNT PAID",
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-emerald-600">
-          ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹ {formatAmount(item.amount)}
         </div>
       ),
     },
@@ -288,7 +289,7 @@ export const SupplierBreakdownPage: React.FC = () => {
       header: "DEBIT (DR)",
       render: (item: any) => (
         <div className="text-right font-mono text-ink-muted">
-          {item.debit > 0 ? `₹ ${item.debit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+          {item.debit > 0 ? `₹ ${formatAmount(item.debit)}` : "-"}
         </div>
       ),
     },
@@ -296,7 +297,7 @@ export const SupplierBreakdownPage: React.FC = () => {
       header: "CREDIT (CR)",
       render: (item: any) => (
         <div className="text-right font-mono text-ink-muted">
-          {item.credit > 0 ? `₹ ${item.credit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+          {item.credit > 0 ? `₹ ${formatAmount(item.credit)}` : "-"}
         </div>
       ),
     },
@@ -304,7 +305,7 @@ export const SupplierBreakdownPage: React.FC = () => {
       header: "RUNNING BALANCE",
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-orange-600">
-          ₹ {item.runningBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹ {formatAmount(item.runningBalance)}
         </div>
       ),
     },
@@ -417,7 +418,7 @@ export const SupplierBreakdownPage: React.FC = () => {
               <FaMoneyBillWave className="text-ink-muted text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-ink mt-1">
-              ₹ {supplierDetail.summary.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(supplierDetail.summary.openingBalance)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Starting liability</div>
           </div>
@@ -428,7 +429,7 @@ export const SupplierBreakdownPage: React.FC = () => {
               <FaBuilding className="text-orange-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-ink mt-1">
-              ₹ {supplierDetail.summary.totalBilled.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(supplierDetail.summary.totalBilled)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">GRN bills posted</div>
           </div>
@@ -439,7 +440,7 @@ export const SupplierBreakdownPage: React.FC = () => {
               <FaCheckCircle className="text-emerald-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-emerald-600 mt-1">
-              ₹ {supplierDetail.summary.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(supplierDetail.summary.totalPaid)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Payments settled</div>
           </div>
@@ -450,7 +451,7 @@ export const SupplierBreakdownPage: React.FC = () => {
               <FaExclamationTriangle className="text-amber-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-orange-600 mt-1">
-              ₹ {supplierDetail.summary.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(supplierDetail.summary.closingBalance)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Net balance due</div>
           </div>

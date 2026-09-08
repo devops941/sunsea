@@ -8,6 +8,7 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 interface ContraRow {
   id: number;
@@ -397,10 +398,10 @@ const ContraVoucherEditPage: React.FC = () => {
                     </button>
                   </td>
                   <td className="w-28 px-2 py-1 text-right font-mono font-bold text-red-400 border-l border-line">
-                    {totalDebit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalDebit)}
                   </td>
                   <td className="w-28 px-2 py-1 text-right font-mono font-bold text-emerald-500 border-l border-line">
-                    {totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalCredit)}
                   </td>
                   <td className="px-2 py-1 text-[10px] italic">
                     {hasAnyAmount ? (

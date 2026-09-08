@@ -8,6 +8,7 @@ import { prefetchDetail } from "../../../../hooks/useDetailCache";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDateDMY } from "../../../../utils/dateUtils";
 import { displayVoucherNo, voucherService, type Voucher } from "../../../../services/voucherService";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Busy-style Day Book — two-column cashbook: Dr side | Cr side.
 // Each side has: Particulars | Type | Cash Amount | Amount.
@@ -717,7 +718,7 @@ const DayBookSide: React.FC<{
 
 // ── Small helpers ──
 const fmt = (n: number) =>
-  n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  formatAmount(n);
 
 const FilterRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="grid grid-cols-12 gap-3 items-center">

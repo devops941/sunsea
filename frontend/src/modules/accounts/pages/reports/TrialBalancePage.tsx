@@ -15,6 +15,7 @@ import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/Dat
 import { useDetailCache } from "../../../../hooks/useDetailCache";
 import { useListCache } from "../../../../hooks/useListCache";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // ─── Backend row shape ──────────────────────────────────────────────
 interface TBRow {
@@ -69,7 +70,7 @@ const saveOptions = (opts: Options) => {
 };
 
 const fmt = (n: number) =>
-  Math.abs(n) < 0.01 ? "" : Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Math.abs(n) < 0.01 ? "" : formatAmount(Math.abs(n));
 const displayDate = (iso: string) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");

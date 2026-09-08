@@ -14,6 +14,7 @@ import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
 import type { CustomerReceivableSummary } from "../../../../services/receivableService";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // ─── Options ────────────────────────────────────────────────────────
 type ShownBy = "name" | "code";
@@ -40,7 +41,7 @@ const loadSaved = (): Partial<Options> | null => {
 const save = (o: Options) => { try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(o)); } catch { /* ignore */ } };
 
 const fmt = (n: number) =>
-  Math.abs(n) < 0.01 ? "" : Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Math.abs(n) < 0.01 ? "" : formatAmount(Math.abs(n));
 const displayDate = (iso: string) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
