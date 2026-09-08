@@ -351,7 +351,7 @@ const JournalEntryAddPage: React.FC = () => {
                         <span className="text-emerald-600 font-semibold">Balanced · {validCount} entries</span>
                       ) : (
                         <span className="text-red-500 font-semibold">
-                          Diff: {Math.abs(diff).toFixed(2)} {diff > 0 ? "(Cr short)" : "(Dr short)"}
+                          Diff: {formatAmount(Math.abs(diff))} {diff > 0 ? "(Cr short)" : "(Dr short)"}
                         </span>
                       )
                     ) : (

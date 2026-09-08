@@ -8,6 +8,7 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../components/form/Led
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { useListCache, prependToListCacheByPrefix } from "../../hooks/useListCache";
+import { formatAmount } from "../../utils/pricingUtils";
 
 // One editable row = one Expense to be saved. Save iterates and POSTs each
 // row so a single "session" can capture multiple expenses in one flow.
@@ -308,7 +309,7 @@ const ExpenseAddPage: React.FC = () => {
                     </button>
                   </td>
                   <td className="w-32 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
-                    {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalAmount)}
                   </td>
                   <td className="px-2 py-1 text-[10px] text-ink-subtle italic">
                     {validCount} valid {validCount === 1 ? "entry" : "entries"}
