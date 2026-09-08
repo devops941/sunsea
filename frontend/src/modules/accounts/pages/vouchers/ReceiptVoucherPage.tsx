@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { useListCache } from "../../../../hooks/useListCache";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Busy-style filter options shown BEFORE the list opens.
 interface FilterOptions {
@@ -372,10 +373,7 @@ const ReceiptVoucherPage: React.FC = () => {
                       </td>
                       {applied.showAmount && (
                         <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
-                          {voucherTotal.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          {formatAmount(voucherTotal)}
                         </td>
                       )}
                       {applied.showNarration && (
@@ -421,10 +419,7 @@ const ReceiptVoucherPage: React.FC = () => {
                       Page Total ({vouchers.length})
                     </td>
                     <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">
-                      {grandTotal.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatAmount(grandTotal)}
                     </td>
                     {applied.showNarration && <td></td>}
                   </tr>

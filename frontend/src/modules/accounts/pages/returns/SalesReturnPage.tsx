@@ -20,6 +20,7 @@ import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSV
 import { usePermission } from "../../../../hooks/usePermission";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../../hooks/useTableKeyboardNav";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 type SortOrder = "default" | "asc" | "desc";
 const SORT_STORAGE_KEY = "sunsea_sales_return_sort";
@@ -304,7 +305,7 @@ export const SalesReturnPage: React.FC = () => {
       header: "GRAND TOTAL (₹)",
       render: (item) => (
         <span className="font-mono font-semibold text-indigo-500 whitespace-nowrap">
-          ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          ₹{formatAmount(Number(item.grandTotal))}
         </span>
       ),
       align: "right",
@@ -499,7 +500,7 @@ export const SalesReturnPage: React.FC = () => {
               {
                 label: "Grand Total",
                 value: selectedViewReturn
-                  ? `₹${Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                  ? `₹${formatAmount(Number(selectedViewReturn.grandTotal))}`
                   : "—",
               },
             ],

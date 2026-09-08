@@ -20,6 +20,7 @@ import { voucherService, type Voucher, type VoucherType } from "../../../../serv
 import { useListCache } from "../../../../hooks/useListCache";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { usePermission } from "../../../../hooks/usePermission";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 export const VoucherListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -389,7 +390,7 @@ export const VoucherListPage: React.FC = () => {
                       <td className="px-3 py-1.5 font-semibold text-ink">{debitLedgerName}</td>
                       <td className="px-3 py-1.5 text-ink-muted">{creditLedgerName}</td>
                       <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink whitespace-nowrap">
-                        ₹{(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₹{formatAmount((amount || 0))}
                       </td>
                       <td className="px-3 py-1.5 text-center">
                         {renderStatusBadge(v.status)}
@@ -520,7 +521,7 @@ export const VoucherListPage: React.FC = () => {
                             <td className="px-3 py-1.5 text-right font-mono">₹{item.unitPrice.toFixed(2)}</td>
                             <td className="px-3 py-1.5 text-right">{item.tax || 0}%</td>
                             <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
-                              ₹{item.lineTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              ₹{formatAmount(item.lineTotal)}
                             </td>
                           </tr>
                         ))}
@@ -556,12 +557,12 @@ export const VoucherListPage: React.FC = () => {
                           </td>
                           <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
                             {Number(item.debitAmount) > 0
-                              ? `₹${Number(item.debitAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                              ? `₹${formatAmount(Number(item.debitAmount))}`
                               : "-"}
                           </td>
                           <td className="px-3 py-1.5 text-right font-mono font-semibold text-ink">
                             {Number(item.creditAmount) > 0
-                              ? `₹${Number(item.creditAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                              ? `₹${formatAmount(Number(item.creditAmount))}`
                               : "-"}
                           </td>
                         </tr>

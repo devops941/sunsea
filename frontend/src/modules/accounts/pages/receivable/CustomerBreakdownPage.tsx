@@ -21,6 +21,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableDetail } from "../../../../services/receivableService";
 import { useListCache } from "../../../../hooks/useListCache";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 export const CustomerBreakdownPage: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
@@ -205,7 +206,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       header: "INVOICE AMOUNT",
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-ink">
-          ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹ {formatAmount(item.amount)}
         </div>
       ),
     },
@@ -247,7 +248,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       header: "AMOUNT RECEIVED",
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-emerald-600">
-          ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹ {formatAmount(item.amount)}
         </div>
       ),
     },
@@ -280,7 +281,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       header: "DEBIT (DR)",
       render: (item: any) => (
         <div className="text-right font-mono text-ink-muted">
-          {item.debit > 0 ? `₹ ${item.debit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+          {item.debit > 0 ? `₹ ${formatAmount(item.debit)}` : "-"}
         </div>
       ),
     },
@@ -288,7 +289,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       header: "CREDIT (CR)",
       render: (item: any) => (
         <div className="text-right font-mono text-ink-muted">
-          {item.credit > 0 ? `₹ ${item.credit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+          {item.credit > 0 ? `₹ ${formatAmount(item.credit)}` : "-"}
         </div>
       ),
     },
@@ -296,7 +297,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       header: "RUNNING BALANCE",
       render: (item: any) => (
         <div className="text-right font-mono font-semibold text-blue-600">
-          ₹ {item.runningBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹ {formatAmount(item.runningBalance)}
         </div>
       ),
     },
@@ -409,7 +410,7 @@ export const CustomerBreakdownPage: React.FC = () => {
               <FaMoneyBillWave className="text-ink-muted text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-ink mt-1">
-              ₹ {customerDetail.summary.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(customerDetail.summary.openingBalance)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Starting receivable</div>
           </div>
@@ -420,7 +421,7 @@ export const CustomerBreakdownPage: React.FC = () => {
               <FaUserFriends className="text-blue-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-ink mt-1">
-              ₹ {customerDetail.summary.totalBilled.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(customerDetail.summary.totalBilled)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Sales invoices</div>
           </div>
@@ -431,7 +432,7 @@ export const CustomerBreakdownPage: React.FC = () => {
               <FaCheckCircle className="text-emerald-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-emerald-600 mt-1">
-              ₹ {customerDetail.summary.totalPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(customerDetail.summary.totalPaid)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Receipts settled</div>
           </div>
@@ -442,7 +443,7 @@ export const CustomerBreakdownPage: React.FC = () => {
               <FaMoneyBillWave className="text-rose-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-rose-600 mt-1">
-              ₹ {(customerDetail.summary.totalReturned || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount((customerDetail.summary.totalReturned || 0))}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Credit notes</div>
           </div>
@@ -453,7 +454,7 @@ export const CustomerBreakdownPage: React.FC = () => {
               <FaExclamationTriangle className="text-amber-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-blue-600 mt-1">
-              ₹ {customerDetail.summary.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹ {formatAmount(customerDetail.summary.closingBalance)}
             </div>
             <div className="text-[10px] text-ink-subtle mt-0.5">Net balance</div>
           </div>

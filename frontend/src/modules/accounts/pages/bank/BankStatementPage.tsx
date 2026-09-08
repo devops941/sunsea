@@ -9,6 +9,7 @@ import { useSocketSync } from "../../../../hooks/useSocketSync";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { formatDateDMY } from "../../../../utils/dateUtils";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Busy-style pre-list filter for the bank/cash statement. Dynamic — works
 // for every ledger the operator drills into (Cash, Main Bank, Petty Cash,
@@ -191,9 +192,7 @@ const BankStatementPage: React.FC = () => {
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
-    const fmt = (n: number) => Number(n || 0).toLocaleString("en-IN", {
-      minimumFractionDigits: 2, maximumFractionDigits: 2,
-    });
+    const fmt = (n: number) => formatAmount(Number(n || 0));
     const ledgerName = data.ledger?.name || "Bank Statement";
     const rangeStr = applied.startDate || applied.endDate
       ? `${formatDateDMY(applied.startDate) || "…"} to ${formatDateDMY(applied.endDate) || "…"}`
@@ -448,7 +447,7 @@ const BankStatementPage: React.FC = () => {
               <span className="flex items-center gap-1.5">
                 <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Opening</span>
                 <span className=" font-bold text-ink">
-                  ₹{Math.abs(data.openingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  ₹{formatAmount(Math.abs(data.openingBalance))}
                   <span className="ml-1 text-[10px] text-ink-subtle">
                     {data.openingBalance >= 0 ? "Dr" : "Cr"}
                   </span>
@@ -458,7 +457,7 @@ const BankStatementPage: React.FC = () => {
               <span className="flex items-center gap-1.5">
                 <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Closing</span>
                 <span className={` font-bold ${data.closingBalance >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                  ₹{Math.abs(data.closingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  ₹{formatAmount(Math.abs(data.closingBalance))}
                   <span className="ml-1 text-[10px]">
                     {data.closingBalance >= 0 ? "Dr" : "Cr"}
                   </span>
@@ -532,20 +531,20 @@ const BankStatementPage: React.FC = () => {
                     <td className="px-3 py-1.5 text-xs text-right font-mono">
                       {entry.debit > 0 ? (
                         <span className="text-emerald-500 font-semibold">
-                          {entry.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          {formatAmount(entry.debit)}
                         </span>
                       ) : "-"}
                     </td>
                     <td className="px-3 py-1.5 text-xs text-right font-mono">
                       {entry.credit > 0 ? (
                         <span className="text-red-500 font-semibold">
-                          {entry.credit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          {formatAmount(entry.credit)}
                         </span>
                       ) : "-"}
                     </td>
                     {applied.showBalance && (
                       <td className="px-3 py-1.5 text-xs text-right font-mono font-bold text-ink">
-                        ₹{Math.abs(entry.runningBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        ₹{formatAmount(Math.abs(entry.runningBalance))}
                         {/* Bank/Cash is an ASSET — natural side is Dr. Negative
                             running balance means the ledger sits on Cr (overdraft /
                             cash shortage). Show "Cr" so the sign matches accounting

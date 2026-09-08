@@ -8,6 +8,7 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Same shape as the Add page — one row per party being paid, with a
 // per-row Payment Mode (bank/cash) column.
@@ -386,7 +387,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                     </button>
                   </td>
                   <td className="w-32 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
-                    {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalAmount)}
                   </td>
                   <td className="px-2 py-1 text-[10px] text-ink-subtle italic">
                     {validCount} valid entries

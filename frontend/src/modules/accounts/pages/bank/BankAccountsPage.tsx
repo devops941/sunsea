@@ -6,6 +6,7 @@ import apiClient from "../../../../api/apiClient";
 import { accountService } from "../../../../services/accountService";
 import { useListCache, invalidateCache, prefetchCache } from "../../../../hooks/useListCache";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 interface BankAccount {
   id: number;
@@ -147,7 +148,7 @@ const BankAccountsPage: React.FC = () => {
       });
       toast.success(
         openingBalance > 0
-          ? `Bank account "${newName}" created with opening balance ₹${openingBalance.toLocaleString("en-IN")}`
+          ? `Bank account "${newName}" created with opening balance ₹${formatAmount(openingBalance)}`
           : `Bank account "${newName}" created`
       );
       setShowAddForm(false);
@@ -246,7 +247,7 @@ const BankAccountsPage: React.FC = () => {
               {filterType === "cash" ? "Cash Balance" : filterType === "bank" ? "Bank Balance" : "Total Balance"}
             </span>
             <span className={`text-lg font-mono font-bold ${filteredBalance < 0 ? "text-red-500" : "text-ink"}`}>
-              ₹{Math.abs(filteredBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              ₹{formatAmount(Math.abs(filteredBalance))}
             </span>
           </div>
         </div>
@@ -301,7 +302,7 @@ const BankAccountsPage: React.FC = () => {
                 <p className={`text-base font-mono font-bold mt-0.5 ${
                   acc.currentBalance >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}>
-                  ₹{Math.abs(acc.currentBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  ₹{formatAmount(Math.abs(acc.currentBalance))}
                   {/* Bank/Cash = ASSET, natural side is Dr. Positive balance
                       shows (Dr), negative balance (overdraft/shortage) shows (Cr).
                       The reverse mapping was flipping every card's label. */}
@@ -312,9 +313,9 @@ const BankAccountsPage: React.FC = () => {
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-line-soft">
                 <div className="text-[11px] text-ink-subtle">
-                  <span className="text-emerald-500 font-semibold">↑ ₹{acc.totalDebit.toLocaleString("en-IN")}</span>
+                  <span className="text-emerald-500 font-semibold">↑ ₹{formatAmount(acc.totalDebit)}</span>
                   {" / "}
-                  <span className="text-red-500 font-semibold">↓ ₹{acc.totalCredit.toLocaleString("en-IN")}</span>
+                  <span className="text-red-500 font-semibold">↓ ₹{formatAmount(acc.totalCredit)}</span>
                 </div>
                 <FaArrowRight className="text-ink-subtle group-hover:text-blue-500 transition-colors w-2.5 h-2.5" />
               </div>
@@ -467,7 +468,7 @@ const BankAccountsPage: React.FC = () => {
                   await accountService.setBankOpeningBalance(editingBank.id, amt);
                   toast.success(
                     amt > 0
-                      ? `Opening balance of ${editingBank.name} set to ₹${amt.toLocaleString("en-IN")}`
+                      ? `Opening balance of ${editingBank.name} set to ₹${formatAmount(amt)}`
                       : `Opening balance of ${editingBank.name} cleared`
                   );
                   setEditingBank(null);

@@ -27,6 +27,7 @@ import {
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { useDetailCache, invalidateDetailCache, prefetchDetail } from "../../../../hooks/useDetailCache";
 import { useListCache } from "../../../../hooks/useListCache";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 type ViewMode = "one" | "group" | "all" | "selected";
 
@@ -2210,7 +2211,7 @@ export const LedgerStatementPage: React.FC = () => {
                     Opening
                   </span>
                   <span className="text-sm font-mono font-bold text-ink">
-                    ₹ {Math.abs(statement.openingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹ {formatAmount(Math.abs(statement.openingBalance))}
                     <span className="ml-1 text-[10px]">{statement.openingBalance >= 0 ? "Dr" : "Cr"}</span>
                   </span>
                 </div>
@@ -2219,7 +2220,7 @@ export const LedgerStatementPage: React.FC = () => {
                     Closing
                   </span>
                   <span className="text-sm font-mono font-black text-blue-500">
-                    ₹ {Math.abs(statement.closingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹ {formatAmount(Math.abs(statement.closingBalance))}
                     <span className="ml-1 text-[10px]">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                   </span>
                 </div>
@@ -2278,7 +2279,7 @@ export const LedgerStatementPage: React.FC = () => {
                               <td className={cell}></td>
                               <td className={`${cell} font-bold text-blue-400`}>Opening Balance</td>
                               <td className="px-2 py-1 text-right font-mono font-bold text-blue-400">
-                                {openingBal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatAmount(openingBal)}
                               </td>
                             </tr>
                           )}
@@ -2301,7 +2302,7 @@ export const LedgerStatementPage: React.FC = () => {
                                 {row.particulars}
                               </td>
                               <td className="px-2 py-1 text-right font-mono text-ink whitespace-nowrap">
-                                {(kind === "dr" ? row.debit : row.credit).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatAmount((kind === "dr" ? row.debit : row.credit))}
                               </td>
                             </tr>
                           ))}
@@ -2312,7 +2313,7 @@ export const LedgerStatementPage: React.FC = () => {
                             <td className={cell}></td>
                             <td className={`${cell} font-bold text-blue-500 text-right`}>Total</td>
                             <td className="px-2 py-1 text-right font-mono font-bold text-blue-500">
-                              {(total + (showOpening ? openingBal : 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatAmount((total + (showOpening ? openingBal : 0)))}
                             </td>
                           </tr>
                           {/* Closing Balance row — Cr or Dr side based on
@@ -2324,7 +2325,7 @@ export const LedgerStatementPage: React.FC = () => {
                               <td className={cell}></td>
                               <td className={`${cell} font-bold text-blue-400`}>Closing Balance</td>
                               <td className="px-2 py-1 text-right font-mono font-bold text-blue-400">
-                                {Math.abs(closingBal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatAmount(Math.abs(closingBal))}
                               </td>
                             </tr>
                           )}
@@ -2434,17 +2435,17 @@ export const LedgerStatementPage: React.FC = () => {
                           </td>
                         )}
                         <td className={`${cellBase} text-right font-mono text-ink whitespace-nowrap`}>
-                          {row.debit > 0 ? `₹ ${row.debit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+                          {row.debit > 0 ? `₹ ${formatAmount(row.debit)}` : "-"}
                         </td>
                         <td className={`${cellBase} text-right font-mono text-amber-500 font-semibold whitespace-nowrap`}>
-                          {row.credit > 0 ? `₹ ${row.credit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+                          {row.credit > 0 ? `₹ ${formatAmount(row.credit)}` : "-"}
                         </td>
                         <td className="px-2 py-1 text-right font-mono font-bold text-ink whitespace-nowrap">
                           {Math.abs(row.runningBalance) < 0.005 ? (
                             <>₹ 0.00</>
                           ) : (
                             <>
-                              ₹ {Math.abs(row.runningBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹ {formatAmount(Math.abs(row.runningBalance))}
                               <span className="ml-1 text-[10px] text-ink-subtle">{row.runningBalance >= 0 ? "Dr" : "Cr"}</span>
                             </>
                           )}
@@ -2504,9 +2505,9 @@ export const LedgerStatementPage: React.FC = () => {
                           rows.push(subRow(`${row.id}-item-${i}`, (
                             <>
                               {it.description}{"  "}
-                              {Number(it.quantity).toLocaleString("en-IN")}
-                              {it.uom ? ` ${it.uom}` : ""} @ ₹{Number(it.unitPrice).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              {" "}= ₹{Number(it.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatAmount(Number(it.quantity))}
+                              {it.uom ? ` ${it.uom}` : ""} @ ₹{formatAmount(Number(it.unitPrice))}
+                              {" "}= ₹{formatAmount(Number(it.amount))}
                             </>
                           )));
                         });
@@ -2515,7 +2516,7 @@ export const LedgerStatementPage: React.FC = () => {
                       if (meta?.billSundry && meta.billSundry.length > 0) {
                         meta.billSundry.forEach((bs: any, i: number) => {
                           rows.push(subRow(`${row.id}-bs-${i}`, (
-                            <>{bs.label} : ₹{Number(bs.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>
+                            <>{bs.label} : ₹{formatAmount(Number(bs.amount))}</>
                           )));
                         });
                       }
@@ -2644,7 +2645,7 @@ export const LedgerStatementPage: React.FC = () => {
                             </td>
                             <td className="px-2 py-1 text-right font-mono font-bold text-blue-500 text-[11px] whitespace-nowrap">
                               {bal ? (
-                                <>₹ {bal.closing.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {bal.closingSide}</>
+                                <>₹ {formatAmount(bal.closing)} {bal.closingSide}</>
                               ) : (
                                 <>—</>
                               )}
@@ -2673,13 +2674,13 @@ export const LedgerStatementPage: React.FC = () => {
               </span>
               <div className="flex items-center gap-4">
                 <span className="font-mono text-ink">
-                  Dr ₹ {filteredEntries.reduce((s, e) => s + e.debit, 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Dr ₹ {formatAmount(filteredEntries.reduce((s, e) => s + e.debit, 0))}
                 </span>
                 <span className="font-mono text-amber-500 font-semibold">
-                  Cr ₹ {filteredEntries.reduce((s, e) => s + e.credit, 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Cr ₹ {formatAmount(filteredEntries.reduce((s, e) => s + e.credit, 0))}
                 </span>
                 <span className="font-mono font-black text-blue-500">
-                  Closing ₹ {Math.abs(statement.closingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Closing ₹ {formatAmount(Math.abs(statement.closingBalance))}
                   <span className="ml-1 text-[10px] font-semibold">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                 </span>
               </div>

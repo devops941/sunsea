@@ -15,6 +15,7 @@ import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/Com
 import CustomButton from "../../../../components/ui/Button/Button";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import BusyItemsTable, { type BusyColumn } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 interface ReturnComponent {
   componentProductId: number;
@@ -174,7 +175,7 @@ export const SalesReturnCreatePage: React.FC = () => {
     const bal = Number(selectedCustomer.balanceAmount ?? selectedCustomer.netBalance ?? selectedCustomer.openingBalance ?? 0);
     const bType = (selectedCustomer.balanceType || selectedCustomer.openingBalanceType || "").toString().toUpperCase();
     const isDr = bType.startsWith("D");
-    const balLabel = bal ? `₹${bal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ${isDr ? "Dr" : "Cr"}` : "";
+    const balLabel = bal ? `₹${formatAmount(bal)} ${isDr ? "Dr" : "Cr"}` : "";
 
     return { name, group, grade: grade ? `${grade} Grade` : "", balLabel, isDr };
   }, [selectedCustomer]);
@@ -240,7 +241,7 @@ export const SalesReturnCreatePage: React.FC = () => {
       const bal = Number(c.balanceAmount ?? c.netBalance ?? c.openingBalance ?? 0);
       const bType = (c.balanceType || c.openingBalanceType || "").toString().toUpperCase();
       const isDr = bType.startsWith("D");
-      const balLabel = bal ? `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : "Cr"}` : "";
+      const balLabel = bal ? `₹${formatAmount(bal)} ${isDr ? "Dr" : "Cr"}` : "";
 
       return {
         value: String(c.id),

@@ -8,6 +8,7 @@ import { accountService, type AccountLedger } from "../../../../services/account
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Receipt = money coming IN. Direction reversed from Payment:
 //   creditLedgerId  = Customer / Income account that paid us ("Received From")
@@ -337,7 +338,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
                     </button>
                   </td>
                   <td className="w-32 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
-                    {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(totalAmount)}
                   </td>
                   <td className="px-2 py-1 text-[10px] text-ink-subtle italic">
                     {validCount} valid entries
