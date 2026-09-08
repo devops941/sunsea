@@ -512,6 +512,64 @@ class SalesInvoiceService {
     });
 
     if (!invoice) throw new ApiError(404, "Sales Invoice not found");
+
+    // Backfill opening/closing balance for invoices created before this field existed
+    if (invoice.openingBalance == null) {
+      try {
+        const customer = await prisma.customer.findUnique({ where: { id: invoice.customerId } });
+        if (customer) {
+          let currentNet = 0;
+          try {
+            const { receivableService } = require("../accounts/receivable.service");
+            const summaries = await receivableService.getReceivableSummaries({ customerId: invoice.customerId });
+            if (summaries && summaries.length > 0) {
+              currentNet = Number(summaries[0].netBalance || 0);
+            } else {
+              const opBal = Number(customer.openingBalance || 0);
+              const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+              currentNet = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+            }
+          } catch {
+            const opBal = Number(customer.openingBalance || 0);
+            const opType = ((customer as any).openingBalanceType || "DEBIT").toUpperCase();
+            currentNet = opType === "CREDIT" ? -Math.abs(opBal) : Math.abs(opBal);
+          }
+
+          // Sum all sales invoices for this customer to find balance before this invoice
+          const allInvoices = await prisma.salesInvoice.findMany({
+            where: { customerId: invoice.customerId },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, grandTotal: true, createdAt: true },
+          });
+
+          // Calculate total of invoices created after this one (they are included in currentNet)
+          let totalAfterThis = 0;
+          let foundThis = false;
+          for (const inv of allInvoices) {
+            if (inv.id === invoice.id) {
+              foundThis = true;
+              continue;
+            }
+            if (foundThis) {
+              totalAfterThis += Number(inv.grandTotal || 0);
+            }
+          }
+
+          const openingBalance = currentNet - Number(invoice.grandTotal || 0) - totalAfterThis;
+          const closingBalance = openingBalance + Number(invoice.grandTotal || 0);
+
+          // Persist so we don't recompute next time
+          await prisma.salesInvoice.update({
+            where: { id: invoice.id },
+            data: { openingBalance, closingBalance },
+          }).catch(() => {});
+
+          (invoice as any).openingBalance = openingBalance;
+          (invoice as any).closingBalance = closingBalance;
+        }
+      } catch { /* non-critical */ }
+    }
+
     return serializeInvoice(invoice);
   }
 
