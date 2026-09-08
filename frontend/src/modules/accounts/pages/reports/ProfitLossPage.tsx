@@ -8,6 +8,7 @@ import {
 } from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { formatAmount } from "../../../../utils/pricingUtils";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
 
 // ─── Backend response shape ─────────────────────────────────────────
@@ -66,9 +67,10 @@ const saveOptions = (opts: Options) => {
 
 const fmt = (n: number, scale = 1) => {
   const v = n / scale;
+  if (scale === 1) return formatAmount(Math.abs(v));
   return Math.abs(v).toLocaleString("en-IN", {
-    minimumFractionDigits: scale === 1 ? 2 : 0,
-    maximumFractionDigits: scale === 1 ? 2 : 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 };
 
@@ -357,9 +359,9 @@ const ProfitLossPage: React.FC = () => {
       const R = rightRows[i];
       lines.push([
         L ? L.name : "",
-        L ? (L.balance / options.scaleFactor).toFixed(2) : "",
+        L ? formatAmount(L.balance / options.scaleFactor) : "",
         R ? R.name : "",
-        R ? (R.balance / options.scaleFactor).toFixed(2) : "",
+        R ? formatAmount(R.balance / options.scaleFactor) : "",
       ]);
     }
     const csv = lines.map((r) => r.join(",")).join("\n");

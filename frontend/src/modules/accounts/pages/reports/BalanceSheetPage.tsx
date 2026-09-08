@@ -9,6 +9,7 @@ import {
 import apiClient from "../../../../api/apiClient";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { formatAmount } from "../../../../utils/pricingUtils";
 
 // ─── Types (backend response shape) ──────────────────────────────────
 interface BSItem {
@@ -64,13 +65,14 @@ const saveOptions = (opts: Options) => {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(opts)); } catch { /* ignore */ }
 };
 
-// Divide amount by scale factor for display; keep 2 decimals when scale=1,
+// Divide amount by scale factor for display; use formatAmount when scale=1,
 // else round to whole units (Busy convention for scaled reports).
 const fmt = (n: number, scale: number = 1) => {
   const v = n / scale;
+  if (scale === 1) return formatAmount(Math.abs(v));
   return Math.abs(v).toLocaleString("en-IN", {
-    minimumFractionDigits: scale === 1 ? 2 : 0,
-    maximumFractionDigits: scale === 1 ? 2 : 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 };
 
@@ -292,13 +294,13 @@ const BalanceSheetPage: React.FC = () => {
       const r = view.rightGroups[i];
       lines.push([
         l ? l.group : "",
-        l ? (l.groupTotal / options.scaleFactor).toFixed(2) : "",
+        l ? formatAmount(l.groupTotal / options.scaleFactor) : "",
         r ? r.group : "",
-        r ? (r.groupTotal / options.scaleFactor).toFixed(2) : "",
+        r ? formatAmount(r.groupTotal / options.scaleFactor) : "",
       ]);
     }
     lines.push([]);
-    lines.push(["Total", (view.leftTotal / options.scaleFactor).toFixed(2), "Total", (view.rightTotal / options.scaleFactor).toFixed(2)]);
+    lines.push(["Total", formatAmount(view.leftTotal / options.scaleFactor), "Total", formatAmount(view.rightTotal / options.scaleFactor)]);
     const csv = lines.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
