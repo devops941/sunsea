@@ -332,7 +332,7 @@ const MachineList: React.FC = () => {
                                 width: "120px",
                                 align: "center",
                                 render: (item) => (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         <ViewButton onClick={() => { setSelectedMachine(item); setShowViewModal(true); }} />
                                         {canEditMachine && <EditButton onClick={() => handleOpenEdit(item)} />}
                                         {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}

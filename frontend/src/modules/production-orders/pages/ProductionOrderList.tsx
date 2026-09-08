@@ -283,6 +283,10 @@ const ProductionOrderList: React.FC = () => {
         onRefresh: () => fetchCombinedData(),
         onDelete: () => setShowDeleteModal(true),
         onNew: () => can("production_orders.create") && navigate("/production-orders/create"),
+        onExport: () => {
+            const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+            exportBtn?.click();
+        },
     });
 
     useSocketSync("productionOrder", undefined, fetchCombinedData);
@@ -490,7 +494,7 @@ const ProductionOrderList: React.FC = () => {
             header: "ACTIONS",
             width: "160px",
             render: (item: any) => (
-                <div className="flex items-center gap-2 justify-start">
+                <div className="flex items-center gap-2 justify-start" onClick={(e) => e.stopPropagation()}>
 
                     {/* PENDING_PLANNING with no PO yet → Create Production Order */}
                     {item.status === "PENDING_PLANNING" && !item.primaryPO && can("production_orders.create") && (
@@ -584,7 +588,6 @@ const ProductionOrderList: React.FC = () => {
                 title: "Order Information",
                 fields: [
                     { label: "Order No", value: fullOrder?.productionOrderId || selectedItem.productionOrderId },
-                    { label: "Priority", value: fullOrder?.priority || selectedItem.priority || "-" },
                 ],
             },
             {
@@ -592,7 +595,6 @@ const ProductionOrderList: React.FC = () => {
                 fields: [
                     { label: "Order Date", value: formatDate(fullOrder?.orderDate || selectedItem.orderDate) },
                     { label: "Due Date", value: formatDate(fullOrder?.dueDate || selectedItem.dueDate) },
-                    { label: "Order Type", value: fullOrder?.orderType || selectedItem.orderType || "-" },
                     { label: "Remarks", value: fullOrder?.remarks || selectedItem.remarks || "N/A" },
                 ],
             },
@@ -752,6 +754,7 @@ const ProductionOrderList: React.FC = () => {
                     setShowViewModal(false);
                     setSelectedItem(null);
                     setFullOrder(null);
+                    setTimeout(() => tableRef.current?.focus(), 100);
                 }}
                 modalTitle="Production Order Details"
                 avatarText={selectedItem ? "PO" : ""}
@@ -765,7 +768,7 @@ const ProductionOrderList: React.FC = () => {
             {/* DELETE PO MODAL */}
             <CommonConfirmModal
                 show={showDeleteModal}
-                onHide={() => setShowDeleteModal(false)}
+                onHide={() => { setShowDeleteModal(false); setTimeout(() => tableRef.current?.focus(), 100); }}
                 onConfirm={handleDeleteConfirm}
                 title="Delete Draft Production Order"
                 isDangerous={true}

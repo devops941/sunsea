@@ -71,7 +71,7 @@ const dashboardController = {
           orderBy: { createdAt: "desc" },
         }).catch(() => []),
 
-        // Products — id, name, code, minimumQty, rate, uom, category
+        // Products — id, name, code, minimumQty, rate, uom, category, finishedGoodsStocks
         prisma.product.findMany({
           where: { isActive: true },
           select: {
@@ -82,6 +82,12 @@ const dashboardController = {
             rate: true,
             uom: { select: { id: true, uomName: true, uomCode: true } },
             category: { select: { id: true, name: true } },
+            finishedGoodsStocks: {
+              select: {
+                onHandQty: true,
+                storeId: true,
+              },
+            },
           },
           orderBy: { productName: "asc" },
         }).catch(() => []),
@@ -150,23 +156,37 @@ const dashboardController = {
           },
         }).catch(() => []),
 
-        // Daily Plans
+        // Daily Plans (exclude DRAFT status)
         prisma.dailyProductionPlan.findMany({
+          where: {
+            status: { not: "DRAFT" },
+          },
           select: {
             dailyPlanId: true,
             productionDate: true,
             status: true,
             productionOrderId: true,
+            plannedQty: true,
+            priority: true,
             machine: { select: { machineName: true } },
             shift: { select: { shiftName: true } },
             productionOrder: {
               select: {
-                productItem: { select: { productName: true } }
-              }
-            }
+                productionOrderId: true,
+                targetQty: true,
+                producedQty: true,
+                productItem: { select: { productName: true } },
+              },
+            },
+            weeklyMachineProgram: {
+              select: {
+                machine: { select: { machineName: true } },
+                shift: { select: { shiftName: true } },
+              },
+            },
           },
           orderBy: { productionDate: "desc" },
-          take: 50,
+          take: 200,
         }).catch(() => []),
 
         // Sales Invoices for pending amount and trend chart

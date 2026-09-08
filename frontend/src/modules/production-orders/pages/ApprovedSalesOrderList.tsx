@@ -143,7 +143,6 @@ const ApprovedSalesOrderList: React.FC = () => {
                                     <th>ORDER NO</th>
                                     <th>ORDER DATE</th>
                                     <th>END DATE</th>
-                                    <th>PRIORITY</th>
                                     <th>CUSTOMER</th>
                                     <th>REMARKS</th>
                                     <th>PRODUCTION STATUS</th>
@@ -153,7 +152,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={10} className="text-center p-4">
+                                        <td colSpan={9} className="text-center p-4">
                                             <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
                                             Loading approved sales orders...
                                         </td>
@@ -166,7 +165,6 @@ const ApprovedSalesOrderList: React.FC = () => {
                                                 <td className="master-data-cell">{order.orderNo}</td>
                                                 <td className="master-data-cell">{formatDate(order.orderDate)}</td>
                                                 <td className="master-data-cell">{(order as any).expectedCompletionDate ? formatDate((order as any).expectedCompletionDate) : "-"}</td>
-                                                <td className="master-data-cell">{order.dispatchType || "-"}</td>
                                                 <td className="master-data-cell">{order.customer?.firmName || "-"}</td>
                                                 <td className="master-data-cell">{order.remarks || "-"}</td>
                                                 <td className="master-data-cell">
@@ -190,7 +188,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={10} className="text-center p-4">
+                                        <td colSpan={9} className="text-center p-4">
                                             No approved sales orders found.
                                         </td>
                                     </tr>

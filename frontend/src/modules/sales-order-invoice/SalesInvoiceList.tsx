@@ -423,7 +423,7 @@ const SalesInvoiceList: React.FC = () => {
             header: "ACTIONS",
             width: "250px",
             render: (item) => (
-                <div className="flex justify-center items-center gap-1.5 whitespace-nowrap">
+                <div className="flex justify-center items-center gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     {canSendWhatsappEmail && <EmailButton onClick={() => handleOpenEmailModal(item)} />}
                     {canSendWhatsappEmail && <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />}
                     <ViewButton onClick={() => handleOpenView(item)} />

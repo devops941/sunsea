@@ -35,11 +35,22 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [focusedRowIndex, setFocusedRowIndex] = useState<number>(-1);
 
     const formRef = useRef<HTMLDivElement>(null);
+    const tableBodyRef = useRef<HTMLTableSectionElement>(null);
+    const datePickerRef = useRef<HTMLDivElement>(null);
     const isDirtyRef = useRef(false);
     const saveConfirmOpenRef = useRef(false);
     const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    // Auto-focus Week Start Date input on mount
+    useEffect(() => {
+        const t = setTimeout(() => {
+            datePickerRef.current?.querySelector<HTMLInputElement>("input:not([disabled])")?.focus();
+        }, 200);
+        return () => clearTimeout(t);
+    }, []);
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
@@ -51,18 +62,21 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
-            if (saveConfirmOpenRef.current) return;
+            if (document.querySelector("[data-select-portal]")) return;
             e.preventDefault();
             e.stopPropagation();
-            if (isDirtyRef.current) {
+            if (saveConfirmOpenRef.current) {
+                setSaveConfirmOpen(false);
+                setTimeout(() => lastFocusedRef.current?.focus(), 50);
+            } else if (isDirtyRef.current) {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
                 navigate("/weekly-machine-schedules");
             }
         };
-        document.addEventListener("keydown", handleEscape, true);
-        return () => document.removeEventListener("keydown", handleEscape, true);
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
     }, [navigate]);
 
     useEffect(() => {
@@ -138,10 +152,10 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         });
     }, [productionOrders, alreadyScheduled]);
 
-    const handleToggleSelect = (poId: string) => {
+    const handleToggleSelect = useCallback((poId: string) => {
         setSelectedOrders(prev => ({ ...prev, [poId]: !prev[poId] }));
         setIsDirty(true);
-    };
+    }, []);
 
     const handleSubmit = async () => {
         const selectedIds = Object.keys(selectedOrders).filter(id => selectedOrders[id]);
@@ -193,9 +207,56 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
     const selectedCount = Object.values(selectedOrders).filter(Boolean).length;
 
+    // When week is selected and orders exist → highlight row 0 and focus table
+    // When week is cleared → reset
+    useEffect(() => {
+        if (weekStartDate && displayOrders.length > 0) {
+            const active = document.activeElement as HTMLElement | null;
+            if (active instanceof HTMLInputElement || active instanceof HTMLSelectElement) {
+                active.blur();
+            }
+            setFocusedRowIndex(0);
+            const t = setTimeout(() => tableBodyRef.current?.focus(), 100);
+            return () => clearTimeout(t);
+        } else {
+            setFocusedRowIndex(-1);
+        }
+    }, [weekStartDate, displayOrders.length]);
+
+    // Table keyboard navigation — arrow keys + Space to select
+    useEffect(() => {
+        const handleTableKey = (e: KeyboardEvent) => {
+            const active = document.activeElement as HTMLElement | null;
+            const inField = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement || active?.isContentEditable;
+            if (inField) return;
+            if (!tableBodyRef.current || displayOrders.length === 0) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setFocusedRowIndex(i => (i < 0 ? 0 : Math.min(i + 1, displayOrders.length - 1)));
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setFocusedRowIndex(i => Math.max(i - 1, 0));
+            } else if ((e.key === " " || e.key === "Enter") && focusedRowIndex >= 0) {
+                e.preventDefault();
+                const po = displayOrders[focusedRowIndex];
+                if (po) handleToggleSelect(po.productionOrderId);
+            }
+        };
+        window.addEventListener("keydown", handleTableKey);
+        return () => window.removeEventListener("keydown", handleTableKey);
+    }, [focusedRowIndex, displayOrders, handleToggleSelect]);
+
+    // Scroll focused row into view
+    useEffect(() => {
+        if (focusedRowIndex < 0 || !tableBodyRef.current) return;
+        const rows = tableBodyRef.current.querySelectorAll<HTMLTableRowElement>("tr[data-order-row]");
+        rows[focusedRowIndex]?.scrollIntoView({ block: "nearest" });
+    }, [focusedRowIndex]);
+
     return (
         <>
-        <div ref={formRef} onKeyDown={handleFormKeyDown} onInput={() => setIsDirty(true)} className="w-full bg-card rounded-2xl shadow-sm border border-line" style={{ maxWidth: 1200 }}>
+        <div ref={formRef} onKeyDown={handleFormKeyDown} onInput={() => setIsDirty(true)} data-escape-guarded className="w-full bg-card rounded-2xl shadow-sm border border-line" style={{ maxWidth: 1200 }}>
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 border-b border-line">
                 <div>
@@ -208,6 +269,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
             {/* Date Filters */}
             <div className="p-6 border-b border-line bg-card-2/40 overflow-visible">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+                    <div ref={datePickerRef}>
                     <DatePickerCalendar
                         label="Week Start Date"
                         name="weekStartDate"
@@ -215,6 +277,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                         required
                         onChange={(e: any) => handleDateChange(e)}
                     />
+                    </div>
                     <DatePickerCalendar
                         label="Week End Date"
                         name="weekEndDate"
@@ -242,17 +305,25 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                         <th className="px-4 py-3">Production Order</th>
                                         <th className="px-4 py-3">Product</th>
                                         <th className="px-4 py-3">Qty</th>
-                                        <th className="px-4 py-3">Priority / Status</th>
+                                        <th className="px-4 py-3">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-line-soft">
-                                    {displayOrders.map((po: any) => {
+                                <tbody ref={tableBodyRef} tabIndex={-1} className="divide-y divide-line-soft outline-none">
+                                    {displayOrders.map((po: any, rowIdx: number) => {
                                         const isSelected = !!selectedOrders[po.productionOrderId];
+                                        const isFocused = rowIdx === focusedRowIndex;
                                         return (
                                             <tr
                                                 key={po.productionOrderId}
-                                                className={`hover:bg-card-2 transition-colors cursor-pointer ${isSelected ? "bg-primary/10 border-l-4 border-l-primary" : ""}`}
-                                                onClick={() => handleToggleSelect(po.productionOrderId)}
+                                                data-order-row
+                                                className={`transition-colors cursor-pointer ${
+                                                    isFocused
+                                                        ? "bg-primary/8 ring-1 ring-inset ring-primary/30"
+                                                        : isSelected
+                                                            ? "bg-primary/10 border-l-4 border-l-primary"
+                                                            : "hover:bg-card-2"
+                                                }`}
+                                                onClick={() => { setFocusedRowIndex(rowIdx); handleToggleSelect(po.productionOrderId); }}
                                             >
                                                 <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                     <input
@@ -269,7 +340,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                                     {Number(po.targetQty)} <span className="text-ink-muted text-xs">PCS</span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <StatusBadge status={po.priority || 'MEDIUM'} />
+                                                    <StatusBadge status={po.status || 'CREATED'} />
                                                 </td>
                                             </tr>
                                         );

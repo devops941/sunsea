@@ -243,7 +243,7 @@ const SalesProductList: React.FC = () => {
             header: "ACTIONS",
             align: "left",
             render: (item) => (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {can("sales_products.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
                     {can("sales_products.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                 </div>

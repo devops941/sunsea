@@ -332,7 +332,7 @@ const SupplierList: React.FC = () => {
                                 {
                                     header: "ACTIONS",
                                     render: (supplier) => (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                             <ViewButton onClick={() => handleOpenView(supplier)} />
                                             {canEditSupplier && <EditButton onClick={() => handleEdit(supplier)} />}
                                             {canViewPricing && <PricingButton onClick={() => handleViewPricing(supplier)} />}

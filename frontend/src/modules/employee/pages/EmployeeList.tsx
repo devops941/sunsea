@@ -331,7 +331,7 @@ const Employeelist: React.FC = () => {
       width: "120px",
       align: "center",
       render: (emp) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {canView && <ViewButton onClick={() => handleView(emp)} />}
           {canEdit && <EditButton onClick={() => handleEdit(emp)} />}
           {canDelete && <DeleteButton onClick={() => triggerDelete(emp.id)} />}
