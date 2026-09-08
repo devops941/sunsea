@@ -686,7 +686,7 @@ const SalesInvoiceView: React.FC = () => {
                                 </div>
 
                                 {/* Customer Balance */}
-                                {invoice.openingBalance != null && (
+                                {(invoice.openingBalance != null || invoice.closingBalance != null) && (
                                     <div className="border-t border-black">
                                         {(() => {
                                             const ob = Number(invoice.openingBalance ?? 0);
