@@ -497,7 +497,7 @@ const DepartmentList: React.FC = () => {
         {
             header: "Actions",
             render: (dept) => (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {canViewDepartment && <ViewButton onClick={() => handleOpenView(dept)} />}
                     {canEditDepartment && (<EditButton onClick={() => handleOpenEdit(dept)} />)}
                     {canDeleteDepartment && (<DeleteButton onClick={() => triggerDelete(dept.id)} />)}

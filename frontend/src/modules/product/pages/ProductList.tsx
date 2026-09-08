@@ -435,7 +435,7 @@ const ProductList: React.FC = () => {
         {
             header: "Actions",
             render: (product) => (
-                <div className="table-action-group w-full justify-end">
+                <div className="table-action-group w-full justify-end" onClick={(e) => e.stopPropagation()}>
                     <ViewButton onClick={() => handleView(product)} />
                     {can("products.edit") && <EditButton onClick={() => handleEdit(product)} />}
                     {can("products.edit") && <IconButton icon={FaCog} variant="primary" title="Capacity Settings" onClick={() => openCapModal(product)} />}

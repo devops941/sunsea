@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { z } from "zod";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -29,6 +30,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { usePermission } from "../../../hooks/usePermission";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -58,6 +60,8 @@ const DailyPlanCreate: React.FC = () => {
   const { can } = usePermission();
   const { id: editId } = useParams<{ id?: string }>();
   const isEdit = !!editId;
+  const formRef = useRef<HTMLFormElement>(null);
+  const handleFormKeyDown = useFormKeyboardNav(formRef as any);
 
   // Redux
   const { data: machines } = useAppSelector((state) => state.machines);
@@ -118,7 +122,64 @@ const DailyPlanCreate: React.FC = () => {
   const [machineOeeSummary, setMachineOeeSummary] = useState<any>(null);
   const [loadingOee, setLoadingOee] = useState(false);
 
-  useFormShortcuts({});
+  // ── Dirty / discard confirm ───────────────────────────────────────────────
+  const [isDirty, setIsDirty] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const isDirtyRef = useRef(false);
+  const showDiscardRef = useRef(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { showDiscardRef.current = showDiscardModal; }, [showDiscardModal]);
+
+  const goBack = useCallback(() => navigate("/daily-machine-planning"), [navigate]);
+
+  const openDiscardModal = useCallback(() => {
+    lastFocusedRef.current = document.activeElement as HTMLElement;
+    setShowDiscardModal(true);
+  }, []);
+
+  const handleResume = useCallback(() => {
+    setShowDiscardModal(false);
+    setTimeout(() => lastFocusedRef.current?.focus(), 50);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    setShowDiscardModal(false);
+    goBack();
+  }, [goBack]);
+
+  const handleSaveAndLeave = useCallback(() => {
+    setShowDiscardModal(false);
+    if (!isSubmitting) handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED");
+  }, [isSubmitting, isEdit, status]);
+
+  const handleBackClick = useCallback(() => {
+    if (isDirtyRef.current) openDiscardModal();
+    else goBack();
+  }, [openDiscardModal, goBack]);
+
+  useFormShortcuts({
+    onSave: () => { if (!isSubmitting) handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED"); },
+  });
+
+  // Esc — canonical pattern (matches CustomerFormPage)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal]")) return; // let open dropdowns close first
+      e.preventDefault();
+      e.stopPropagation();
+      if (showDiscardRef.current) {
+        handleResume();
+      } else if (isDirtyRef.current) {
+        openDiscardModal();
+      } else {
+        goBack();
+      }
+    };
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
+  }, [handleResume, openDiscardModal, goBack]);
 
   useEffect(() => {
     if (!productionDate || !machineId) {
@@ -417,6 +478,7 @@ const DailyPlanCreate: React.FC = () => {
       } else if (plan.operators && Array.isArray(plan.operators)) {
         setSelectedOperators(plan.operators.map((op: any) => (op.id || op.employeeId)?.toString()).filter(Boolean));
       }
+      setIsDirty(false);
     }).catch(() => toast.error("Failed to load plan for editing"));
   }, [isEdit, editId]);
 
@@ -685,6 +747,7 @@ const DailyPlanCreate: React.FC = () => {
           );
         }, 1200);
       }
+      setIsDirty(false);
       navigate("/daily-machine-planning");
     } catch (err: any) {
       let errMsg = "Failed to save daily plan";
@@ -705,9 +768,9 @@ const DailyPlanCreate: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-[1024px] xl:mr-auto">
-    <form onSubmit={(e) => e.preventDefault()} className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
+    <form ref={formRef} onKeyDown={handleFormKeyDown} onInput={() => setIsDirty(true)} onChange={() => setIsDirty(true)} onSubmit={(e) => e.preventDefault()} data-escape-guarded className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 px-4 py-3 border-b border-line">
         <div>
           <h2 className="text-xl font-bold text-ink">
             {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
@@ -715,6 +778,7 @@ const DailyPlanCreate: React.FC = () => {
         </div>
         <BackButton
           text="Back to Daily Planning"
+          onClick={handleBackClick}
         />
       </div>
 
@@ -756,20 +820,21 @@ const DailyPlanCreate: React.FC = () => {
 
 
       {/* ─── Form Body ─── */}
-      <div className="p-5 lg:p-6 space-y-5">
+      <div className="p-3 lg:p-4 space-y-3">
 
         {/* Section 1: Weekly Program */}
         <div>
-          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-3">Weekly Program</h6>
+          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-2">Weekly Program</h6>
           <SelectInput
             label="Weekly Program"
             required
             disabled={isEdit || !!(location.state as any)?.weeklyProgramId}
             value={weeklyProgramId}
-            onChange={(e: any) => setWeeklyProgramId(e.target.value)}
+            onChange={(e: any) => { setWeeklyProgramId(e.target.value); setIsDirty(true); }}
             error={formErrors.weeklyProgramId}
             defaultOptionLabel="— Select Weekly Program —"
             horizontal
+            data-nav
             options={weeklyPrograms.map((wp: any) => {
               const po = wp.productionOrder;
               const poTargetQty = Number(wp.poTargetQty ?? po?.targetQty ?? 0);
@@ -796,8 +861,8 @@ const DailyPlanCreate: React.FC = () => {
 
           {/* Auto-filled info banner */}
           {selectedWeeklyProg && (
-            <div className="rounded-xl p-3 mt-3 bg-emerald-500/10 border border-emerald-500/20 text-ink">
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="rounded-xl p-2 mt-2 bg-emerald-500/10 border border-emerald-500/20 text-ink">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
                 <div>
                   <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">Production Order</div>
                   <div className="font-bold text-ink text-sm">{selectedWeeklyProg.productionOrderId}</div>
@@ -838,25 +903,27 @@ const DailyPlanCreate: React.FC = () => {
 
         {/* Section 2: Schedule Details */}
         <div>
-          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-3">Schedule Details</h6>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-8 xl:gap-x-10 gap-y-3 md:gap-y-4">
+          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-2">Schedule Details</h6>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-6 gap-y-2 md:gap-y-2.5">
 
             <DatePickerCalendar
               label="Production Date"
               name="productionDate"
               required
               horizontal
+              data-nav
               value={productionDate}
               error={formErrors.productionDate}
-              onChange={(e: any) => setProductionDate(e.target.value)}
+              onChange={(e: any) => { setProductionDate(e.target.value); setIsDirty(true); }}
             />
 
             <SelectInput
               label="Machine"
               required
               horizontal
+              data-nav
               value={machineId}
-              onChange={(e: any) => setMachineId(e.target.value)}
+              onChange={(e: any) => { setMachineId(e.target.value); setIsDirty(true); }}
               error={formErrors.machineId}
               defaultOptionLabel="— Select Machine —"
               options={allowedMachines.map((m: any) => ({
@@ -870,8 +937,9 @@ const DailyPlanCreate: React.FC = () => {
                 label="Shift"
                 required
                 horizontal
+                data-nav
                 value={shiftId}
-                onChange={(e: any) => setShiftId(e.target.value)}
+                onChange={(e: any) => { setShiftId(e.target.value); setIsDirty(true); }}
                 error={formErrors.shiftId}
                 defaultOptionLabel="— Select Shift —"
                 options={shifts.map((s: any) => {
@@ -915,6 +983,8 @@ const DailyPlanCreate: React.FC = () => {
                   label="Operators"
                   name="operators"
                   required={true}
+                  horizontal
+                  data-nav
                   options={availableOperators.map((op: any) => ({
                     value: (op.id || op.employeeId)?.toString(),
                     label: op.fullName + (op.empCode ? ` (${op.empCode})` : "") + (op.role?.name ? ` • ${op.role.name}` : ""),
@@ -923,6 +993,7 @@ const DailyPlanCreate: React.FC = () => {
                   onChange={(_name, vals) => {
                     setSelectedOperators(vals);
                     setAssignmentError(null);
+                    setIsDirty(true);
                   }}
                   placeholder={availableOperators.length === 0 ? "No operators assigned to this machine..." : "-- Select Assigned Operators --"}
                   error={formErrors.selectedOperators || (selectedOperators.length === 0 && assignmentError ? assignmentError : undefined)}
@@ -941,7 +1012,7 @@ const DailyPlanCreate: React.FC = () => {
                 label="Status"
                 horizontal
                 value={status}
-                onChange={(e: any) => setStatus(e.target.value)}
+                onChange={(e: any) => { setStatus(e.target.value); setIsDirty(true); }}
                 options={[
                   { value: "DRAFT", label: "Draft" },
                   { value: "PLANNED", label: "Planned" },
@@ -958,8 +1029,8 @@ const DailyPlanCreate: React.FC = () => {
 
         {/* Section 3: Quantity & Time */}
         <div>
-          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-3">Quantity & Time</h6>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 md:gap-x-8 xl:gap-x-10 gap-y-3 md:gap-y-4">
+          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-2">Quantity & Time</h6>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-6 gap-y-2 md:gap-y-2.5">
 
             <div>
               <TextInput
@@ -968,10 +1039,11 @@ const DailyPlanCreate: React.FC = () => {
                 type="number"
                 required
                 horizontal
+                data-nav
                 value={plannedQty}
                 error={formErrors.plannedQty}
                 placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
-                onChange={(e) => setPlannedQty(e.target.value)}
+                onChange={(e) => { setPlannedQty(e.target.value); setIsDirty(true); }}
               />
               {machineId && machineProductCapacity != null && (
                 <div className="text-[11px] text-primary font-semibold mt-1 ml-[148px]">
@@ -1004,10 +1076,11 @@ const DailyPlanCreate: React.FC = () => {
                 name="plannedHours"
                 type="number"
                 horizontal
+                data-nav
                 value={plannedHours}
                 error={formErrors.plannedHours}
                 placeholder="Auto-filled from shift"
-                onChange={(e) => setPlannedHours(e.target.value)}
+                onChange={(e) => { setPlannedHours(e.target.value); setIsDirty(true); }}
               />
               <div className="flex items-center gap-1.5 mt-1.5 ml-[148px] text-xs text-ink-muted font-medium">
                 <FaInfoCircle className="text-primary text-xs" />
@@ -1020,8 +1093,9 @@ const DailyPlanCreate: React.FC = () => {
                 ? "Priority (auto)"
                 : "Priority"}
               horizontal
+              data-nav
               value={priority}
-              onChange={(e: any) => setPriority(e.target.value)}
+              onChange={(e: any) => { setPriority(e.target.value); setIsDirty(true); }}
               options={[
                 { value: "LOW", label: "LOW" },
                 { value: "MEDIUM", label: "MEDIUM" },
@@ -1035,8 +1109,9 @@ const DailyPlanCreate: React.FC = () => {
                 label="Narration"
                 name="remarks"
                 rows={2}
+                data-nav
                 value={remarks}
-                onChange={(e: any) => setRemarks(e.target.value)}
+                onChange={(e: any) => { setRemarks(e.target.value); setIsDirty(true); }}
                 placeholder="Optional notes for this daily production plan..."
               />
             </div>
@@ -1045,7 +1120,7 @@ const DailyPlanCreate: React.FC = () => {
       </div>
 
       {/* ─── Action Buttons ─── */}
-      <div className="flex justify-end items-center gap-3 px-5 py-4 border-t border-line bg-card-2">
+      <div className="flex justify-end items-center gap-3 px-4 py-3 border-t border-line bg-card-2">
         <CustomButton
           text="Cancel"
           variant="secondary"
@@ -1077,6 +1152,21 @@ const DailyPlanCreate: React.FC = () => {
       </div>
 
     </form>
+
+    <CommonConfirmModal
+      show={showDiscardModal}
+      onHide={handleResume}
+      onCancel={handleDiscard}
+      onConfirm={handleSaveAndLeave}
+      title="Unsaved Changes"
+      message="You have unsaved changes. What would you like to do?"
+      cancelText="Discard"
+      cancelVariant="danger"
+      confirmText="Save & Leave"
+      confirmVariant="success"
+      confirmIcon={FaSave}
+      warningText=""
+    />
     </div>
   );
 };

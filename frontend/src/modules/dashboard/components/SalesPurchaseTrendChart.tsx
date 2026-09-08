@@ -18,6 +18,7 @@ interface SalesPurchaseTrendChartProps {
   salesInvoices?: any[];
   purchaseInvoices?: any[];
   externalPeriod?: PeriodKey;
+  loading?: boolean;
 }
 
 const trendChartConfig = {
@@ -58,6 +59,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
   salesInvoices = [],
   purchaseInvoices = [],
   externalPeriod,
+  loading = false,
 }) => {
   const [internalPeriod, setInternalPeriod] = useState<PeriodKey>(() => {
     try {
@@ -334,7 +336,23 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
 
         {/* Dynamic Multi-Type Visualization Container */}
         <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col">
-          {chartType === "bar" ? (
+          {loading ? (
+            <div className="h-full flex-1 flex flex-col justify-between p-4 animate-pulse">
+              <div className="flex items-end justify-between gap-3 h-[240px] px-4 pt-4 border-b border-line-soft/40">
+                {[65, 40, 80, 55, 90, 70, 85].map((h, i) => (
+                  <div key={i} className="flex-1 flex items-end justify-center gap-1.5 h-full">
+                    <div className="w-full max-w-[20px] bg-sky-500/20 rounded-t" style={{ height: `${h}%` }} />
+                    <div className="w-full max-w-[20px] bg-rose-500/20 rounded-t" style={{ height: `${Math.max(20, h - 25)}%` }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between px-4 pt-3 text-[10px] text-ink-subtle">
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((_, idx) => (
+                  <span key={idx} className="h-3 w-6 bg-white/10 rounded" />
+                ))}
+              </div>
+            </div>
+          ) : chartType === "bar" ? (
             /* 1. COLUMN BAR CHART */
             <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 h-full flex-1 min-h-0 flex flex-col">
               <ChartContainer config={trendChartConfig} className="min-w-[460px] w-full h-full flex-1 !aspect-auto">

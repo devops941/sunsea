@@ -396,7 +396,7 @@ const MachineAssignmentList: React.FC = () => {
               {
                 header: "ACTIONS",
                 render: (item) => (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <ViewButton onClick={() => setViewModalData(item)} />
                     {canEditAssignment && <EditButton onClick={() => handleOpenEdit(item)} />}
                     {canDeleteAssignment && (

@@ -436,7 +436,7 @@ const CategoryList: React.FC = () => {
                   width: "120px",
                   align: "center",
                   render: (item) => (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <ViewButton onClick={() => handleOpenView(item)} />
                       {canEdit && <EditButton onClick={() => handleOpenEdit(item)} />}
                       {canDelete && <DeleteButton onClick={() => triggerDelete(item.id)} />}

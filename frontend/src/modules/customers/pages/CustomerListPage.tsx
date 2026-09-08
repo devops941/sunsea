@@ -548,7 +548,7 @@ const CustomerListPage: React.FC = () => {
               {
                 header: "ACTIONS",
                 render: (customer) => (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <ViewButton onClick={() => handleView(customer)} />
                     {canEditCustomer   && <EditButton   onClick={() => handleEdit(customer)} />}
                     {canDeleteCustomer && <DeleteButton onClick={() => triggerDelete(customer.id)} />}

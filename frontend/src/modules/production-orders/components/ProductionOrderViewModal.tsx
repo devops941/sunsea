@@ -159,14 +159,6 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         <div className="font-semibold text-slate-800">{formatDate(fullOrder?.dueDate || order.dueDate)}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Priority</div>
-                                        <div className="font-semibold text-slate-800">{fullOrder?.priority || order.priority || "-"}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Order Type</div>
-                                        <div className="font-semibold text-slate-800">{fullOrder?.orderType || order.orderType || "-"}</div>
-                                    </div>
-                                    <div>
                                         <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Status</div>
                                         <div className="flex flex-col gap-1">
                                             <div>

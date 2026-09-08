@@ -107,6 +107,22 @@ const DashboardPage: React.FC = () => {
     try { localStorage.setItem("dashboard_period", p); } catch (e) {}
   };
 
+  type TaskPeriod = "day" | "week" | "month";
+  const [taskPeriod, setTaskPeriod] = useState<TaskPeriod>(() => {
+    try {
+      const saved = localStorage.getItem("dashboard_tasks_period");
+      if (saved && ["day", "week", "month"].includes(saved)) {
+        return saved as TaskPeriod;
+      }
+    } catch (e) {}
+    return "day";
+  });
+
+  const handleTaskPeriodChange = (p: TaskPeriod) => {
+    setTaskPeriod(p);
+    try { localStorage.setItem("dashboard_tasks_period", p); } catch (e) {}
+  };
+
   // Map dashboard period → SalesPurchaseTrendChart period key
   const trendPeriodMap: Record<DashPeriod, "7d" | "30d" | "90d" | "12m"> = {
     day: "7d",
@@ -148,6 +164,8 @@ const DashboardPage: React.FC = () => {
     fetcher: dashboardFetcher,
   });
   const dashData = dashboardCache.data[0] || {};
+  const isDashboardLoading = dashboardCache.loading || !dashboardCache.data[0];
+  const isDashboardSyncing = dashboardCache.refreshing;
   const refreshDashboard = dashboardCache.refresh;
 
   // Derive the individual arrays from the cached payload. Empty arrays fall
@@ -174,7 +192,7 @@ const DashboardPage: React.FC = () => {
   // Single 300ms debounce shared across all modules — prevents up to 5
   // independent refetches when one save touches multiple collections.
   usePageSocketSync(
-    ["purchaseOrder", "productionOrder", "dailyPlan", "finishedGoodsStock", "rawMaterialStock", "salesOrder", "salesInvoice", "grnInvoice"],
+    ["purchaseOrder", "productionOrder", "dailyPlan", "finishedGoodsStock", "rawMaterialStock", "salesOrder", "salesInvoice", "grnInvoice", "rawMaterial", "product"],
     refreshDashboard
   );
 
@@ -284,23 +302,47 @@ const DashboardPage: React.FC = () => {
     };
   }, [productionOrders, salesOrders, purchaseOrders, rawMaterials, machines, weeklyPrograms, productsCount, employeesCount, salesInvoices]);
 
-  // Today's Tasks Stats
+  const isDateInTaskPeriod = useCallback((dateStr: string, period: TaskPeriod) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+
+    const now = new Date();
+
+    if (period === "day") {
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    }
+
+    if (period === "week") {
+      // Monday 00:00:00 to Sunday 23:59:59 of current week
+      const day = now.getDay();
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday, 0, 0, 0, 0);
+      const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+      return d >= monday && d <= sunday;
+    }
+
+    if (period === "month") {
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth()
+      );
+    }
+
+    return false;
+  }, []);
+
+  // Today's / Period Tasks Stats
   const todayStats = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const isToday = (dateStr: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime() === today.getTime();
-    };
-
-    const poToday = safe(productionOrders).filter((o: any) => isToday(o.createdAt || o.orderDate));
-    const soToday = safe(salesOrders).filter((o: any) => isToday(o.createdAt || o.orderDate));
-    const puToday = safe(purchaseOrders).filter((o: any) => isToday(o.createdAt || o.orderDate));
-    const wpToday = safe(weeklyPrograms).filter((w: any) => isToday(w.createdAt || w.startDate || w.date || w.scheduleDate));
-    const dpToday = safe(dailyPlans).filter((p: any) => isToday(p.productionDate || p.date || p.createdAt));
+    const poToday = safe(productionOrders).filter((o: any) => isDateInTaskPeriod(o.createdAt || o.orderDate, taskPeriod));
+    const soToday = safe(salesOrders).filter((o: any) => isDateInTaskPeriod(o.createdAt || o.orderDate, taskPeriod));
+    const puToday = safe(purchaseOrders).filter((o: any) => isDateInTaskPeriod(o.createdAt || o.orderDate, taskPeriod));
+    const wpToday = safe(weeklyPrograms).filter((w: any) => isDateInTaskPeriod(w.createdAt || w.startDate || w.date || w.scheduleDate, taskPeriod));
+    const dpToday = safe(dailyPlans).filter((p: any) => (p.status?.toUpperCase() !== 'DRAFT') && isDateInTaskPeriod(p.productionDate || p.date || p.createdAt, taskPeriod));
     const pendingCount = safe(salesOrders).filter((s: any) => s.status === 'DRAFT' || s.status === 'PENDING').length +
       safe(purchaseOrders).filter((p: any) => p.status === 'DRAFT' || p.status === 'PENDING').length;
 
@@ -312,7 +354,7 @@ const DashboardPage: React.FC = () => {
       pending: pendingCount,
       tasksList: dpToday,
     };
-  }, [productionOrders, salesOrders, purchaseOrders, weeklyPrograms, dailyPlans]);
+  }, [productionOrders, salesOrders, purchaseOrders, weeklyPrograms, dailyPlans, taskPeriod, isDateInTaskPeriod]);
 
   // Production status counts
   const prodStatusData = useMemo(() => {
@@ -751,13 +793,14 @@ const DashboardPage: React.FC = () => {
                 salesInvoices={salesInvoices}
                 purchaseInvoices={purchaseInvoices}
                 externalPeriod={trendPeriodMap[dashPeriod]}
+                loading={isDashboardLoading}
               />
             </div>
           )}
 
           {/* Right: Today's Tasks & Production (Top) + Recent Sales Orders (Bottom) */}
           <div className="flex flex-col gap-3 sm:gap-4 h-full min-h-[530px]">
-            {/* 1. Today's Tasks / Daily Production Planning */}
+            {/* 1. Tasks / Daily Production Planning */}
             {showTasks && (
               <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden flex-1 min-h-[255px]">
                 {/* Card Header */}
@@ -767,24 +810,78 @@ const DashboardPage: React.FC = () => {
                       <FaCalendarCheck className="text-xs" />
                     </div>
                     <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
-                      Today's Tasks & Production
+                      {taskPeriod === "day"
+                        ? "Today's Tasks & Production"
+                        : taskPeriod === "week"
+                        ? "This Week's Tasks & Production"
+                        : "This Month's Tasks & Production"}
                     </div>
                   </div>
                   
-                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Day / Week / Month Filter Tabs */}
+                    <div className="flex items-center gap-0.5 bg-card-2 p-0.5 rounded-lg border border-line-soft">
+                      {(["day", "week", "month"] as const).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => handleTaskPeriodChange(p)}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold capitalize transition-all duration-200 cursor-pointer ${
+                            taskPeriod === p
+                              ? "bg-emerald-500 text-white shadow-xs font-black"
+                              : "text-ink-muted hover:text-ink hover:bg-card/50"
+                          }`}
+                        >
+                          {p === "day" ? "Day" : p === "week" ? "Week" : "Month"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {isDashboardLoading ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-ink-muted border border-line-soft uppercase tracking-wider shrink-0">
+                        <FaSync className="animate-spin text-emerald-400 text-[8px]" /> Loading...
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {todayStats.tasksList.length} Tasks
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Card Content */}
                 <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-                  {todayStats.tasksList.length > 0 ? (
+                  {isDashboardLoading ? (
+                    <div className="space-y-2 animate-pulse">
+                      {[1, 2, 3].map((n) => (
+                        <div key={n} className="flex items-center justify-between p-2.5 rounded-xl bg-card-2 border border-line-soft">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-white/10 shrink-0" />
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="h-3 bg-white/15 rounded w-28" />
+                              <div className="h-2.5 bg-white/10 rounded w-40" />
+                            </div>
+                          </div>
+                          <div className="h-4 w-16 bg-white/10 rounded-full shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : todayStats.tasksList.length > 0 ? (
                     todayStats.tasksList.map((task: any, i: number) => {
                       const linkedPo = safe(productionOrders).find((po: any) => po.productionOrderId === task.productionOrderId || po.id === task.productionOrderId);
                       const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
-                      const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
-                      const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || "General Shift";
+                      const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || task.weeklyMachineProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
+                      const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || task.weeklyMachineProgram?.shift?.shiftName || "General Shift";
+                      
+                      const rawDate = task.productionDate || task.date || task.createdAt;
+                      const dateObj = rawDate ? new Date(rawDate) : null;
+                      const dateText = dateObj && !isNaN(dateObj.getTime()) ? (
+                        dateObj.toDateString() === new Date().toDateString()
+                          ? "Today"
+                          : dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+                      ) : "";
+
                       return (
                         <div
                           key={i}
@@ -796,11 +893,16 @@ const DashboardPage: React.FC = () => {
                               <FaCalendarCheck className="text-xs" />
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[12px] font-bold text-ink truncate">{machineName}</span>
                                 <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-card text-ink-muted border border-line-soft">
                                   {shiftName}
                                 </span>
+                                {dateText && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    {dateText}
+                                  </span>
+                                )}
                               </div>
                               <span className="text-[10.5px] font-medium text-ink-muted truncate block mt-0.5">{productName}</span>
                             </div>
@@ -817,8 +919,12 @@ const DashboardPage: React.FC = () => {
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full py-8 text-center text-ink-subtle">
                       <FaCalendarCheck size={32} className="mb-2 opacity-25 text-emerald-400" />
-                      <p className="text-[12px] font-bold text-ink-muted">No tasks scheduled for today</p>
-                      <p className="text-[10px] text-ink-subtle mt-0.5">Daily production plans for today will appear here</p>
+                      <p className="text-[12px] font-bold text-ink-muted">
+                        No tasks scheduled for {taskPeriod === "day" ? "today" : taskPeriod === "week" ? "this week" : "this month"}
+                      </p>
+                      <p className="text-[10px] text-ink-subtle mt-0.5">
+                        Daily production plans for {taskPeriod === "day" ? "today" : taskPeriod === "week" ? "this week" : "this month"} will appear here
+                      </p>
                     </div>
                   )}
                 </div>
@@ -840,9 +946,15 @@ const DashboardPage: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 uppercase">
-                      Latest {recentSales.length}
-                    </span>
+                    {isDashboardLoading ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-muted border border-line-soft uppercase">
+                        Loading...
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 uppercase">
+                        Latest {recentSales.length}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => navigate("/sales-order")}
@@ -857,7 +969,25 @@ const DashboardPage: React.FC = () => {
 
                 {/* Content */}
                 <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-                  {recentSales.length === 0 ? (
+                  {isDashboardLoading ? (
+                    <div className="space-y-2 animate-pulse">
+                      {[1, 2, 3].map((n) => (
+                        <div key={n} className="flex items-center justify-between p-2.5 rounded-xl bg-card-2 border border-line-soft">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-white/10 shrink-0" />
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="h-3 bg-white/15 rounded w-20" />
+                              <div className="h-2.5 bg-white/10 rounded w-32" />
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-right flex flex-col items-end shrink-0">
+                            <div className="h-3 bg-white/15 rounded w-16" />
+                            <div className="h-3 w-12 bg-white/10 rounded-full" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : recentSales.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full py-8 text-center text-ink-subtle">
                       <FaShoppingCart size={32} className="mb-2 opacity-25 text-blue-400" />
                       <p className="text-[12px] font-bold text-ink-muted">No Sales Orders Yet</p>
@@ -928,7 +1058,10 @@ const DashboardPage: React.FC = () => {
                   <span>Alerts</span>
                 </div>
                 {isAccountsLoading ? (
-                  <span className="h-4 w-12 bg-white/10 rounded animate-pulse" />
+                  <span className="inline-flex items-center gap-1.5 text-[9px] font-black px-2 py-0.5 rounded-full bg-white/10 text-ink-muted border border-line-soft uppercase tracking-wider">
+                    <FaSync className="animate-spin text-amber-400 text-[8px]" />
+                    Checking...
+                  </span>
                 ) : accountsSummary?.alerts && accountsSummary.alerts.length > 0 ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
                     {accountsSummary.alerts.length} Action{accountsSummary.alerts.length > 1 ? "s" : ""}
@@ -1171,7 +1304,19 @@ const DashboardPage: React.FC = () => {
               {/* 1. Horizontal Progress Ranking */}
               {topProductsChartType === "list" && (
                 <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
-                  {topProducts.length === 0 ? (
+                  {isDashboardLoading ? (
+                    <div className="space-y-3 animate-pulse">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <div key={n} className="space-y-1.5">
+                          <div className="flex justify-between">
+                            <div className="h-3 bg-white/15 rounded w-24" />
+                            <div className="h-3 bg-white/10 rounded w-10" />
+                          </div>
+                          <div className="h-1.5 bg-white/10 rounded-full w-full" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : topProducts.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
                   ) : (
                     topProductsWithColors.map((prod: any, i: number) => {
@@ -1210,7 +1355,22 @@ const DashboardPage: React.FC = () => {
               {/* 2. Vertical Column Bar Chart */}
               {topProductsChartType === "bar" && (
                 <div className="flex-1 min-h-0 p-2.5 flex flex-col">
-                  {topProducts.length === 0 ? (
+                  {isDashboardLoading ? (
+                    <div className="w-full h-full min-h-[220px] flex flex-col justify-between p-2 animate-pulse">
+                      <div className="flex items-end justify-between gap-2 h-[170px] border-b border-line-soft/40 px-2">
+                        {[40, 70, 90, 60, 50].map((h, idx) => (
+                          <div key={idx} className="flex-1 flex justify-center items-end h-full">
+                            <div className="w-full max-w-[24px] bg-teal-500/20 rounded-t" style={{ height: `${h}%` }} />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between px-2 pt-2">
+                        {[1, 2, 3, 4, 5].map((_, idx) => (
+                          <div key={idx} className="h-2 w-8 bg-white/10 rounded" />
+                        ))}
+                      </div>
+                    </div>
+                  ) : topProducts.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
                   ) : (
                     <div className="w-full h-full min-h-[220px]">
@@ -1269,7 +1429,17 @@ const DashboardPage: React.FC = () => {
               {/* 3. Donut / Pie Chart */}
               {topProductsChartType === "pie" && (
                 <div className="flex-1 min-h-0 p-2 flex flex-col justify-between overflow-hidden">
-                  {topProducts.length === 0 ? (
+                  {isDashboardLoading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 animate-pulse space-y-3">
+                      <div className="w-28 h-28 rounded-full border-4 border-teal-500/20 flex items-center justify-center">
+                        <div className="w-16 h-16 rounded-full bg-white/10" />
+                      </div>
+                      <div className="w-full space-y-1.5 pt-2">
+                        <div className="h-2.5 bg-white/15 rounded w-3/4 mx-auto" />
+                        <div className="h-2.5 bg-white/10 rounded w-1/2 mx-auto" />
+                      </div>
+                    </div>
+                  ) : topProducts.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-ink-muted text-xs">No Products</div>
                   ) : (
                     <>
@@ -1557,7 +1727,19 @@ const DashboardPage: React.FC = () => {
             ) : (
               /* Customer Overview Table */
               <div className="flex-1 min-h-0 overflow-auto">
-                {customerPurchaseReport.customers.length === 0 ? (
+                {isDashboardLoading ? (
+                  <div className="p-3 space-y-2 animate-pulse">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-card-2 border border-line-soft">
+                        <div className="h-3.5 bg-white/15 rounded w-1/3" />
+                        <div className="flex items-center gap-4">
+                          <div className="h-4 bg-emerald-500/20 rounded w-8" />
+                          <div className="h-4 bg-rose-500/20 rounded w-8" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : customerPurchaseReport.customers.length === 0 ? (
                   <div className="p-6 text-center text-xs text-ink-subtle">No customers available</div>
                 ) : (
                   <table className="w-full text-left text-xs">
@@ -1638,6 +1820,7 @@ const DashboardPage: React.FC = () => {
           rawMaterialStocks={rawMaterialStocks}
           finishedGoodsStocks={finishedGoodsStocks}
           allProducts={allProducts}
+          isParentLoading={isDashboardLoading}
         />
 
         {/* ══════════════════════════════════════════════════════
@@ -1647,6 +1830,7 @@ const DashboardPage: React.FC = () => {
           employeesCount={employeesCount}
           dailyPlans={dailyPlans}
           weeklyPrograms={weeklyPrograms}
+          isParentLoading={isDashboardLoading}
         />
       </div>
 

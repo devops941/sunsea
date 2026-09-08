@@ -257,24 +257,6 @@ const ProductionOrderCreate: React.FC = () => {
                                         {errors.dueDate && <span className="text-danger small">{errors.dueDate}</span>}
                                     </Col>
 
-                                    <Col md={6}>
-                                        <SelectInput
-                                            label="Order Type"
-                                            name="orderType"
-                                            value={formData.orderType}
-                                            onChange={handleChange as any}
-                                            options={ORDER_TYPE_OPTIONS}
-                                        />
-                                    </Col>
-                                    <Col md={6}>
-                                        <SelectInput
-                                            label="Priority"
-                                            name="priority"
-                                            value={formData.priority}
-                                            onChange={handleChange as any}
-                                            options={PRIORITY_OPTIONS}
-                                        />
-                                    </Col>
 
                                     <Col md={12}>
                                         <hr />

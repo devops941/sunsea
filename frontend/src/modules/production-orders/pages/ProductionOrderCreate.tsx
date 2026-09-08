@@ -6,16 +6,17 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
+import { useForm, Controller, useFieldArray, useWatch, useController } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
+import AutocompleteInput from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import TextArea from "../../../components/form/TextArea/TextArea";
-import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import { productionOrderService } from "../../../services/productionOrderService";
@@ -130,7 +131,8 @@ const defaultValues: ProductionOrderFormValues = {
 };
 
 
-// ————— Cell renderer components for the Raw Materials DataTable —————
+// ————— Inline cell renderers for Raw Materials BusyItemsTable —————
+// All inputs are borderless / transparent to match the Sales Order items table style.
 
 const StoreCellRenderer: React.FC<{
     productIndex: number;
@@ -139,29 +141,26 @@ const StoreCellRenderer: React.FC<{
     storeOptions: { label: string; value: string }[];
     error?: string;
     onStoreChange: (idx: number, storeId: string) => void;
-}> = React.memo(({ productIndex, index, control, storeOptions, error, onStoreChange }) => (
-    <div className="w-full">
-        <Controller
-            name={`products.${productIndex}.rawMaterials.${index}.storeId` as const}
-            control={control}
-            render={({ field }) => (
-                <SelectInput
-                    hideLabel
-                    noMargin
-                    name={field.name}
-                    value={field.value}
-                    options={storeOptions}
-                    defaultOptionLabel="Select Store"
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                        field.onChange(e);
-                        onStoreChange(index, e.target.value);
-                    }}
-                    error={error}
-                />
-            )}
+}> = React.memo(({ productIndex, index, control, storeOptions, error, onStoreChange }) => {
+    const { field } = useController({
+        control,
+        name: `products.${productIndex}.rawMaterials.${index}.storeId` as const,
+    });
+    return (
+        <AutocompleteInput
+            inline
+            name={field.name}
+            value={field.value || ""}
+            options={storeOptions}
+            placeholder="Select Store"
+            error={error}
+            onChange={(v) => {
+                field.onChange(v);
+                onStoreChange(index, v);
+            }}
         />
-    </div>
-));
+    );
+});
 
 const RawMaterialCellRenderer: React.FC<{
     productIndex: number;
@@ -171,63 +170,52 @@ const RawMaterialCellRenderer: React.FC<{
     rowState: RowRawMaterialState;
     onRmChange: (idx: number, rmValue: string) => void;
     fetchRawMaterialsForStore: (storeId: string, fieldId: string) => void;
-    fieldId: string;
-}> = React.memo(({ productIndex, index, control, error, rowState, onRmChange, fetchRawMaterialsForStore, fieldId }) => {
+}> = React.memo(({ productIndex, index, control, error, rowState, onRmChange, fetchRawMaterialsForStore }) => {
+    const { field } = useController({
+        control,
+        name: `products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const,
+    });
     const storeId = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.storeId` as const });
     const currentRawMaterials = useWatch({ control, name: `products.${productIndex}.rawMaterials` as const });
-    const lastFetchedRef = useRef<string | null>(null);
 
+    // Key by storeId (stable business key) — safe to call on every storeId change because
+    // fetchRawMaterialsForStore internally deduplicates via storeRmCacheRef.
     useEffect(() => {
-        if (storeId && storeId !== lastFetchedRef.current) {
-            lastFetchedRef.current = storeId;
-            fetchRawMaterialsForStore(storeId, fieldId);
+        if (storeId) {
+            fetchRawMaterialsForStore(storeId, storeId);
         }
-    }, [storeId, fieldId, fetchRawMaterialsForStore]);
+    }, [storeId, fetchRawMaterialsForStore]);
 
     const { options, loading } = rowState;
     const noStore = !storeId;
-    const rmDisabled = noStore || loading || options.length === 0;
-    const showEmpty = storeId && !loading && options.length === 0;
-    const rmPlaceholder = loading
+    const filteredOptions = options
+        .filter((opt) => !currentRawMaterials?.some(
+            (rm: any, rmIdx: number) => rmIdx !== index && rm.rawMaterialId === opt.value
+        ))
+        .map((opt) => ({ value: opt.value, label: opt.label }));
+
+    const placeholder = loading
         ? "Loading..."
         : noStore
             ? "Select Store first"
             : options.length === 0
-                ? "No materials available"
+                ? "No materials"
                 : "Select Raw Material";
 
-    const filteredOptions = options.map((opt) => ({
-        ...opt,
-        disabled: currentRawMaterials?.some(
-            (rm: any, rmIdx: number) => rmIdx !== index && rm.rawMaterialId === opt.value
-        ),
-    }));
-
     return (
-        <div className="w-full">
-            <Controller
-                name={`products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const}
-                control={control}
-                render={({ field }) => (
-                    <SelectInput
-                        hideLabel
-                        noMargin
-                        name={field.name}
-                        value={field.value}
-                        options={filteredOptions}
-                        defaultOptionLabel={rmPlaceholder}
-                        disabled={rmDisabled}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                            field.onChange(e);
-                            onRmChange(index, e.target.value);
-                        }}
-                        error={error}
-                    />
-                )}
-            />
-            {loading && <div className="text-slate-500 text-xs mt-1">Fetching raw materials…</div>}
-            {showEmpty && <div className="text-red-500 text-xs mt-1">No Raw Materials available in this Store.</div>}
-        </div>
+        <AutocompleteInput
+            inline
+            name={field.name}
+            value={field.value || ""}
+            options={filteredOptions}
+            placeholder={placeholder}
+            error={error}
+            disabled={noStore || loading}
+            onChange={(v) => {
+                field.onChange(v);
+                onRmChange(index, v);
+            }}
+        />
     );
 });
 
@@ -238,41 +226,57 @@ const QtyUomCellRenderer: React.FC<{
     error?: string;
     rowState: RowRawMaterialState;
     setValue: any;
-}> = React.memo(({ productIndex, index, control, error, rowState, setValue }) => {
-    const currentRm  = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const });
-    const currentUom = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.uom` as const });
+}> = React.memo(({ productIndex, index, control, rowState, setValue }) => {
+    const { field: qtyField } = useController({
+        control,
+        name: `products.${productIndex}.rawMaterials.${index}.requiredQty` as const,
+    });
+    const { field: uomField } = useController({
+        control,
+        name: `products.${productIndex}.rawMaterials.${index}.uom` as const,
+    });
+    const currentRm = useWatch({ control, name: `products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const });
     const { options } = rowState;
     const selectedRmOption = options.find((opt) => opt.value === currentRm);
-    const baseUoms   = selectedRmOption ? (selectedRmOption as any).rawUom : (currentUom || "");
-    const primaryUom = baseUoms ? baseUoms.split(",").map((u: string) => u.trim()).filter(Boolean)[0] : "";
+    const baseUoms = selectedRmOption ? (selectedRmOption as any).rawUom : (uomField.value || "kg");
+    const uomList = baseUoms ? baseUoms.split(",").map((u: string) => u.trim()).filter(Boolean) : ["kg"];
+    const primaryUom = uomList[0] || "kg";
 
     useEffect(() => {
-        if (primaryUom) setValue(`products.${productIndex}.rawMaterials.${index}.uom`, primaryUom);
+        if (primaryUom && primaryUom !== uomField.value) {
+            setValue(`products.${productIndex}.rawMaterials.${index}.uom`, primaryUom);
+        }
     }, [primaryUom, productIndex, index, setValue]);
 
     return (
-        <div className="w-full">
-            <Controller
-                name={`products.${productIndex}.rawMaterials.${index}.requiredQty` as const}
-                control={control}
-                render={({ field }) => (
-                    <QuantityInput
-                        hideLabel
-                        name={field.name}
-                        value={field.value}
-                        baseUoms={baseUoms}
-                        error={error}
-                        onChange={(e: any) => field.onChange(e.target.value)}
-                    />
-                )}
+        <div className="flex items-center w-full h-full gap-1">
+            <input
+                type="number"
+                data-nav
+                value={qtyField.value || ""}
+                onChange={(e) => qtyField.onChange(e.target.value)}
+                placeholder="0.000"
+                step="any"
+                min="0"
+                className="flex-1 min-w-0 bg-transparent text-[13px] text-ink outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-ink-subtle placeholder:font-normal"
             />
-            <Controller
-                name={`products.${productIndex}.rawMaterials.${index}.uom` as const}
-                control={control}
-                render={({ field }) => (
-                    <input type="hidden" name={field.name} value={field.value || ""} />
-                )}
-            />
+            {uomList.length > 1 ? (
+                <select
+                    value={uomField.value || primaryUom}
+                    onChange={(e) => uomField.onChange(e.target.value)}
+                    className="bg-transparent border-none outline-none text-[11px] text-ink-muted cursor-pointer shrink-0 p-0"
+                >
+                    {uomList.map((u: string) => (
+                        <option key={u} value={u} style={{ background: "var(--color-card)", color: "var(--color-ink)" }}>
+                            {u.toLowerCase() === "ea" ? "pcs" : u}
+                        </option>
+                    ))}
+                </select>
+            ) : (
+                <span className="text-[11px] text-ink-muted shrink-0">
+                    {primaryUom.toLowerCase() === "ea" ? "pcs" : primaryUom}
+                </span>
+            )}
         </div>
     );
 });
@@ -281,24 +285,22 @@ const RemarksCellRenderer: React.FC<{
     productIndex: number;
     index: number;
     control: any;
-}> = React.memo(({ productIndex, index, control }) => (
-    <div className="w-full">
-        <Controller
-            name={`products.${productIndex}.rawMaterials.${index}.remarks` as const}
-            control={control}
-            render={({ field }) => (
-                <TextInput
-                    label=""
-                    bottom
-                    name={field.name}
-                    placeholder="Narration"
-                    value={field.value}
-                    onChange={field.onChange}
-                />
-            )}
+}> = React.memo(({ productIndex, index, control }) => {
+    const { field } = useController({
+        control,
+        name: `products.${productIndex}.rawMaterials.${index}.remarks` as const,
+    });
+    return (
+        <input
+            type="text"
+            data-nav
+            value={field.value || ""}
+            onChange={(e) => field.onChange(e.target.value)}
+            placeholder="Narration"
+            className="w-full bg-transparent text-[13px] text-ink outline-none border-none p-0 placeholder:text-ink-subtle placeholder:font-normal"
         />
-    </div>
-));
+    );
+});
 
 interface ProductRawMaterialsSectionProps {
     productIndex: number;
@@ -332,55 +334,60 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
         name: `products.${productIndex}.rawMaterials` as const,
     });
 
-    const columns: DataTableColumn<typeof fields[number]>[] = useMemo(() => [
+    const emptyRmRow = { id: "", rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" };
+
+    const columns: BusyColumn<any>[] = useMemo(() => [
         {
-            header: "STORE",
-            headerNode: <>STORE <span className="text-red-500">*</span></>,
-            width: "minmax(140px, 1fr)",
-            render: (row, index) => (
+            key: "storeId",
+            header: "STORE *",
+            width: "minmax(150px, 1.2fr)",
+            render: (_row: any, index: number) => (
                 <StoreCellRenderer
                     productIndex={productIndex}
                     index={index}
                     control={control}
                     storeOptions={storeOptions}
                     error={errors?.rawMaterials?.[index]?.storeId?.message}
-                    onStoreChange={(idx, storeId) => handleStoreChange(productIndex, idx, storeId, row.id)}
+                    // Pass storeId as the fieldId so rowRmStates is keyed by storeId (stable)
+                    onStoreChange={(idx: number, sid: string) => handleStoreChange(productIndex, idx, sid, sid)}
                 />
             ),
         },
         {
-            header: "RAW MATERIAL",
-            headerNode: <>RAW MATERIAL <span className="text-red-500">*</span></>,
-            width: "minmax(180px, 1.3fr)",
-            render: (row, index) => (
+            key: "rawMaterialId",
+            header: "RAW MATERIAL *",
+            width: "minmax(200px, 1.5fr)",
+            render: (row: any, index: number) => (
                 <RawMaterialCellRenderer
                     productIndex={productIndex}
                     index={index}
                     control={control}
                     error={errors?.rawMaterials?.[index]?.rawMaterialId?.message}
-                    rowState={rowRmStates[row.id] ?? { options: [], loading: false, fetchedForStoreId: null }}
-                    onRmChange={(idx, rmValue) => handleRmChange(productIndex, idx, rmValue, row.id)}
+                    // Key by storeId — survives field-array UUID regeneration
+                    rowState={rowRmStates[row.storeId] ?? { options: [], loading: false, fetchedForStoreId: null }}
+                    onRmChange={(idx: number, rmValue: string) => handleRmChange(productIndex, idx, rmValue, row.storeId)}
                     fetchRawMaterialsForStore={fetchRawMaterialsForStore}
-                    fieldId={row.id}
                 />
             ),
         },
         {
-            header: "REQUIRED QTY & UOM",
-            headerNode: <>REQUIRED QTY & UOM <span className="text-red-500">*</span></>,
-            width: "minmax(160px, 1fr)",
-            render: (row, index) => (
+            key: "requiredQty",
+            header: "REQUIRED QTY & UOM *",
+            width: "minmax(170px, 1fr)",
+            render: (row: any, index: number) => (
                 <QtyUomCellRenderer
                     productIndex={productIndex}
                     index={index}
                     control={control}
                     error={errors?.rawMaterials?.[index]?.requiredQty?.message || errors?.rawMaterials?.[index]?.uom?.message}
-                    rowState={rowRmStates[row.id] ?? { options: [], loading: false, fetchedForStoreId: null }}
+                    // Same key — storeId
+                    rowState={rowRmStates[row.storeId] ?? { options: [], loading: false, fetchedForStoreId: null }}
                     setValue={setValue}
                 />
             ),
         },
         {
+            key: "remarks",
             header: "NARRATION",
             width: "minmax(140px, 1fr)",
             render: (_, index) => (
@@ -391,18 +398,10 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                 />
             ),
         },
-        {
-            header: "",
-            width: "52px",
-            align: "center",
-            render: (_, index) => (
-                <DeleteButton onClick={() => remove(index)} />
-            ),
-        },
-    ], [productIndex, control, storeOptions, errors, rowRmStates, handleStoreChange, handleRmChange, fetchRawMaterialsForStore, setValue, remove]);
+    ], [productIndex, control, storeOptions, errors, rowRmStates, handleStoreChange, handleRmChange, fetchRawMaterialsForStore, setValue]);
 
     return (
-        <div className="md:col-span-12 mt-3 relative min-h-[150px]">
+        <div className="md:col-span-12 mt-3 relative">
             {isCalculatingRM && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/80 backdrop-blur-[2px] rounded-lg overflow-hidden">
                     <div className="scale-[0.6] origin-center -mt-6">
@@ -410,28 +409,20 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                     </div>
                 </div>
             )}
-            <div className="flex justify-between items-center mb-3">
+            <div className="mb-2">
                 <h3 className="text-xs font-extrabold text-ink uppercase tracking-wider">
                     Manual Raw Materials ({productName || `Product ${productIndex + 1}`})
                 </h3>
-                <CustomButton
-                    text="Add Material Row"
-                    icon={FaPlus}
-                    type="button"
-                    size="sm"
-                    onClick={() =>
-                        append({ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" })
-                    }
-                />
             </div>
 
-            <DataTable
+            <BusyItemsTable
                 columns={columns}
-                data={fields}
-                rowKey={(row) => row.id}
-                minHeightClassName="min-h-[60px]"
-                density="default"
-                emptyMessage="No raw materials added. Click 'Add Material Row' to include materials."
+                rows={fields}
+                emptyRow={emptyRmRow as any}
+                onAdd={() => append({ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" })}
+                onRemove={(i) => remove(i)}
+                editable={true}
+                visibleRows={Math.max(fields.length, 5)}
             />
         </div>
     );
@@ -468,12 +459,34 @@ const ProductionOrderCreate: React.FC = () => {
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
     handleSubmitRef.current = () => {
-        handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "CREATED" : data.status }))();
+        handleSubmit((data) => {
+            const targetStatus = (isEditMode && (data.status === "DRAFT" || data.status === "CREATED"))
+                ? "READY_FOR_PLANNING"
+                : data.status === "DRAFT"
+                    ? "CREATED"
+                    : data.status;
+            onSubmit({ ...data, status: targetStatus });
+        })();
     };
 
     const handleFormKeyDown = useFormKeyboardNav(formRef);
 
-    useFormShortcuts({ onSave: () => handleSubmitRef.current() });
+    useFormShortcuts({
+        onSave: () => handleSubmitRef.current(),
+        onDelete: () => {
+            if (!isEditMode) {
+                reset(defaultValues);
+                setRowRmStates({});
+                productionOrderService
+                    .fetchNextId()
+                    .then((orderNo) => setValue("productionOrderId", orderNo))
+                    .catch(() => {});
+                setTimeout(() => {
+                    formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+                }, 100);
+            }
+        },
+    });
 
     // Helper: update a single row's state
     const updateRowState = (
@@ -510,6 +523,9 @@ const ProductionOrderCreate: React.FC = () => {
 
     const watchSalesOrderId = useWatch({ control, name: "sourceSalesOrderId" });
     const watchProducts = useWatch({ control, name: "products" });
+    const watchStatus = useWatch({ control, name: "status" });
+    // DRAFT or CREATED edit → promote to READY_FOR_PLANNING on main submit
+    const isDraftEdit = isEditMode && (watchStatus === "DRAFT" || watchStatus === "CREATED");
 
     // ── Store changed for a specific row ───────────────────────────────────────────
     const fetchRawMaterialsForStore = useCallback(async (
@@ -973,6 +989,69 @@ const ProductionOrderCreate: React.FC = () => {
 
     useEffect(() => { isDirtyRef.current = rhfIsDirty; }, [rhfIsDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    // F5 — Edit: reload from API; Create: reset form + fetch next ID
+    useEffect(() => {
+        const handleRefresh = async () => {
+            if (isEditMode && id) {
+                try {
+                    const fullOrder = await productionOrderService.getById(id);
+                    const rmRows = ((fullOrder as any).draftRawMaterials || (fullOrder as any).products?.flatMap((p: any) => p.rawMaterials) || []).map((rm: any) => ({
+                        rawMaterialId: rm.rawMaterialId?.toString() || "",
+                        requiredQty: rm.requiredQty?.toString() || "",
+                        uom: rm.uom || "KG",
+                        storeId: rm.storeId?.toString() || "",
+                        remarks: rm.remarks || "",
+                    }));
+                    reset({
+                        id: fullOrder.id,
+                        sourceSalesOrderId: fullOrder.sourceSalesOrderId?.toString() || "",
+                        sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId?.toString() || "",
+                        productionOrderId: fullOrder.productionOrderId || "",
+                        orderDate: fullOrder.orderDate?.split("T")[0] || today,
+                        dueDate: fullOrder.dueDate?.split("T")[0] || nextWeek,
+                        priority: fullOrder.priority || "MEDIUM",
+                        orderType: fullOrder.orderType || "STANDARD",
+                        batchNo: fullOrder.batchNo || "",
+                        lotNo: fullOrder.lotNo || "",
+                        sourceStoreId: fullOrder.sourceStoreId?.toString() || "",
+                        destinationStoreId: fullOrder.destinationStoreId?.toString() || "",
+                        status: fullOrder.status || "CREATED",
+                        remarks: fullOrder.remarks || "",
+                        products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
+                            productItemId: p.productItemId?.toString() || p.productId?.toString() || "",
+                            targetQty: Number(p.targetQty || p.quantity || 0),
+                            damageQty: Number(p.damageQty || (fullOrder as any).damageQty) || 0,
+                            uom: p.uom || fullOrder.uom || "PCS",
+                            sourceSalesOrderLineId: p.sourceSalesOrderLineId?.toString() || "",
+                            rawMaterials: rmRows,
+                        })) : [{
+                            productItemId: fullOrder.productItemId?.toString() || "",
+                            targetQty: Number(fullOrder.targetQty) || 0,
+                            damageQty: Number((fullOrder as any).damageQty) || 0,
+                            uom: fullOrder.uom || "PCS",
+                            sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
+                            rawMaterials: rmRows,
+                        }],
+                    });
+                    setRowRmStates({});
+                    toast.info("Production order details refreshed");
+                } catch {
+                    toast.error("Failed to reload production order details");
+                }
+            } else if (!isEditMode) {
+                reset({ ...defaultValues });
+                setRowRmStates({});
+                productionOrderService
+                    .fetchNextId()
+                    .then((orderNo) => setValue("productionOrderId", orderNo))
+                    .catch(() => {});
+                toast.info("Form reset");
+            }
+        };
+        window.addEventListener("fkey-refresh", handleRefresh);
+        return () => window.removeEventListener("fkey-refresh", handleRefresh);
+    }, [id, isEditMode, reset, setValue]);
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
@@ -1078,7 +1157,7 @@ const ProductionOrderCreate: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
                     <h2 className="text-xl font-bold text-ink flex items-start">
-                        {isEditMode ? "Edit Production Order" : "Create Production Order"}
+                        {isEditMode && !isDraftEdit ? "Edit Production Order" : "Create Production Order"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("productionOrderId")}</span>
                     </h2>
                     <BackButton text="Back to List" to="/production-orders" />
@@ -1088,16 +1167,17 @@ const ProductionOrderCreate: React.FC = () => {
                     ref={formRef}
                     onSubmit={handleSubmit(onSubmit)}
                     onKeyDown={handleFormKeyDown}
-                    className="p-5 lg:p-6 space-y-6"
+                    data-escape-guarded
+                    className="p-4 lg:p-5 space-y-4"
                     noValidate
                 >
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
 
                         {/* ── 1. Source Information ─────────────────────────── */}
                         {watchSalesOrderId && (
                             <>
                                 <div className="md:col-span-12">
-                                    <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-4">
+                                    <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2">
                                         1. Selected Sales Order
                                     </h3>
                                     <div className="p-0" >
@@ -1158,11 +1238,11 @@ const ProductionOrderCreate: React.FC = () => {
                                     </div>
                                 </div>
                                 {selectedSalesOrderItems.length > 0 && (
-                                    <div className="md:col-span-12 mt-3 mb-3">
-                                        <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-3">
+                                    <div className="md:col-span-12 mt-2 mb-2">
+                                        <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2">
                                             Sales Order Items
                                         </h3>
-                                        <div className="mt-2 mb-4 border rounded-lg border-line-soft shadow-sm overflow-hidden">
+                                        <div className="mt-1 mb-2 border rounded-lg border-line-soft shadow-sm overflow-hidden">
                                             <DataTable
                                                 columns={salesOrderColumns}
                                                 data={selectedSalesOrderItems}
@@ -1177,7 +1257,7 @@ const ProductionOrderCreate: React.FC = () => {
                             </>
                         )}
                         <div className="md:col-span-12">
-                            <div className="flex justify-between items-center mb-3">
+                            <div className="flex justify-between items-center mb-2">
                                 <h3 className="text-xs font-extrabold text-ink uppercase tracking-wider">
                                     {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}
                                 </h3>
@@ -1193,14 +1273,14 @@ const ProductionOrderCreate: React.FC = () => {
                             </div>
                             <div className="p-0">
                                 {productFields.map((prodItem, index) => (
-                                    <div key={prodItem.id} className={index > 0 ? "mt-6 pt-6 border-t border-line-soft" : ""}>
-                                        <div className="flex justify-between items-center mb-4">
+                                    <div key={prodItem.id} className={index > 0 ? "mt-3 pt-3 border-t border-line-soft" : ""}>
+                                        <div className="flex justify-between items-center mb-2">
                                             <h3 className="text-sm font-bold text-ink-muted">Product {index + 1}</h3>
                                             {!watchSalesOrderId && productFields.length > 1 && (
                                                 <DeleteButton onClick={() => removeProduct(index)} />
                                             )}
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-3">
                                             <Controller
                                                 name={`products.${index}.productItemId` as const}
                                                 control={control}
@@ -1278,7 +1358,7 @@ const ProductionOrderCreate: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 xl:gap-x-24 gap-y-3 md:gap-y-4 lg:gap-y-5 mt-6 pt-6 border-t border-line-soft">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-3 mt-3 pt-3 border-t border-line-soft">
                                     <Controller
                                         name="orderDate"
                                         control={control}
@@ -1360,15 +1440,18 @@ const ProductionOrderCreate: React.FC = () => {
                             <CustomButton
                                 text={
                                     isSubmitting
-                                        ? isEditMode
-                                            ? "Updating"
-                                            : "Creating"
-                                        : isEditMode
-                                            ? "Update Order"
-                                            : "Create Production Order"
+                                        ? (isEditMode && !isDraftEdit ? "Updating" : "Creating")
+                                        : (isEditMode && !isDraftEdit ? "Update Order" : "Create Production Order")
                                 }
                                 icon={isSubmitting ? undefined : FaSave}
-                                onClick={handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "CREATED" : data.status }))}
+                                onClick={handleSubmit((data) => {
+                                    const targetStatus = (isEditMode && (data.status === "DRAFT" || data.status === "CREATED"))
+                                        ? "READY_FOR_PLANNING"
+                                        : data.status === "DRAFT"
+                                            ? "CREATED"
+                                            : data.status;
+                                    onSubmit({ ...data, status: targetStatus });
+                                })}
                                 type="button"
                                 disabled={isSubmitting}
                             />

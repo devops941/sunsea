@@ -32,6 +32,8 @@ export interface BusyItemsTableProps<T = any> {
   onChange?: (rows: T[]) => void;
   emptyRow?: T;
   visibleRows?: number;
+  /** Height (px) of each data row. Default 32. Use a larger value (e.g. 44) when cells contain form inputs. */
+  rowHeight?: number;
   showTotals?: TotalCell[];
   billSundry?: BillSundryConfig;
   editable?: boolean;
@@ -139,14 +141,14 @@ function isInputAtRightBoundary(input: HTMLInputElement): boolean {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function BusyItemsTable<T extends Record<string, any>>({
-  columns, rows, onChange, emptyRow, visibleRows = 10, showTotals, billSundry,
+  columns, rows, onChange, emptyRow, visibleRows = 10, rowHeight, showTotals, billSundry,
   editable = true, className = "", onAdd, onRemove,
   renderExpandedRow, expandedIndex, onExpandToggle, expandable = false, canExpand,
   getFieldBeforeTable: propGetFieldBefore, getFieldAfterTable: propGetFieldAfter,
   onNavigateRight: propOnNavigateRight, onNavigateLeft: propOnNavigateLeft,
 }: BusyItemsTableProps<T>) {
 
-  const ROW = 32;
+  const ROW = rowHeight ?? 32;
   const SN = "40px";
   const colW = columns.map(c => c.width || "1fr").join(" ");
   const grid = `${SN} ${colW}${expandable ? " 32px" : ""}${editable ? " 36px" : ""}`;

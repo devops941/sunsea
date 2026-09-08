@@ -14,6 +14,8 @@ import QuantityInput from "../../../components/form/QuantityInput/QuantityInput"
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
+import AutocompleteInput from "../../../components/form/AutocompleteInput/AutocompleteInput";
+import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createHourlyProduction, updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
@@ -125,6 +127,8 @@ const HourlyWorkReportCreate: React.FC = () => {
     const handleSubmitRef = useRef<() => void>(() => {});
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [backConfirmOpen, setBackConfirmOpen] = useState(false);
+    const backConfirmOpenRef = useRef(false);
 
     handleSubmitRef.current = () => {
         formRef.current?.requestSubmit();
@@ -136,14 +140,17 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+    useEffect(() => { backConfirmOpenRef.current = backConfirmOpen; }, [backConfirmOpen]);
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
             if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault(); e.stopImmediatePropagation();
             if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
-            if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
-            else { navigate("/hourly-work-reports"); }
+            if (backConfirmOpenRef.current) { setBackConfirmOpen(false); return; }
+            // Always show back confirm on ESC
+            lastFocusedRef.current = document.activeElement as HTMLElement;
+            setBackConfirmOpen(true);
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
@@ -706,16 +713,231 @@ const HourlyWorkReportCreate: React.FC = () => {
         ? Math.max(0, Number(activePlan.plannedQty || 0) - shiftProducedQty)
         : 0;
 
+    // ── BusyItemsTable column definitions ─────────────────────────────────
+    const wastageColumns: BusyColumn<any>[] = [
+        {
+            key: "storeId",
+            header: "Store *",
+            width: "180px",
+            render: (row: any, idx: number) => (
+                <AutocompleteInput
+                    inline
+                    name={`w-store-${idx}`}
+                    value={row.storeId}
+                    options={wastageStores.map((s: any) => ({ value: s.storeId, label: s.storeName }))}
+                    placeholder="Select Store"
+                    error={row.storeError || undefined}
+                    onChange={(v) => setWastages(prev => {
+                        const copy = [...prev];
+                        copy[idx] = { ...copy[idx], storeId: v, storeError: "", targetWastageProductId: "", productError: "" };
+                        return copy;
+                    })}
+                />
+            )
+        },
+        {
+            key: "targetWastageProductId",
+            header: "Wastage Product *",
+            width: "1fr",
+            render: (row: any, idx: number) => (
+                <AutocompleteInput
+                    inline
+                    name={`w-product-${idx}`}
+                    value={row.targetWastageProductId}
+                    options={rawMaterials
+                        .filter((r: any) => !row.storeId || String(r.storeId || r.store?.storeId) === String(row.storeId))
+                        .filter((r: any) => !wastages.some((w, i) => i !== idx && w.targetWastageProductId === r.rawMaterialId))
+                        .map((r: any) => ({ value: r.rawMaterialId, label: `${r.materialName} (${r.rawMaterialId})` }))}
+                    placeholder="Select Product"
+                    error={row.productError || undefined}
+                    onChange={(v) => setWastages(prev => {
+                        const copy = [...prev];
+                        copy[idx] = { ...copy[idx], targetWastageProductId: v, productError: "" };
+                        const rm = rawMaterials.find((r: any) => r.rawMaterialId === v);
+                        if (rm) {
+                            let uoms = rm.baseUom || "kg";
+                            if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
+                            copy[idx].uom = uoms;
+                            if (!copy[idx].selectedUom) {
+                                const opts = getUomOptions(uoms);
+                                copy[idx].selectedUom = opts.length > 0 ? opts[0].value : "";
+                            }
+                        }
+                        return copy;
+                    })}
+                />
+            )
+        },
+        {
+            key: "quantity",
+            header: "Quantity *",
+            width: "150px",
+            render: (row: any, idx: number) => {
+                const uomOpts = getUomOptions(row.uom || "kg");
+                return (
+                    <div className={`flex items-center w-full h-full ${row.quantityError ? "border-b-2 border-red-500" : ""}`} title={row.quantityError || undefined}>
+                        <input
+                            type="number"
+                            value={row.quantity}
+                            onChange={(e) => setWastages(prev => {
+                                const copy = [...prev];
+                                copy[idx] = { ...copy[idx], quantity: e.target.value, quantityError: "" };
+                                return copy;
+                            })}
+                            step="0.001"
+                            data-nav
+                            placeholder="0.00"
+                            className="flex-1 min-w-0 bg-transparent text-[13px] text-ink outline-none border-none h-full px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-ink-subtle/60"
+                        />
+                        {uomOpts.length > 1 ? (
+                            <select
+                                value={row.selectedUom}
+                                onChange={(e) => setWastages(prev => {
+                                    const copy = [...prev];
+                                    copy[idx] = { ...copy[idx], selectedUom: e.target.value };
+                                    return copy;
+                                })}
+                                className="text-xs text-ink bg-transparent border-l border-line-soft h-full px-1 focus:outline-none min-w-[42px] cursor-pointer"
+                            >
+                                {uomOpts.map(u => <option key={u.value} value={u.value} className="bg-card text-ink">{u.label}</option>)}
+                            </select>
+                        ) : (
+                            <span className="text-xs text-ink-muted px-1 h-full flex items-center border-l border-line-soft min-w-[42px]">{row.selectedUom || uomOpts[0]?.label || "kg"}</span>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            key: "delete",
+            header: "",
+            width: "36px",
+            align: "center" as const,
+            render: (_row: any, idx: number) => (
+                <DeleteButton onClick={() => setWastages(prev => prev.filter((_, i) => i !== idx))} />
+            )
+        }
+    ];
+
+    const returnedRmColumns: BusyColumn<any>[] = [
+        {
+            key: "rawMaterialId",
+            header: "Raw Material *",
+            width: "1fr",
+            render: (row: any, idx: number) => (
+                <AutocompleteInput
+                    inline
+                    name={`rm-id-${idx}`}
+                    value={row.rawMaterialId}
+                    options={rawMaterialOptions
+                        .filter((r: any) => !rawMaterialsUsed.some((o, i) => i !== idx && o.rawMaterialId === r.rawMaterialId))
+                        .map((r: any) => ({ value: r.rawMaterialId, label: `${r.rawMaterialId} - ${r.materialName}` }))}
+                    placeholder="Select Raw Material"
+                    error={row.productError || undefined}
+                    onChange={(v) => setRawMaterialsUsed(prev => {
+                        const copy = [...prev];
+                        copy[idx] = { ...copy[idx], rawMaterialId: v, productError: "" };
+                        const matched = rawMaterialOptions.find((r: any) => r.rawMaterialId === v);
+                        if (matched) {
+                            const base = matched.baseUom || "";
+                            copy[idx].uom = base;
+                            const opts = getUomOptions(base);
+                            if (!copy[idx].selectedUom || !opts.some((o: any) => o.value === copy[idx].selectedUom)) {
+                                copy[idx].selectedUom = opts.length > 0 ? opts[0].value : "";
+                            }
+                            const autoStore = matched.storeId || matched.store?.storeId;
+                            if (autoStore) { copy[idx].storeId = String(autoStore); copy[idx].storeError = ""; }
+                        } else {
+                            copy[idx].uom = "";
+                            copy[idx].selectedUom = "";
+                        }
+                        return copy;
+                    })}
+                />
+            )
+        },
+        {
+            key: "storeId",
+            header: "Store *",
+            width: "180px",
+            render: (row: any, idx: number) => (
+                <AutocompleteInput
+                    inline
+                    name={`rm-store-${idx}`}
+                    value={row.storeId}
+                    options={rawMaterialStores.map((s: any) => ({ value: s.storeId, label: s.storeName || s.storeId }))}
+                    placeholder="Select Store"
+                    error={row.storeError || undefined}
+                    onChange={(v) => setRawMaterialsUsed(prev => {
+                        const copy = [...prev];
+                        copy[idx] = { ...copy[idx], storeId: v, storeError: "" };
+                        return copy;
+                    })}
+                />
+            )
+        },
+        {
+            key: "quantity",
+            header: "Quantity *",
+            width: "150px",
+            render: (row: any, idx: number) => {
+                const uomOpts = getUomOptions(row.uom || "kg");
+                return (
+                    <div className={`flex items-center w-full h-full ${row.quantityError ? "border-b-2 border-red-500" : ""}`} title={row.quantityError || undefined}>
+                        <input
+                            type="number"
+                            value={row.quantity}
+                            onChange={(e) => setRawMaterialsUsed(prev => {
+                                const copy = [...prev];
+                                copy[idx] = { ...copy[idx], quantity: e.target.value, quantityError: "" };
+                                return copy;
+                            })}
+                            step="0.001"
+                            data-nav
+                            placeholder="0.00"
+                            className="flex-1 min-w-0 bg-transparent text-[13px] text-ink outline-none border-none h-full px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-ink-subtle/60"
+                        />
+                        {uomOpts.length > 1 ? (
+                            <select
+                                value={row.selectedUom}
+                                onChange={(e) => setRawMaterialsUsed(prev => {
+                                    const copy = [...prev];
+                                    copy[idx] = { ...copy[idx], selectedUom: e.target.value };
+                                    return copy;
+                                })}
+                                className="text-xs text-ink bg-transparent border-l border-line-soft h-full px-1 focus:outline-none min-w-[42px] cursor-pointer"
+                            >
+                                {uomOpts.map(u => <option key={u.value} value={u.value} className="bg-card text-ink">{u.label}</option>)}
+                            </select>
+                        ) : (
+                            <span className="text-xs text-ink-muted px-1 h-full flex items-center border-l border-line-soft min-w-[42px]">{row.selectedUom || uomOpts[0]?.label || "kg"}</span>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            key: "delete",
+            header: "",
+            width: "36px",
+            align: "center" as const,
+            render: (_row: any, idx: number) => (
+                <DeleteButton onClick={() => setRawMaterialsUsed(prev => prev.filter((_, i) => i !== idx))} />
+            )
+        }
+    ];
+    // ── End column definitions ─────────────────────────────────────────────
+
     return (
         <>
-        <div className="max-w-[1024px] xl:mr-auto">
-            <form ref={formRef} onSubmit={handleSubmit} onInput={() => setIsDirty(true)} onKeyDown={handleFormKeyDown} className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
+        <div className="w-full">
+            <form ref={formRef} onSubmit={handleSubmit} onInput={() => setIsDirty(true)} onKeyDown={handleFormKeyDown} data-escape-guarded className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-5 py-3 border-b border-line-soft">
                     <div>
                         <h2 className="text-base font-bold text-ink m-0">Hourly Production Entry</h2>
                     </div>
                     <div className="flex justify-end">
-                        <BackButton to="/daily-machine-planning" text="Back to Planning" />
+                        <BackButton text="Back to Planning" onClick={() => setBackConfirmOpen(true)} />
                     </div>
                 </div>
 
@@ -728,118 +950,51 @@ const HourlyWorkReportCreate: React.FC = () => {
                         </div>
                     </div>
                 )}
-                <div className="flex flex-col md:flex-row gap-4 px-5 py-4">
+                <div className="flex flex-col md:flex-row gap-0 px-5 py-3">
 
-                    {/* Left Side: Plan Details */}
-                    <div className="w-full md:w-5/12 lg:w-4/12 flex flex-col gap-3 sticky top-6 self-start">
-                        <div>
-                            <h6 className="font-bold text-xs text-ink-muted m-0 uppercase tracking-wider">Plan Details</h6>
-                        </div>
-                        <div>
-                            <div className="flex flex-col gap-3">
-                                {/* Daily Production Plan dropdown when not prefilled */}
-                                {!isPreFilled ? (
-                                    <div>
-                                        <SelectInput
-                                            label="Daily Production Plan"
-                                            name="selectedDailyPlanId"
-                                            value={selectedDailyPlanId}
-                                            required
-                                            options={dailyPlans.map((dp) => ({
-                                                label: `${dp.dailyPlanId} — PO: ${dp.productionOrderId} — Date: ${dp.productionDate?.split("T")[0]} — Machine: ${dp.machineId} — Shift: ${dp.shiftId}`,
-                                                value: dp.dailyPlanId
-                                            }))}
-                                            onChange={(e) => handleDailyPlanSelect(e.target.value)}
-                                            defaultOptionLabel="— Select Daily Production Plan —"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <TextInput
-                                            label="Daily Production Plan ID"
-                                            name="dailyPlanId"
-                                            value={dailyPlanId || ""}
-                                            disabled
-                                        />
-                                    </div>
-                                )}
-
-                                <div>
-                                    <TextInput
-                                        label="Machine"
-                                        name="machineId"
-                                        value={machines.find((m: any) => m.machineId === machineId)?.machineName || machineId || "—"}
-                                        disabled
-                                    />
-                                </div>
-                                <div>
-                                    <TextInput
-                                        label="Production Date"
-                                        name="productionDate"
-                                        value={productionDate || "—"}
-                                        disabled
-                                    />
-                                </div>
-                                <div>
-                                    <TextInput
-                                        label="Shift"
-                                        name="shiftId"
-                                        value={shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId || "—"}
-                                        disabled
-                                    />
-                                </div>
-
-                            </div>
+                    {/* Col 1: Plan Details */}
+                    <div className="w-full md:w-3/12 flex flex-col gap-1.5 border-r border-line-soft pr-4">
+                        <h6 className="font-bold text-xs text-ink-muted m-0 uppercase tracking-wider">Plan Details</h6>
+                        <div className="flex flex-col gap-1.5">
+                            {!isPreFilled ? (
+                                <SelectInput
+                                    horizontal
+                                    label="Daily Plan"
+                                    name="selectedDailyPlanId"
+                                    value={selectedDailyPlanId}
+                                    required
+                                    options={dailyPlans.map((dp) => ({
+                                        label: `${dp.dailyPlanId} — PO: ${dp.productionOrderId} — Date: ${dp.productionDate?.split("T")[0]} — Machine: ${dp.machineId} — Shift: ${dp.shiftId}`,
+                                        value: dp.dailyPlanId
+                                    }))}
+                                    onChange={(e) => handleDailyPlanSelect(e.target.value)}
+                                    defaultOptionLabel="— Select Daily Plan —"
+                                />
+                            ) : (
+                                <TextInput
+                                    horizontal
+                                    label="Daily Plan ID"
+                                    name="dailyPlanId"
+                                    value={dailyPlanId || ""}
+                                    disabled
+                                />
+                            )}
+                            <TextInput horizontal label="Machine" name="machineId"
+                                value={machines.find((m: any) => m.machineId === machineId)?.machineName || machineId || "—"} disabled />
+                            <TextInput horizontal label="Date" name="productionDate" value={productionDate || "—"} disabled />
+                            <TextInput horizontal label="Shift" name="shiftId"
+                                value={shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId || "—"} disabled />
                         </div>
                     </div>
 
-                    {/* Right Side: Active Plan + Hourly Entry Log */}
-                    <div className="w-full md:w-7/12 lg:w-8/12 flex flex-col gap-3">
-                        {/* Active Plan Card — horizontal layout at top */}
-                        {loadingPlan ? (
-                            <div className="text-center py-3">
-                                <div className="animate-spin rounded-full border-2 border-primary border-t-transparent h-4 w-4 mr-2 inline-block align-middle"></div>
-                                <span className="text-ink-subtle text-xs font-semibold">Loading active plan...</span>
-                            </div>
-                        ) : activePlan ? (
-                            <div className="p-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-between gap-4">
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2 mb-2 font-bold text-xs tracking-wider text-indigo-400">
-                                        <FaCheckCircle />
-                                        <span>ACTIVE PLAN LOADED</span>
-                                    </div>
-                                    <strong className="text-base text-primary font-black block leading-tight">{activePlan.productionOrderId}</strong>
-                                    <span className="text-sm text-ink font-bold block truncate">{activePlan.productName}</span>
-                                    {activePlan.productCode && <span className="text-ink-subtle text-xs font-mono">({activePlan.productCode})</span>}
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 text-center shrink-0">
-                                    <div className="bg-card-2 px-3 py-2 rounded-xl border border-line-soft">
-                                        <span className="text-ink-subtle block text-[10px] tracking-wider font-extrabold">TARGET</span>
-                                        <strong className="text-sm text-ink font-bold">{activePlan.plannedQty}</strong>
-                                    </div>
-                                    <div className="bg-emerald-500/15 px-3 py-2 rounded-xl border border-emerald-500/30">
-                                        <span className="text-emerald-400 block text-[10px] tracking-wider font-extrabold">PRODUCED</span>
-                                        <strong className="text-sm text-emerald-300 font-bold">{shiftProducedQty}</strong>
-                                    </div>
-                                    <div className="bg-amber-500/15 px-3 py-2 rounded-xl border border-amber-500/30">
-                                        <span className="text-amber-400 block text-[10px] tracking-wider font-extrabold">REMAINING</span>
-                                        <strong className="text-sm text-amber-300 font-bold">{remainingQtyForShift}</strong>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-amber-500/15 text-amber-300 px-4 py-2.5 rounded-xl flex items-center gap-3 border border-amber-500/30">
-                                <FaInfoCircle className="text-amber-400 shrink-0" />
-                                <p className="mb-0 text-xs text-amber-300/90 font-medium">No active plan. Select a valid Daily Production Plan to begin.</p>
-                            </div>
-                        )}
-
-                        <h6 className="font-bold text-xs text-ink-muted mb-0 uppercase tracking-wider">Hourly Entry Log</h6>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                            <div className="flex flex-col">
+                    {/* Col 2: Hourly Entry Log */}
+                    <div className="w-full md:w-5/12 flex flex-col gap-1.5 border-r border-line-soft px-4">
+                        <h6 className="font-bold text-xs text-ink-muted m-0 uppercase tracking-wider">Hourly Entry Log</h6>
+                        <div className="flex flex-col gap-1.5">
+                            <div>
                                 <SelectInput
-                                    label="Hour index of Shift"
+                                    horizontal
+                                    label="Hour of Shift"
                                     name="hourIndex"
                                     value={hourIndex}
                                     options={hourOptions}
@@ -855,184 +1010,172 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     const filledIndices = existingLogs.map(log => Number(log.hourIndex));
                                     const maxFilled = filledIndices.length > 0 ? Math.max(...filledIndices) : 0;
                                     const nextRequiredHour = maxFilled + 1;
-                                    
                                     if (limit > 0 && nextRequiredHour > limit && limit < hourOptions.length && !editingLogId) {
                                         return (
-                                            <div className="mt-2 text-xs text-amber-400 bg-amber-500/10 p-2 rounded border border-amber-500/30">
-                                                <strong>Plan Completed:</strong> {limit} hours planned and logged. Remaining shift hours can be allocated to a new plan.
+                                            <div className="mt-1 text-xs text-amber-400 bg-amber-500/10 p-1.5 rounded border border-amber-500/30">
+                                                <strong>Plan Completed:</strong> {limit} hours logged. Remaining can go to a new plan.
                                             </div>
                                         );
                                     }
                                     return null;
                                 })()}
                             </div>
-                            <div>
-                                <SelectInput
-                                    label="Operator"
-                                    name="operatorId"
-                                    value={operatorId}
-                                    required
-                                    error={formErrors.operatorId || (planError && planError.includes("operator") ? planError : undefined)}
-                                    disabled={loadingPlan || availableOperators.length === 0}
-                                    defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}
-                                    options={availableOperators.map(op => ({
-                                        value: op.id.toString(),
-                                        label: op.fullName
-                                    }))}
-                                    onChange={(e: any) => {
-                                        userSelectedOperator.current = true;
-                                        setOperatorId(e.target.value);
-                                        setFormErrors((prev) => ({ ...prev, operatorId: "" }));
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Produced Qty"
-                                    name="qtyProduced"
-                                    value={qtyProduced}
-                                    type="number"
-                                    step="1"
-                                    required
-                                    placeholder="Enter produced amount"
-                                    error={formErrors.qtyProduced}
-                                    onChange={(e) => {
-                                        setQtyProduced(e.target.value);
-                                        setFormErrors((prev) => ({ ...prev, qtyProduced: "" }));
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Reject Qty"
-                                    name="rejectQty"
-                                    value={rejectQty}
-                                    type="number"
-                                    step="1"
-                                    placeholder="Enter reject amount"
-                                    error={formErrors.rejectQty}
-                                    onChange={(e) => {
-                                        setRejectQty(e.target.value);
-                                        setFormErrors((prev) => ({ ...prev, rejectQty: "" }));
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Scrap Qty"
-                                    name="scrapQty"
-                                    value={scrapQty}
-                                    type="number"
-                                    step="1"
-                                    placeholder="Enter scrap amount"
-                                    error={formErrors.scrapQty}
-                                    onChange={(e) => {
-                                        setScrapQty(e.target.value);
-                                        setFormErrors((prev) => ({ ...prev, scrapQty: "" }));
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <QuantityInput
-                                    label="Downtime"
-                                    name="downtime"
-                                    value={downtime}
-                                    baseUoms="mins,hrs"
-                                    error={formErrors.downtime}
-                                    onChange={(e) => {
-                                        setDowntime(e.target.value);
-                                        setFormErrors((prev) => ({ ...prev, downtime: "" }));
-                                    }}
-                                />
-                            </div>
-                            {Number(downtime) > 0 && (
-                                <div>
-                                    <SelectInput
-                                        label="Downtime Reason"
-                                        name="downtimeReason"
-                                        value={downtimeReason}
-                                        error={formErrors.downtimeReason}
-                                        onChange={(e) => {
-                                            setDowntimeReason(e.target.value);
-                                            setFormErrors((prev) => ({ ...prev, downtimeReason: "" }));
-                                        }}
-                                        options={[
-                                            { label: "Machine Breakdown", value: "Machine Breakdown" },
-                                            { label: "Power Failure", value: "Power Failure" },
-                                            { label: "Material Shortage", value: "Material Shortage" },
-                                            { label: "Tool/Mould Change", value: "Tool/Mould Change" },
-                                            { label: "Operator Unavailable", value: "Operator Unavailable" },
-                                            { label: "Quality Issue", value: "Quality Issue" },
-                                            { label: "Preventative Maintenance", value: "Preventative Maintenance" },
-                                            { label: "Others", value: "Others" },
-                                        ]}
+                            <SelectInput
+                                horizontal
+                                label="Operator"
+                                name="operatorId"
+                                value={operatorId}
+                                required
+                                error={formErrors.operatorId || (planError && planError.includes("operator") ? planError : undefined)}
+                                disabled={loadingPlan || availableOperators.length === 0}
+                                defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}
+                                options={availableOperators.map(op => ({ value: op.id.toString(), label: op.fullName }))}
+                                onChange={(e: any) => {
+                                    userSelectedOperator.current = true;
+                                    setOperatorId(e.target.value);
+                                    setFormErrors((prev) => ({ ...prev, operatorId: "" }));
+                                }}
+                            />
+                            <TextInput horizontal label="Produced Qty" name="qtyProduced" value={qtyProduced}
+                                type="number" step="1" required placeholder="Enter produced amount"
+                                error={formErrors.qtyProduced}
+                                onChange={(e) => { setQtyProduced(e.target.value); setFormErrors((prev) => ({ ...prev, qtyProduced: "" })); }}
+                            />
+                            {/* Reject Qty + Reject Reason — same row */}
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <TextInput horizontal label="Reject Qty" name="rejectQty" value={rejectQty}
+                                        type="number" step="1" placeholder="Enter reject amount"
+                                        error={formErrors.rejectQty}
+                                        onChange={(e) => { setRejectQty(e.target.value); setFormErrors((prev) => ({ ...prev, rejectQty: "" })); }}
                                     />
                                 </div>
-                            )}
-                            {Number(rejectQty) > 0 && (
-                                <div>
-                                    <SelectInput
-                                        label="Reject Reason"
-                                        name="rejectReason"
-                                        value={rejectReason}
-                                        error={formErrors.rejectReason}
-                                        onChange={(e) => {
-                                            setRejectReason(e.target.value);
-                                            setFormErrors((prev) => ({ ...prev, rejectReason: "" }));
-                                        }}
-                                        options={[
-                                            { value: "Quality Issue", label: "Quality Issue" },
-                                            { value: "Machine Defect", label: "Machine Defect" },
-                                            { value: "Material Defect", label: "Material Defect" },
-                                            { value: "Operator Error", label: "Operator Error" },
-                                            { value: "Others", label: "Others" }
-                                        ]}
+                                {Number(rejectQty) > 0 && (
+                                    <div className="flex-1">
+                                        <SelectInput horizontal label="Reject Reason" name="rejectReason" value={rejectReason}
+                                            error={formErrors.rejectReason}
+                                            onChange={(e) => { setRejectReason(e.target.value); setFormErrors((prev) => ({ ...prev, rejectReason: "" })); }}
+                                            options={[
+                                                { value: "Quality Issue", label: "Quality Issue" },
+                                                { value: "Machine Defect", label: "Machine Defect" },
+                                                { value: "Material Defect", label: "Material Defect" },
+                                                { value: "Operator Error", label: "Operator Error" },
+                                                { value: "Others", label: "Others" }
+                                            ]}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Scrap Qty + Scrap Reason — same row */}
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <TextInput horizontal label="Scrap Qty" name="scrapQty" value={scrapQty}
+                                        type="number" step="1" placeholder="Enter scrap amount"
+                                        error={formErrors.scrapQty}
+                                        onChange={(e) => { setScrapQty(e.target.value); setFormErrors((prev) => ({ ...prev, scrapQty: "" })); }}
                                     />
                                 </div>
-                            )}
-                            {Number(scrapQty) > 0 && (
-                                <div>
-                                    <SelectInput
-                                        label="Scrap Reason"
-                                        name="scrapReason"
-                                        value={scrapReason}
-                                        error={formErrors.scrapReason}
-                                        onChange={(e) => {
-                                            setScrapReason(e.target.value);
-                                            setFormErrors((prev) => ({ ...prev, scrapReason: "" }));
-                                        }}
-                                        options={[
-                                            { value: "Startup Scrap", label: "Startup Scrap" },
-                                            { value: "Process Setting", label: "Process Setting" },
-                                            { value: "Material Purging", label: "Material Purging" },
-                                            { value: "Others", label: "Others" }
-                                        ]}
+                                {Number(scrapQty) > 0 && (
+                                    <div className="flex-1">
+                                        <SelectInput horizontal label="Scrap Reason" name="scrapReason" value={scrapReason}
+                                            error={formErrors.scrapReason}
+                                            onChange={(e) => { setScrapReason(e.target.value); setFormErrors((prev) => ({ ...prev, scrapReason: "" })); }}
+                                            options={[
+                                                { value: "Startup Scrap", label: "Startup Scrap" },
+                                                { value: "Process Setting", label: "Process Setting" },
+                                                { value: "Material Purging", label: "Material Purging" },
+                                                { value: "Others", label: "Others" }
+                                            ]}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Downtime + Downtime Reason — same row */}
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <QuantityInput horizontal label="Downtime" name="downtime" value={downtime}
+                                        baseUoms="mins,hrs" error={formErrors.downtime}
+                                        onChange={(e) => { setDowntime(e.target.value); setFormErrors((prev) => ({ ...prev, downtime: "" })); }}
                                     />
                                 </div>
-                            )}
+                                {Number(downtime) > 0 && (
+                                    <div className="flex-1">
+                                        <SelectInput horizontal label="Downtime Reason" name="downtimeReason" value={downtimeReason}
+                                            error={formErrors.downtimeReason}
+                                            onChange={(e) => { setDowntimeReason(e.target.value); setFormErrors((prev) => ({ ...prev, downtimeReason: "" })); }}
+                                            options={[
+                                                { label: "Machine Breakdown", value: "Machine Breakdown" },
+                                                { label: "Power Failure", value: "Power Failure" },
+                                                { label: "Material Shortage", value: "Material Shortage" },
+                                                { label: "Tool/Mould Change", value: "Tool/Mould Change" },
+                                                { label: "Operator Unavailable", value: "Operator Unavailable" },
+                                                { label: "Quality Issue", value: "Quality Issue" },
+                                                { label: "Preventative Maintenance", value: "Preventative Maintenance" },
+                                                { label: "Others", value: "Others" },
+                                            ]}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                             {(downtimeReason === "Others" || rejectReason === "Others" || scrapReason === "Others") && (
-                                <div>
-                                    <TextInput
-                                        label="Remarks (Reason for Others)"
-                                        name="remarks"
-                                        value={remarks}
-                                        required
-                                        placeholder="Enter specific reason"
-                                        error={formErrors.remarks}
-                                        onChange={(e) => {
-                                            setRemarks(e.target.value);
-                                            setFormErrors((prev) => ({ ...prev, remarks: "" }));
-                                        }}
-                                    />
-                                </div>
+                                <TextInput horizontal label="Remarks" name="remarks" value={remarks}
+                                    required placeholder="Enter specific reason"
+                                    error={formErrors.remarks}
+                                    onChange={(e) => { setRemarks(e.target.value); setFormErrors((prev) => ({ ...prev, remarks: "" })); }}
+                                />
                             )}
                         </div>
                     </div>
+
+                    {/* Col 3: Active Plan Loaded */}
+                    <div className="w-full md:w-4/12 flex flex-col gap-2 pl-4">
+                        <h6 className="font-bold text-xs text-ink-muted m-0 uppercase tracking-wider">Active Plan Loaded</h6>
+                        {loadingPlan ? (
+                            <div className="text-center py-3">
+                                <div className="animate-spin rounded-full border-2 border-primary border-t-transparent h-3 w-3 mr-2 inline-block align-middle"></div>
+                                <span className="text-ink-subtle text-xs font-semibold">Loading...</span>
+                            </div>
+                        ) : activePlan ? (
+                            <div className="px-3 py-3 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex flex-col gap-2">
+                                <div className="flex items-center gap-1.5 font-bold text-[10px] tracking-wider text-indigo-400">
+                                    <FaCheckCircle />
+                                    <span>ACTIVE PLAN LOADED</span>
+                                </div>
+                                <div>
+                                    <strong className="text-sm text-primary font-black block leading-tight">{activePlan.productionOrderId}</strong>
+                                    <span className="text-xs text-ink font-bold block">{activePlan.productName}</span>
+                                    {activePlan.productCode && <span className="text-ink-subtle text-[10px] font-mono">({activePlan.productCode})</span>}
+                                </div>
+                                <div className="grid grid-cols-3 gap-1.5 text-center mt-1">
+                                    <div className="bg-card-2 px-2 py-2 rounded-lg border border-line-soft">
+                                        <span className="text-ink-subtle block text-[9px] tracking-wider font-extrabold">TARGET</span>
+                                        <strong className="text-xs text-ink font-bold">{activePlan.plannedQty}</strong>
+                                    </div>
+                                    <div className="bg-emerald-500/15 px-2 py-2 rounded-lg border border-emerald-500/30">
+                                        <span className="text-emerald-400 block text-[9px] tracking-wider font-extrabold">PRODUCED</span>
+                                        <strong className="text-xs text-emerald-300 font-bold">{shiftProducedQty}</strong>
+                                    </div>
+                                    <div className="bg-amber-500/15 px-2 py-2 rounded-lg border border-amber-500/30">
+                                        <span className="text-amber-400 block text-[9px] tracking-wider font-extrabold">REMAINING</span>
+                                        <strong className="text-xs text-amber-300 font-bold">{remainingQtyForShift}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-amber-500/15 text-amber-300 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-500/30">
+                                <FaInfoCircle className="text-amber-400 shrink-0 text-xs" />
+                                <p className="mb-0 text-xs text-amber-300/90 font-medium">No active plan. Select a valid Daily Production Plan to begin.</p>
+                            </div>
+                        )}
+                    </div>
+
                 </div>
 
                 {/* Stop Section — full width */}
                 {hourOptions.length > 0 && dailyPlanId && (
-                    <div className="px-5 pt-4 pb-4 border-t border-line-soft">
+                    <div className="px-5 pt-2 pb-2 border-t border-line-soft">
                                 <Form.Check
                                     type="switch"
                                     id="stop-plan-early-switch"
@@ -1138,352 +1281,76 @@ const HourlyWorkReportCreate: React.FC = () => {
                             </div>
                 )}
 
-                {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
-                    <div className="px-5 pt-4 pb-4 border-t border-line-soft">
-                                {/* Info Banner */}
-                                <div className="bg-amber-500/10 border border-amber-500/25 px-3 py-2 flex items-center gap-2 rounded-lg mb-3">
-                                    <span className="text-xs font-bold text-amber-400 shrink-0">
-                                        {stopPlanEarly ? "🛑 Log Wastage (Optional)" : "Final Hour — Log Wastage (Required)"}
-                                    </span>
-                                    <span className="text-xs text-amber-300/80 font-medium">
-                                        {stopPlanEarly
-                                            ? "Add rows below only if wastage occurred."
-                                            : "At least one wastage entry is required."}
-                                    </span>
-                                </div>
+                {/* Wastage Products + Returned Raw Materials — side by side */}
+                <div className="px-5 pt-3 pb-3 border-t border-line-soft">
+                    {/* Info Banner: shown only on final hour or stop early */}
+                    {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
+                        <div className="bg-amber-500/10 border border-amber-500/25 px-3 py-2 flex items-center gap-2 rounded-lg mb-3">
+                            <span className="text-xs font-bold text-amber-400 shrink-0">
+                                {stopPlanEarly ? "🛑 Log Wastage (Optional)" : "Final Hour — Log Wastage (Required)"}
+                            </span>
+                            <span className="text-xs text-amber-300/80 font-medium">
+                                {stopPlanEarly
+                                    ? "Add rows below only if wastage occurred."
+                                    : "At least one wastage entry is required."}
+                            </span>
+                        </div>
+                    )}
 
-                                {/* Wastage error (when final hour + no rows) */}
-                                {formErrors.logWastage && (
-                                    <p className="mb-4 text-xs font-semibold text-red-400 bg-red-500/15 border border-red-500/30 rounded-lg px-3 py-2">
-                                        ⚠️ {formErrors.logWastage}
-                                    </p>
-                                )}
+                    {/* Wastage error */}
+                    {formErrors.logWastage && (
+                        <p className="mb-3 text-xs font-semibold text-red-400 bg-red-500/15 border border-red-500/30 rounded-lg px-3 py-2">
+                            ⚠️ {formErrors.logWastage}
+                        </p>
+                    )}
 
-                                {/* Wastage Table — always shown (no checkbox) */}
-                                <div className="mt-4 p-5 border border-line-soft rounded-2xl bg-card-2 shadow-xs">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-bold text-ink text-[15px] m-0 leading-tight">
-                                            Wastage Products
-                                            {!stopPlanEarly && <span className="text-red-400 ml-1">*</span>}
-                                            {stopPlanEarly && <span className="ml-2 text-xs text-ink-subtle font-normal">(optional)</span>}
-                                        </h4>
-                                        <CustomButton
-                                            size="sm"
-                                            variant="secondary"
-                                            icon={FaPlus}
-                                            text=" Add Wastage Product"
-                                            onClick={() => {
-                                                setFormErrors((prev) => ({ ...prev, logWastage: "" }));
-                                                setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }]);
-                                            }}
-                                        />
-                                    </div>
-
-                                    {wastages.length === 0 ? (
-                                        <div className="text-center py-8 text-ink-subtle font-semibold text-sm border-2 border-dashed border-line-soft bg-card/40 rounded-xl">
-                                            {stopPlanEarly
-                                                ? "No wastage products added. Click '+ Add Wastage Product' if needed."
-                                                : "No wastage products added yet. Click '+ Add Wastage Product' to add one."}
-                                        </div>
-                                    ) : (
-                                        <div className="bg-card border border-line-soft rounded-xl overflow-visible mt-3">
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left text-sm whitespace-nowrap">
-                                                    <thead>
-                                                        <tr className="border-b border-line-soft text-xs font-bold text-ink-subtle uppercase tracking-wider">
-                                                            <th className="px-4 py-3 bg-card-2 min-w-[160px]">Store <span className="text-red-400">*</span></th>
-                                                            <th className="px-4 py-3 bg-card-2 min-w-[220px]">Wastage Product <span className="text-red-400">*</span></th>
-                                                            <th className="px-4 py-3 bg-card-2 min-w-[180px]">Quantity <span className="text-red-400">*</span></th>
-                                                            <th className="px-4 py-3 bg-card-2 text-center w-[80px]">Action</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-line-soft">
-                                                        {wastages.map((w, index) => (
-                                                            <tr key={index} className="hover:bg-card-2/60 transition-colors">
-                                                                <td className="px-4 py-3 align-top min-w-[160px]">
-                                                                    <SelectInput
-                                                                        label=""
-                                                                        hideLabel
-                                                                        noMargin
-                                                                        name={`storeId-${index}`}
-                                                                        value={w.storeId}
-                                                                        onChange={(e) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].storeId = e.target.value;
-                                                                            newW[index].storeError = "";
-                                                                            newW[index].targetWastageProductId = "";
-                                                                            newW[index].productError = "";
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        options={[
-                                                                            { label: "Select Store", value: "" },
-                                                                            ...wastageStores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
-                                                                        ]}
-                                                                        required
-                                                                        error={w.storeError}
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-3 align-top min-w-[220px]">
-                                                                    <SelectInput
-                                                                        label=""
-                                                                        hideLabel
-                                                                        noMargin
-                                                                        name={`targetWastageProductId-${index}`}
-                                                                        value={w.targetWastageProductId}
-                                                                        onChange={(e) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].targetWastageProductId = e.target.value;
-                                                                            newW[index].productError = "";
-                                                                            const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
-                                                                            if (rm) {
-                                                                                let uoms = rm.baseUom || "kg";
-                                                                                if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
-                                                                                else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
-                                                                                    try { uoms = JSON.parse(rm.baseUom).join(','); } catch (e) { }
-                                                                                }
-                                                                                newW[index].uom = uoms;
-                                                                                // Only reset selectedUom to primary if none was set yet.
-                                                                                // This prevents overwriting the UOM the user already chose.
-                                                                                if (!newW[index].selectedUom) {
-                                                                                    const opts = getUomOptions(uoms);
-                                                                                    newW[index].selectedUom = opts.length > 0 ? opts[0].value : "";
-                                                                                }
-                                                                            } else {
-                                                                                newW[index].uom = "";
-                                                                                newW[index].selectedUom = "";
-                                                                            }
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        options={[
-                                                                            { label: "Select Product", value: "" },
-                                                                            ...rawMaterials
-                                                                                .filter((r: any) => {
-                                                                                    if (!w.storeId) return true;
-                                                                                    const rmStoreId = r.storeId || r.store?.storeId;
-                                                                                    return rmStoreId && String(rmStoreId) === String(w.storeId);
-                                                                                })
-                                                                                .map((r: any) => {
-                                                                                    const isSelectedInOtherRow = wastages.some((otherW, otherIdx) => otherIdx !== index && otherW.targetWastageProductId === r.rawMaterialId);
-                                                                                    return {
-                                                                                        label: `${r.materialName} (${r.rawMaterialId})`,
-                                                                                        value: r.rawMaterialId,
-                                                                                        disabled: isSelectedInOtherRow
-                                                                                    };
-                                                                                })
-                                                                        ]}
-                                                                        disabled={!w.storeId}
-                                                                        required
-                                                                        error={w.productError}
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-3 align-top min-w-[180px]">
-                                                                    <QuantityInput
-                                                                        label=""
-                                                                        hideLabel
-                                                                        name={`quantity-${index}`}
-                                                                        value={w.quantity}
-                                                                        uom={w.selectedUom || undefined}
-                                                                        onUomChange={(uomVal) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].selectedUom = uomVal;
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        onChange={(e) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].quantity = e.target.value;
-                                                                            if (e.target.uom) {
-                                                                                newW[index].selectedUom = e.target.uom;
-                                                                            }
-                                                                            newW[index].quantityError = "";
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        baseUoms={w.uom || "KG"}
-                                                                        required
-                                                                        error={w.quantityError}
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-3 align-middle text-center w-[80px]">
-                                                                    <DeleteButton
-                                                                        onClick={() => {
-                                                                            const newW = [...wastages];
-                                                                            newW.splice(index, 1);
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                    />
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        {/* Wastage Products */}
+                        <div className="flex flex-col">
+                            <div className="mb-1">
+                                <span className="text-sm font-semibold text-ink">
+                                    Wastage Products
+                                    {hourOptions.length > 0 && Number(hourIndex) === hourOptions.length && !stopPlanEarly && (
+                                        <span className="text-red-400 ml-1">*</span>
                                     )}
-                                </div>
-                            </div>
-                )}
-
-                {/* Returned Raw Materials */}
-                {(isFinalHour || stopPlanEarly) && (
-                    <div className="mx-5 mb-4 p-4 border border-line-soft rounded-2xl bg-card-2 shadow-xs">
-                                <div className="flex justify-between items-center mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div>
-                                            <h4 className="font-bold text-ink text-[15px] m-0 leading-tight">
-                                                Returned Raw Materials
-                                            </h4>
-                                            <p className="text-xs text-ink-subtle m-0 font-medium">
-                                                Log remaining raw materials returned to the warehouse.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <CustomButton
-                                        size="sm"
-                                        variant="secondary"
-                                        icon={FaPlus}
-                                        text=" Add Raw Material"
-                                        onClick={() => {
-                                            setRawMaterialsUsed([...rawMaterialsUsed, { storeId: "", rawMaterialId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }]);
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="bg-card border border-line-soft rounded-xl overflow-hidden mt-3">
-                                    {rawMaterialsUsed.length === 0 ? (
-                                        <div className="p-6 text-center text-ink-subtle font-semibold text-sm border-2 border-dashed border-line-soft bg-card/40 rounded-xl">
-                                            No raw materials logged. Click '+ Add Raw Material' to add one.
-                                        </div>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                                <thead>
-                                                    <tr className="border-b border-line-soft text-xs font-bold text-ink-subtle uppercase tracking-wider">
-                                                        <th className="px-4 py-3 bg-card-2 min-w-[160px]">Store <span className="text-red-400">*</span></th>
-                                                        <th className="px-4 py-3 bg-card-2 min-w-[220px]">Raw Material <span className="text-red-400">*</span></th>
-                                                        <th className="px-4 py-3 bg-card-2 min-w-[180px]">Quantity <span className="text-red-400">*</span></th>
-                                                        <th className="px-4 py-3 bg-card-2 text-center w-[80px]">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-line-soft">
-                                                    {rawMaterialsUsed.map((rm, index) => (
-                                                        <tr key={`rm-${index}`}>
-                                                            <td className="px-4 py-3 align-top min-w-[160px]">
-                                                                <SelectInput
-                                                                    hideLabel={true}
-                                                                    noMargin
-                                                                    name={`rm-store-${index}`}
-                                                                    value={rm.storeId}
-                                                                    options={[
-                                                                        { value: "", label: "-- Select Store --" },
-                                                                        ...rawMaterialStores.map((s: any) => ({
-                                                                            value: s.storeId,
-                                                                            label: s.storeName || s.storeId
-                                                                        }))
-                                                                    ]}
-                                                                    onChange={(e) => {
-                                                                        const newRm = [...rawMaterialsUsed];
-                                                                        newRm[index].storeId = e.target.value;
-                                                                        newRm[index].storeError = "";
-                                                                        newRm[index].rawMaterialId = ""; // Reset raw material when store changes
-                                                                        setRawMaterialsUsed(newRm);
-                                                                    }}
-                                                                    error={rm.storeError}
-                                                                />
-                                                            </td>
-                                                            <td className="px-4 py-3 align-top min-w-[220px]">
-                                                                <SelectInput
-                                                                    hideLabel={true}
-                                                                    name={`rm-id-${index}`}
-                                                                    value={rm.rawMaterialId}
-                                                                    options={[
-                                                                        { value: "", label: "-- Select Raw Material --" },
-                                                                        ...rawMaterialOptions
-                                                                            .filter((r: any) => {
-                                                                                if (r.itemType === "WASTAGE") return false;
-                                                                                if (r.store?.storeCategory === "WASTAGE") return false;
-                                                                                if (r.store?.storeName?.toLowerCase().includes("wastage")) return false;
-                                                                                if (r.category?.categoryName?.toLowerCase().includes("wastage")) return false;
-                                                                                if (r.materialName?.toLowerCase().startsWith("wastage")) return false;
-                                                                                return rm.storeId ? String(r.storeId) === String(rm.storeId) : true;
-                                                                            })
-                                                                            .map((r: any) => {
-                                                                                const isSelectedInOtherRow = rawMaterialsUsed.some(
-                                                                                    (otherRm, otherIdx) => otherIdx !== index && otherRm.rawMaterialId === r.rawMaterialId
-                                                                                );
-                                                                                return {
-                                                                                    value: r.rawMaterialId,
-                                                                                    label: `${r.rawMaterialId} - ${r.materialName}`,
-                                                                                    disabled: isSelectedInOtherRow
-                                                                                };
-                                                                            })
-                                                                    ]}
-                                                                    onChange={(e) => {
-                                                                        const newRm = [...rawMaterialsUsed];
-                                                                        newRm[index].rawMaterialId = e.target.value;
-                                                                        newRm[index].productError = "";
-                                                                        const matchedRm = rawMaterialOptions.find((r: any) => r.rawMaterialId === e.target.value);
-                                                                        if (matchedRm) {
-                                                                            const base = matchedRm.baseUom || "";
-                                                                            newRm[index].uom = base;
-                                                                            const opts = getUomOptions(base);
-                                                                            // Only reset selectedUom if it's empty or not valid for this product's UOM list.
-                                                                            const currentSelected = newRm[index].selectedUom || "";
-                                                                            const isValidForProduct = opts.some(o => o.value === currentSelected);
-                                                                            if (!currentSelected || !isValidForProduct) {
-                                                                                newRm[index].selectedUom = opts.length > 0 ? opts[0].value : "";
-                                                                            }
-                                                                        } else {
-                                                                            newRm[index].uom = "";
-                                                                            newRm[index].selectedUom = "";
-                                                                        }
-                                                                        setRawMaterialsUsed(newRm);
-                                                                    }}
-                                                                    error={rm.productError}
-                                                                />
-                                                            </td>
-                                                            <td className="px-4 py-3 align-top min-w-[180px]">
-                                                                <QuantityInput
-                                                                    label=""
-                                                                    hideLabel
-                                                                    name={`rm-qty-${index}`}
-                                                                    value={rm.quantity}
-                                                                    uom={rm.selectedUom || undefined}
-                                                                    onUomChange={(uomVal) => {
-                                                                        const newRm = [...rawMaterialsUsed];
-                                                                        newRm[index].selectedUom = uomVal;
-                                                                        setRawMaterialsUsed(newRm);
-                                                                    }}
-                                                                    onChange={(e) => {
-                                                                        const newRm = [...rawMaterialsUsed];
-                                                                        newRm[index].quantity = e.target.value;
-                                                                        if (e.target.uom) {
-                                                                            newRm[index].selectedUom = e.target.uom;
-                                                                        }
-                                                                        newRm[index].quantityError = "";
-                                                                        setRawMaterialsUsed(newRm);
-                                                                    }}
-                                                                    baseUoms={rm.uom || "KG"}
-                                                                    required
-                                                                    error={rm.quantityError}
-                                                                />
-                                                            </td>
-                                                            <td className="px-4 py-3 align-middle text-center w-[80px]">
-                                                                <DeleteButton
-                                                                    onClick={() => {
-                                                                        const newRm = [...rawMaterialsUsed];
-                                                                        newRm.splice(index, 1);
-                                                                        setRawMaterialsUsed(newRm);
-                                                                    }}
-                                                                />
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    {(stopPlanEarly || !(hourOptions.length > 0 && Number(hourIndex) === hourOptions.length)) && (
+                                        <span className="ml-2 text-xs text-ink-subtle font-normal">(optional)</span>
                                     )}
-                                </div>
+                                </span>
                             </div>
-                        )}
+                            <BusyItemsTable
+                                columns={wastageColumns}
+                                rows={wastages}
+                                onChange={setWastages}
+                                onAdd={() => setWastages(prev => [...prev, { storeId: "", targetWastageProductId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }])}
+                                emptyRow={{ storeId: "", targetWastageProductId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }}
+                                rowHeight={40}
+                                visibleRows={5}
+                                editable={false}
+                            />
+                        </div>
+
+                        {/* Returned Raw Materials */}
+                        <div className="flex flex-col">
+                            <div className="mb-1">
+                                <span className="text-sm font-semibold text-ink">
+                                    Returned Raw Materials
+                                    <span className="ml-2 text-xs text-ink-subtle font-normal">(optional)</span>
+                                </span>
+                            </div>
+                            <BusyItemsTable
+                                columns={returnedRmColumns}
+                                rows={rawMaterialsUsed}
+                                onChange={setRawMaterialsUsed}
+                                onAdd={() => setRawMaterialsUsed(prev => [...prev, { storeId: "", rawMaterialId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }])}
+                                emptyRow={{ storeId: "", rawMaterialId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }}
+                                rowHeight={40}
+                                visibleRows={5}
+                                editable={false}
+                            />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex justify-end items-center gap-3 px-5 py-3 border-t border-line-soft">
@@ -1612,6 +1479,21 @@ const HourlyWorkReportCreate: React.FC = () => {
             confirmVariant="primary"
             confirmIcon={FaCheck}
             onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/hourly-work-reports"); }}
+        />
+        <CommonConfirmModal
+            show={backConfirmOpen}
+            onHide={() => { setBackConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onConfirm={() => {
+                setBackConfirmOpen(false);
+                setTimeout(() => handleSubmitRef.current(), 150);
+            }}
+            title="Unsaved Entry"
+            message="Do you want to save this hourly entry before going back?"
+            confirmText="Save"
+            cancelText="Discard"
+            confirmVariant="primary"
+            confirmIcon={FaCheck}
+            onCancel={() => { setBackConfirmOpen(false); setIsDirty(false); navigate("/daily-machine-planning"); }}
         />
         </>
     );

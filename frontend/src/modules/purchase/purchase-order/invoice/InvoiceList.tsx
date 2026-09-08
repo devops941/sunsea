@@ -228,7 +228,7 @@ const InvoiceList: React.FC = () => {
                             width: "160px",
                             render: (item) => {
                                 return (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         <ViewButton onClick={() => navigate(`/invoice/details/${item.id}`)} />
                                         <EditButton onClick={() => navigate(`/invoice/edit/${item.id}`)} />
                                         <DeleteButton onClick={() => handleDeleteClick(item.id)} />

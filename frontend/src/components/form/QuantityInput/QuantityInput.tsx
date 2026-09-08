@@ -12,6 +12,7 @@ interface QuantityInputProps {
   disabled?: boolean;
   step?: string;
   hideLabel?: boolean;
+  horizontal?: boolean;
   uom?: string;
   onUomChange?: (uom: string) => void;
 }
@@ -27,6 +28,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   disabled = false,
   step,
   hideLabel = false,
+  horizontal = false,
   uom,
   onUomChange,
 }) => {
@@ -86,16 +88,17 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   const primaryUom = uomList.length > 0 ? uomList[0] : "";
 
   return (
-    <div className={`w-full ${!hideLabel ? "mb-4" : ""} group`}>
+    <div className={`w-full group ${horizontal ? "flex items-start gap-3" : (!hideLabel ? "mb-4" : "")}`}>
       {!hideLabel && (
         <label
           className={`
-            flex items-center gap-[6px] mb-2
+            flex items-center gap-[6px]
             text-xs font-extrabold uppercase
             tracking-[0.5px]
             transition-colors duration-250
             ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
+            ${horizontal ? "shrink-0 w-[140px] mb-0 pt-[10px]" : "mb-2"}
           `}
         >
           <span>{label}</span>
@@ -105,7 +108,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
         </label>
       )}
 
-      <div className="flex relative rounded-md h-10 border border-line-soft focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-card-2">
+      <div className={`flex relative rounded-md h-10 border border-line-soft focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-card-2 ${horizontal ? "flex-1" : ""}`}>
         <input
           name={name}
           data-nav

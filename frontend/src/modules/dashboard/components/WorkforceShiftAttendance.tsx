@@ -20,18 +20,21 @@ interface WorkforceShiftAttendanceProps {
   employeesCount?: number;
   dailyPlans?: any[];
   weeklyPrograms?: any[];
+  isParentLoading?: boolean;
 }
 
 export const WorkforceShiftAttendance: React.FC<WorkforceShiftAttendanceProps> = ({
   employeesCount: initialEmpCount = 0,
   dailyPlans = [],
+  isParentLoading = false,
 }) => {
   const navigate = useNavigate();
 
   const [liveEmployees, setLiveEmployees] = useState<any[]>([]);
   const [liveShifts, setLiveShifts] = useState<any[]>([]);
   const [liveAttendanceRecords, setLiveAttendanceRecords] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [hasLoaded, setHasLoaded] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Current period in format "YYYY-MM" (e.g. "2026-09")
   const { currentPeriod, todayStr } = useMemo(() => {
@@ -79,9 +82,12 @@ export const WorkforceShiftAttendance: React.FC<WorkforceShiftAttendanceProps> =
       console.warn("Live workforce fetch fallback:", err);
     } finally {
       setIsLoading(false);
+      setHasLoaded(true);
       fetchingRef.current = false;
     }
   }, [currentPeriod]);
+
+  const isOverallLoading = isLoading || isParentLoading || !hasLoaded;
 
   useEffect(() => {
     fetchLiveWorkforceData();
@@ -251,14 +257,20 @@ export const WorkforceShiftAttendance: React.FC<WorkforceShiftAttendanceProps> =
             <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-ink-muted mb-1">
               Present Today
             </div>
-            <div className="text-2xl font-mono font-black text-slate-900 dark:text-ink">
-              <span className={isMarkedToday && presentCount > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-ink"}>
-                {presentCount}
-              </span>{" "}
-              <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">/ {totalStaff}</span>
-            </div>
+            {isOverallLoading ? (
+              <div className="h-7 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-2xl font-mono font-black text-slate-900 dark:text-ink">
+                <span className={isMarkedToday && presentCount > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-ink"}>
+                  {presentCount}
+                </span>{" "}
+                <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">/ {totalStaff}</span>
+              </div>
+            )}
             <div className="text-[11px] font-bold flex items-center gap-1 mt-0.5">
-              {isMarkedToday ? (
+              {isOverallLoading ? (
+                <div className="h-3 w-28 bg-slate-200 dark:bg-card-2 rounded animate-pulse" />
+              ) : isMarkedToday ? (
                 <span className="text-emerald-600 dark:text-emerald-400">{turnoverRate}% Present Rate</span>
               ) : (
                 <span className="text-amber-600 dark:text-amber-400 font-semibold">● Not Marked Yet →</span>
@@ -280,14 +292,24 @@ export const WorkforceShiftAttendance: React.FC<WorkforceShiftAttendanceProps> =
             <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-ink-muted mb-1">
               Approved Leave / Off
             </div>
-            <div className="text-2xl font-mono font-black text-amber-600 dark:text-amber-400">
-              {leaveCount}{" "}
-              <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">
-                {absentCount > 0 ? `(${absentCount} abs)` : ""}
-              </span>
-            </div>
+            {isOverallLoading ? (
+              <div className="h-7 w-20 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-2xl font-mono font-black text-amber-600 dark:text-amber-400">
+                {leaveCount}{" "}
+                <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">
+                  {absentCount > 0 ? `(${absentCount} abs)` : ""}
+                </span>
+              </div>
+            )}
             <div className="text-[11px] text-slate-500 dark:text-ink-muted font-medium mt-0.5">
-              {isMarkedToday ? "Medical & Scheduled" : "No Leaves Recorded"}
+              {isOverallLoading ? (
+                <div className="h-3 w-28 bg-slate-200 dark:bg-card-2 rounded animate-pulse" />
+              ) : isMarkedToday ? (
+                "Medical & Scheduled"
+              ) : (
+                "No Leaves Recorded"
+              )}
             </div>
           </div>
           <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
@@ -306,10 +328,14 @@ export const WorkforceShiftAttendance: React.FC<WorkforceShiftAttendanceProps> =
               <FaSun className="text-amber-500 text-[11px]" />
               <span className="truncate max-w-[130px]">{shift1Name}</span>
             </div>
-            <div className="text-2xl font-mono font-black text-slate-900 dark:text-ink">
-              {shift1Count} <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">{isMarkedToday ? "Active" : "Checked In"}</span>
-            </div>
-            <div className="text-[11px] text-slate-500 dark:text-ink-muted font-medium mt-0.5">{shift1Time}</div>
+            {isOverallLoading ? (
+              <div className="h-7 w-20 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-2xl font-mono font-black text-slate-900 dark:text-ink">
+                {shift1Count} <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">{isMarkedToday ? "Active" : "Checked In"}</span>
+              </div>
+            )}
+            <div className="text-[11px] text-slate-500 dark:text-ink-muted font-medium mt-0.5">{isOverallLoading ? "Loading shift hours..." : shift1Time}</div>
           </div>
           <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
             <FaCogs className="text-lg" />
@@ -327,10 +353,14 @@ export const WorkforceShiftAttendance: React.FC<WorkforceShiftAttendanceProps> =
               <FaMoon className="text-indigo-400 text-[11px]" />
               <span className="truncate max-w-[130px]">{shift2Name}</span>
             </div>
-            <div className="text-2xl font-mono font-black text-slate-900 dark:text-ink">
-              {shift2Count} <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">{isMarkedToday ? "Active" : "Checked In"}</span>
-            </div>
-            <div className="text-[11px] text-slate-500 dark:text-ink-muted font-medium mt-0.5">{shift2Time}</div>
+            {isOverallLoading ? (
+              <div className="h-7 w-20 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-2xl font-mono font-black text-slate-900 dark:text-ink">
+                {shift2Count} <span className="text-xs text-slate-500 dark:text-ink-muted font-normal">{isMarkedToday ? "Active" : "Checked In"}</span>
+              </div>
+            )}
+            <div className="text-[11px] text-slate-500 dark:text-ink-muted font-medium mt-0.5">{isOverallLoading ? "Loading shift hours..." : shift2Time}</div>
           </div>
           <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:scale-105 transition-transform">
             <FaCogs className="text-lg" />

@@ -534,7 +534,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                         Production Order Details
                         <span className="text-primary text-sm font-semibold ml-2">{id}</span>
                     </h2>
-                    <BackButton text="Back to List" to="/production-orders" />
+                    <BackButton text="Back to List" to="/allproduction-orders" />
                 </div>
 
                 <div className="p-5 lg:p-6 space-y-6">

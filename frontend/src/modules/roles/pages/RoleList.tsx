@@ -527,7 +527,7 @@ const RoleList: React.FC = () => {
         {
             header: "Actions",
             render: (role) => (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {canViewRole && <ViewButton onClick={() => handleOpenView(role)} />}
                     {canEditRole && <EditButton onClick={() => handleOpenEdit(role)} />}
                     {canDeleteRole && <DeleteButton onClick={() => triggerDelete(role.id)} />}

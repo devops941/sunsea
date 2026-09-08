@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -30,6 +30,8 @@ import { ProductionOrderViewModal } from "../../production-orders/components/Pro
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
 import { usePermission } from "../../../hooks/usePermission";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import DailyPlanViewModal from "../components/DailyPlanViewModal";
 
 // ---------- helpers ----------
@@ -71,6 +73,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { can } = usePermission();
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const { data: machines } = useAppSelector((state: any) => state.machines);
   const { data: dailyPlans, loading } = useAppSelector((state: any) => state.dailyPlans);
@@ -220,8 +223,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   useSocketSync("productionOrder", undefined, loadDailyPlans);
 
   // ──────────────────────────────────────────────────────────────
-  // ──────────────────────────────────────────────────────────────
-  // Filtered data
+  // Filtered data & Pagination
   // ──────────────────────────────────────────────────────────────
   const allPlans = useMemo(() => Array.isArray(dailyPlans) ? dailyPlans : [], [dailyPlans]);
 
@@ -241,8 +243,6 @@ const DailyProductionPlanningPage: React.FC = () => {
     return filteredPlans.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredPlans, currentPage]);
 
-
-  // console.log({filteredPlans});
   const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
 
   // Stats (active plans only)
@@ -254,6 +254,41 @@ const DailyProductionPlanningPage: React.FC = () => {
     const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0);
     return { total, planned, running, completed, totalPlanned };
   }, [filteredPlans]);
+
+  const handleViewDailyPlan = useCallback((plan: any) => {
+    setSelectedDailyPlanForView(plan);
+    setShowDailyPlanViewModal(true);
+  }, []);
+
+  usePageShortcuts({
+    onRefresh: () => loadDailyPlans(),
+    onNew: () => { if (can("daily-machine-planning.create")) navigate("/daily-production-plans/create"); },
+    onDelete: () => setShowDeleteModal(true),
+    onExport: () => document.querySelector<HTMLButtonElement>("[data-export-btn]")?.click(),
+  });
+
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: paginatedPlans.length,
+    onEnter: (i) => { const plan = paginatedPlans[i]; if (plan) handleViewDailyPlan(plan); },
+    containerRef: tableRef,
+  });
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+      const inField = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement || active?.isContentEditable;
+      if (inField) return;
+      const isTableFocused = active === tableRef.current || tableRef.current?.contains(active) || active === document.body;
+      if (!isTableFocused) return;
+      if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        if (currentPage > 1) { e.preventDefault(); setCurrentPage(p => p - 1); }
+      } else if (e.key === "ArrowRight" || e.key === "PageDown") {
+        if (currentPage < totalPages) { e.preventDefault(); setCurrentPage(p => p + 1); }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [currentPage, totalPages]);
 
   // ──────────────────────────────────────────────────────────────
   // Form Handlers
@@ -334,11 +369,6 @@ const DailyProductionPlanningPage: React.FC = () => {
       toast.error(err || "Failed to update status");
     }
   };
-
-  const handleViewDailyPlan = useCallback((plan: any) => {
-    setSelectedDailyPlanForView(plan);
-    setShowDailyPlanViewModal(true);
-  }, []);
 
   const handleStopProductionClick = (plan: any) => {
     setStopPlan(plan);
@@ -1004,13 +1034,15 @@ const DailyProductionPlanningPage: React.FC = () => {
 
         {/* Daily Plans Table */}
         <div className="px-5 pb-4">
-        <div className="rounded-xl overflow-hidden border border-line-soft">
+        <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none focus:outline-none rounded-xl overflow-hidden border border-line-soft">
           <DataTable
             columns={columns}
             data={paginatedPlans}
             rowKey={(row) => row.dailyPlanId}
             loading={loading}
             density="compact"
+            rowClassName={(_: any, i: number) => i === focusedIndex ? "bg-primary/8" : ""}
+            onRowClick={(_row: any, i: number) => { setFocusedIndex(i); tableRef.current?.focus({ preventScroll: true }); }}
             pagination={{
               currentPage,
               totalPages,

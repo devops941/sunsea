@@ -44,6 +44,7 @@ interface InventoryStockIntelligenceProps {
   rawMaterialStocks?: any[];
   finishedGoodsStocks?: any[];
   allProducts?: any[];
+  isParentLoading?: boolean;
 }
 
 type InventoryTab = "raw" | "finished" | "wastage";
@@ -125,6 +126,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
   rawMaterialStocks: initialRawStocks = [],
   finishedGoodsStocks: initialFgStocks = [],
   allProducts: initialProducts = [],
+  isParentLoading = false,
 }) => {
   const navigate = useNavigate();
 
@@ -180,6 +182,8 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
   const [hasLoadedData, setHasLoadedData] = useState<boolean>(() => Boolean(initialRawMaterials?.length || initialRawStocks?.length || initialProducts?.length));
   const [isLoading, setIsLoading] = useState<boolean>(() => !initialRawMaterials?.length && !initialRawStocks?.length);
 
+  const isOverallLoading = isLoading || isParentLoading || !hasLoadedData;
+
   // Prevent concurrent fetches: if a socket event fires while a fetch is
   // in-flight, skip it — the in-flight response is already the freshest data.
   const fetchingRef = useRef(false);
@@ -234,70 +238,91 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
   }, [fetchLiveInventoryData]);
 
   // Real-time socket sync — ONE shared 300ms debounce across all 4 modules.
-  // Previously 4 separate useSocketSync calls each had their own 50ms timer,
-  // so a bulk update could trigger 4 independent refetches. Now they all
-  // share one timer: any event resets the window → single fetch at the end.
   usePageSocketSync(
     ["rawMaterialStock", "finishedGoodsStock", "rawMaterial", "product"],
     fetchLiveInventoryData
   );
 
+  // Refetch live inventory whenever the browser tab gains focus or user returns to page
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchLiveInventoryData();
+    };
+    window.addEventListener("focus", handleFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLiveInventoryData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchLiveInventoryData]);
+
   // Sync props if parent updates
   useEffect(() => {
     if (initialRawMaterials?.length > 0) {
-      setLiveRawMaterials(initialRawMaterials);
+      setLiveRawMaterials((prev) => (prev.length === 0 ? initialRawMaterials : prev));
       setHasLoadedData(true);
     }
   }, [initialRawMaterials]);
 
   useEffect(() => {
     if (initialProducts?.length > 0) {
-      setLiveProducts(initialProducts);
+      setLiveProducts((prev) => (prev.length === 0 ? initialProducts : prev));
       setHasLoadedData(true);
     }
   }, [initialProducts]);
 
   useEffect(() => {
     if (initialRawStocks?.length > 0) {
-      setLiveRawStocks(initialRawStocks);
+      setLiveRawStocks((prev) => (prev.length === 0 ? initialRawStocks : prev));
       setHasLoadedData(true);
     }
   }, [initialRawStocks]);
 
   useEffect(() => {
     if (initialFgStocks?.length > 0) {
-      setLiveFgStocks(initialFgStocks);
+      setLiveFgStocks((prev) => (prev.length === 0 ? initialFgStocks : prev));
       setHasLoadedData(true);
     }
   }, [initialFgStocks]);
 
   // 1. Process All Raw Stock Entries (Separating Standard Raw Materials from Wastage Store)
   const { rawStockItems, wastageStockItems } = useMemo(() => {
-    const list = liveRawMaterials.length > 0 ? liveRawMaterials : initialRawMaterials;
-    if (!Array.isArray(list) || list.length === 0) {
+    const rmList = liveRawMaterials.length > 0 ? liveRawMaterials : initialRawMaterials;
+    const rmStockList = liveRawStocks.length > 0 ? liveRawStocks : initialRawStocks;
+    if (!Array.isArray(rmList) || rmList.length === 0) {
       return { rawStockItems: [], wastageStockItems: [] };
     }
 
     const rawList: any[] = [];
     const wastageList: any[] = [];
 
-    list.forEach((rm: any, idx: number) => {
+    rmList.forEach((rm: any, idx: number) => {
       const name = rm.materialName || rm.name || rm.itemName || `Item #${rm.rawMaterialId || rm.id || idx + 1}`;
       const rmId = String(rm.rawMaterialId || rm.id || "");
       const isWastage = isWastageItem(rm, name);
 
       // Sum all store stock entries for this item
-      const matchingStocks = liveRawStocks.filter(
-        (s: any) => String(s.rawMaterialId) === rmId || String(s.rawMaterial?.rawMaterialId) === rmId || String(s.rawMaterial?.id) === rmId
+      const matchingStocks = rmStockList.filter(
+        (s: any) =>
+          (s.rawMaterialId != null && String(s.rawMaterialId) === rmId) ||
+          (s.rawMaterial?.rawMaterialId != null && String(s.rawMaterial.rawMaterialId) === rmId) ||
+          (s.rawMaterial?.id != null && String(s.rawMaterial.id) === rmId)
       );
 
       let hasRealStock = matchingStocks.length > 0;
-      let totalStockQty = matchingStocks.reduce(
-        (sum: number, s: any) => sum + (Number(s.onHandQty ?? s.currentStock ?? s.quantity ?? 0) || 0),
-        0
-      );
+      let totalStockQty = 0;
 
-      if (!hasRealStock && (rm.onHandQty !== undefined && rm.onHandQty !== null)) {
+      if (hasRealStock) {
+        totalStockQty = matchingStocks.reduce(
+          (sum: number, s: any) => sum + (Number(s.onHandQty ?? s.currentStock ?? s.quantity ?? 0) || 0),
+          0
+        );
+      } else if (rm.onHandQty !== undefined && rm.onHandQty !== null) {
         totalStockQty = Number(rm.onHandQty ?? rm.currentStock ?? rm.totalQuantity ?? rm.quantity ?? 0) || 0;
       }
 
@@ -323,10 +348,6 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         } else if (reorderLevel > 0 && totalStockQty <= reorderLevel) {
           isLow = true;
           status = "REORDER";
-        } else if (minStock === 0 && reorderLevel === 0 && totalStockQty === 0) {
-          isCritical = true;
-          isLow = true;
-          status = "CRITICAL";
         }
       }
 
@@ -359,29 +380,42 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
     });
 
     return { rawStockItems: rawList, wastageStockItems: wastageList };
-  }, [liveRawMaterials, initialRawMaterials, liveRawStocks]);
+  }, [liveRawMaterials, initialRawMaterials, liveRawStocks, initialRawStocks]);
 
   // 2. Process Finished Goods
   const finishedStockItems = useMemo(() => {
-    const list = liveProducts.length > 0 ? liveProducts : initialProducts;
-    if (!Array.isArray(list) || list.length === 0) return [];
+    const prodList = liveProducts.length > 0 ? liveProducts : initialProducts;
+    const fgList = liveFgStocks.length > 0 ? liveFgStocks : initialFgStocks;
+    if (!Array.isArray(prodList) || prodList.length === 0) return [];
 
-    return list.map((p: any, idx: number) => {
+    return prodList.map((p: any, idx: number) => {
       const name = p.productName || p.name || `Product #${p.id || idx + 1}`;
-      const pId = String(p.id || p.productId || "");
+      const pId = String(p.id ?? p.productId ?? "");
 
       // Sum all store stock entries for this product
-      const matchingFg = liveFgStocks.filter(
-        (fg: any) => String(fg.productItemId) === pId || String(fg.productId) === pId || String(fg.product?.id) === pId
+      const matchingFg = fgList.filter(
+        (fg: any) =>
+          (fg.productItemId != null && String(fg.productItemId) === pId) ||
+          (fg.productId != null && String(fg.productId) === pId) ||
+          (fg.product?.id != null && String(fg.product.id) === pId) ||
+          (fg.product?.productId != null && String(fg.product.productId) === pId)
       );
 
       let hasRealFgStock = matchingFg.length > 0;
-      let totalFgQty = matchingFg.reduce(
-        (sum: number, fg: any) => sum + (Number(fg.onHandQty ?? fg.currentStock ?? fg.quantity ?? 0) || 0),
-        0
-      );
+      let totalFgQty = 0;
 
-      if (!hasRealFgStock && (p.onHandQty != null || p.currentStock != null || p.stock != null || p.quantity != null)) {
+      if (hasRealFgStock) {
+        totalFgQty = matchingFg.reduce(
+          (sum: number, fg: any) => sum + (Number(fg.onHandQty ?? fg.currentStock ?? fg.quantity ?? 0) || 0),
+          0
+        );
+      } else if (Array.isArray(p.finishedGoodsStocks) && p.finishedGoodsStocks.length > 0) {
+        hasRealFgStock = true;
+        totalFgQty = p.finishedGoodsStocks.reduce(
+          (sum: number, fg: any) => sum + (Number(fg.onHandQty ?? fg.currentStock ?? fg.quantity ?? 0) || 0),
+          0
+        );
+      } else if (p.onHandQty != null || p.currentStock != null || p.stock != null || p.quantity != null) {
         totalFgQty = Number(p.onHandQty ?? p.currentStock ?? p.stock ?? p.quantity ?? 0) || 0;
       }
 
@@ -410,10 +444,6 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
       } else if (reorderLevel > 0 && totalFgQty <= reorderLevel) {
         isLow = true;
         status = "REORDER";
-      } else if (minStock === 0 && reorderLevel === 0 && totalFgQty === 0) {
-        isCritical = true;
-        isLow = true;
-        status = "CRITICAL";
       }
 
       const value = totalFgQty * unitPrice;
@@ -437,7 +467,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         status,
       };
     });
-  }, [liveProducts, initialProducts, liveFgStocks]);
+  }, [liveProducts, initialProducts, liveFgStocks, initialFgStocks]);
 
   // 3. System-Wide Reorder Alerts (Monitors Raw Materials & Finished Goods)
   const lowStockAlerts = useMemo(() => {
@@ -644,9 +674,13 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
               Total SKUs
             </div>
-            <div className="text-lg font-mono font-black text-slate-900 dark:text-ink mt-0.5">
-              {totalTrackedSKUs} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold uppercase">Items</span>
-            </div>
+            {isOverallLoading ? (
+              <div className="h-6 w-20 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-lg font-mono font-black text-slate-900 dark:text-ink mt-0.5">
+                {totalTrackedSKUs} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold uppercase">Items</span>
+              </div>
+            )}
             <div className="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
               ● Stock Ledger →
             </div>
@@ -666,10 +700,14 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
               Raw Materials
             </div>
-            <div className="text-lg font-mono font-black text-sky-600 dark:text-sky-400 mt-0.5">
-              {totalRawQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
-            </div>
-            <div className="text-[9.5px] text-sky-600 dark:text-sky-400 font-semibold mt-0.5">{rawStockItems.length} materials →</div>
+            {isOverallLoading ? (
+              <div className="h-6 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-lg font-mono font-black text-sky-600 dark:text-sky-400 mt-0.5">
+                {totalRawQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
+              </div>
+            )}
+            <div className="text-[9.5px] text-sky-600 dark:text-sky-400 font-semibold mt-0.5">{isOverallLoading ? "Loading..." : `${rawStockItems.length} materials →`}</div>
           </div>
         </div>
 
@@ -686,10 +724,14 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
               Finished Goods
             </div>
-            <div className="text-lg font-mono font-black text-teal-600 dark:text-teal-400 mt-0.5">
-              {totalFgQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">PCS</span>
-            </div>
-            <div className="text-[9.5px] text-teal-600 dark:text-teal-400 font-semibold mt-0.5">{finishedStockItems.length} products →</div>
+            {isOverallLoading ? (
+              <div className="h-6 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-lg font-mono font-black text-teal-600 dark:text-teal-400 mt-0.5">
+                {totalFgQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">PCS</span>
+              </div>
+            )}
+            <div className="text-[9.5px] text-teal-600 dark:text-teal-400 font-semibold mt-0.5">{isOverallLoading ? "Loading..." : `${finishedStockItems.length} products →`}</div>
           </div>
         </div>
 
@@ -706,10 +748,14 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
               Wastage Store
             </div>
-            <div className="text-lg font-mono font-black text-amber-600 dark:text-amber-400 mt-0.5">
-              {totalWastageQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
-            </div>
-            <div className="text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">{wastageStockItems.length} scrap items →</div>
+            {isOverallLoading ? (
+              <div className="h-6 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+            ) : (
+              <div className="text-lg font-mono font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                {totalWastageQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
+              </div>
+            )}
+            <div className="text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">{isOverallLoading ? "Loading..." : `${wastageStockItems.length} scrap items →`}</div>
           </div>
         </div>
       </div>
@@ -719,7 +765,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         {/* LEFT 2/3: Dynamic Visual Charts with Auto-Batching Pagination */}
         <div
           className="lg:col-span-2 p-4 flex flex-col justify-between"
-          style={{ minHeight: "340px" }}
+          style={{ minHeight: "440px" }}
           onMouseEnter={() => setIsAutoRotating(false)}
           onMouseLeave={() => setIsAutoRotating(true)}
         >
@@ -788,228 +834,247 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             </div>
           )}
 
-          {chartType === "bar" && (
-            <div className="w-full h-[260px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 15, right: 15, left: -15, bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150,150,150,0.18)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "currentColor" }} angle={-25} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 10, fill: "currentColor" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-card, #ffffff)",
-                      borderColor: "var(--color-line-soft, #cbd5e1)",
-                      borderRadius: "0.75rem",
-                      fontSize: "12px",
-                      color: "var(--color-ink, #0f172a)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
-                    }}
-                    labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-                    formatter={(val: any, name: any, props: any) => [
-                      `${Number(val).toLocaleString()} ${props.payload.uom || "Units"}`,
-                      props.payload.fullName || props.payload.name || "Live Stock",
-                    ]}
-                  />
-                  <Bar dataKey="quantity" fill="#0ea5e9" radius={[6, 6, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {chartType === "pie" && (
-            <div className="w-full h-[260px] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-              {/* Left Donut Wheel */}
-              <div className="sm:col-span-6 h-[250px] relative flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--color-card, #ffffff)",
-                        borderColor: "var(--color-line-soft, #cbd5e1)",
-                        borderRadius: "0.75rem",
-                        fontSize: "12px",
-                        color: "var(--color-ink, #0f172a)",
-                        boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
-                      }}
-                      formatter={(val: any, name: any, props: any) => {
-                        const total = currentBatchTotal || 1;
-                        const pct = ((Number(val) / total) * 100).toFixed(1);
-                        return [
-                          `${Number(val).toLocaleString()} ${props.payload.uom || "Units"} (${pct}%)`,
-                          props.payload.fullName || props.payload.name || "Stock Item",
-                        ];
-                      }}
-                    />
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={62}
-                      outerRadius={92}
-                      paddingAngle={4}
-                      dataKey="quantity"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-pie-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Central Donut Hub with Real Live Batch Total */}
-                <div className="absolute text-center pointer-events-none px-2">
-                  <div className="text-[9px] font-extrabold text-slate-500 dark:text-ink-muted uppercase tracking-wider">
-                    {currentTabTitle}
+          {isOverallLoading ? (
+            <div className="w-full h-[380px] flex flex-col justify-between p-3 animate-pulse">
+              <div className="flex items-end justify-between gap-3 h-[300px] px-3 pt-4 border-b border-line-soft/40">
+                {[60, 85, 45, 75, 90, 50, 70].map((h, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                    <div className="w-full max-w-[28px] bg-teal-500/20 rounded-t" style={{ height: `${h}%` }} />
                   </div>
-                  <div className="text-sm font-mono font-black text-slate-900 dark:text-ink">
-                    {currentBatchTotal.toLocaleString()} <span className="text-[9px] text-slate-500 dark:text-ink-muted">{currentTabUom}</span>
-                  </div>
-                  <div className="text-[8.5px] text-teal-600 dark:text-teal-400 font-bold">
-                    Batch {currentPage + 1}/{totalPages}
-                  </div>
-                </div>
+                ))}
               </div>
+              <div className="flex justify-between px-3 pt-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((_, i) => (
+                  <div key={i} className="h-2.5 w-10 bg-slate-200 dark:bg-card-2 rounded" />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {chartType === "bar" && (
+                <div className="w-full h-[380px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 20, left: -10, bottom: 35 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150,150,150,0.18)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "currentColor" }} angle={-25} textAnchor="end" height={40} interval={0} />
+                      <YAxis tick={{ fontSize: 11, fill: "currentColor" }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-card, #ffffff)",
+                          borderColor: "var(--color-line-soft, #cbd5e1)",
+                          borderRadius: "0.75rem",
+                          fontSize: "12px",
+                          color: "var(--color-ink, #0f172a)",
+                          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
+                        }}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                        formatter={(val: any, name: any, props: any) => [
+                          `${Number(val).toLocaleString()} ${props.payload.uom || "Units"}`,
+                          props.payload.fullName || props.payload.name || "Live Stock",
+                        ]}
+                      />
+                      <Bar dataKey="quantity" fill="#0ea5e9" radius={[6, 6, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
-              {/* Right Side Item Legend List with Badges */}
-              <div className="sm:col-span-6 max-h-[240px] overflow-y-auto pr-1 space-y-1.5">
-                {chartData.map((item, idx) => {
-                  const pct = currentBatchTotal > 0 ? ((item.quantity / currentBatchTotal) * 100).toFixed(1) : "0";
-                  return (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50/80 dark:bg-card-2/50 border border-slate-200/80 dark:border-line-soft hover:bg-slate-100 dark:hover:bg-card-2 transition-colors text-xs"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 pr-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
-                          style={{ backgroundColor: item.color }}
+              {chartType === "pie" && (
+                <div className="w-full h-[380px] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  {/* Left Donut Wheel */}
+                  <div className="sm:col-span-6 h-[350px] relative flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "var(--color-card, #ffffff)",
+                            borderColor: "var(--color-line-soft, #cbd5e1)",
+                            borderRadius: "0.75rem",
+                            fontSize: "12px",
+                            color: "var(--color-ink, #0f172a)",
+                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
+                          }}
+                          formatter={(val: any, name: any, props: any) => {
+                            const total = currentBatchTotal || 1;
+                            const pct = ((Number(val) / total) * 100).toFixed(1);
+                            return [
+                              `${Number(val).toLocaleString()} ${props.payload.uom || "Units"} (${pct}%)`,
+                              props.payload.fullName || props.payload.name || "Stock Item",
+                            ];
+                          }}
                         />
-                        <span className="font-bold text-slate-800 dark:text-ink truncate text-[11px]" title={item.fullName}>
-                          {item.fullName}
-                        </span>
+                        <Pie
+                          data={chartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={78}
+                          outerRadius={118}
+                          paddingAngle={4}
+                          dataKey="quantity"
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-pie-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Central Donut Hub with Real Live Batch Total */}
+                    <div className="absolute text-center pointer-events-none px-2">
+                      <div className="text-[10px] font-extrabold text-slate-500 dark:text-ink-muted uppercase tracking-wider">
+                        {currentTabTitle}
                       </div>
-                      <div className="text-right shrink-0 font-mono">
-                        <span className="text-[11px] font-bold text-slate-900 dark:text-ink">
-                          {item.quantity.toLocaleString()} {item.uom}
-                        </span>
-                        <span className="text-[9.5px] text-slate-500 dark:text-ink-muted ml-1.5 font-bold">({pct}%)</span>
+                      <div className="text-base font-mono font-black text-slate-900 dark:text-ink">
+                        {currentBatchTotal.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted">{currentTabUom}</span>
+                      </div>
+                      <div className="text-[9.5px] text-teal-600 dark:text-teal-400 font-bold">
+                        Batch {currentPage + 1}/{totalPages}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                  </div>
 
-          {chartType === "area" && (
-            <div className="w-full h-[260px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -10, bottom: 25 }}>
-                  <defs>
-                    <linearGradient id="colorStockVal" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor={activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b"}
-                        stopOpacity={0.45}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b"}
-                        stopOpacity={0.0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150,150,150,0.18)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "currentColor" }} angle={-25} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 10, fill: "currentColor" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-card, #ffffff)",
-                      borderColor: "var(--color-line-soft, #cbd5e1)",
-                      borderRadius: "0.75rem",
-                      fontSize: "12px",
-                      color: "var(--color-ink, #0f172a)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
-                    }}
-                    labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-                    formatter={(val: any, name: any, props: any) => [
-                      `${Number(val).toLocaleString()} ${props.payload.uom || "Units"}`,
-                      props.payload.fullName || props.payload.name || "Stock Level",
-                    ]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="quantity"
-                    stroke={activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b"}
-                    strokeWidth={2.5}
-                    dot={{
-                      r: 3.5,
-                      fill: activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b",
-                      stroke: "#fff",
-                      strokeWidth: 1.5,
-                    }}
-                    activeDot={{
-                      r: 6,
-                      fill: activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b",
-                      stroke: "#fff",
-                      strokeWidth: 2,
-                    }}
-                    fillOpacity={1}
-                    fill="url(#colorStockVal)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+                  {/* Right Side Item Legend List with Badges */}
+                  <div className="sm:col-span-6 max-h-[350px] overflow-y-auto pr-1 space-y-1.5">
+                    {chartData.map((item, idx) => {
+                      const pct = currentBatchTotal > 0 ? ((item.quantity / currentBatchTotal) * 100).toFixed(1) : "0";
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-slate-50/80 dark:bg-card-2/50 border border-slate-200/80 dark:border-line-soft hover:bg-slate-100 dark:hover:bg-card-2 transition-colors text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0 pr-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="font-bold text-slate-800 dark:text-ink truncate text-[11px]" title={item.fullName}>
+                              {item.fullName}
+                            </span>
+                          </div>
+                          <div className="text-right shrink-0 font-mono">
+                            <span className="text-[11px] font-bold text-slate-900 dark:text-ink">
+                              {item.quantity.toLocaleString()} {item.uom}
+                            </span>
+                            <span className="text-[9.5px] text-slate-500 dark:text-ink-muted ml-1.5 font-bold">({pct}%)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-          {chartType === "list" && (
-            <div className="w-full h-[260px] overflow-y-auto pr-1">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100/90 dark:bg-card-2 text-slate-700 dark:text-ink-subtle uppercase text-[9.5px] font-black tracking-wider sticky top-0 border-b border-slate-200 dark:border-line-soft z-10">
-                  <tr>
-                    <th className="px-3 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold">Item Name</th>
-                    <th className="px-2 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold">Category</th>
-                    <th className="px-2 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold text-right">Live Stock</th>
-                    <th className="px-3 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-line-soft">
-                  {chartData.map((item, i) => (
-                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-card-2/60 transition-colors">
-                      <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-ink truncate max-w-[150px]" title={item.fullName}>
-                        {item.fullName}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-card-2 border border-slate-200 dark:border-line-soft text-slate-700 dark:text-ink">
-                          {item.category || item.type}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-ink">
-                        {item.quantity.toLocaleString()} {item.uom}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold">
-                        {item.status === "CRITICAL" ? (
-                          <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30 uppercase">
-                            Critical ({item.quantity.toLocaleString()} &le; {item.minStock})
-                          </span>
-                        ) : item.status === "REORDER" || item.status === "LOW STOCK" ? (
-                          <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30 uppercase">
-                            Reorder ({item.quantity.toLocaleString()} &le; {item.reorderLevel || item.minStock})
-                          </span>
-                        ) : (
-                          <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 uppercase">
-                            Optimal
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+              {chartType === "area" && (
+                <div className="w-full h-[380px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 20, right: 20, left: -10, bottom: 35 }}>
+                      <defs>
+                        <linearGradient id="colorStockVal" x1="0" y1="0" x2="0" y2="1">
+                          <stop
+                            offset="5%"
+                            stopColor={activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b"}
+                            stopOpacity={0.45}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b"}
+                            stopOpacity={0.0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150,150,150,0.18)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "currentColor" }} angle={-25} textAnchor="end" height={40} interval={0} />
+                      <YAxis tick={{ fontSize: 11, fill: "currentColor" }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-card, #ffffff)",
+                          borderColor: "var(--color-line-soft, #cbd5e1)",
+                          borderRadius: "0.75rem",
+                          fontSize: "12px",
+                          color: "var(--color-ink, #0f172a)",
+                          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
+                        }}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                        formatter={(val: any, name: any, props: any) => [
+                          `${Number(val).toLocaleString()} ${props.payload.uom || "Units"}`,
+                          props.payload.fullName || props.payload.name || "Stock Level",
+                        ]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="quantity"
+                        stroke={activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b"}
+                        strokeWidth={2.5}
+                        dot={{
+                          r: 4,
+                          fill: activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b",
+                          stroke: "#fff",
+                          strokeWidth: 2,
+                        }}
+                        activeDot={{
+                          r: 7,
+                          fill: activeTab === "raw" ? "#0ea5e9" : activeTab === "finished" ? "#10b981" : "#f59e0b",
+                          stroke: "#fff",
+                          strokeWidth: 2,
+                        }}
+                        fillOpacity={1}
+                        fill="url(#colorStockVal)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {chartType === "list" && (
+                <div className="w-full h-[380px] overflow-y-auto pr-1">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100/90 dark:bg-card-2 text-slate-700 dark:text-ink-subtle uppercase text-[9.5px] font-black tracking-wider sticky top-0 border-b border-slate-200 dark:border-line-soft z-10">
+                      <tr>
+                        <th className="px-3 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold">Item Name</th>
+                        <th className="px-2 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold">Category</th>
+                        <th className="px-2 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold text-right">Live Stock</th>
+                        <th className="px-3 py-2 bg-slate-100/95 dark:bg-card-2 text-slate-700 dark:text-ink-subtle font-extrabold text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-line-soft">
+                      {chartData.map((item, i) => (
+                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-card-2/60 transition-colors">
+                          <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-ink truncate max-w-[150px]" title={item.fullName}>
+                            {item.fullName}
+                          </td>
+                          <td className="px-2 py-2.5">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-card-2 border border-slate-200 dark:border-line-soft text-slate-700 dark:text-ink">
+                              {item.category || item.type}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-ink">
+                            {item.quantity.toLocaleString()} {item.uom}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold">
+                            {item.status === "CRITICAL" ? (
+                              <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30 uppercase">
+                                Critical ({item.quantity.toLocaleString()} &le; {item.minStock})
+                              </span>
+                            ) : item.status === "REORDER" || item.status === "LOW STOCK" ? (
+                              <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30 uppercase">
+                                Reorder ({item.quantity.toLocaleString()} &le; {item.reorderLevel || item.minStock})
+                              </span>
+                            ) : (
+                              <span className="text-[9.5px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 uppercase">
+                                Optimal
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -1021,7 +1086,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                 <FaExclamationTriangle className="text-amber-500 text-xs" />
                 <span>Reorder Alerts</span>
               </div>
-              {!hasLoadedData || (isLoading && lowStockAlerts.length === 0) ? (
+              {isOverallLoading ? (
                 <span className="inline-flex items-center gap-1.5 text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-card-2 dark:text-ink-muted border border-slate-200 dark:border-line-soft uppercase tracking-wider">
                   <FaSync className="animate-spin text-teal-500 text-[8px]" />
                   Checking...
@@ -1040,9 +1105,9 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             </div>
 
             {/* List of Low Stock items across Raw Materials & Finished Goods */}
-            <div className="space-y-2.5 max-h-[285px] overflow-y-auto pr-1">
-              {!hasLoadedData || (isLoading && lowStockAlerts.length === 0) ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center">
+            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              {isOverallLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
                   <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mb-2.5 shadow-2xs">
                     <FaSync className="animate-spin text-sm" />
                   </div>
@@ -1070,10 +1135,10 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                   </div>
                 </div>
               ) : lowStockAlerts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400 dark:text-ink-subtle">
-                  <FaCheckCircle className="text-emerald-500 text-2xl mb-1.5 opacity-60" />
-                  <p className="text-xs font-bold text-slate-800 dark:text-ink">All Stock Levels Healthy</p>
-                  <p className="text-[10px] text-slate-500 dark:text-ink-muted mt-0.5">Every Raw Material & FG is within safety limits</p>
+                <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 dark:text-ink-subtle">
+                  <FaCheckCircle className="text-emerald-500 text-3xl mb-2 opacity-70" />
+                  <p className="text-sm font-bold text-slate-800 dark:text-ink">All Stock Levels Healthy</p>
+                  <p className="text-xs text-slate-500 dark:text-ink-muted mt-1">Every Raw Material & FG is within safety limits</p>
                 </div>
               ) : (
                 lowStockAlerts.map((item, idx) => {

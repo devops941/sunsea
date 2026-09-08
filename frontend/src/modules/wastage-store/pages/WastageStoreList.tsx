@@ -273,7 +273,7 @@ const WastageStoreList: React.FC = () => {
             header: "ACTIONS",
             align: "center",
             render: (item) => (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <ViewButton onClick={() => handleOpenView(item)} />
                     {can("wastage-store.edit") && (
                         <EditButton onClick={() => handleOpenEdit(item)} />

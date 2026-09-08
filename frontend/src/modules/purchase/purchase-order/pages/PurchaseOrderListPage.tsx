@@ -457,7 +457,7 @@ const PurchaseOrderListPage: React.FC = () => {
               {
                 header: "ACTIONS",
                 render: (item) => (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <ViewButton onClick={() => handleView(item)} />
                     {canEdit && item.status !== "COMPLETED" && item.status !== "CANCELLED" && (
                       <EditButton onClick={() => handleEdit(item)} />
