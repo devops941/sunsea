@@ -13,6 +13,7 @@ import {
 import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import type { SupplierPayableSummary } from "../../../../services/payableService";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
@@ -66,7 +67,16 @@ const AmountPayablePage: React.FC = () => {
   });
   useEffect(() => { save(options); }, [options]);
 
-  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(true);
+  // ─── Options dialog — persisted view (see BalanceSheetPage for docs).
+  // Re-entering after a previous commit lands on the table, not a fresh
+  // modal. Esc walks table → options → close (if data) or navigate back.
+  const VIEW_KEY = "sunsea:payable:view";
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, showOptionsDialog ? "options" : "table"); } catch { /* ignore */ }
+  }, [showOptionsDialog]);
   const [draftAsOnDate, setDraftAsOnDate] = useState<string>(asOnDate);
   const [draftOptions, setDraftOptions] = useState<Options>(options);
   const setOpt = <K extends keyof Options>(k: K, v: Options[K]) =>
@@ -110,6 +120,7 @@ const AmountPayablePage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const rows = useMemo<SupplierPayableSummary[]>(() => {
     let list = data ?? [];
@@ -145,30 +156,47 @@ const AmountPayablePage: React.FC = () => {
     setShowOptionsDialog(false);
   }, [draftAsOnDate, draftOptions]);
 
+  // Modal nav stack — Esc walks: table → options → navigate away.
+  const showOptionsDialogRef = useRef(showOptionsDialog);
+  const rowSearchValRef = useRef(rowSearch);
+  useEffect(() => { showOptionsDialogRef.current = showOptionsDialog; }, [showOptionsDialog]);
+  useEffect(() => { rowSearchValRef.current = rowSearch; }, [rowSearch]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2" && showOptionsDialog) { e.preventDefault(); commitOptions(); }
-      else if (e.key === "F3" && !showOptionsDialog) {
+      if (e.key === "F2" && showOptionsDialogRef.current) {
         e.preventDefault();
+        e.stopPropagation();
+        commitOptions();
+        return;
+      }
+      if (e.key === "F3" && !showOptionsDialogRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
         rowSearchRef.current?.focus();
         rowSearchRef.current?.select();
+        return;
       }
-      else if (e.key === "Escape" && !showOptionsDialog) {
-        const tag = (e.target as HTMLElement | null)?.tagName;
-        if (e.target === rowSearchRef.current) {
-          e.preventDefault();
-          if (rowSearch) setRowSearch("");
-          else rowSearchRef.current?.blur();
-          return;
-        }
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key !== "Escape") return;
+      if (e.target === rowSearchRef.current) {
         e.preventDefault();
+        e.stopPropagation();
+        if (rowSearchValRef.current) setRowSearch("");
+        else rowSearchRef.current?.blur();
+        return;
+      }
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!showOptionsDialogRef.current) {
         setShowOptionsDialog(true);
+      } else {
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, commitOptions, rowSearch]);
+  }, [commitOptions, navigate]);
 
   const [rowIdx, setRowIdx] = useState<number>(-1);
   const rowIdxRef = useRef(rowIdx);
@@ -239,7 +267,9 @@ const AmountPayablePage: React.FC = () => {
   };
 
   return (
-    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+    // `data-escape-guarded` opts out of the global Esc→back shortcut so
+    // our own handler owns the local modal-stack nav.
+    <div data-escape-guarded className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
       {!showOptionsDialog && (
       <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
         <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">

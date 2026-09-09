@@ -8,6 +8,7 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Same shape as the Add page — one row per party being paid, with a
@@ -38,6 +39,9 @@ const PaymentVoucherEditPage: React.FC = () => {
   const location = useLocation();
   const { id: routeId } = useParams<{ id: string }>();
   const id = routeId ? parseInt(routeId, 10) : NaN;
+
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Zero-loading strategy (three layers, fastest → slowest):
   //   1. Router-state preload from list-page navigate() — instant

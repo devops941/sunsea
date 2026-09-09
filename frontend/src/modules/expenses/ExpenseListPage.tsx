@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCoins, FaPlus, FaSync, FaFilter } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { expenseService, displayExpenseNo, type Expense } from "../../services/expenseService";
 import { useListCache } from "../../hooks/useListCache";
+import { usePageShortcuts } from "../../hooks/usePageShortcuts";
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 // Busy-style filter panel that opens BEFORE the list — same shape as the
@@ -27,24 +28,45 @@ const ExpenseListPage: React.FC = () => {
 
   const [applied, setApplied] = useState<FilterOptions>(() => defaultFilters());
   const [pending, setPending] = useState<FilterOptions>(() => defaultFilters());
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Modal-as-page persistence.
+  const VIEW_KEY = "sunsea:expenses:view";
+  const [panelOpen, setPanelOpen] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, panelOpen ? "panel" : "table"); } catch { /* ignore */ }
+  }, [panelOpen]);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
 
-  // F2 = OK inside filter panel, Esc = close (Busy shortcut).
+  // Modal nav stack — Esc walks: table → panel → navigate away.
+  const panelOpenRef = useRef(panelOpen);
+  const pendingRef = useRef(pending);
+  useEffect(() => { panelOpenRef.current = panelOpen; }, [panelOpen]);
+  useEffect(() => { pendingRef.current = pending; }, [pending]);
   useEffect(() => {
-    if (!panelOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2") {
+      if (e.key === "F2" && panelOpenRef.current) {
         e.preventDefault();
-        setApplied(pending);
+        e.stopPropagation();
+        setApplied(pendingRef.current);
         setPanelOpen(false);
-      } else if (e.key === "Escape") {
-        setPanelOpen(false);
+        return;
+      }
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!panelOpenRef.current) {
+        setPending(applied);
+        setPanelOpen(true);
+      } else {
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelOpen, pending]);
+  }, [applied, navigate]);
 
   const cacheKey = `expenses:${applied.startDate}:${applied.endDate}`;
 
@@ -71,6 +93,7 @@ const ExpenseListPage: React.FC = () => {
     socketModule: "expense",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const openExpenseEdit = useCallback(
     (exp: Expense) => {
@@ -149,9 +172,10 @@ const ExpenseListPage: React.FC = () => {
   );
 
   // ────── Busy-style pre-list filter dialog ──────
+  // `data-escape-guarded` opts out of the global Esc→back shortcut.
   if (panelOpen) {
     return (
-      <div className="p-3">
+      <div data-escape-guarded className="p-3">
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
             <div className="bg-amber-500/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
@@ -204,7 +228,7 @@ const ExpenseListPage: React.FC = () => {
   }
 
   return (
-    <div className="p-3 space-y-2 w-full max-w-7xl">
+    <div data-escape-guarded className="p-3 space-y-2 w-full max-w-7xl">
       {/* Header bar */}
       <div className="bg-card rounded-md border border-line px-3 py-1.5 flex flex-wrap items-center gap-2 shadow-sm">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">

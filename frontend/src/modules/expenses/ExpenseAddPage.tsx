@@ -45,7 +45,8 @@ const ExpenseAddPage: React.FC = () => {
   const [nextExpenseNo, setNextExpenseNo] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
-  useFormShortcuts({});
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Show operator the next auto-generated Expense No so they know what will
   // save (Busy convention — Vch No visible before Save).

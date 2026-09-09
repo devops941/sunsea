@@ -21,6 +21,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableDetail } from "../../../../services/payableService";
 import { useListCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
 export const SupplierBreakdownPage: React.FC = () => {
@@ -88,6 +89,7 @@ export const SupplierBreakdownPage: React.FC = () => {
     fetcher,
     enabled: !!supplierId,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const supplierDetail: SupplierPayableDetail | null = supplierDetailList[0] || null;
 

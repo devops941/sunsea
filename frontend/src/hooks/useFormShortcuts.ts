@@ -7,6 +7,16 @@ interface FormShortcutOptions {
   onSave?: () => void;
   /** F8 — called when user presses Delete/Remove. */
   onDelete?: () => void;
+  /**
+   * Auto-focus the input with this `name=""` attribute on mount. Matches the
+   * Busy "cursor is always ready" convention so operators can start typing
+   * immediately (e.g. `autoFocusField: "date"` on voucher Add pages).
+   *
+   * All accounts Add/Edit pages should pass this so first-field focus is
+   * centralised — future tweaks (delay tuning, retry-until-mounted, etc.)
+   * live in ONE place instead of dozens of per-page useEffects.
+   */
+  autoFocusField?: string;
 }
 
 /**
@@ -25,13 +35,35 @@ interface FormShortcutOptions {
  * Usage (with custom save):
  *   useFormShortcuts({ onSave: handleSave });
  */
-export function useFormShortcuts({ onSave, onDelete }: FormShortcutOptions = {}) {
+export function useFormShortcuts({ onSave, onDelete, autoFocusField }: FormShortcutOptions = {}) {
   // Keep stable refs so event listeners never become stale
   const onSaveRef   = useRef(onSave);
   const onDeleteRef = useRef(onDelete);
 
   useEffect(() => { onSaveRef.current   = onSave;   }, [onSave]);
   useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
+
+  // Auto-focus the first field on mount. Uses two rAFs so date-picker /
+  // select components that mount their inner <input> a beat late (after
+  // their own initial render commit) still get focused correctly. Ignored
+  // if the caller didn't ask for it — pages keep total control.
+  useEffect(() => {
+    if (!autoFocusField) return;
+    let cancelled = false;
+    const focus = () => {
+      if (cancelled) return;
+      const el = document.querySelector<HTMLInputElement>(
+        `input[name="${autoFocusField}"]:not([disabled])`
+      );
+      if (el) {
+        el.focus();
+        // Select existing text so the operator can overwrite immediately.
+        try { el.select(); } catch { /* not a text input */ }
+      }
+    };
+    requestAnimationFrame(() => requestAnimationFrame(focus));
+    return () => { cancelled = true; };
+  }, [autoFocusField]);
 
   useEffect(() => {
     // F2 / F9 → Save / Submit

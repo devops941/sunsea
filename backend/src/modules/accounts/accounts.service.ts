@@ -460,7 +460,19 @@ class AccountsService {
         voucher: voucherWhere,
       },
       include: {
-        voucher: true,
+        // Include sibling items so `getParticularsLabel` can resolve the
+        // opposing ledger name for vouchers (Contra, some Journal entries)
+        // that store one-sided items instead of paired debit+credit rows.
+        voucher: {
+          include: {
+            items: {
+              include: {
+                debitLedger: { select: { id: true, name: true, code: true } },
+                creditLedger: { select: { id: true, name: true, code: true } },
+              },
+            },
+          },
+        },
         debitLedger: { select: { id: true, name: true, code: true } },
         creditLedger: { select: { id: true, name: true, code: true } },
       },
@@ -469,8 +481,6 @@ class AccountsService {
         { voucher: { id: "asc" } },
       ],
     });
-
-    const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
 
     // Read opening balance AND its side ("DEBIT" | "CREDIT") from the party record.
     // Customer defaults to DEBIT (they owe us), Supplier defaults to CREDIT (we owe them).
@@ -487,11 +497,11 @@ class AccountsService {
       openingType = String((ledger.supplier as any).openingBalanceType || "CREDIT").toUpperCase() === "DEBIT" ? "DEBIT" : "CREDIT";
     }
 
-    // The ledger's natural side (Asset/Expense → DEBIT natural, Liability/Income/Equity → CREDIT natural).
-    // Only used to derive the signed "opening balance" number displayed in the
-    // header banner — the row itself now comes from the real JV entry below.
-    const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
-    const signedOpeningBalance = openingType === naturalSide ? openingBalance : -openingBalance;
+    // Signed opening balance in ASSET convention (positive = Dr, negative = Cr).
+    // Uniform across ledger types so the frontend can render Dr/Cr with a single
+    // rule (`value >= 0 ? "Dr" : "Cr"`). For a Sundry Creditor opening on the
+    // natural (CREDIT) side, this produces a negative value → shown as "Cr".
+    const signedOpeningBalance = openingType === "DEBIT" ? openingBalance : -openingBalance;
 
     // For bank/cash ledgers (no customer or supplier link), pull the opening
     // balance from the dedicated LEDGER_OPENING_BALANCE JV and exclude it from
@@ -514,11 +524,7 @@ class AccountsService {
         const rawDebit = Number(item.debitAmount);
         const rawCredit = Number(item.creditAmount);
         const amt = rawDebit > 0 ? rawDebit : rawCredit > 0 ? rawCredit : 0;
-        if (isAssetOrExpense) {
-          computedOpening += isDebit ? amt : -amt;
-        } else {
-          computedOpening += isDebit ? -amt : amt;
-        }
+        computedOpening += isDebit ? amt : -amt;
       }
       openingBalanceForDisplay = computedOpening;
     }
@@ -536,16 +542,28 @@ class AccountsService {
       if (vType === VoucherType.SALES_RETURN) return "Sales Return";
       if (vType === VoucherType.PURCHASE_RETURN) return "Purchase Return";
 
-      const opposingName = isDebit ? item.creditLedger?.name : item.debitLedger?.name;
+      const isNameUsable = (name?: string | null) =>
+        !!name &&
+        name !== "Credit Account" &&
+        name !== "Debit Account" &&
+        name !== "General Ledger" &&
+        name !== ledger.name;
 
-      if (
-        opposingName &&
-        opposingName !== "Credit Account" &&
-        opposingName !== "Debit Account" &&
-        opposingName !== "General Ledger" &&
-        opposingName !== ledger.name
-      ) {
-        return opposingName;
+      // Same-row opposing side (paired items — Payment, Receipt, most Journals)
+      let opposingName: string | undefined = isDebit ? item.creditLedger?.name : item.debitLedger?.name;
+
+      // Fallback for one-sided items (Contra, some Journals): look through
+      // sibling items in the same voucher for a ledger on the opposing side.
+      if (!isNameUsable(opposingName) && Array.isArray(item.voucher?.items)) {
+        for (const sib of item.voucher.items) {
+          if (sib.id === item.id) continue;
+          const sibName = isDebit ? sib.creditLedger?.name : sib.debitLedger?.name;
+          if (isNameUsable(sibName)) { opposingName = sibName; break; }
+        }
+      }
+
+      if (isNameUsable(opposingName)) {
+        return opposingName!;
       }
 
       switch (vType) {
@@ -580,11 +598,7 @@ class AccountsService {
       const debit = isDebit ? amt : 0;
       const credit = !isDebit ? amt : 0;
 
-      if (isAssetOrExpense) {
-        runningBalance += debit - credit;
-      } else {
-        runningBalance += credit - debit;
-      }
+      runningBalance += debit - credit;
 
       entries.push({
         id: item.id.toString(),
@@ -854,7 +868,18 @@ class AccountsService {
         voucher: dateFilter,
       },
       include: {
-        voucher: true,
+        // Sibling items included so we can name the opposing side for
+        // one-sided items (Contra transfers, one-sided Journal entries).
+        voucher: {
+          include: {
+            items: {
+              include: {
+                debitLedger: { select: { id: true, name: true, code: true } },
+                creditLedger: { select: { id: true, name: true, code: true } },
+              },
+            },
+          },
+        },
         debitLedger: { select: { id: true, name: true, code: true, type: true } },
         creditLedger: { select: { id: true, name: true, code: true, type: true } },
       },
@@ -866,16 +891,16 @@ class AccountsService {
     // number is used purely as a summary shown at the top of the statement.
     //
     // Per-account tracking — needed so the frontend can render Busy-style
-    // "Closing Balance" rows per account. `opening` holds the signed opening
-    // in natural direction (positive = same side as ledger's natural side).
+    // "Closing Balance" rows per account. Both `opening` and `running` are
+    // signed in ASSET convention (positive = Dr, negative = Cr) so the frontend
+    // side-labelling matches every ledger type without branching on type.
     // `running` starts at 0 because the opening JV itself will be one of the
     // journal items iterated below — starting from `opening` would double-count.
     type AccountAgg = {
       id: number;
       name: string;
-      isAssetOrExpense: boolean;
-      opening: number;   // signed in the ledger's natural direction
-      running: number;   // signed running balance
+      opening: number;
+      running: number;
     };
     const perAccount = new Map<number, AccountAgg>();
 
@@ -890,14 +915,14 @@ class AccountsService {
         opening = Number((ledger.supplier as any).openingBalance || 0);
         openingType = String((ledger.supplier as any).openingBalanceType || "CREDIT").toUpperCase() === "DEBIT" ? "DEBIT" : "CREDIT";
       }
-      const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
-      const naturalSide: "DEBIT" | "CREDIT" = isAssetOrExpense ? "DEBIT" : "CREDIT";
-      const signedOpening = openingType === naturalSide ? opening : -opening;
+      // ASSET convention (positive = Dr, negative = Cr) — uniform across ledger
+      // types. Matches the per-row `debit - credit` delta below and the frontend
+      // Dr/Cr rendering rule.
+      const signedOpening = openingType === "DEBIT" ? opening : -opening;
       openingBalance += signedOpening;
       perAccount.set(ledger.id, {
         id: ledger.id,
         name: ledger.name,
-        isAssetOrExpense,
         opening: signedOpening,
         running: 0,
       });
@@ -940,13 +965,23 @@ class AccountsService {
 
       // Determine which side of the selected set the entry falls on
       const selectedLedger = isSelectedDebit ? item.debitLedger : item.creditLedger;
-      const opposingLedger = isSelectedDebit ? item.creditLedger : item.debitLedger;
-      const isAssetOrExpense = selectedLedger?.type === LedgerType.ASSET || selectedLedger?.type === LedgerType.EXPENSE;
+      let opposingLedgerName: string | undefined = isSelectedDebit ? item.creditLedger?.name : item.debitLedger?.name;
+
+      // One-sided items (Contra transfers, some Journals) don't have both
+      // ledgers populated on the same row — look at sibling items in the
+      // same voucher for the opposing ledger name.
+      if (!opposingLedgerName && Array.isArray(item.voucher?.items)) {
+        for (const sib of item.voucher.items) {
+          if (sib.id === item.id) continue;
+          const sibName = isSelectedDebit ? sib.creditLedger?.name : sib.debitLedger?.name;
+          if (sibName) { opposingLedgerName = sibName; break; }
+        }
+      }
 
       const debit = isSelectedDebit ? amt : 0;
       const credit = isSelectedCredit ? amt : 0;
 
-      const delta = isAssetOrExpense ? (debit - credit) : (credit - debit);
+      const delta = debit - credit;
       runningBalance += delta;
       // Also apply the same delta to the individual account's running
       // balance so we can return per-account closing balances for the
@@ -966,7 +1001,7 @@ class AccountsService {
         refDocId: item.voucher.refDocId,
         date: item.voucher.date.toISOString().split("T")[0],
         narration: item.narration || item.voucher.narration || "",
-        particulars: opposingLedger?.name || (isSelectedDebit ? "Debit Entry" : "Credit Entry"),
+        particulars: opposingLedgerName || (isSelectedDebit ? "Debit Entry" : "Credit Entry"),
         accountName: selectedLedger?.name || "-",
         debit,
         credit,
@@ -991,18 +1026,16 @@ class AccountsService {
     // Per-account opening / closing balances keyed by account NAME (matches
     // what entries carry as `accountName`, so the frontend can look up the
     // group's balance in O(1) when rendering the per-account footer row).
-    // Closing is expressed as a positive number + Dr/Cr side (natural side
-    // of the ledger). `runningRaw` keeps the signed value for internal use.
+    // Closing is a positive amount + Dr/Cr side; the signed store already uses
+    // ASSET convention (positive = Dr) so the side derivation is uniform.
     const accountBalances: Record<string, { name: string; opening: number; openingSide: "Dr" | "Cr"; closing: number; closingSide: "Dr" | "Cr" }> = {};
     for (const agg of perAccount.values()) {
-      const naturalSide: "Dr" | "Cr" = agg.isAssetOrExpense ? "Dr" : "Cr";
-      const oppositeSide: "Dr" | "Cr" = agg.isAssetOrExpense ? "Cr" : "Dr";
       accountBalances[agg.name] = {
         name: agg.name,
         opening: Math.abs(agg.opening),
-        openingSide: agg.opening >= 0 ? naturalSide : oppositeSide,
+        openingSide: agg.opening >= 0 ? "Dr" : "Cr",
         closing: Math.abs(agg.running),
-        closingSide: agg.running >= 0 ? naturalSide : oppositeSide,
+        closingSide: agg.running >= 0 ? "Dr" : "Cr",
       };
     }
 

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { voucherService, type Voucher } from "../../../../services/voucherService";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache } from "../../../../hooks/useListCache";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 
 // Busy-style "Select Voucher To Modify (Contra)" picker.
 const ContraVoucherModifyPickerPage: React.FC = () => {
@@ -14,6 +15,9 @@ const ContraVoucherModifyPickerPage: React.FC = () => {
   const [voucherNo, setVoucherNo] = useState("");
   const [voucherDate, setVoucherDate] = useState(todayIso);
   const [submitting, setSubmitting] = useState(false);
+
+  // F2 = submit + auto-focus Voucher No on mount (centralised).
+  useFormShortcuts({ autoFocusField: "voucherNo" });
 
   const fetcher = useCallback(async () => {
     const res = await voucherService.fetchVouchers({
@@ -151,7 +155,7 @@ const ContraVoucherModifyPickerPage: React.FC = () => {
               <label className="col-span-5 text-ink-subtle font-semibold">Voucher No.</label>
               <div className="col-span-7">
                 <input
-                  autoFocus
+                  name="voucherNo"
                   type="text"
                   value={voucherNo}
                   onChange={(e) => setVoucherNo(e.target.value)}

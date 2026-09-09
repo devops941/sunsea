@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaExchangeAlt, FaPlus, FaSync, FaFilter, FaTrash, FaCheckSquare, FaSquare } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { voucherService, displayVoucherNo, type Voucher } from "../../../../services/voucherService";
 import { useListCache, invalidateCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
@@ -32,25 +33,47 @@ const ContraVoucherPage: React.FC = () => {
 
   const [applied, setApplied] = useState<FilterOptions>(() => defaultFilters());
   const [pending, setPending] = useState<FilterOptions>(() => defaultFilters());
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Modal-as-page persistence.
+  const VIEW_KEY = "sunsea:contra-voucher:view";
+  const [panelOpen, setPanelOpen] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, panelOpen ? "panel" : "table"); } catch { /* ignore */ }
+  }, [panelOpen]);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
+  // Modal nav stack — Esc walks: table → panel → navigate away.
+  const panelOpenRef = useRef(panelOpen);
+  const pendingRef = useRef(pending);
+  useEffect(() => { panelOpenRef.current = panelOpen; }, [panelOpen]);
+  useEffect(() => { pendingRef.current = pending; }, [pending]);
   useEffect(() => {
-    if (!panelOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2") {
+      if (e.key === "F2" && panelOpenRef.current) {
         e.preventDefault();
-        setApplied(pending);
+        e.stopPropagation();
+        setApplied(pendingRef.current);
         setPanelOpen(false);
-      } else if (e.key === "Escape") {
-        setPanelOpen(false);
+        return;
+      }
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!panelOpenRef.current) {
+        setPending(applied);
+        setPanelOpen(true);
+      } else {
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelOpen, pending]);
+  }, [applied, navigate]);
 
   const cacheKey = `accounts:contra-vouchers:${applied.startDate}:${applied.endDate}`;
 
@@ -78,6 +101,7 @@ const ContraVoucherPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const openVoucherEdit = useCallback(
     (v: Voucher) => {
@@ -223,9 +247,10 @@ const ContraVoucherPage: React.FC = () => {
   }, [vouchers]);
 
   // ────── Busy-style pre-list filter dialog ──────
+  // `data-escape-guarded` opts out of the global Esc→back shortcut.
   if (panelOpen) {
     return (
-      <div className="p-3">
+      <div data-escape-guarded className="p-3">
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
             <div className="bg-rose-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
@@ -304,7 +329,7 @@ const ContraVoucherPage: React.FC = () => {
 
   // ────── Contra Register (list) — one row per item ──────
   return (
-    <div className="p-3 space-y-2 w-full max-w-7xl">
+    <div data-escape-guarded className="p-3 space-y-2 w-full max-w-7xl">
       {/* Header bar */}
       <div className="bg-card rounded-md border border-line px-3 py-1.5 flex flex-wrap items-center gap-2 shadow-sm">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">

@@ -8,6 +8,7 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../components/form/Led
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, upsertInListCacheByPrefix } from "../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../hooks/useDetailCache";
+import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 
 const ACTIVE_CELL = "focus:bg-slate-900 focus:text-white focus:font-semibold";
 
@@ -15,6 +16,9 @@ const ExpenseEditPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
+
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Zero-loading: router state → detail cache → SWR fetch.
   const preloaded = (location.state as { expense?: Expense } | null)?.expense || null;
