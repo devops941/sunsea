@@ -40,7 +40,7 @@ const customerFormSchema = z.object({
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/, "Invalid GSTIN format").optional().or(z.literal("")),
   openingBalance: z.string().min(1, "Opening Balance is required"),
   openingBalanceType: z.string().min(1, "Opening Balance Type is required"),
-  creditLimit: z.string().min(1, "Credit Limit is required").refine(val => !isNaN(Number(val)) && Number(val) >= 25000, { message: "Credit Limit must be at least ₹25000" }),
+  creditLimit: z.string().optional().default("0"),
   creditDays: z.string().optional(),
 
   transports: z.array(z.object({
@@ -129,6 +129,7 @@ const CustomerFormPage: React.FC = () => {
   const { addCustomer, editCustomer } = useCustomers();
 
   const [loading, setLoading] = useState(isEditMode);
+  const [hasTransactions, setHasTransactions] = useState(false);
 
   const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
   const [deleteGradeModalState, setDeleteGradeModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
@@ -267,22 +268,18 @@ const CustomerFormPage: React.FC = () => {
 
   useEffect(() => {
     if (isEditMode) {
-      if (location.state) {
-        reset(mapCustomerToFormData(location.state));
-        setLoading(false);
-      } else {
-        const fetchCustomer = async () => {
-          try {
-            const customer = await customerService.fetchById(id);
-            reset(mapCustomerToFormData(customer));
-          } catch (err) {
-            toast.error("Failed to load customer details");
-          } finally {
-            setLoading(false);
-          }
-        };
-        fetchCustomer();
-      }
+      const fetchCustomer = async () => {
+        try {
+          const customer = await customerService.fetchById(id);
+          reset(mapCustomerToFormData(customer));
+          setHasTransactions(Boolean(customer.hasTransactions));
+        } catch (err) {
+          toast.error("Failed to load customer details");
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchCustomer();
     } else {
       const fetchCode = async () => {
         try {
@@ -342,9 +339,14 @@ const CustomerFormPage: React.FC = () => {
       };
 
       if (isEditMode && id) {
-        // Exclude openingBalance and openingBalanceType — both are immutable after creation
-        const { openingBalance: _ob, openingBalanceType: _obt, ...updatePayload } = payload;
-        await editCustomer(id, updatePayload as any);
+        if (hasTransactions) {
+          // Exclude openingBalance and openingBalanceType when customer has transactions
+          const { openingBalance: _ob, openingBalanceType: _obt, ...updatePayload } = payload;
+          await editCustomer(id, updatePayload as any);
+        } else {
+          // No transactions — include opening balance in update
+          await editCustomer(id, payload as any);
+        }
         toast.success("Customer updated successfully");
       } else {
         await addCustomer(payload as any);
@@ -418,6 +420,7 @@ const CustomerFormPage: React.FC = () => {
           setLoading(true);
           const customer = await customerService.fetchById(id);
           reset(mapCustomerToFormData(customer));
+          setHasTransactions(Boolean(customer.hasTransactions));
           toast.info("Customer details refreshed");
         } catch {
           toast.error("Failed to reload customer details");
@@ -546,7 +549,7 @@ const CustomerFormPage: React.FC = () => {
               <CtrlText field={field} label="GSTIN (15 CHAR)" placeholder="33AABC1234D1Z5" error={errors.gstin?.message} />
             )} />
             <Controller name="openingBalance" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative  required error={errors.openingBalance?.message} disabled={isEditMode} />
+              <CtrlText field={field} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative  required error={errors.openingBalance?.message} disabled={isEditMode && hasTransactions} />
             )} />
             <Controller name="openingBalanceType" control={control} render={({ field }) => (
               <SelectInput
@@ -559,7 +562,7 @@ const CustomerFormPage: React.FC = () => {
                   { value: "CREDIT", label: "Credit (Advance received from customer)" },
                 ]}
                 onChange={(e: any) => field.onChange(e.target.value)}
-                disabled={isEditMode}
+                disabled={isEditMode && hasTransactions}
                 error={errors.openingBalanceType?.message}
               />
             )} />
