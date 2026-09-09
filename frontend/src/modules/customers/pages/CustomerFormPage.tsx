@@ -21,11 +21,11 @@ import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 
 const addressSchema = z.object({
-  addressLine1: z.string().min(1, "Address Line 1 is required"),
+  addressLine1: z.string(),
   addressLine2: z.string().optional(),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
-  pincode: z.string().min(1, "Pincode is required").regex(/^[1-9][0-9]{5}$/, "Enter a valid 6-digit pincode"),
+  city: z.string(),
+  state: z.string(),
+  pincode: z.string(),
 });
 
 const customerFormSchema = z.object({
@@ -35,16 +35,7 @@ const customerFormSchema = z.object({
   displayName: z.string().min(3, "Display Name must be at least 3 characters"),
   customerTypeId: z.number({ message: "Customer Type is required" }).nullable(),
   customerGradeId: z.number({ message: "Customer Grade is required" }).nullable(),
-  phones: z.any().superRefine((val, ctx) => {
-    const primaryMobileNumber = Array.isArray(val) && val.length > 0 ? val[0].number : (typeof val === "string" ? val : "");
-    const error = validatePhoneNumber(primaryMobileNumber, true);
-    if (error) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: error,
-      });
-    }
-  }),
+  phones: z.any().optional().nullable(),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/, "Invalid GSTIN format").optional().or(z.literal("")),
   openingBalance: z.string().min(1, "Opening Balance is required"),
@@ -58,7 +49,7 @@ const customerFormSchema = z.object({
     phone: z.string().optional(),
   })),
 
-  addresses: z.array(z.object({ address: addressSchema })).min(1, "At least one address is required"),
+  addresses: z.array(z.object({ address: addressSchema })),
 });
 
 type CustomerFormValues = z.infer<typeof customerFormSchema>;
@@ -472,7 +463,7 @@ const CustomerFormPage: React.FC = () => {
               <CtrlText field={field} label="Firm / Legal Name" placeholder="e.g. Murugan Plastics" required error={errors.firmName?.message} />
             )} />
             <Controller name="displayName" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Display Name" placeholder="Murugan" error={errors.displayName?.message} />
+              <CtrlText field={field} label="Display Name" placeholder="Murugan" required error={errors.displayName?.message}  />
             )} />
             <Controller name="customerGradeId" control={control} render={({ field }) => (
               <CreatableSelectInput
@@ -544,6 +535,7 @@ const CustomerFormPage: React.FC = () => {
                 value={field.value}
                 onChange={(e) => field.onChange(e.target.value)}
                 maxNumbers={5}
+                required={false}
                 error={errors.phones?.message as string}
               />
             )} />
@@ -554,7 +546,7 @@ const CustomerFormPage: React.FC = () => {
               <CtrlText field={field} label="GSTIN (15 CHAR)" placeholder="33AABC1234D1Z5" error={errors.gstin?.message} />
             )} />
             <Controller name="openingBalance" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative error={errors.openingBalance?.message} disabled={isEditMode} />
+              <CtrlText field={field} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative  required error={errors.openingBalance?.message} disabled={isEditMode} />
             )} />
             <Controller name="openingBalanceType" control={control} render={({ field }) => (
               <SelectInput
@@ -572,7 +564,7 @@ const CustomerFormPage: React.FC = () => {
               />
             )} />
             <Controller name="creditLimit" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Credit Limit ₹" type="number" placeholder="30000" preventNegative error={errors.creditLimit?.message} />
+              <CtrlText field={field} label="Credit Limit ₹" type="number" placeholder="30000" preventNegative required error={errors.creditLimit?.message} />
             )} />
             <Controller name="creditDays" control={control} render={({ field }) => (
               <SelectInput
@@ -633,7 +625,6 @@ const CustomerFormPage: React.FC = () => {
                   pincodeValue={watch(`addresses.0.address.pincode`)}
                   onPincodeChange={(v) => setValue(`addresses.0.address.pincode`, v, { shouldValidate: true, shouldDirty: true })}
                   pincodeError={fieldErrors?.pincode?.message}
-                  required
                 />
               );
             })()}
@@ -665,7 +656,6 @@ const CustomerFormPage: React.FC = () => {
                     pincodeValue={watch(`addresses.${index}.address.pincode`)}
                     onPincodeChange={(v) => setValue(`addresses.${index}.address.pincode`, v, { shouldValidate: true, shouldDirty: true })}
                     pincodeError={fieldErrors?.pincode?.message}
-                    required
                   />
                 </div>
               );

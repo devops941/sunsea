@@ -51,6 +51,7 @@ class CustomerService {
           }
         })
       },
+      include: { addresses: true, customerType: true, customerGrade: true },
     });
 
     // Auto-create AccountLedger under Sundry Debtors.

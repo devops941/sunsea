@@ -48,11 +48,11 @@ export const createCustomerSchema = z.object({
   addresses: z
     .array(
       z.object({
-        addressLine1: z.string().min(1, "Address Line 1 is required"),
+        addressLine1: z.string().optional().default(""),
         addressLine2: z.string().optional(),
-        city: z.string().min(1, "City is required"),
-        state: z.string().min(1, "State is required"),
-        pincode: z.string().min(6, "Pincode is required"),
+        city: z.string().optional().default(""),
+        state: z.string().optional().default(""),
+        pincode: z.string().optional().default(""),
         _label: z.string().optional(),
       })
     )
