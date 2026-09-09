@@ -8,7 +8,7 @@ import { accountService, type AccountLedger } from "../../../../services/account
 import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
-import { formatAmount } from "../../../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
 // Journal = free-form debit/credit entries. Unlike Payment/Receipt there is
 // no fixed "Mode" account; every row picks its own ledger AND its own side
@@ -286,6 +286,7 @@ const JournalEntryAddPage: React.FC = () => {
                             placeholder=""
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -305,6 +306,7 @@ const JournalEntryAddPage: React.FC = () => {
                             placeholder=""
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

@@ -7,7 +7,7 @@ import { accountService } from "../../../../services/accountService";
 import { useListCache, invalidateCache, prefetchCache } from "../../../../hooks/useListCache";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
-import { formatAmount } from "../../../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
 interface BankAccount {
   id: number;
@@ -406,6 +406,7 @@ const BankAccountsPage: React.FC = () => {
                       placeholder="0.00"
                       value={newOpeningBalance}
                       onChange={(e) => setNewOpeningBalance(e.target.value)}
+                      onBlur={formatAmountOnBlur((val) => setNewOpeningBalance(val))}
                       className="flex-1 px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
                     />
                   </div>
@@ -501,6 +502,7 @@ const BankAccountsPage: React.FC = () => {
                   placeholder="e.g. 150000.00"
                   value={editOpeningBalance}
                   onChange={(e) => setEditOpeningBalance(e.target.value)}
+                  onBlur={formatAmountOnBlur((val) => setEditOpeningBalance(val))}
                   className="w-full px-3 py-2 border border-line bg-card-2 rounded text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
                   autoFocus
                 />

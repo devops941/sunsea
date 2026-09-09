@@ -8,8 +8,8 @@ import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/Led
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { formatAmount } from "../../../../utils/pricingUtils";
 
 interface JournalRow {
   id: number;
@@ -338,6 +338,7 @@ const JournalEntryEditPage: React.FC = () => {
                             placeholder=""
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
@@ -357,6 +358,7 @@ const JournalEntryEditPage: React.FC = () => {
                             placeholder=""
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}

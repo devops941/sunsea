@@ -8,8 +8,8 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { formatAmount } from "../../../../utils/pricingUtils";
 
 // Same shape as the Add page — one row per party being paid, with a
 // per-row Payment Mode (bank/cash) column.
@@ -354,6 +354,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                           min="0"
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                          onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                           onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                           // Select existing value on focus so typing replaces it
                           // (matches Busy — click any pre-filled amount and the

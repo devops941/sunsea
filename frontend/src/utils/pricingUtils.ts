@@ -24,6 +24,16 @@ export const getUnitPrice = (item: PriceableItem): string | number => {
     return item.product?.b2b ?? item.b2b ?? item.unitPrice ?? item.product?.mrp ?? 0;
 };
 
+/**
+ * onBlur handler for amount inputs — formats value to 2 decimal places.
+ * Usage: <input onBlur={formatAmountOnBlur((formatted) => updateRow(id, "amount", formatted))} />
+ */
+export const formatAmountOnBlur = (onUpdate: (formatted: string) => void) =>
+  (e: React.FocusEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v > 0) onUpdate(v.toFixed(2));
+  };
+
 export const formatAmount = (value: number) => {
   return value % 1 === 0
     ? value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })

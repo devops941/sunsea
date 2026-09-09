@@ -8,7 +8,7 @@ import { accountService, type AccountLedger } from "../../../../services/account
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
-import { formatAmount } from "../../../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
 interface PaymentRow {
   id: number;
@@ -323,6 +323,7 @@ const PaymentVoucherAddPage: React.FC = () => {
                         // Select existing value on focus so typing replaces
                         // it (Busy behaviour). Native spinner arrows hidden.
                         onFocus={(e) => e.currentTarget.select()}
+                        onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                         disabled={!unlocked}
                         className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                       />
