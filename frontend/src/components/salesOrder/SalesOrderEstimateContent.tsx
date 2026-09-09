@@ -75,10 +75,14 @@ export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps>
     const orderDate = formatDate(estimateOrder.orderDate);
 
     const items: EstimateItem[] = estimateOrder.items || [];
-    const subtotal = Number(estimateOrder.subtotal ?? 0);
+    // Recalculate subtotal from grouped items to avoid mismatch with component-level rounding
+    const itemsSubtotal = items.reduce((sum, it) => {
+        const lt = Number(it.lineTotal ?? (Number(it.quantity || 0) * Number(it.unitPrice ?? 0)));
+        return sum + lt;
+    }, 0);
+    const subtotal = itemsSubtotal > 0 ? itemsSubtotal : Number(estimateOrder.subtotal ?? 0);
     const totalDiscount = Number(estimateOrder.totalDiscount ?? 0);
     const discountPct = Number(estimateOrder.orderDiscountValue ?? 0);
-    const netAmount = Number(estimateOrder.netAmount ?? 0);
 
     const isInterState = Boolean((estimateOrder as any).isInterState);
 
@@ -108,7 +112,8 @@ export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps>
         });
     }
 
-    const taxDiff = netAmount - (subtotal - totalDiscount);
+    const storedNetAmount = Number(estimateOrder.netAmount ?? 0);
+    const taxDiff = storedNetAmount - (subtotal - totalDiscount);
     if (totalCgst === 0 && totalSgst === 0 && totalIgst === 0 && taxDiff > 0.009) {
         if (isInterState) {
             totalIgst = taxDiff;
@@ -124,6 +129,12 @@ export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps>
     const totalCess = Number((estimateOrder as any).totalCess ?? items.reduce((acc: number, it: any) => acc + Number(it.cessAmount || 0), 0));
 
     const taxableBase = Math.max(0, subtotal - totalDiscount);
+
+    // Recalculate net amount from the corrected subtotal (including charges)
+    const ch = (estimateOrder as any).__charges__ || {};
+    const chargeAdditions  = Number(ch.lorryFreight || 0) + Number(ch.othersPlus || 0) + Number(ch.roundOffPlus || 0);
+    const chargeDeductions = Number(ch.othersMinus || 0) + Number(ch.roundOffMinus || 0) + Number(ch.tds || 0);
+    const netAmount = taxableBase + totalTax + totalCess + chargeAdditions - chargeDeductions;
 
     const cgstRates = Array.from(new Set(items.map((it: any) => Number(it.cgstRate || (Number(it.gstRate || 0) / 2) || 0)).filter((r: number) => r > 0)));
     const cgstRateDisplay = cgstRates.length === 1 ? cgstRates[0] : (totalCgst > 0 && taxableBase > 0 ? (totalCgst / taxableBase) * 100 : null);

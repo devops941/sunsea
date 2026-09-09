@@ -418,7 +418,10 @@ const SalesOrderDetail: React.FC = () => {
     const calcSgst = useInvoiceTotals ? invoiceSgst : Number(order?.totalSgst || 0);
     const calcIgst = useInvoiceTotals ? invoiceIgst : Number(order?.totalIgst || 0);
     const calcTotalTax = useInvoiceTotals ? invoiceTotalTax : Number(order?.totalTax || 0);
-    const baseNetAmount = useInvoiceTotals ? Number(linkedInvoice.grandTotal || 0) : Number(order?.netAmount || 0);
+    // Recalculate net amount from subtotal to avoid mismatch with component-level rounding
+    const baseNetAmount = useInvoiceTotals
+        ? Number(linkedInvoice.grandTotal || 0)
+        : (taxableAmount + calcTotalTax);
     const billSundryTotal = useMemo(() => {
         const raw = (order as any)?.billSundry;
         if (!Array.isArray(raw) || raw.length === 0) return 0;

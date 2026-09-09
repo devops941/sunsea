@@ -26,6 +26,6 @@ export const getUnitPrice = (item: PriceableItem): string | number => {
 
 export const formatAmount = (value: number) => {
   return value % 1 === 0
-    ? value.toLocaleString("en-IN")
+    ? value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };

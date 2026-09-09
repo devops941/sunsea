@@ -562,7 +562,11 @@ const QuotationForm: React.FC = () => {
     };
 
     // ── Load order ──
+    // Wait for salesProducts to finish loading before populating form (avoids race condition
+    // where reconstructQuotationItems gets an empty salesProducts array)
     useEffect(() => {
+        if (salesProductsLoading) return;
+
         const state = location.state as any;
         // Edit target: prefer the URL param (survives refresh), fall back to nav state
         const editId = idParam ? Number(idParam) : (state?.id ? Number(state.id) : null);
@@ -629,7 +633,8 @@ const QuotationForm: React.FC = () => {
         };
 
         loadOrder();
-    }, [location, idParam, reset, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location, idParam, reset, navigate, salesProductsLoading]);
 
     // ─── Load draft orders (only in create mode) ──────────────
     useEffect(() => {
@@ -1146,12 +1151,31 @@ const QuotationForm: React.FC = () => {
             render: (_row: any, index: number) => {
                 const itemValue = watchedItems?.[index];
                 if (!itemValue) return null;
-                const rowCalc = calculateItemDisplay(itemValue);
-                if (rowCalc.subtotal <= 0) return <span className="text-[13px] text-ink-subtle">—</span>;
+                const orderQty = Number(itemValue.orderQuantity) || 0;
+                const unitPrice = Number(itemValue.unitPrice) || 0;
+                const subtotal = orderQty * unitPrice;
+                const displayTotal = subtotal > 0 ? subtotal.toFixed(2) : "";
                 return (
-                    <div className="text-right">
-                        <span className="text-emerald-500 text-[13px] font-bold">₹{rowCalc.totalWithGst.toFixed(2)}</span>
-                    </div>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        key={`total-${index}-${displayTotal}`}
+                        defaultValue={displayTotal}
+                        onBlur={(e) => {
+                            const newTotal = Number(e.target.value) || 0;
+                            const qty = Number(watchedItems?.[index]?.orderQuantity) || 1;
+                            const newUnitPrice = qty > 0 ? Math.round((newTotal / qty) * 100) / 100 : 0;
+                            setValue(`items.${index}.unitPrice`, String(newUnitPrice));
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                (e.target as HTMLInputElement).blur();
+                            }
+                        }}
+                        className="w-full bg-transparent text-[13px] text-emerald-500 font-bold text-right outline-none border-none p-0 h-full"
+                        placeholder="0"
+                    />
                 );
             },
         },
@@ -1373,19 +1397,6 @@ const QuotationForm: React.FC = () => {
                                             onChange={f.onChange}
                                             required
                                             disabled={isEditMode}
-                                        />
-                                    )}
-                                />
-                                <Controller
-                                    name="quotationNo"
-                                    control={control}
-                                    render={({ field: f }) => (
-                                        <CtrlText
-                                            field={f}
-                                            label="Quotation No"
-                                            placeholder={isEditMode ? "" : "Auto-generated"}
-                                            disabled={isEditMode}
-                                            error={errors.quotationNo?.message}
                                         />
                                     )}
                                 />

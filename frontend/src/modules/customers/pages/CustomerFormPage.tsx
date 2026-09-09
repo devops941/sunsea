@@ -45,7 +45,7 @@ const customerFormSchema = z.object({
       });
     }
   }),
-  email: z.string().min(1, "Email is required").email("Invalid email address"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/, "Invalid GSTIN format").optional().or(z.literal("")),
   openingBalance: z.string().min(1, "Opening Balance is required"),
   openingBalanceType: z.string().min(1, "Opening Balance Type is required"),
