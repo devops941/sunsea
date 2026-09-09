@@ -26,6 +26,7 @@ import {
 } from "../../../../services/accountService";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { useDetailCache, invalidateDetailCache, prefetchDetail } from "../../../../hooks/useDetailCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useListCache } from "../../../../hooks/useListCache";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
@@ -197,6 +198,11 @@ export const LedgerStatementPage: React.FC = () => {
   const [showMergedDialog, setShowMergedDialog] = useState<boolean>(isMerged && !mergedHasSelection);
   const [showModeDialog, setShowModeDialog] = useState<boolean>(!isMerged && initialStep === "mode");
   const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(!isMerged && initialStep === "options");
+  // Selected mode is a 2-step flow: "panel" (Busy's Select Accounts screen)
+  // then "config" (dates + toggles). Other scopes stay single-panel.
+  // Declared HERE (up front) so the Esc / auto-focus effects below can
+  // safely reference it without a temporal-dead-zone error.
+  const [selectedStep, setSelectedStep] = useState<"panel" | "config">("panel");
   const [selectedLedgerId, setSelectedLedgerId] = useState<number | null>(urlSeed.acc);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(urlSeed.grp);
   const [selectedLedgerIds, setSelectedLedgerIds] = useState<Set<number>>(urlSeed.ids);
@@ -291,6 +297,7 @@ export const LedgerStatementPage: React.FC = () => {
   // Group picker (searchable dropdown, LedgerSearchInput-style)
   const [groupPickerOpen, setGroupPickerOpen] = useState<boolean>(false);
   const [groupPickerQuery, setGroupPickerQuery] = useState<string>("");
+  const [groupPickerHlIdx, setGroupPickerHlIdx] = useState<number>(0);
   // Busy "Selected Accounts" panel: radio filter (All / Group) + Show List
   // button that populates the checkbox list. List is hidden until user
   // clicks Show List (matches Busy screenshot 1 → 2).
@@ -352,6 +359,21 @@ export const LedgerStatementPage: React.FC = () => {
       document.querySelector<HTMLInputElement>('input[name="draftStartDate"]')?.focus();
     });
   }, [showOptionsDialog, viewMode]);
+
+  // Selected mode → config step transition: auto-focus Starting Date so
+  // the operator can keep hitting Enter through dates → toggles → OK
+  // without ever touching the mouse.
+  useEffect(() => {
+    if (!showOptionsDialog) return;
+    if (viewMode !== "selected") return;
+    if (selectedStep !== "config") return;
+    // setTimeout(0) — DatePickerCalendar's controlled input mounts a
+    // beat after the sub-step swaps, so a plain rAF sometimes fires
+    // before the target exists.
+    setTimeout(() => {
+      document.querySelector<HTMLInputElement>('input[name="draftStartDate"]')?.focus();
+    }, 0);
+  }, [showOptionsDialog, viewMode, selectedStep]);
 
   // Map a row → its detail/edit route so Enter opens the underlying record.
   // KEY: for auto-posted vouchers (Sales/Purchase/GRN), the "voucherId" is
@@ -459,8 +481,10 @@ export const LedgerStatementPage: React.FC = () => {
   }, [showModeDialog]);
 
   // Options config dialog — Esc reverses to the previous step (Merged /
-  // Format / Mode) matching the "← Back" button in the header. Keeps the
-  // whole reverse-nav chain keyboard-only.
+  // Format / Mode) matching the "← Back" button in the header. For the
+  // Selected-Accounts flow, if the operator is on the "config" sub-step
+  // (dates + toggles), Esc first walks BACK to the "panel" sub-step
+  // (account picker) — one Esc = one back-step, just like Busy.
   useEffect(() => {
     if (!showOptionsDialog) return;
     const onKey = (e: KeyboardEvent) => {
@@ -473,6 +497,12 @@ export const LedgerStatementPage: React.FC = () => {
         // caller's onKeyDown already handled it.
         return;
       }
+      // Selected → config → Esc → back to Selected panel.
+      if (viewMode === "selected" && selectedStep === "config") {
+        e.preventDefault();
+        setSelectedStep("panel");
+        return;
+      }
       e.preventDefault();
       setShowOptionsDialog(false);
       if (isMerged) setShowMergedDialog(true);
@@ -481,7 +511,7 @@ export const LedgerStatementPage: React.FC = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, isMerged, format]);
+  }, [showOptionsDialog, isMerged, format, viewMode, selectedStep]);
 
   // Merged Ledger dialog — currently 1 option (Account Group).
   useEffect(() => {
@@ -518,9 +548,7 @@ export const LedgerStatementPage: React.FC = () => {
   useEffect(() => { formatDialogHlIdxRef.current = formatDialogHlIdx; }, [formatDialogHlIdx]);
   useEffect(() => { modeDialogHlIdxRef.current = modeDialogHlIdx; }, [modeDialogHlIdx]);
   useEffect(() => { mergedDialogHlIdxRef.current = mergedDialogHlIdx; }, [mergedDialogHlIdx]);
-  // Selected mode is a 2-step flow: "panel" (Busy's Select Accounts screen)
-  // then "config" (dates + toggles). Other scopes stay single-panel.
-  const [selectedStep, setSelectedStep] = useState<"panel" | "config">("panel");
+  // (selectedStep declared earlier — near the other dialog visibility state.)
   // True while the prefetch fetch is in-flight. Used to show a subtle
   // "loading data..." indicator on the OK button so the user knows the
   // click will resolve instantly once the pre-warm completes.
@@ -633,6 +661,7 @@ export const LedgerStatementPage: React.FC = () => {
     fetcher,
     enabled: cacheEnabled,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   // Real-time revalidation from every source that can mutate ledger balances.
   // useDetailCache only listens to `voucher`; these extra modules cover the rest.
@@ -846,7 +875,10 @@ export const LedgerStatementPage: React.FC = () => {
   }, [statement, showFormatDialog, showModeDialog, showMergedDialog, showOptionsDialog, filteredEntries]);
 
   return (
-    <div className="p-3 font-sans text-ink relative" style={{ minHeight: "calc(100vh - 100px)" }}>
+    // `data-escape-guarded` opts this page OUT of the global Esc→back
+    // shortcut so our own multi-panel Esc chain (Format → Mode → Options
+    // → Table) can walk the local stack instead of the browser leaving.
+    <div data-escape-guarded className="p-3 font-sans text-ink relative" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* Merged Ledger picker — Busy's "Merged Ledger !" modal. Only shown
          when navigating to /accounts/ledger-statement/merged. Skips the
          Format + Mode dialogs and offers Group / Selected only. */}
@@ -871,10 +903,11 @@ export const LedgerStatementPage: React.FC = () => {
                     onClick={() => {
                       setViewMode(m.key);
                       setShowMergedDialog(false);
-                      // Prepare draft state for the Options / picker step
+                      // Prepare draft state for the Options / picker step —
+                      // start empty so the operator picks fresh (Busy convention).
                       setDraftLedgerId(null);
-                      setDraftGroup(selectedGroup);
-                      setDraftLedgerIds(new Set(selectedLedgerIds));
+                      setDraftGroup(null);
+                      setDraftLedgerIds(new Set());
                       setDraftStartDate(startDate);
                       setDraftEndDate(endDate);
                       setSelFilter("all");
@@ -967,8 +1000,10 @@ export const LedgerStatementPage: React.FC = () => {
                         // T-Format is inherently a single-account view — skip
                         // the Mode dialog (One/Group/All/Selected) and jump
                         // straight to the filter/config for one account.
+                        // Start with EMPTY selection so the operator picks
+                        // fresh (matches the One-Account flow).
                         setViewMode("one");
-                        setDraftLedgerId(selectedLedgerId);
+                        setDraftLedgerId(null);
                         setDraftGroup(null);
                         setDraftLedgerIds(new Set());
                         setDraftStartDate(startDate);
@@ -1054,10 +1089,13 @@ export const LedgerStatementPage: React.FC = () => {
                         grp: null,
                         ids: null,
                       });
-                      // Prepare draft state for Step-2 options dialog
-                      setDraftLedgerId(selectedLedgerId);
-                      setDraftGroup(selectedGroup);
-                      setDraftLedgerIds(new Set(selectedLedgerIds));
+                      // Prepare draft state for Step-2 options dialog. Start
+                      // with EMPTY selection — the operator explicitly asked
+                      // for a blank Select Account on every re-entry so they
+                      // pick fresh rather than inheriting a stale drill target.
+                      setDraftLedgerId(null);
+                      setDraftGroup(null);
+                      setDraftLedgerIds(new Set());
                       setDraftStartDate(startDate);
                       setDraftEndDate(endDate);
                       // Reset the Busy "Select Accounts" panel state so it
@@ -1204,14 +1242,54 @@ export const LedgerStatementPage: React.FC = () => {
                         onFocus={() => {
                           setGroupPickerOpen(true);
                           setGroupPickerQuery("");
+                          setGroupPickerHlIdx(0);
                         }}
-                        onChange={(e) => setGroupPickerQuery(e.target.value)}
+                        onChange={(e) => {
+                          setGroupPickerQuery(e.target.value);
+                          // Any typing resets highlight to the first match so
+                          // Enter picks the top row (Busy convention).
+                          setGroupPickerHlIdx(0);
+                        }}
                         onBlur={() => {
                           // Delay so click on option registers before close
                           setTimeout(() => setGroupPickerOpen(false), 150);
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === "Escape") {
+                          // Recompute the filtered list to bound the highlight
+                          // and know what Enter should pick — mirrors the
+                          // exact filter used in the dropdown render below.
+                          const q = groupPickerQuery.trim().toLowerCase();
+                          const list = groupedLedgers.filter((g) => !q || g.group.toLowerCase().includes(q));
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            if (list.length === 0) return;
+                            setGroupPickerHlIdx((i) => Math.min(i + 1, list.length - 1));
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            if (list.length === 0) return;
+                            setGroupPickerHlIdx((i) => Math.max(i - 1, 0));
+                          } else if (e.key === "Enter") {
+                            // Commit the highlighted match (defaults to the
+                            // first row) and advance focus to Starting Date.
+                            // Focusing by NAME avoids the stale-tabbable-list
+                            // race where the just-closed dropdown's buttons
+                            // hadn't yet unmounted, causing the "next" element
+                            // to be the dropdown item instead of the date input.
+                            e.preventDefault();
+                            if (list.length === 0) return;
+                            const idx = Math.min(Math.max(groupPickerHlIdx, 0), list.length - 1);
+                            const pick = list[idx];
+                            if (!pick) return;
+                            setDraftGroup(pick.group);
+                            setGroupPickerOpen(false);
+                            setGroupPickerQuery("");
+                            setTimeout(() => {
+                              document
+                                .querySelector<HTMLInputElement>('input[name="draftStartDate"]')
+                                ?.focus();
+                            }, 0);
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
                             setGroupPickerOpen(false);
                             (e.target as HTMLInputElement).blur();
                           }
@@ -1246,26 +1324,40 @@ export const LedgerStatementPage: React.FC = () => {
                                 </div>
                               );
                             }
-                            return list.map((g) => (
-                              <button
-                                key={g.group}
-                                type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setDraftGroup(g.group);
-                                  setGroupPickerOpen(false);
-                                  setGroupPickerQuery("");
-                                }}
-                                className={`w-full text-left px-2 py-1 text-[11px] flex items-center justify-between border-b border-line-soft last:border-b-0 hover:bg-card-2 ${
-                                  draftGroup === g.group ? "bg-blue-500/10 text-blue-400" : "text-ink-muted"
-                                }`}
-                              >
-                                <span className="truncate">{g.group}</span>
-                                <span className="text-[9px] text-ink-subtle font-mono ml-2 shrink-0">
-                                  {g.ledgers.length}
-                                </span>
-                              </button>
-                            ));
+                            return list.map((g, idx) => {
+                              const isHl = idx === Math.min(Math.max(groupPickerHlIdx, 0), list.length - 1);
+                              return (
+                                <button
+                                  key={g.group}
+                                  type="button"
+                                  ref={(el) => {
+                                    // Scroll the highlighted row into view so
+                                    // arrow-key nav past the visible window
+                                    // keeps the operator's target on screen.
+                                    if (el && isHl) el.scrollIntoView({ block: "nearest" });
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setDraftGroup(g.group);
+                                    setGroupPickerOpen(false);
+                                    setGroupPickerQuery("");
+                                  }}
+                                  onMouseEnter={() => setGroupPickerHlIdx(idx)}
+                                  className={`w-full text-left px-2 py-1 text-[11px] flex items-center justify-between border-b border-line-soft last:border-b-0 ${
+                                    isHl
+                                      ? "bg-red-500/20 text-red-300"
+                                      : draftGroup === g.group
+                                        ? "bg-blue-500/10 text-blue-400"
+                                        : "text-ink-muted hover:bg-card-2"
+                                  }`}
+                                >
+                                  <span className="truncate">{g.group}</span>
+                                  <span className="text-[9px] text-ink-subtle font-mono ml-2 shrink-0">
+                                    {g.ledgers.length}
+                                  </span>
+                                </button>
+                              );
+                            });
                           })()}
                         </div>
                       )}
@@ -1330,14 +1422,66 @@ export const LedgerStatementPage: React.FC = () => {
                     setDraftLedgerIds(next);
                   } else if (e.key === "Enter") {
                     e.preventDefault();
-                    // Advance panel → config step (equivalent to "Next →").
-                    if (!selListShown) setSelListShown(true);
-                    else setSelectedStep("config");
+                    // If the list is still hidden, first Enter opens it
+                    // (equivalent to clicking Show List).
+                    if (!selListShown) {
+                      setSelListShown(true);
+                      return;
+                    }
+                    // If the operator has typed a search query, Enter should
+                    // TICK the highlighted match (or the top match if none is
+                    // highlighted yet), then clear the search so they can pick
+                    // another one — matches Busy's operator flow.
+                    if (selListQuery && filtered.length > 0) {
+                      const idx = selHighlightIdx >= 0 && selHighlightIdx < filtered.length
+                        ? selHighlightIdx
+                        : 0;
+                      const l = filtered[idx];
+                      const next = new Set(draftLedgerIds);
+                      if (!next.has(l.id)) next.add(l.id);
+                      setDraftLedgerIds(next);
+                      setSelListQuery("");
+                      setSelHighlightIdx(-1);
+                      return;
+                    }
+                    // With no active search but a highlighted row, Enter also
+                    // ticks that row (arrow-key nav flow).
+                    if (selHighlightIdx >= 0 && selHighlightIdx < filtered.length) {
+                      const l = filtered[selHighlightIdx];
+                      const next = new Set(draftLedgerIds);
+                      if (next.has(l.id)) next.delete(l.id);
+                      else next.add(l.id);
+                      setDraftLedgerIds(next);
+                      return;
+                    }
+                    // Empty search + no highlight → only advance if at least
+                    // one account is already ticked; otherwise nudge the
+                    // operator by ignoring Enter.
+                    if (draftLedgerIds.size === 0) {
+                      toast.error("Tick at least one account first");
+                      return;
+                    }
+                    setSelectedStep("config");
                   } else if (e.key === "Escape") {
                     if (selListQuery) {
+                      // First Esc clears the active search query.
                       e.preventDefault();
                       setSelListQuery("");
                       setSelHighlightIdx(-1);
+                    } else {
+                      // Empty query → Esc walks BACK one step in the modal
+                      // stack: close the Options dialog and re-open the
+                      // Mode picker. The window-level Esc handler above
+                      // ignores keys typed inside inputs (so we can clear
+                      // search first), so we have to do the reverse-nav
+                      // ourselves here.
+                      e.preventDefault();
+                      e.stopPropagation();
+                      (e.target as HTMLInputElement).blur();
+                      setShowOptionsDialog(false);
+                      if (isMerged) setShowMergedDialog(true);
+                      else if (format === "t-format") setShowFormatDialog(true);
+                      else setShowModeDialog(true);
                     }
                   }
                 };
@@ -1834,6 +1978,10 @@ export const LedgerStatementPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => { setShowOptionsDialog(false); setShowModeDialog(true); }}
+                  // `tabIndex={-1}` — Enter's focus-next-tabbable should
+                  // skip Cancel and land on OK, so the operator can commit
+                  // by simply pressing Enter through the final field.
+                  tabIndex={-1}
                   className="px-2 py-0.5 text-[11px] font-semibold text-ink-muted hover:text-ink hover:bg-card rounded border border-line"
                 >
                   Cancel

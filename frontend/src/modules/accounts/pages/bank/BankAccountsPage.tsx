@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import apiClient from "../../../../api/apiClient";
 import { accountService } from "../../../../services/accountService";
 import { useListCache, invalidateCache, prefetchCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
@@ -90,6 +91,7 @@ const BankAccountsPage: React.FC = () => {
     fetcher,
     onSuccess: onListSuccess,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   // useListCache only listens to ONE module. Bank balances change on ANY voucher
   // (payment/receipt/journal/contra), petty-cash entry, or expense posting — none
@@ -162,7 +164,9 @@ const BankAccountsPage: React.FC = () => {
   };
 
   return (
-    <div className="p-3 space-y-3 min-h-screen">
+    // Opt out of the global Esc→back shortcut so the accounts module's
+    // Esc behaviour stays consistent (no accidental page navigation).
+    <div data-escape-guarded className="p-3 space-y-3 min-h-screen">
       {/* Compact merged header */}
       <div className="bg-card rounded-lg border border-line">
         <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-2">
@@ -424,6 +428,9 @@ const BankAccountsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setShowAddForm(false); resetForm(); }}
+                  // Skip Cancel in Enter's tab order so pressing Enter after
+                  // the last field commits (lands on the submit button).
+                  tabIndex={-1}
                   className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line"
                 >
                   Cancel
@@ -510,6 +517,7 @@ const BankAccountsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setEditingBank(null); setEditOpeningBalance(""); }}
+                  tabIndex={-1}
                   className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line"
                 >
                   Cancel

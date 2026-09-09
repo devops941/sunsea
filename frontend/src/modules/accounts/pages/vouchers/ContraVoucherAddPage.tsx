@@ -136,20 +136,21 @@ const ContraVoucherAddPage: React.FC = () => {
       return;
     }
 
-    // Standard accounting mapping — matches the UI column headers exactly:
-    //   D  → Debit column shows the amount → posts as DEBIT
-    //   C  → Credit column shows the amount → posts as CREDIT
-    // Old code had this inverted ("D = Out = Credit posting"), which meant the
-    // ledger ended up on the opposite side of what the operator picked in the
-    // D/C selector. Every contra voucher was flipping bank vs cash Dr/Cr sign.
+    // Passbook mapping — matches the "D=Out(↓) · C=In(↑)" caption on the
+    // D/C selector (user's mental model, like SBI SMS "your account was
+    // debited"):
+    //   D on this account = money LEAVES  → post as CREDIT (asset ↓)
+    //   C on this account = money ARRIVES → post as DEBIT  (asset ↑)
+    // Downstream ledger/bank statement views still render standard Dr/Cr
+    // because they read the underlying journal items directly.
     const items = validRows.map((r) => {
       const amt = parseFloat(r.amount);
-      const isDebit = r.dc === "D";
+      const isOut = r.dc === "D";
       return {
-        debitLedgerId: isDebit ? parseInt(r.ledgerId, 10) : null,
-        creditLedgerId: !isDebit ? parseInt(r.ledgerId, 10) : null,
-        debitAmount: isDebit ? amt : 0,
-        creditAmount: !isDebit ? amt : 0,
+        debitLedgerId: !isOut ? parseInt(r.ledgerId, 10) : null,
+        creditLedgerId: isOut ? parseInt(r.ledgerId, 10) : null,
+        debitAmount: !isOut ? amt : 0,
+        creditAmount: isOut ? amt : 0,
         narration: r.narration || mainNarration || "Contra Entry",
       };
     });

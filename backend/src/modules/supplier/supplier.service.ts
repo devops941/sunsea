@@ -171,6 +171,9 @@ class SupplierService {
         const creatorInfo = adminMap.get(supplier.createdBy) || userMap.get(supplier.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
         const updaterInfo = supplier.updatedBy ? (adminMap.get(supplier.updatedBy) || userMap.get(supplier.updatedBy)) : null;
 
+        // Payable convention (matches payableService + getSupplierById):
+        //   positive netBalance = we owe supplier (Cr on their ledger)
+        //   negative netBalance = advance paid, supplier owes us (Dr)
         let netBalance = 0;
         try {
           const result = await payableService.getPayableSummaries({ supplierId: supplier.id });
@@ -180,16 +183,16 @@ class SupplierService {
           } else {
             const opBal = Number(supplier.openingBalance || 0);
             const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
-            netBalance = opType === "DEBIT" ? Math.abs(opBal) : -Math.abs(opBal);
+            netBalance = opType === "DEBIT" ? -Math.abs(opBal) : Math.abs(opBal);
           }
         } catch (e) {
           const opBal = Number(supplier.openingBalance || 0);
           const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
-          netBalance = opType === "DEBIT" ? Math.abs(opBal) : -Math.abs(opBal);
+          netBalance = opType === "DEBIT" ? -Math.abs(opBal) : Math.abs(opBal);
         }
 
         const balanceAmount = Math.abs(netBalance);
-        const balanceType = netBalance > 0 ? "Dr" : netBalance < 0 ? "Cr" : "";
+        const balanceType = netBalance > 0 ? "Cr" : netBalance < 0 ? "Dr" : "";
 
         return {
           ...supplier,

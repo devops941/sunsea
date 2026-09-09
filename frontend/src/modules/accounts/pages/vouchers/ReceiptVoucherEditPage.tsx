@@ -9,6 +9,7 @@ import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/Dat
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 
 // Same shape as the Add page — one row per payer, with a per-row Receipt
 // Mode (bank/cash) column.
@@ -38,6 +39,9 @@ const ReceiptVoucherEditPage: React.FC = () => {
   const location = useLocation();
   const { id: routeId } = useParams<{ id: string }>();
   const id = routeId ? parseInt(routeId, 10) : NaN;
+
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Zero-loading strategy (three layers, fastest → slowest):
   //   1. Router-state preload from list-page navigate() — instant, no cache hit needed

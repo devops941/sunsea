@@ -9,6 +9,7 @@ import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/Dat
 import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 
 interface JournalRow {
   id: number;
@@ -35,6 +36,9 @@ const JournalEntryEditPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: routeId } = useParams<{ id: string }>();
+
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
   const id = routeId ? parseInt(routeId, 10) : NaN;
 
   // Zero-loading: router state -> detail cache -> SWR fetch.

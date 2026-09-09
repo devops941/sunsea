@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaBook, FaSync, FaFilter } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { accountService, type DayBookResult, type DayBookRow } from "../../../../services/accountService";
 import { useListCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { prefetchDetail } from "../../../../hooks/useDetailCache";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDateDMY } from "../../../../utils/dateUtils";
@@ -53,27 +54,48 @@ const DayBookPage: React.FC = () => {
   const navigate = useNavigate();
   const [applied, setApplied] = useState<FilterOptions>(() => defaultFilters());
   const [pending, setPending] = useState<FilterOptions>(() => defaultFilters());
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Modal-as-page persistence.
+  const VIEW_KEY = "sunsea:day-book:view";
+  const [panelOpen, setPanelOpen] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, panelOpen ? "panel" : "table"); } catch { /* ignore */ }
+  }, [panelOpen]);
   // Row selection — { side, idx-within-that-side }. Auto-selected to first
   // Dr row when data lands, then user can arrow around.
   const [selected, setSelected] = useState<{ side: "Dr" | "Cr"; idx: number } | null>(null);
   const [modalRow, setModalRow] = useState<DayBookRow | null>(null);
 
-  // F2 = OK, Esc = quit — Busy shortcuts, active only while the panel is open.
+  // Modal nav stack — Esc walks: table → panel → navigate away.
+  const panelOpenRef = useRef(panelOpen);
+  const pendingRef = useRef(pending);
+  useEffect(() => { panelOpenRef.current = panelOpen; }, [panelOpen]);
+  useEffect(() => { pendingRef.current = pending; }, [pending]);
   useEffect(() => {
-    if (!panelOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2") {
+      if (e.key === "F2" && panelOpenRef.current) {
         e.preventDefault();
-        setApplied(pending);
+        e.stopPropagation();
+        setApplied(pendingRef.current);
         setPanelOpen(false);
-      } else if (e.key === "Escape") {
-        setPanelOpen(false);
+        return;
+      }
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!panelOpenRef.current) {
+        setPending(applied);
+        setPanelOpen(true);
+      } else {
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelOpen, pending]);
+  }, [applied, navigate]);
 
   const cacheKey = `accounts:day-book:${applied.startDate}:${applied.endDate}`;
 
@@ -101,6 +123,7 @@ const DayBookPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const dayBook: DayBookResult | null = results[0] || null;
 
@@ -200,9 +223,10 @@ const DayBookPage: React.FC = () => {
   }, [panelOpen, dayBook, selected, modalRow, openViewModal]);
 
   // ────── Busy-style pre-list filter dialog ──────
+  // `data-escape-guarded` opts out of the global Esc→back shortcut.
   if (panelOpen) {
     return (
-      <div className="p-3">
+      <div data-escape-guarded className="p-3">
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
             <div className="bg-indigo-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
@@ -274,7 +298,7 @@ const DayBookPage: React.FC = () => {
 
   // ────── Day Book (list) ──────
   return (
-    <div className="p-3 space-y-2 w-full max-w-[1400px]">
+    <div data-escape-guarded className="p-3 space-y-2 w-full max-w-[1400px]">
       {/* Header bar */}
       <div className="bg-card rounded-md border border-line px-3 py-1.5 flex flex-wrap items-center gap-2 shadow-sm">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
@@ -452,6 +476,10 @@ const ViewOptionsModal: React.FC<{
             <button
               type="button"
               onClick={onClose}
+              // `tabIndex={-1}` — Enter's focus-next-tabbable should skip
+              // Cancel and land on OK so the operator can commit with a
+              // single Enter after the last field.
+              tabIndex={-1}
               className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
             >
               Cancel

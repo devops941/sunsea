@@ -65,11 +65,14 @@ const ContraVoucherEditPage: React.FC = () => {
   const effective = preloaded || cachedVoucher || getDetailFromCache<Voucher>(cacheKey);
 
   const hydrateFromVoucher = (v: Voucher): ContraRow[] => {
+    // Passbook convention on this screen (see handleSubmit for details):
+    //   Journal DEBIT to this ledger  = money arrived  → show as C (In)
+    //   Journal CREDIT to this ledger = money left     → show as D (Out)
     const populated: ContraRow[] = (v.items || []).map((it) => {
       const isDebit = it.debitLedgerId != null && Number(it.debitAmount || 0) > 0;
       return {
         id: rowCounter++,
-        dc: isDebit ? "D" : "C",
+        dc: isDebit ? "C" : "D",
         ledgerId: String(isDebit ? it.debitLedgerId : it.creditLedgerId),
         amount: String(Number(isDebit ? it.debitAmount : it.creditAmount) || 0),
         narration: it.narration || "",
@@ -197,14 +200,17 @@ const ContraVoucherEditPage: React.FC = () => {
       return;
     }
 
+    // Passbook mapping (see ContraVoucherAddPage for the rationale):
+    //   D on this account = money OUT → post as CREDIT (asset ↓)
+    //   C on this account = money IN  → post as DEBIT  (asset ↑)
     const items = validRows.map((r) => {
       const amt = parseFloat(r.amount);
-      const isDebit = r.dc === "D";
+      const isOut = r.dc === "D";
       return {
-        debitLedgerId: isDebit ? parseInt(r.ledgerId, 10) : null,
-        creditLedgerId: !isDebit ? parseInt(r.ledgerId, 10) : null,
-        debitAmount: isDebit ? amt : 0,
-        creditAmount: !isDebit ? amt : 0,
+        debitLedgerId: !isOut ? parseInt(r.ledgerId, 10) : null,
+        creditLedgerId: isOut ? parseInt(r.ledgerId, 10) : null,
+        debitAmount: !isOut ? amt : 0,
+        creditAmount: isOut ? amt : 0,
         narration: r.narration || mainNarration || "Contra Entry",
       };
     });

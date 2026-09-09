@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { expenseService, type Expense } from "../../services/expenseService";
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache } from "../../hooks/useListCache";
+import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 
 // Busy-style "Select Expense To Modify" picker. Operator enters Vch No
 // and/or Date → OK finds the expense and navigates to the Modify page.
@@ -15,6 +16,9 @@ const ExpenseModifyPickerPage: React.FC = () => {
   const [expenseNo, setExpenseNo] = useState("");
   const [expenseDate, setExpenseDate] = useState(todayIso);
   const [submitting, setSubmitting] = useState(false);
+
+  // F2 = submit + auto-focus Expense No on mount (centralised).
+  useFormShortcuts({ autoFocusField: "expenseNo" });
 
   const fetcher = useCallback(async () => {
     const res = await expenseService.fetchAll({ page: 1, limit: 10000 });
@@ -127,7 +131,7 @@ const ExpenseModifyPickerPage: React.FC = () => {
               <label className="col-span-5 text-ink-subtle font-semibold">Expense No.</label>
               <div className="col-span-7">
                 <input
-                  autoFocus
+                  name="expenseNo"
                   type="text"
                   value={expenseNo}
                   onChange={(e) => setExpenseNo(e.target.value)}

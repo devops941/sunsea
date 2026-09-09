@@ -44,7 +44,8 @@ const JournalEntryAddPage: React.FC = () => {
     Array.from({ length: INITIAL_ROW_COUNT }, (_, i) => makeEmptyRow(i))
   );
 
-  useFormShortcuts({});
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Busy quirk: Journal doesn't preview the next Vch No in the entry screen
   // (unlike Payment / Receipt). The number is assigned server-side on save.

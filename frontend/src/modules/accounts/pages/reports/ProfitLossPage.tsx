@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaChartLine,
   FaSync,
@@ -10,6 +11,9 @@ import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatAmount } from "../../../../utils/pricingUtils";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
+import { useListCache } from "../../../../hooks/useListCache";
+import { accountService, type AccountLedger } from "../../../../services/accountService";
 
 // ─── Backend response shape ─────────────────────────────────────────
 interface PLAccount {
@@ -122,8 +126,16 @@ const ProfitLossPage: React.FC = () => {
   });
   useEffect(() => { saveOptions(options); }, [options]);
 
-  // ─── Options dialog ─────────────────────────────────────────────
-  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(true);
+  // ─── Options dialog — persisted view (see BalanceSheetPage for docs).
+  // Re-entering the page after a previous commit lands on the table, not
+  // a fresh modal. Esc walks table → options → back-navigate. ────────
+  const VIEW_KEY = "sunsea:profit-loss:view";
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, showOptionsDialog ? "options" : "table"); } catch { /* ignore */ }
+  }, [showOptionsDialog]);
   const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
   const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
   const [draftOptions, setDraftOptions] = useState<Options>(options);
@@ -160,6 +172,37 @@ const ProfitLossPage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
+
+  // ─── Ledger list + drill helpers ────────────────────────────────
+  // Resolve a P&L row's account code → ledgerId so drill-down can jump
+  // into the exact ledger statement page. Sections navigate to the
+  // group ledger view; individual accounts to the one-ledger view.
+  const navigate = useNavigate();
+  const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
+    const list = res.ledgers || [];
+    return { data: list, total: list.length };
+  }, []);
+  const { data: ledgers } = useListCache<AccountLedger>({
+    cacheKey: "accounts:ledgers:all",
+    socketModule: "accountLedger",
+    fetcher: ledgersFetcher,
+  });
+  const ledgerByCode = useMemo(() => {
+    const m = new Map<string, AccountLedger>();
+    for (const l of ledgers) if (l.code) m.set(l.code, l);
+    return m;
+  }, [ledgers]);
+  const drillGroup = useCallback((groupName: string) => {
+    if (!groupName) return;
+    navigate(`/accounts/ledger-statement?fmt=std&mode=group&grp=${encodeURIComponent(groupName)}&from=${startDate}&to=${endDate}`);
+  }, [navigate, startDate, endDate]);
+  const drillItem = useCallback((code: string) => {
+    const l = ledgerByCode.get(code);
+    if (!l) return;
+    navigate(`/accounts/ledger-statement?fmt=std&mode=one&acc=${l.id}&from=${startDate}&to=${endDate}`);
+  }, [navigate, ledgerByCode, startDate, endDate]);
 
   // ─── Commit / F2 / Esc ──────────────────────────────────────────
   const commitOptions = useCallback(() => {
@@ -169,21 +212,32 @@ const ProfitLossPage: React.FC = () => {
     setShowOptionsDialog(false);
   }, [draftStartDate, draftEndDate, draftOptions]);
 
+  // Modal nav stack — Esc walks: table → options → navigate away.
+  // Uses refs so the listener is registered once (no stale-closure race).
+  const showOptionsDialogRef = useRef(showOptionsDialog);
+  useEffect(() => { showOptionsDialogRef.current = showOptionsDialog; }, [showOptionsDialog]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2" && showOptionsDialog) {
+      if (e.key === "F2" && showOptionsDialogRef.current) {
         e.preventDefault();
+        e.stopPropagation();
         commitOptions();
-      } else if (e.key === "Escape" && !showOptionsDialog) {
-        const tag = (e.target as HTMLElement | null)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-        e.preventDefault();
+        return;
+      }
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!showOptionsDialogRef.current) {
         setShowOptionsDialog(true);
+      } else {
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, commitOptions]);
+  }, [commitOptions, navigate]);
 
   // ─── Derived view — Trading + P&L buckets ───────────────────────
   type Bucket = { section: string; items: PLAccount[]; total: number };
@@ -257,7 +311,7 @@ const ProfitLossPage: React.FC = () => {
   const navRef = useRef(nav);
   useEffect(() => { navRef.current = nav; }, [nav]);
 
-  type FlatRow = { kind: "section" | "item" | "total" | "sub"; name: string; balance: number; sign?: "dr" | "cr" };
+  type FlatRow = { kind: "section" | "item" | "total" | "sub"; name: string; balance: number; sign?: "dr" | "cr"; code?: string };
   const { leftRows, rightRows } = useMemo(() => {
     if (!view) return { leftRows: [] as FlatRow[], rightRows: [] as FlatRow[] };
 
@@ -269,7 +323,7 @@ const ProfitLossPage: React.FC = () => {
         arr.push({ kind: "section", name: g.section, balance: g.total });
         if (options.showSecondLevelGroups) {
           for (const it of g.items) {
-            arr.push({ kind: "item", name: it.name, balance: it.netAmount });
+            arr.push({ kind: "item", name: it.name, balance: it.netAmount, code: it.code });
           }
         }
       }
@@ -339,10 +393,21 @@ const ProfitLossPage: React.FC = () => {
       else if (e.key === "End") { e.preventDefault(); setNav({ ...cur, idx: maxIdx }); }
       else if (e.key === "PageDown") { e.preventDefault(); setNav({ ...cur, idx: Math.min(cur.idx + 10, maxIdx) }); }
       else if (e.key === "PageUp") { e.preventDefault(); setNav({ ...cur, idx: Math.max(cur.idx - 10, 0) }); }
+      else if (e.key === "Enter" && cur.idx >= 0) {
+        // Drill into highlighted row. Sections open the group ledger,
+        // items open the one-ledger view. Total / balancing rows
+        // (Gross Profit, Nett Profit, Total) don't have a ledger to
+        // drill into so we quietly ignore them.
+        e.preventDefault();
+        const row = (cur.side === "L" ? leftRows : rightRows)[cur.idx];
+        if (!row) return;
+        if (row.kind === "section") drillGroup(row.name);
+        else if (row.kind === "item" && row.code) drillItem(row.code);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, leftRows.length, rightRows.length]);
+  }, [showOptionsDialog, leftRows, rightRows, drillGroup, drillItem]);
 
   // ─── Print / Export ─────────────────────────────────────────────
   const handlePrint = () => window.print();
@@ -375,8 +440,10 @@ const ProfitLossPage: React.FC = () => {
   };
 
   // ─── Render ─────────────────────────────────────────────────────
+  // `data-escape-guarded` opts this page OUT of the global Esc→back
+  // shortcut so our own Esc handler owns the local modal-stack nav.
   return (
-    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div data-escape-guarded className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* Top action bar — hidden while filter dialog is open. */}
       {!showOptionsDialog && (
       <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
@@ -481,6 +548,24 @@ const ProfitLossPage: React.FC = () => {
                         const rowClassR = rowClassL;
                         const amtClassR = amtClassL;
 
+                        // Click handlers — single click selects (highlight),
+                        // double click drills into the ledger statement.
+                        // Section rows → group ledger; item rows → one ledger.
+                        // Total / sub rows (Gross Profit, Nett Profit, Total)
+                        // are informational — no drill target.
+                        const canDrill = (r?: FlatRow) => r && (r.kind === "section" || (r.kind === "item" && !!r.code));
+                        const drillRow = (r?: FlatRow) => {
+                          if (!r) return;
+                          if (r.kind === "section") drillGroup(r.name);
+                          else if (r.kind === "item" && r.code) drillItem(r.code);
+                        };
+                        const onLClick = () => setNav({ side: "L", idx: i });
+                        const onLDbl = () => drillRow(L);
+                        const onRClick = () => setNav({ side: "R", idx: i });
+                        const onRDbl = () => drillRow(R);
+                        const lCursor = canDrill(L) ? "cursor-pointer" : "";
+                        const rCursor = canDrill(R) ? "cursor-pointer" : "";
+
                         rows.push(
                           <tr key={`plrow-${i}`} className="border-b border-line-soft/60 hover:bg-card-2/40">
                             {/* LEFT (Debit) */}
@@ -488,12 +573,17 @@ const ProfitLossPage: React.FC = () => {
                               <>
                                 <td
                                   data-pl-row={`L-${i}`}
-                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${rowClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
+                                  onClick={onLClick}
+                                  onDoubleClick={onLDbl}
+                                  title={canDrill(L) ? "Double-click (or Enter) to drill into ledger" : undefined}
+                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${lCursor} ${rowClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
                                 >
                                   {L.name}
                                 </td>
                                 <td
-                                  className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${amtClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
+                                  onClick={onLClick}
+                                  onDoubleClick={onLDbl}
+                                  className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${lCursor} ${amtClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
                                 >
                                   {L.balance !== 0 && fmt(Math.abs(L.balance), options.scaleFactor)}
                                 </td>
@@ -509,12 +599,17 @@ const ProfitLossPage: React.FC = () => {
                               <>
                                 <td
                                   data-pl-row={`R-${i}`}
-                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${rowClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
+                                  onClick={onRClick}
+                                  onDoubleClick={onRDbl}
+                                  title={canDrill(R) ? "Double-click (or Enter) to drill into ledger" : undefined}
+                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${rCursor} ${rowClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
                                 >
                                   {R.name}
                                 </td>
                                 <td
-                                  className={`px-3 py-0.5 text-[11px] text-right font-mono ${amtClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
+                                  onClick={onRClick}
+                                  onDoubleClick={onRDbl}
+                                  className={`px-3 py-0.5 text-[11px] text-right font-mono ${rCursor} ${amtClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
                                 >
                                   {R.balance !== 0 && fmt(Math.abs(R.balance), options.scaleFactor)}
                                 </td>
@@ -548,8 +643,8 @@ const ProfitLossPage: React.FC = () => {
 
               {/* Footer strip */}
               <div className="px-3 py-1 text-[10px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
-                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
-                <span><kbd className="px-1 border border-line rounded bg-card">← →</kbd> switch</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓ ← →</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill into ledger</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Home / End</kbd> jump</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
                 <span className="ml-auto">

@@ -156,6 +156,21 @@ class ReceivableService {
       }),
       (prisma as any).salesInvoice.findMany({
         where: { customerId: { in: customerIds } },
+        // Explicit select — only the fields this file actually reads. Also
+        // insulates against schema drift on unused columns (e.g. shipping_*
+        // fields declared in schema but missing in DB → previously blew up
+        // with Prisma P2022 on the whole endpoint).
+        select: {
+          id: true,
+          customerId: true,
+          invoiceNo: true,
+          invoiceDate: true,
+          dueDate: true,
+          createdAt: true,
+          grandTotal: true,
+          subTotal: true,
+          payments: true,
+        },
       }),
     ]);
 
@@ -286,10 +301,22 @@ class ReceivableService {
     const ledger = await accountsService.ensureCustomerLedger(customer);
     const statement = await accountsService.getLedgerStatement(ledger.id, options || {});
 
-    // Fetch Sales Invoices for per-invoice breakdown
+    // Fetch Sales Invoices for per-invoice breakdown. Explicit select
+    // avoids the P2022 schema-drift crash on unused columns.
     const salesInvoices = await (prisma as any).salesInvoice.findMany({
       where: { customerId: customer.id },
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        customerId: true,
+        invoiceNo: true,
+        invoiceDate: true,
+        dueDate: true,
+        createdAt: true,
+        grandTotal: true,
+        subTotal: true,
+        payments: true,
+      },
     });
 
     const invoices = salesInvoices.map((inv: any) => {

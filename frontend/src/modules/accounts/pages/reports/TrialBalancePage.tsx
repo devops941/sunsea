@@ -13,6 +13,7 @@ import {
 import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useListCache } from "../../../../hooks/useListCache";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import { formatAmount } from "../../../../utils/pricingUtils";
@@ -120,9 +121,26 @@ const TrialBalancePage: React.FC = () => {
   });
   useEffect(() => { saveOptions(options); }, [options]);
 
-  // ─── Dialog visibility — mode picker → options → table ──────────
-  const [showModeDialog, setShowModeDialog] = useState<boolean>(true);
-  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(false);
+  // ─── Dialog visibility — Mode picker → Options → Table.
+  // Persisted per session (sessionStorage) so navigating away and back
+  // (Ledger drill-out, sidebar hop, etc.) restores the operator to the
+  // exact view they left, not a fresh Mode picker. Esc walks one step
+  // back through the stack. ─────────────────────────────────────────
+  const VIEW_KEY = "sunsea:trial-balance:view";
+  type View = "mode" | "options" | "table";
+  const initialView: View = (() => {
+    try {
+      const v = sessionStorage.getItem(VIEW_KEY) as View | null;
+      if (v === "table" || v === "options" || v === "mode") return v;
+    } catch { /* ignore */ }
+    return "mode";
+  })();
+  const [showModeDialog, setShowModeDialog] = useState<boolean>(initialView === "mode");
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(initialView === "options");
+  useEffect(() => {
+    const v: View = showModeDialog ? "mode" : showOptionsDialog ? "options" : "table";
+    try { sessionStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ }
+  }, [showModeDialog, showOptionsDialog]);
   const [modeHlIdx, setModeHlIdx] = useState<number>(0);
   const modeHlRef = useRef(modeHlIdx);
   useEffect(() => { modeHlRef.current = modeHlIdx; }, [modeHlIdx]);
@@ -138,6 +156,7 @@ const TrialBalancePage: React.FC = () => {
   // Group picker (searchable dropdown, Ledger-style)
   const [groupPickerOpen, setGroupPickerOpen] = useState<boolean>(false);
   const [groupPickerQuery, setGroupPickerQuery] = useState<string>("");
+  const [groupPickerHlIdx, setGroupPickerHlIdx] = useState<number>(0);
 
   // ─── Mode dialog keyboard nav (3 buttons) ───────────────────────
   useEffect(() => {
@@ -167,8 +186,11 @@ const TrialBalancePage: React.FC = () => {
     if (!showOptionsDialog) return;
     setDraftAsOnDate(asOnDate);
     setDraftOptions(options);
-    if (viewMode === "group") setDraftGroup(selectedGroup);
-    if (viewMode === "selected") setDraftLedgerIds(new Set(selectedLedgerIds));
+    // Start pickers EMPTY on every dialog open — operator explicitly
+    // wants a fresh pick (matches Ledger Statement convention). Never
+    // inherit the previously-committed group / ids.
+    if (viewMode === "group") setDraftGroup(null);
+    if (viewMode === "selected") setDraftLedgerIds(new Set());
     requestAnimationFrame(() => {
       document.querySelector<HTMLInputElement>('input[name="tbAsOnDate"]')?.focus();
     });
@@ -195,6 +217,7 @@ const TrialBalancePage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   // ─── Filtered rows (apply Group / Selected filter client-side) ──
   const filteredRows = useMemo<TBRow[]>(() => {
@@ -233,28 +256,43 @@ const TrialBalancePage: React.FC = () => {
     setShowOptionsDialog(false);
   }, [viewMode, draftAsOnDate, draftOptions, draftGroup, draftLedgerIds]);
 
+  // Modal nav stack — Esc walks:
+  //   table   → open options dialog
+  //   options → back to mode picker
+  //   mode    → navigate away (handled inside the Mode dialog effect)
+  // Uses refs so the listener registers once (no stale-closure race).
+  const showOptionsDialogRef = useRef(showOptionsDialog);
+  const showModeDialogRef = useRef(showModeDialog);
+  useEffect(() => { showOptionsDialogRef.current = showOptionsDialog; }, [showOptionsDialog]);
+  useEffect(() => { showModeDialogRef.current = showModeDialog; }, [showModeDialog]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2" && showOptionsDialog) {
+      if (e.key === "F2" && showOptionsDialogRef.current) {
         e.preventDefault();
+        e.stopPropagation();
         commitOptions();
-      } else if (e.key === "Escape" && showOptionsDialog) {
-        // Back to mode picker
-        const tag = (e.target as HTMLElement | null)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-        e.preventDefault();
+        return;
+      }
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Mode dialog owns its own Esc handler (registered inside that
+      // effect) so we don't touch it here — it navigates away.
+      if (showModeDialogRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (showOptionsDialogRef.current) {
+        // Options dialog → back to Mode picker.
         setShowOptionsDialog(false);
         setShowModeDialog(true);
-      } else if (e.key === "Escape" && !showOptionsDialog && !showModeDialog) {
-        const tag = (e.target as HTMLElement | null)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-        e.preventDefault();
+      } else {
+        // Table → open Options dialog.
         setShowOptionsDialog(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, showModeDialog, commitOptions]);
+  }, [commitOptions]);
 
   // ─── Row keyboard nav ───────────────────────────────────────────
   const [rowIdx, setRowIdx] = useState<number>(-1);
@@ -325,7 +363,9 @@ const TrialBalancePage: React.FC = () => {
 
   // ─── Render ─────────────────────────────────────────────────────
   return (
-    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+    // `data-escape-guarded` opts this page OUT of the global Esc→back
+    // shortcut so our own handler walks table → options → mode → back.
+    <div data-escape-guarded className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* Top action bar — hidden while dialogs are open. */}
       {!showOptionsDialog && !showModeDialog && (
       <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
@@ -572,9 +612,45 @@ const TrialBalancePage: React.FC = () => {
                         autoFocus
                         value={groupPickerOpen ? groupPickerQuery : (draftGroup || "")}
                         placeholder="Type to search group..."
-                        onFocus={() => { setGroupPickerOpen(true); setGroupPickerQuery(""); }}
-                        onChange={(e) => setGroupPickerQuery(e.target.value)}
+                        onFocus={() => { setGroupPickerOpen(true); setGroupPickerQuery(""); setGroupPickerHlIdx(0); }}
+                        onChange={(e) => { setGroupPickerQuery(e.target.value); setGroupPickerHlIdx(0); }}
                         onBlur={() => setTimeout(() => setGroupPickerOpen(false), 150)}
+                        onKeyDown={(e) => {
+                          const q = groupPickerQuery.trim().toLowerCase();
+                          const list = groupList.filter((g) => !q || g.toLowerCase().includes(q));
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            if (list.length === 0) return;
+                            setGroupPickerHlIdx((i) => Math.min(i + 1, list.length - 1));
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            if (list.length === 0) return;
+                            setGroupPickerHlIdx((i) => Math.max(i - 1, 0));
+                          } else if (e.key === "Enter") {
+                            // Commit the highlighted group (default: first
+                            // match) and advance focus to the Report Date
+                            // field. Focus by NAME avoids the stale-tabbable
+                            // race where the closing dropdown's buttons are
+                            // briefly still in the DOM.
+                            e.preventDefault();
+                            if (list.length === 0) return;
+                            const idx = Math.min(Math.max(groupPickerHlIdx, 0), list.length - 1);
+                            const pick = list[idx];
+                            if (!pick) return;
+                            setDraftGroup(pick);
+                            setGroupPickerOpen(false);
+                            setGroupPickerQuery("");
+                            setTimeout(() => {
+                              document
+                                .querySelector<HTMLInputElement>('input[name="tbAsOnDate"]')
+                                ?.focus();
+                            }, 0);
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            setGroupPickerOpen(false);
+                            (e.target as HTMLInputElement).blur();
+                          }
+                        }}
                         className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                       />
                       {groupPickerOpen && (
@@ -585,23 +661,32 @@ const TrialBalancePage: React.FC = () => {
                             if (list.length === 0) return (
                               <div className="px-2 py-3 text-center text-[10px] text-ink-subtle italic">No groups</div>
                             );
-                            return list.map((g) => (
-                              <button
-                                key={g}
-                                type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setDraftGroup(g);
-                                  setGroupPickerOpen(false);
-                                  setGroupPickerQuery("");
-                                }}
-                                className={`w-full text-left px-2 py-1 text-[11px] uppercase font-semibold border-b border-line-soft last:border-b-0 hover:bg-card-2 ${
-                                  draftGroup === g ? "bg-red-500/10 text-red-400" : "text-ink-muted"
-                                }`}
-                              >
-                                {g}
-                              </button>
-                            ));
+                            return list.map((g, idx) => {
+                              const isHl = idx === Math.min(Math.max(groupPickerHlIdx, 0), list.length - 1);
+                              return (
+                                <button
+                                  key={g}
+                                  type="button"
+                                  ref={(el) => { if (el && isHl) el.scrollIntoView({ block: "nearest" }); }}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setDraftGroup(g);
+                                    setGroupPickerOpen(false);
+                                    setGroupPickerQuery("");
+                                  }}
+                                  onMouseEnter={() => setGroupPickerHlIdx(idx)}
+                                  className={`w-full text-left px-2 py-1 text-[11px] uppercase font-semibold border-b border-line-soft last:border-b-0 ${
+                                    isHl
+                                      ? "bg-red-500/20 text-red-300"
+                                      : draftGroup === g
+                                        ? "bg-red-500/10 text-red-400"
+                                        : "text-ink-muted hover:bg-card-2"
+                                  }`}
+                                >
+                                  {g}
+                                </button>
+                              );
+                            });
                           })()}
                         </div>
                       )}

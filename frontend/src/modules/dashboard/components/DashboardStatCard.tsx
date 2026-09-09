@@ -41,18 +41,18 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
 }) => {
   // Safe formatting helper to prevent ever showing "NaN" or "undefined"
   const formatAmount = (val: string | number | null | undefined): string => {
-    if (val === null || val === undefined) return "₹0";
+    if (val === null || val === undefined) return "₹0.00";
     if (typeof val === "number") {
-      if (isNaN(val) || !isFinite(val)) return "₹0";
-      return `₹${val.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+      if (isNaN(val) || !isFinite(val)) return "₹0.00";
+      return `₹${val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     const str = String(val).trim();
     if (!str || str.toLowerCase().includes("nan") || str.toLowerCase().includes("undefined")) {
-      return "₹0";
+      return "₹0.00";
     }
     const num = Number(str.replace(/[^0-9.-]+/g, ""));
     if (!isNaN(num) && isFinite(num)) {
-      return `₹${num.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+      return `₹${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     return str.startsWith("₹") ? str : `₹${str}`;
   };
