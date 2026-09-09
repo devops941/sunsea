@@ -261,6 +261,16 @@ class CustomerService {
     const balanceAmount = Math.abs(netBalance);
     const balanceType = netBalance > 0 ? "Dr" : netBalance < 0 ? "Cr" : "";
 
+    // Check if customer has real transactions (beyond the opening balance voucher)
+    const customerLedger = await prisma.accountLedger.findUnique({
+      where: { customerId: id },
+      include: { debitItems: { include: { voucher: true } }, creditItems: { include: { voucher: true } } },
+    });
+    const allJournalItems = [...(customerLedger?.debitItems || []), ...(customerLedger?.creditItems || [])];
+    const hasTransactions = allJournalItems.some(
+      (item: any) => item.voucher?.refDocType !== "CUSTOMER_OPENING_BALANCE"
+    );
+
     return {
       ...customer,
       createdUserName,
@@ -268,6 +278,7 @@ class CustomerService {
       netBalance,
       balanceAmount,
       balanceType,
+      hasTransactions,
     };
   }
 
@@ -300,14 +311,25 @@ class CustomerService {
       }
     }
 
-    const { phones, addresses, ...restData } = data as any;
+    const { phones, addresses, openingBalance, openingBalanceType, ...restData } = data as any;
     const mobileData = phones !== undefined ? phones : restData.mobile;
+
+    // Handle opening balance update — only if customer has no real transactions
+    const wantsOpeningBalanceUpdate = openingBalance !== undefined || openingBalanceType !== undefined;
+    if (wantsOpeningBalanceUpdate && customer.hasTransactions) {
+      throw new ApiError(400, "Cannot update opening balance — customer has existing transactions");
+    }
 
     const updated = await prisma.customer.update({
       where: { id },
       data: {
         ...restData,
         ...(mobileData !== undefined && { mobile: mobileData as any }),
+        ...(wantsOpeningBalanceUpdate && {
+          openingBalance: openingBalance ?? Number(customer.openingBalance ?? 0),
+          openingBalanceType: openingBalanceType ?? customer.openingBalanceType ?? "DEBIT",
+          outstandingAmount: openingBalance ?? Number(customer.openingBalance ?? 0),
+        }),
 
         ...(addresses && {
           addresses: {
@@ -326,6 +348,27 @@ class CustomerService {
       },
       include: { addresses: true, customerType: true, customerGrade: true },
     });
+
+    // Re-post opening balance voucher if opening balance was changed
+    if (wantsOpeningBalanceUpdate) {
+      // Delete old opening balance voucher
+      try {
+        await prisma.voucher.deleteMany({
+          where: { refDocType: "CUSTOMER_OPENING_BALANCE", refDocId: id },
+        });
+      } catch { /* no existing voucher — that's fine */ }
+
+      // Post new voucher with updated amount
+      const newBalance = openingBalance ?? Number(customer.openingBalance ?? 0);
+      if (newBalance > 0) {
+        const newType = ((openingBalanceType ?? customer.openingBalanceType ?? "DEBIT") as string).toUpperCase() as "DEBIT" | "CREDIT";
+        await voucherPostingService.postCustomerOpeningBalanceVoucher(
+          { id: updated.id, customerCode: updated.customerCode, firmName: updated.firmName },
+          newBalance,
+          newType
+        );
+      }
+    }
 
     return updated;
   }
