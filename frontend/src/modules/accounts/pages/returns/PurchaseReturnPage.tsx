@@ -20,7 +20,7 @@ import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSV
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { usePermission } from "../../../../hooks/usePermission";
-import { formatAmount } from "../../../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
 interface FormReturnRow {
   rawMaterialId: string;
@@ -692,7 +692,7 @@ export const PurchaseReturnPage: React.FC = () => {
                                   <input type="number" min="0" max={row.maxReturnable} step="0.01" value={row.quantity || ""} placeholder="0" disabled={row.maxReturnable <= 0} onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)} className="w-full px-1 border border-line rounded text-center font-mono font-semibold text-primary bg-card focus:outline-none focus:border-primary disabled:opacity-60" />
                                 </td>
                                 <td className="px-2 py-1">
-                                  <input type="number" min="0" step="0.01" value={row.unitPrice || ""} disabled={row.isGrnLinked} onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)} className="w-full px-1 border border-line rounded text-right font-mono bg-card text-ink focus:outline-none focus:border-primary disabled:opacity-60" />
+                                  <input type="number" min="0" step="0.01" value={row.unitPrice || ""} disabled={row.isGrnLinked} onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)} onBlur={formatAmountOnBlur((val) => handleRowPriceChange(idx, parseFloat(val)))} className="w-full px-1 border border-line rounded text-right font-mono bg-card text-ink focus:outline-none focus:border-primary disabled:opacity-60" />
                                 </td>
                                 <td className="px-2 py-1 text-right font-mono font-semibold text-ink text-[11px]">₹{lineTot.toFixed(2)}</td>
                                 <td className="px-2 py-1 text-center">

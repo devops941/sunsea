@@ -7,7 +7,7 @@ import { accountService, type AccountLedger } from "../../../../services/account
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
-import { formatAmount } from "../../../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
 // Each row: D = money LEAVES (Out → credited in journal), C = money ARRIVES (In → debited in journal)
 interface ContraRow {
@@ -282,6 +282,7 @@ const ContraVoucherAddPage: React.FC = () => {
                             placeholder=""
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-red-400 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -300,6 +301,7 @@ const ContraVoucherAddPage: React.FC = () => {
                             placeholder=""
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                            onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-emerald-500 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

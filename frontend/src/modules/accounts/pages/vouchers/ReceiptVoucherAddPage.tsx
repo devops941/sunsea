@@ -8,7 +8,7 @@ import { accountService, type AccountLedger } from "../../../../services/account
 import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
-import { formatAmount } from "../../../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 
 // Receipt = money coming IN. Direction reversed from Payment:
 //   creditLedgerId  = Customer / Income account that paid us ("Received From")
@@ -303,6 +303,7 @@ const ReceiptVoucherAddPage: React.FC = () => {
                           placeholder=""
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                          onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                           onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
