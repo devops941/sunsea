@@ -52,7 +52,9 @@ const customerFormSchema = z.object({
   addresses: z.array(z.object({ address: addressSchema })),
 });
 
-type CustomerFormValues = z.infer<typeof customerFormSchema>;
+// Use the schema's input type because zod defaults/transformations can make
+// the resolver output stricter than the values accepted by react-hook-form.
+type CustomerFormValues = z.input<typeof customerFormSchema>;
 
 const initialFormData: CustomerFormValues = {
   customerId: "",
@@ -146,7 +148,7 @@ const CustomerFormPage: React.FC = () => {
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CustomerFormValues>({
-    resolver: zodResolver(customerFormSchema),
+    resolver: zodResolver(customerFormSchema) as any,
     defaultValues: initialFormData,
   });
 
