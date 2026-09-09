@@ -14,6 +14,7 @@ import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { usePermission } from "../../../../hooks/usePermission";
 
 export const ChartOfAccountsPage: React.FC = () => {
@@ -56,6 +57,7 @@ export const ChartOfAccountsPage: React.FC = () => {
     socketModule: "accountLedger",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const handleApplyFilters = () => {
     setSearchTerm(draftSearchTerm);
@@ -179,7 +181,9 @@ export const ChartOfAccountsPage: React.FC = () => {
   }, [ledgers]);
 
   return (
-    <div className="flex gap-3 w-full items-start font-sans text-ink">
+    // Opt out of the global Esc→back shortcut so accounts-module Esc
+    // handling stays consistent across sibling pages.
+    <div data-escape-guarded className="flex gap-3 w-full items-start font-sans text-ink">
       <div className="flex-1 space-y-2 min-w-0 max-w-7xl">
 
         {/* Single-row header — filters + actions */}
@@ -542,6 +546,9 @@ export const ChartOfAccountsPage: React.FC = () => {
                   type="button"
                   onClick={() => setShowModal(false)}
                   disabled={submitting}
+                  // Skip Cancel in Enter's tab order so Enter after the last
+                  // field lands on Save.
+                  tabIndex={-1}
                   className="px-3 py-1.5 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded border border-line disabled:opacity-50"
                 >
                   Cancel

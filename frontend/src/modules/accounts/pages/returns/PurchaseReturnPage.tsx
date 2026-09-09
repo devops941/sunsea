@@ -8,6 +8,7 @@ import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { storeService } from "../../../../services/storeService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 import { useListCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 import CustomButton from "../../../../components/ui/Button/Button";
@@ -114,6 +115,7 @@ export const PurchaseReturnPage: React.FC = () => {
     socketModule: "purchaseReturn",
     fetcher,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   useSocketSync("grnInvoice", undefined, refresh);
   useSocketSync("supplier", undefined, refresh);
@@ -471,7 +473,7 @@ export const PurchaseReturnPage: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div data-escape-guarded>
       <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* Header */}

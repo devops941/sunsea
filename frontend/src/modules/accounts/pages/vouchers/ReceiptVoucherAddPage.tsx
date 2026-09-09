@@ -47,7 +47,8 @@ const ReceiptVoucherAddPage: React.FC = () => {
     Array.from({ length: INITIAL_ROW_COUNT }, makeEmptyRow)
   );
 
-  useFormShortcuts({});
+  // F2 = save + auto-focus Date on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Peek next Vch No so the operator sees "R-5" waiting for them
   useEffect(() => {

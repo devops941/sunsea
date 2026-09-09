@@ -328,7 +328,7 @@ export const SalesReturnPage: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div data-escape-guarded>
       <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* Header */}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaBalanceScale,
   FaSync,
@@ -8,8 +9,11 @@ import {
 } from "react-icons/fa";
 import apiClient from "../../../../api/apiClient";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
+import { useListCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatAmount } from "../../../../utils/pricingUtils";
+import { accountService, type AccountLedger } from "../../../../services/accountService";
 
 // ─── Types (backend response shape) ──────────────────────────────────
 interface BSItem {
@@ -93,8 +97,20 @@ const BalanceSheetPage: React.FC = () => {
   // Persist on every change so next open starts with the last-picked values.
   useEffect(() => { saveOptions(options); }, [options]);
 
-  // ─── Options dialog (opens on mount, closes after F2/OK) ────────────
-  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(true);
+  // ─── Options dialog — treated as a "page" in a mini nav stack.
+  // On first visit the dialog opens. Once the operator commits it, the
+  // fact is persisted to sessionStorage so re-entering the page from
+  // elsewhere (via Ledger drill-back etc.) lands directly on the table,
+  // not on a fresh modal. Esc from the table re-opens the dialog; Esc
+  // from the dialog (when we have data to show) closes it back to the
+  // table; Esc from the dialog on a fresh visit navigates back. ──────
+  const VIEW_KEY = "sunsea:balance-sheet:view";
+  const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, showOptionsDialog ? "options" : "table"); } catch { /* ignore */ }
+  }, [showOptionsDialog]);
   const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
   const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
   const [draftOptions, setDraftOptions] = useState<Options>(options);
@@ -136,6 +152,43 @@ const BalanceSheetPage: React.FC = () => {
     fetcher,
   });
 
+  // F5 = refresh (centralised via usePageShortcuts).
+  usePageShortcuts({ onRefresh: refresh });
+
+  // ─── Ledger list (cached, socket-synced) — used to resolve a row's
+  //     ledger code → ledgerId so drill-down can jump into the correct
+  //     ledger statement without a second fetch. Same cacheKey as the
+  //     ledger statement / trial balance pages → instant hit. ───────────
+  const navigate = useNavigate();
+  const ledgersFetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
+    const list = res.ledgers || [];
+    return { data: list, total: list.length };
+  }, []);
+  const { data: ledgers } = useListCache<AccountLedger>({
+    cacheKey: "accounts:ledgers:all",
+    socketModule: "accountLedger",
+    fetcher: ledgersFetcher,
+  });
+  const ledgerByCode = useMemo(() => {
+    const m = new Map<string, AccountLedger>();
+    for (const l of ledgers) if (l.code) m.set(l.code, l);
+    return m;
+  }, [ledgers]);
+
+  // Drill helper — sends the operator into the appropriate ledger
+  // statement view. Group headers open the "Group of Accounts" ledger;
+  // sub-item rows open the "One Account" ledger for that specific code.
+  const drillGroup = useCallback((groupName: string) => {
+    if (!groupName) return;
+    navigate(`/accounts/ledger-statement?fmt=std&mode=group&grp=${encodeURIComponent(groupName)}&from=${startDate}&to=${endDate}`);
+  }, [navigate, startDate, endDate]);
+  const drillItem = useCallback((code: string) => {
+    const l = ledgerByCode.get(code);
+    if (!l) return;
+    navigate(`/accounts/ledger-statement?fmt=std&mode=one&acc=${l.id}&from=${startDate}&to=${endDate}`);
+  }, [navigate, ledgerByCode, startDate, endDate]);
+
   // ─── Commit / Apply (F2) ────────────────────────────────────────────
   const commitOptions = useCallback(() => {
     setStartDate(draftStartDate);
@@ -144,24 +197,42 @@ const BalanceSheetPage: React.FC = () => {
     setShowOptionsDialog(false);
   }, [draftStartDate, draftEndDate, draftOptions]);
 
-  // F2 anywhere while dialog is open → submit; Esc while table is
-  // visible → re-open dialog (Busy convention).
+  // Modal nav stack — Esc walks back one "page":
+  //   table   → Esc → open options dialog
+  //   options → Esc → navigate away (leave the page)
+  //
+  // Uses REFS for the state read inside the keydown listener so we can
+  // register the effect ONCE (not every render) — a stale-closure race
+  // was previously letting the wrong branch fire and popping the user
+  // out of the page instead of re-opening the modal. Also stops the
+  // event so no other listener (or browser default) can swallow it.
+  const showOptionsDialogRef = useRef(showOptionsDialog);
+  useEffect(() => { showOptionsDialogRef.current = showOptionsDialog; }, [showOptionsDialog]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2" && showOptionsDialog) {
+      if (e.key === "F2" && showOptionsDialogRef.current) {
         e.preventDefault();
+        e.stopPropagation();
         commitOptions();
-      } else if (e.key === "Escape" && !showOptionsDialog) {
-        // Only reopen if focus isn't inside a text input consuming Esc
-        const tag = (e.target as HTMLElement | null)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-        e.preventDefault();
+        return;
+      }
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!showOptionsDialogRef.current) {
+        // From table → re-open the options dialog.
         setShowOptionsDialog(true);
+      } else {
+        // From options dialog → leave the page (Esc twice = go back).
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, commitOptions]);
+    // commitOptions/navigate are stable; refs handle the reactive state.
+  }, [commitOptions, navigate]);
 
   // ─── Derived T-format view (LIABILITIES + EQUITY on left, ASSETS on right) ──
   const groupItems = (items: BSItem[]): Array<{ group: string; items: BSItem[]; groupTotal: number }> => {
@@ -274,10 +345,19 @@ const BalanceSheetPage: React.FC = () => {
       else if (e.key === "End") { e.preventDefault(); setNav({ ...cur, idx: maxIdx }); }
       else if (e.key === "PageDown") { e.preventDefault(); setNav({ ...cur, idx: Math.min(cur.idx + 10, maxIdx) }); }
       else if (e.key === "PageUp") { e.preventDefault(); setNav({ ...cur, idx: Math.max(cur.idx - 10, 0) }); }
+      else if (e.key === "Enter" && cur.idx >= 0) {
+        // Drill into the highlighted row: group header → group ledger,
+        // sub-item → one ledger. Same behaviour as double-click on the row.
+        e.preventDefault();
+        const row = (cur.side === "L" ? leftRows : rightRows)[cur.idx];
+        if (!row) return;
+        if (row.kind === "group") drillGroup(row.name);
+        else if (row.kind === "item" && row.code) drillItem(row.code);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, leftRows.length, rightRows.length]);
+  }, [showOptionsDialog, leftRows, rightRows, drillGroup, drillItem]);
 
   // ─── Export / Print ─────────────────────────────────────────────────
   const handlePrint = () => window.print();
@@ -312,8 +392,12 @@ const BalanceSheetPage: React.FC = () => {
   };
 
   // ─── Render ─────────────────────────────────────────────────────────
+  // `data-escape-guarded` opts this page OUT of the global Esc→back
+  // shortcut (see useGlobalShortcuts.ts) so our own Esc handler above
+  // can walk the local modal stack (table ↔ options) instead of the
+  // browser navigating away.
   return (
-    <div className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
+    <div data-escape-guarded className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
       {/* Top action bar — hidden while the filter dialog is open so the
          background stays clean (matches Busy: opening the filter clears the
          screen and shows only the filter card). */}
@@ -413,6 +497,21 @@ const BalanceSheetPage: React.FC = () => {
                         ? (L!.balance >= 0 ? "text-emerald-600" : "text-red-600")
                         : "text-ink";
 
+                      // Click handlers — single click selects (highlight),
+                      // double click drills into the ledger statement.
+                      const onLClick = () => setNav({ side: "L", idx: i });
+                      const onLDbl = () => {
+                        if (!L) return;
+                        if (L.kind === "group") drillGroup(L.name);
+                        else if (L.kind === "item" && L.code) drillItem(L.code);
+                      };
+                      const onRClick = () => setNav({ side: "R", idx: i });
+                      const onRDbl = () => {
+                        if (!R) return;
+                        if (R.kind === "group") drillGroup(R.name);
+                        else if (R.kind === "item" && R.code) drillItem(R.code);
+                      };
+
                       rows.push(
                         <tr key={`row-${i}`} className="border-b border-line-soft/60 hover:bg-card-2/40">
                           {/* LEFT SIDE */}
@@ -420,7 +519,10 @@ const BalanceSheetPage: React.FC = () => {
                             <>
                               <td
                                 data-bs-row={`L-${i}`}
-                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${
+                                onClick={onLClick}
+                                onDoubleClick={onLDbl}
+                                title="Double-click (or Enter) to drill into ledger"
+                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 cursor-pointer ${
                                   L.kind === "group"
                                     ? `font-bold uppercase ${isLPnl ? lPnlClass : "text-ink"}`
                                     : "pl-6 text-ink-muted"
@@ -429,7 +531,9 @@ const BalanceSheetPage: React.FC = () => {
                                 {L.name}
                               </td>
                               <td
-                                className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${
+                                onClick={onLClick}
+                                onDoubleClick={onLDbl}
+                                className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 cursor-pointer ${
                                   L.kind === "group" ? `font-bold ${lPnlClass}` : "text-ink-muted"
                                 } ${lHl ? "bg-black text-white" : ""}`}
                               >
@@ -449,7 +553,10 @@ const BalanceSheetPage: React.FC = () => {
                             <>
                               <td
                                 data-bs-row={`R-${i}`}
-                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${
+                                onClick={onRClick}
+                                onDoubleClick={onRDbl}
+                                title="Double-click (or Enter) to drill into ledger"
+                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 cursor-pointer ${
                                   R.kind === "group"
                                     ? "font-bold uppercase text-ink"
                                     : "pl-6 text-ink-muted"
@@ -458,7 +565,9 @@ const BalanceSheetPage: React.FC = () => {
                                 {R.name}
                               </td>
                               <td
-                                className={`px-3 py-0.5 text-[11px] text-right font-mono ${
+                                onClick={onRClick}
+                                onDoubleClick={onRDbl}
+                                className={`px-3 py-0.5 text-[11px] text-right font-mono cursor-pointer ${
                                   R.kind === "group" ? "font-bold text-ink" : "text-ink-muted"
                                 } ${rHl ? "bg-black text-white" : ""}`}
                               >
@@ -515,10 +624,10 @@ const BalanceSheetPage: React.FC = () => {
               </div>
 
               <div className="px-3 py-1 text-[10px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
-                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓ ← →</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill into ledger</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Home / End</kbd> jump</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
-                <span className="ml-auto">[ Esc - Quit ] [ Enter - Details ]</span>
               </div>
             </div>
           )}

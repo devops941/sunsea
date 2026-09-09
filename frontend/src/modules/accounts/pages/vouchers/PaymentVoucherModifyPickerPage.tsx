@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { voucherService, type Voucher } from "../../../../services/voucherService";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache } from "../../../../hooks/useListCache";
+import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 
 // Busy-style "Select Voucher To Modify (Payment)" picker.
 // Operator enters Voucher Number and/or Date → OK finds the voucher and
@@ -18,6 +19,10 @@ const PaymentVoucherModifyPickerPage: React.FC = () => {
   const [voucherNo, setVoucherNo] = useState("");
   const [voucherDate, setVoucherDate] = useState(todayIso);
   const [submitting, setSubmitting] = useState(false);
+
+  // F2 = submit (auto-clicks the form's submit button) + auto-focus the
+  // Voucher No field on mount (centralised via useFormShortcuts).
+  useFormShortcuts({ autoFocusField: "voucherNo" });
 
   // Read the payment vouchers cache so we can look up locally first (no
   // network round-trip when the user already has the list warm).
@@ -162,7 +167,7 @@ const PaymentVoucherModifyPickerPage: React.FC = () => {
               <label className="col-span-5 text-ink-subtle font-semibold">Voucher No.</label>
               <div className="col-span-7">
                 <input
-                  autoFocus
+                  name="voucherNo"
                   type="text"
                   value={voucherNo}
                   onChange={(e) => setVoucherNo(e.target.value)}

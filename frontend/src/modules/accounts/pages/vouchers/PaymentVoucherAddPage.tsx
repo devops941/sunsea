@@ -47,7 +47,9 @@ const PaymentVoucherAddPage: React.FC = () => {
   const [mainNarration, setMainNarration] = useState("");
   const [nextVoucherNo, setNextVoucherNo] = useState<string>("");
 
-  useFormShortcuts({});
+  // F2 = save + auto-focus Date on mount. Centralised in the hook so
+  // future first-field tweaks live in ONE place instead of per-page copies.
+  useFormShortcuts({ autoFocusField: "date" });
 
   // Fetch the next sequential voucher number so it can be shown Busy-style
   // ("Vch No. 5"). We re-fetch after a save happens (see handleSubmit) so

@@ -21,6 +21,7 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableDetail } from "../../../../services/receivableService";
 import { useListCache } from "../../../../hooks/useListCache";
+import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
 export const CustomerBreakdownPage: React.FC = () => {
@@ -88,6 +89,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     fetcher,
     enabled: !!customerId,
   });
+// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const customerDetail: CustomerReceivableDetail | null = customerDetailList[0] || null;
 
