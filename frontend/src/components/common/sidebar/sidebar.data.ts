@@ -995,6 +995,7 @@ export const sidebarItems: SidebarItem[] = [
             permission: "chart-of-accounts.view",
             badge: "Alt+N",
           },
+          { title: "Day Book", path: "/accounts/day-book", permission: "accounts.view" },
           { title: "Account-Wise Ledger", path: "/accounts/ledger-statement", permission: "accounts.view", badge: "Alt+Shift+L" },
           { title: "Merged Accounts Ledger", path: "/accounts/ledger-statement/merged", permission: "accounts.view" },
         ],
