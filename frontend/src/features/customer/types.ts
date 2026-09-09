@@ -62,6 +62,7 @@ export interface Customer {
   netBalance?: number;
   balanceAmount?: number;
   balanceType?: string;
+  hasTransactions?: boolean;
   createdAt: string;
   updatedAt: string;
   createdUser?: {

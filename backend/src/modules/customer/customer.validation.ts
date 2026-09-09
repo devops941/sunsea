@@ -65,8 +65,9 @@ export const createCustomerSchema = z.object({
 
 });
 
-// openingBalance is intentionally excluded from updates — it is immutable after creation
-export const updateCustomerSchema = createCustomerSchema.omit({ openingBalance: true }).partial();
+// openingBalance + openingBalanceType are allowed in updates but only applied
+// when the customer has no real transactions (enforced in the service layer).
+export const updateCustomerSchema = createCustomerSchema.partial();
 
 export const createCustomerRequestSchema = z.object({
   body: createCustomerSchema,
