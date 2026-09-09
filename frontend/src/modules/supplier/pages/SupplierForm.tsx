@@ -77,7 +77,7 @@ const INITIAL_FORM = {
     billingAddressLine1: "",
     billingAddressLine2: "",
     billingAddressCity: "",
-    billingAddressState: "",
+    billingAddressState: "Tamil Nadu",
     billingAddressPincode: "",
     billingAddressCountry: "India",
     stateCode: "TN",
@@ -111,7 +111,7 @@ const SupplierForm: React.FC = () => {
     const [formData, setFormData] = useState(INITIAL_FORM);
 
     const [addresses, setAddresses] = useState<SupplierAddress[]>([
-        { address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }
+        { address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }
     ]);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -222,7 +222,7 @@ const SupplierForm: React.FC = () => {
         if (supplier.addresses && supplier.addresses.length > 0) {
             setAddresses(supplier.addresses);
         } else {
-            setAddresses([{ address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }]);
+            setAddresses([{ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }]);
         }
 
         if (Array.isArray(supplier.mobile) && supplier.mobile.length > 0) {
@@ -284,7 +284,7 @@ const SupplierForm: React.FC = () => {
             if (initialSupplier) { populateForm(initialSupplier); }
         } else {
             setFormData({ ...INITIAL_FORM, createdByOn: user?.username || "" });
-            setAddresses([{ address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }]);
+            setAddresses([{ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }]);
             setPhones([]);
             setErrors({});
             setIsDirty(false);
@@ -324,7 +324,7 @@ const SupplierForm: React.FC = () => {
     };
 
     const addShippingAddress = () => {
-        setAddresses(prev => [...prev, { address: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" } }]);
+        setAddresses(prev => [...prev, { address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }]);
         setIsDirty(true);
     };
 
@@ -611,21 +611,19 @@ const SupplierForm: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* ── Section 4: Opening Balance — create mode only ── */}
-                        {!isEdit && (
-                            <div>
-                                <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                    <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Opening Balance</h3>
-                                </div>
-                                <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
-                                    <div>
-                                        <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} />
-                                        <p className="mt-0.5 text-[10px] text-amber-600">Set once. Cannot be edited later.</p>
-                                    </div>
-                                    <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} />
-                                </div>
+                        {/* ── Section 4: Opening Balance ── */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Opening Balance</h3>
                             </div>
-                        )}
+                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                                <div>
+                                    <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} disabled={isEdit} />
+                                    {!isEdit && <p className="mt-0.5 text-[10px] text-amber-600">Set once. Cannot be edited later.</p>}
+                                </div>
+                                <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} disabled={isEdit} />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Footer */}

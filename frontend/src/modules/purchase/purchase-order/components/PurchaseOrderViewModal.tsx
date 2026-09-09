@@ -139,15 +139,6 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
               <th className="py-3 px-4">Product</th>
               <th className="py-3 px-4 text-right">Qty</th>
               <th className="py-3 px-4 text-right">Unit Price</th>
-              <th className="py-3 px-4 text-right">Tax %</th>
-              {isInterState ? (
-                <th className="py-3 px-4 text-right">IGST</th>
-              ) : (
-                <>
-                  <th className="py-3 px-4 text-right">CGST</th>
-                  <th className="py-3 px-4 text-right">SGST</th>
-                </>
-              )}
               <th className="py-3 px-4 text-right">Total</th>
             </tr>
           </thead>
@@ -156,21 +147,7 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
               purchaseOrder.items.map((item, index) => {
                 const qty = safeNumber(item.quantity);
                 const price = safeNumber(item.unitPrice);
-                const tax = safeNumber(item.tax);
-
                 const base = qty * price;
-                const taxAmt = (base * tax) / 100;
-                const total = item.lineTotal ? safeNumber(item.lineTotal) : base + taxAmt;
-
-                const cgstAmt = item.cgstAmount !== undefined
-                  ? safeNumber(item.cgstAmount)
-                  : taxAmt / 2;
-                const sgstAmt = item.sgstAmount !== undefined
-                  ? safeNumber(item.sgstAmount)
-                  : taxAmt / 2;
-                const igstAmt = item.igstAmount !== undefined
-                  ? safeNumber(item.igstAmount)
-                  : taxAmt;
 
                 const matchedMaterial = rawMaterials.find(
                   (rm: any) => String(rm.rawMaterialId) === String(item.productId)
@@ -183,22 +160,13 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                     <td className="py-3.5 px-4 font-medium text-ink">{productName}</td>
                     <td className="py-3.5 px-4 text-right font-mono font-medium text-ink">{qty}</td>
                     <td className="py-3.5 px-4 text-right font-mono text-ink-muted">₹{price.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-right font-mono text-ink-subtle">{tax}%</td>
-                    {isInterState ? (
-                      <td className="py-3.5 px-4 text-right font-mono text-blue-600 dark:text-blue-400">₹{igstAmt.toFixed(2)}</td>
-                    ) : (
-                      <>
-                        <td className="py-3.5 px-4 text-right font-mono text-blue-600 dark:text-blue-400">₹{cgstAmt.toFixed(2)}</td>
-                        <td className="py-3.5 px-4 text-right font-mono text-purple-600 dark:text-purple-400">₹{sgstAmt.toFixed(2)}</td>
-                      </>
-                    )}
-                    <td className="py-3.5 px-4 text-right font-mono font-semibold text-ink">₹{total.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-right font-mono font-semibold text-ink">₹{base.toFixed(2)}</td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={isInterState ? 7 : 8} className="p-8 text-center text-ink-subtle">
+                <td colSpan={5} className="p-8 text-center text-ink-subtle">
                   No items found
                 </td>
               </tr>
@@ -207,45 +175,6 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
         </table>
       </div>
 
-      <div className="p-5 bg-card-2/50 border-t border-line flex justify-end">
-        <div className="w-full sm:w-1/2 lg:w-1/3 space-y-2 text-sm">
-          <div className="flex justify-between text-ink-muted">
-            <span>Subtotal:</span>
-            <span className="font-mono font-medium text-ink">₹{safeNumber(purchaseOrder.subtotal).toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-rose-600 dark:text-rose-400">
-            <span>Discount:</span>
-            <span className="font-mono font-medium">-₹{safeNumber(purchaseOrder.totalDiscount).toFixed(2)}</span>
-          </div>
-          {isInterState ? (
-            <div className="flex justify-between text-blue-600 dark:text-blue-400">
-              <span>IGST:</span>
-              <span className="font-mono font-medium">+₹{safeNumber(purchaseOrder.totalIgst).toFixed(2)}</span>
-            </div>
-          ) : (
-            <>
-              <div className="flex justify-between text-blue-600 dark:text-blue-400">
-                <span>CGST:</span>
-                <span className="font-mono font-medium">+₹{safeNumber(purchaseOrder.totalCgst).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-purple-600 dark:text-purple-400">
-                <span>SGST:</span>
-                <span className="font-mono font-medium">+₹{safeNumber(purchaseOrder.totalSgst).toFixed(2)}</span>
-              </div>
-            </>
-          )}
-          {Number((purchaseOrder as any).roundingAdjust || 0) !== 0 && (
-            <div className="flex justify-between text-ink-muted">
-              <span>Round Off:</span>
-              <span className="font-mono font-medium">{Number((purchaseOrder as any).roundingAdjust) > 0 ? "+" : ""}₹{safeNumber((purchaseOrder as any).roundingAdjust).toFixed(2)}</span>
-            </div>
-          )}
-          <div className="border-t border-line pt-2.5 mt-2 flex justify-between font-bold text-ink text-base">
-            <span>Net Amount:</span>
-            <span className="font-mono text-primary font-bold text-lg">₹{safeNumber(purchaseOrder.netAmount).toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 

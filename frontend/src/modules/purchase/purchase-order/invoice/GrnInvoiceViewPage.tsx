@@ -6,6 +6,7 @@ import { useSelector, useDispatch } from "react-redux";
 
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
+import { supplierService } from "../../../../services/supplierService";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 import CustomButton from "../../../../components/ui/Button/Button";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
@@ -43,6 +44,34 @@ const numberToWords = (num: number): string => {
     return inWords(rounded) + " Only";
 };
 
+/** Compute display total: DB netAmount + sundry from remarks/billSundry */
+const getInvoiceDisplayTotal = (inv: any): number => {
+    const dbNet = Number(inv.netAmount ?? 0);
+
+    // Parse sundry from billSundry field or remarks JSON
+    let sundryData: any[] = [];
+    if (inv.billSundry) {
+        sundryData = typeof inv.billSundry === "string" ? (() => { try { return JSON.parse(inv.billSundry); } catch { return []; } })() : inv.billSundry;
+    }
+    if ((!Array.isArray(sundryData) || sundryData.length === 0) && inv.remarks) {
+        try {
+            const parsed = JSON.parse(inv.remarks);
+            if (Array.isArray(parsed?.__billSundry__)) sundryData = parsed.__billSundry__;
+        } catch { /* plain text */ }
+    }
+
+    if (!Array.isArray(sundryData) || sundryData.length === 0) return dbNet;
+
+    const sundryTotal = sundryData.reduce((sum: number, r: any) => {
+        const amt = Number(r.amount) || 0;
+        const t = (r.type || "").toUpperCase();
+        const isNeg = t.includes("DISCOUNT") || t.includes("MINUS");
+        return sum + (isNeg ? -amt : amt);
+    }, 0);
+
+    return dbNet + sundryTotal;
+};
+
 const GrnInvoiceViewPage: React.FC = () => {
     const navigate = useNavigate();
     const { id: idParam } = useParams<{ id: string }>();
@@ -59,6 +88,7 @@ const GrnInvoiceViewPage: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [supplierBalance, setSupplierBalance] = useState<{ amount: number; type: string } | null>(null);
 
     // Fetch company settings on mount
     useEffect(() => {
@@ -113,6 +143,18 @@ const GrnInvoiceViewPage: React.FC = () => {
     }, [fetchInvoicesList, idParam, loadDetail]);
 
     useSocketSync("grnInvoice", undefined, handleSocketUpdate);
+
+    // Fetch supplier balance when invoice loads
+    useEffect(() => {
+        if (!selectedItem?.supplierId) { setSupplierBalance(null); return; }
+        supplierService.fetchById(String(selectedItem.supplierId))
+            .then((sup: any) => {
+                const bal = Number(sup.balanceAmount ?? sup.netBalance ?? sup.openingBalance ?? 0);
+                const bType = (sup.balanceType || sup.openingBalanceType || "").toString().toUpperCase();
+                setSupplierBalance({ amount: bal, type: bType.startsWith("D") ? "Dr" : bType.startsWith("C") ? "Cr" : "" });
+            })
+            .catch(() => setSupplierBalance(null));
+    }, [selectedItem?.supplierId, selectedItem?.id]);
 
     const handleDeleteClick = (id: string) => {
         setItemToDelete(id);
@@ -198,7 +240,6 @@ const GrnInvoiceViewPage: React.FC = () => {
     const totalSgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0), [itemsWithTax]);
     const totalIgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.igstAmount, 0), [itemsWithTax]);
     const totalTaxable = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.amount, 0), [itemsWithTax]);
-    const grandTotal = Number(selectedItem?.netAmount ?? (totalTaxable + totalCgst + totalSgst + totalIgst));
 
     // Tax summary grouped by rate
     const taxSummary = useMemo(() => {
@@ -218,7 +259,54 @@ const GrnInvoiceViewPage: React.FC = () => {
 
     const hasTax = useMemo(() => (totalCgst + totalSgst + totalIgst) > 0, [totalCgst, totalSgst, totalIgst]);
 
-    const amountInWords = useMemo(() => numberToWords(grandTotal), [grandTotal]);
+    // Stored totalTax from the invoice record (includes sundry bill tax)
+    const storedTotalTax = Number(selectedItem?.totalTax ?? 0);
+
+    // Bill Sundry rows — try billSundry field first, then parse from remarks
+    const viewSundryRows = useMemo(() => {
+        const rows: { label: string; sign: 1 | -1; amount: number }[] = [];
+
+        // Source 1: billSundry field on the invoice
+        let sundryData = selectedItem?.billSundry;
+        if (typeof sundryData === "string") {
+            try { sundryData = JSON.parse(sundryData); } catch { sundryData = null; }
+        }
+
+        // Source 2: embedded in remarks as JSON { __billSundry__: [...], text: "..." }
+        if (!Array.isArray(sundryData) || sundryData.length === 0) {
+            const raw = selectedItem?.remarks;
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed?.__billSundry__)) sundryData = parsed.__billSundry__;
+                } catch { /* plain text remarks — no sundry */ }
+            }
+        }
+
+        if (Array.isArray(sundryData)) {
+            sundryData.filter((r: any) => Number(r.amount) > 0).forEach((r: any) => {
+                const typeStr = String(r.type || "").toUpperCase();
+                const isDeduction = typeStr.includes("DISCOUNT") || typeStr.includes("MINUS");
+                const cleanLabel = (r.type || "Sundry")
+                    .replace(/_/g, " ")
+                    .replace(/\b(MINUS|PLUS|minus|plus)\b/gi, "")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase());
+                rows.push({ label: cleanLabel || "Sundry", sign: isDeduction ? -1 : 1, amount: Number(r.amount) });
+            });
+        }
+        return rows;
+    }, [selectedItem?.billSundry, selectedItem?.remarks]);
+
+    // Sundry total from parsed rows
+    const viewSundryTotal = useMemo(() => viewSundryRows.reduce((s, r) => s + (r.sign * r.amount), 0), [viewSundryRows]);
+
+    // Display grand total = items subtotal + item-level tax + sundry rows
+    const itemLevelTax = totalCgst + totalSgst + totalIgst;
+    const displayGrandTotal = totalTaxable + itemLevelTax + viewSundryTotal;
+
+    const amountInWords = useMemo(() => numberToWords(displayGrandTotal), [displayGrandTotal]);
 
     const handleDownloadPdf = async () => {
         try {
@@ -285,19 +373,13 @@ const GrnInvoiceViewPage: React.FC = () => {
                             >
                                 <div className="flex justify-between items-start mb-1">
                                     <span className="font-bold text-gray-900">{inv.invoiceNo || inv.grnNumber}</span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${inv.paymentStatus?.toUpperCase() === "PAID"
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-yellow-100 text-yellow-800"
-                                        }`}>
-                                        {inv.paymentStatus || "Unpaid"}
-                                    </span>
                                 </div>
                                 <div className="text-sm text-gray-600 mb-2 truncate">
                                     {inv.supplier?.displayName || inv.supplier?.legalName || "N/A"}
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-400">
                                     <span>{formatDate(inv.grnDate)}</span>
-                                    <span className="font-bold text-gray-900">₹{formatMoney(inv.netAmount)}</span>
+                                    <span className="font-bold text-gray-900">₹{formatMoney(getInvoiceDisplayTotal(inv))}</span>
                                 </div>
                             </div>
                         );
@@ -498,10 +580,38 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 <tfoot>
                                     <tr>
                                         <td colSpan={!hasTax ? 5 : isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">
+                                            Total
+                                        </td>
+                                        <td className="border border-black px-2 py-1 text-right font-bold font-mono">
+                                            ₹{formatMoney(totalTaxable)}
+                                        </td>
+                                    </tr>
+                                    {hasTax && (
+                                        <tr>
+                                            <td colSpan={isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right text-[13px]">
+                                                TAX
+                                            </td>
+                                            <td className="border border-black px-2 py-1 text-right text-[13px]">
+                                                + {formatMoney(totalCgst + totalSgst + totalIgst)}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {viewSundryRows.map((cr, idx) => (
+                                        <tr key={idx}>
+                                            <td colSpan={!hasTax ? 5 : isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right text-[13px]">
+                                                {cr.label}
+                                            </td>
+                                            <td className="border border-black px-2 py-1 text-right text-[13px]">
+                                                {cr.sign === 1 ? "+" : "-"} {formatMoney(cr.amount)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    <tr>
+                                        <td colSpan={!hasTax ? 5 : isInterState ? 7 : 9} className="border border-black px-2 py-1 text-right font-bold">
                                             Grand Total
                                         </td>
                                         <td className="border border-black px-2 py-1 text-right font-bold font-mono">
-                                            ₹{formatMoney(grandTotal)}
+                                            ₹{formatMoney(displayGrandTotal)}
                                         </td>
                                     </tr>
                                 </tfoot>
@@ -548,32 +658,98 @@ const GrnInvoiceViewPage: React.FC = () => {
                             {/* Bottom section — pushed to bottom of page */}
                             <div className="mt-auto">
                                 {/* Amount in words */}
-                                <div className="px-4 py-2 border-t-[1.5px] border-black text-[14px] font-bold">
-                                    Rupees {amountInWords}
+                                <div className="px-3 py-2.5 border-t-[2px] border-black text-[13px]">
+                                    <span className="font-bold">Amount in Words:</span> Rupees {amountInWords}
                                 </div>
 
-                                {/* Bank details */}
-                                <div className="px-4 py-2 border-t-[1.5px] border-black text-[13px]">
-                                    <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
-                                    &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
-                                    A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
-                                </div>
+                                {/* Supplier Balance — use saved fields (like Sales Invoice) */}
+                                {(selectedItem.openingBalance != null || supplierBalance) && (
+                                    <div className="border-t border-black">
+                                        {(() => {
+                                            // Invoice amount = full total (items + sundry) since sundry is now posted to ledger
+                                            const ledgerInvoiceAmt = displayGrandTotal;
 
-                                {/* Remarks / Notes */}
-                                {selectedItem.remarks && (
-                                    <div className="px-4 py-2 border-t-[1.5px] border-black text-[13px] print:block">
-                                        <span className="font-bold">Remarks / Notes :</span> {selectedItem.remarks}
+                                            // Prefer saved balance from invoice record
+                                            if (selectedItem.openingBalance != null) {
+                                                const ob = Number(selectedItem.openingBalance ?? 0);
+                                                const cb = Number(selectedItem.closingBalance ?? 0);
+                                                const obAbs = Math.abs(ob);
+                                                const obType = ob > 0 ? "Cr" : ob < 0 ? "Dr" : "";
+                                                const cbAbs = Math.abs(cb);
+                                                const cbType = cb > 0 ? "Cr" : cb < 0 ? "Dr" : "";
+                                                return (
+                                                    <table className="w-full text-[13px]">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td className="px-2 py-1 text-right">Opening Balance</td>
+                                                                <td className="px-2 py-1 text-right w-[140px]">
+                                                                    ₹{obAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {obType}
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td className="px-2 py-1 text-right">Invoice Amount</td>
+                                                                <td className="px-2 py-1 text-right">
+                                                                    ₹{ledgerInvoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td className="px-2 py-1 text-right font-bold text-[14px]">Closing Balance</td>
+                                                                <td className="px-2 py-1 text-right font-bold text-[15px]">
+                                                                    ₹{cbAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {cbType}
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                );
+                                            }
+                                            // Fallback: compute from live supplier balance
+                                            if (!supplierBalance) return null;
+                                            const isDr = supplierBalance.type === "Dr";
+                                            const openingRaw = isDr ? supplierBalance.amount + ledgerInvoiceAmt : supplierBalance.amount - ledgerInvoiceAmt;
+                                            const openingAbs = Math.abs(openingRaw);
+                                            const openingType = openingRaw > 0 ? (isDr ? "Dr" : "Cr") : openingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+                                            return (
+                                                <table className="w-full text-[13px]">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td className="px-2 py-1 text-right">Opening Balance</td>
+                                                            <td className="px-2 py-1 text-right w-[140px]">
+                                                                ₹{openingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openingType}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="px-2 py-1 text-right">Invoice Amount</td>
+                                                            <td className="px-2 py-1 text-right">
+                                                                ₹{ledgerInvoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="px-2 py-1 text-right font-bold text-[14px]">Closing Balance</td>
+                                                            <td className="px-2 py-1 text-right font-bold text-[15px]">
+                                                                ₹{supplierBalance.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {supplierBalance.type}
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            );
+                                        })()}
                                     </div>
                                 )}
 
-                                {/* Footer: Terms + Signature */}
+                                {/* Remarks / Notes */}
+                                {selectedItem.remarks && (() => {
+                                    const raw = selectedItem.remarks;
+                                    let text = raw;
+                                    try { const p = JSON.parse(raw); text = p?.text || ""; } catch { /* plain text */ }
+                                    return text ? (
+                                        <div className="px-4 py-2 border-t-[1.5px] border-black text-[13px] print:block">
+                                            <span className="font-bold">Remarks / Notes :</span> {text}
+                                        </div>
+                                    ) : null;
+                                })()}
+
+                                {/* Signature */}
                                 <div className="flex border-t-[1.5px] border-black text-[13px]">
-                                    <div className="flex-1 border-r-[1.5px] border-black px-4 py-3">
-                                        <div className="font-bold mb-1">Terms &amp; Conditions</div>
-                                        <div>E &amp; O.E.</div>
-                                        <div>1. Goods once sold will not be taken back.</div>
-                                        <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
-                                    </div>
                                     <div className="flex-1 px-4 py-3 flex flex-col justify-between">
                                         <div className="font-bold">Receiver's Signature :</div>
                                         <div className="text-right font-bold mt-8">

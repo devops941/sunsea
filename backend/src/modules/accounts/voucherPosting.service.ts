@@ -194,7 +194,23 @@ class VoucherPostingService {
 
     if (!voucher) {
       const g: any = grnInvoice;
-      const netAmountNum = Number(g.netAmount || g.subtotal || g.grandTotal || g.totalAmount || 0);
+      // Parse sundry from remarks to get full invoice total
+      let sundryTotal = 0;
+      if (g.remarks) {
+        try {
+          const parsed = JSON.parse(g.remarks);
+          if (Array.isArray(parsed?.__billSundry__)) {
+            sundryTotal = parsed.__billSundry__.reduce((sum: number, r: any) => {
+              const amt = Number(r.amount) || 0;
+              const t = (r.type || "").toUpperCase();
+              const isNeg = t.includes("DISCOUNT") || t.includes("MINUS");
+              return sum + (isNeg ? -amt : amt);
+            }, 0);
+          }
+        } catch { /* plain text */ }
+      }
+      const baseNetAmount = Number(g.netAmount || g.subtotal || g.grandTotal || g.totalAmount || 0);
+      const netAmountNum = baseNetAmount + sundryTotal; // Full invoice total including sundry
       const totalCgst = Number(g.totalCgst || 0);
       const totalSgst = Number(g.totalSgst || 0);
       const totalIgst = Number(g.totalIgst || 0);

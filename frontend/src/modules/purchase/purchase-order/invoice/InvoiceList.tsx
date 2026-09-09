@@ -33,6 +33,29 @@ const formatDate = (val: string | null | undefined) => {
     return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+/** Compute display total: DB netAmount + sundry from remarks/billSundry */
+const getInvoiceDisplayTotal = (inv: any): number => {
+    const dbNet = Number(inv.netAmount ?? 0);
+    let sundryData: any[] = [];
+    if (inv.billSundry) {
+        sundryData = typeof inv.billSundry === "string" ? (() => { try { return JSON.parse(inv.billSundry); } catch { return []; } })() : inv.billSundry;
+    }
+    if ((!Array.isArray(sundryData) || sundryData.length === 0) && inv.remarks) {
+        try {
+            const parsed = JSON.parse(inv.remarks);
+            if (Array.isArray(parsed?.__billSundry__)) sundryData = parsed.__billSundry__;
+        } catch { /* plain text */ }
+    }
+    if (!Array.isArray(sundryData) || sundryData.length === 0) return dbNet;
+    const sundryTotal = sundryData.reduce((sum: number, r: any) => {
+        const amt = Number(r.amount) || 0;
+        const t = (r.type || "").toUpperCase();
+        const isNeg = t.includes("DISCOUNT") || t.includes("MINUS");
+        return sum + (isNeg ? -amt : amt);
+    }, 0);
+    return dbNet + sundryTotal;
+};
+
 const calculatePendingAmount = (item: any) => {
     const status = (item.paymentStatus || "").toUpperCase();
     if (status === "CLOSED" || status === "PAID") return 0;
@@ -139,7 +162,7 @@ const InvoiceList: React.FC = () => {
             { header: "Invoice No", accessor: (item: any) => item.invoiceNo || "" },
             { header: "GRN Date", accessor: (item: any) => formatDate(item.grnDate) },
             { header: "Supplier", accessor: (item: any) => item.supplier?.displayName || item.supplier?.legalName || "" },
-            { header: "Net Amount", accessor: (item: any) => Number(item.netAmount || 0).toFixed(2) },
+            { header: "Net Amount", accessor: (item: any) => getInvoiceDisplayTotal(item).toFixed(2) },
             { header: "Payment Status", accessor: (item: any) => item.paymentStatus || "—" },
         ];
         return {
@@ -219,7 +242,7 @@ const InvoiceList: React.FC = () => {
                             header: "NET AMOUNT",
                             render: (item) => (
                                 <span className="font-semibold text-green-600">
-                                    {formatMoney(item.netAmount)}
+                                    {formatMoney(getInvoiceDisplayTotal(item))}
                                 </span>
                             ),
                         },

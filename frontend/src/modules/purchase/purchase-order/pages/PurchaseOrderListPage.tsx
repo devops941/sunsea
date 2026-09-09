@@ -36,7 +36,6 @@ type SortOrder = "default" | "asc" | "desc";
 
 const PurchaseOrderListPage: React.FC = () => {
   const navigate = useNavigate();
-
   const company = useSelector((state: any) => state.company.data);
   const { can } = usePermission();
   const canCreate = can("purchaseOrders.create");

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
-  FaShieldAlt, FaSlidersH, FaCogs, FaUsersCog,
-  FaBoxOpen, FaShoppingCart, FaWarehouse, FaChartBar,
-  FaLayerGroup, FaBox, FaDollarSign, FaCalendarCheck, FaTachometerAlt,
-  FaLock, FaKey,
+  FaShieldAlt, FaSlidersH, FaCogs,
+  FaExchangeAlt, FaWarehouse, FaChartBar,
+  FaCalendarCheck, FaTachometerAlt,
+  FaLock, FaKey, FaChevronDown, FaChevronRight,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -20,6 +20,7 @@ import type { Permission } from "../../../features/permissions/types";
 interface ModuleEntry {
   key: string;
   label: string;
+  subGroup?: string;
 }
 interface ModuleGroup {
   id: string;
@@ -56,37 +57,13 @@ const SECTION_STYLE: Record<string, {
     iconClass: "text-violet-400",
     hex: "#7c3aed",
   },
-  hr: {
-    activeBg: "bg-blue-600",
-    activeShadow: "shadow-blue-600/30",
+  transactions: {
+    activeBg: "bg-amber-600",
+    activeShadow: "shadow-amber-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-blue-500/15 text-blue-400",
-    iconClass: "text-blue-400",
-    hex: "#2563eb",
-  },
-  products: {
-    activeBg: "bg-emerald-600",
-    activeShadow: "shadow-emerald-600/30",
-    badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-emerald-500/15 text-emerald-400",
-    iconClass: "text-emerald-400",
-    hex: "#059669",
-  },
-  purchase: {
-    activeBg: "bg-orange-500",
-    activeShadow: "shadow-orange-500/30",
-    badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-orange-500/15 text-orange-400",
-    iconClass: "text-orange-400",
-    hex: "#f97316",
-  },
-  sales: {
-    activeBg: "bg-sky-600",
-    activeShadow: "shadow-sky-600/30",
-    badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-sky-500/15 text-sky-400",
-    iconClass: "text-sky-400",
-    hex: "#0284c7",
+    badgeInactive: "bg-amber-500/15 text-amber-400",
+    iconClass: "text-amber-400",
+    hex: "#d97706",
   },
   production: {
     activeBg: "bg-rose-600",
@@ -104,29 +81,13 @@ const SECTION_STYLE: Record<string, {
     iconClass: "text-teal-400",
     hex: "#0d9488",
   },
-  stores: {
-    activeBg: "bg-indigo-600",
-    activeShadow: "shadow-indigo-600/30",
+  display: {
+    activeBg: "bg-purple-600",
+    activeShadow: "shadow-purple-600/30",
     badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-indigo-500/15 text-indigo-400",
-    iconClass: "text-indigo-400",
-    hex: "#4338ca",
-  },
-  reports: {
-    activeBg: "bg-pink-600",
-    activeShadow: "shadow-pink-600/30",
-    badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-pink-500/15 text-pink-400",
-    iconClass: "text-pink-400",
-    hex: "#db2777",
-  },
-  accounts: {
-    activeBg: "bg-green-700",
-    activeShadow: "shadow-green-700/30",
-    badgeActive: "bg-white/20 text-white",
-    badgeInactive: "bg-green-500/15 text-green-400",
-    iconClass: "text-green-400",
-    hex: "#15803d",
+    badgeInactive: "bg-purple-500/15 text-purple-400",
+    iconClass: "text-purple-400",
+    hex: "#9333ea",
   },
   payroll: {
     activeBg: "bg-cyan-600",
@@ -163,71 +124,39 @@ const MODULE_GROUPS: ModuleGroup[] = [
     icon: <FaShieldAlt />,
     colorId: "administration",
     modules: [
-      { key: "users", label: "System Users" },
-      { key: "roles", label: "User Roles" },
-      { key: "departments", label: "Departments" },
-      { key: "permissions", label: "Permissions" },
-      { key: "role-permissions", label: "Role Mappings" },
-      { key: "company-settings", label: "Company Settings" },
-      { key: "gst_tax", label: "GST Tax Rates" },
-      { key: "whatsapp", label: "WhatsApp Settings" },
-      { key: "email-config", label: "Email Config" },
-      { key: "invoice-settings", label: "Invoice Settings" },
-      { key: "profile", label: "User Profile" },
+      { key: "customers", label: "Customers", subGroup: "Masters" },
+      { key: "suppliers", label: "Suppliers", subGroup: "Masters" },
+      { key: "employees", label: "Employees", subGroup: "Masters" },
+      { key: "machines", label: "Machines", subGroup: "Masters" },
+      { key: "machine-assignments", label: "Machine Assignments", subGroup: "Masters" },
+      { key: "shifts", label: "Shift Management", subGroup: "Masters" },
+      { key: "roles", label: "User Roles", subGroup: "Users & Roles" },
+      { key: "departments", label: "Departments", subGroup: "Users & Roles" },
+      { key: "role-permissions", label: "Role Mappings", subGroup: "Users & Roles" },
+      { key: "company-settings", label: "Company Settings", subGroup: "Configuration" },
+      { key: "whatsapp", label: "WhatsApp Settings", subGroup: "Configuration" },
+      { key: "email-config", label: "Email Config", subGroup: "Configuration" },
+      { key: "invoice-settings", label: "Invoice Settings", subGroup: "Configuration" },
+      { key: "users", label: "System Users", subGroup: "Other" },
+      { key: "permissions", label: "Permissions", subGroup: "Other" },
+      { key: "gst_tax", label: "GST Tax Rates", subGroup: "Other" },
+      { key: "profile", label: "User Profile", subGroup: "Other" },
     ],
   },
   {
-    id: "hr",
-    groupName: "HR & Organization",
-    icon: <FaUsersCog />,
-    colorId: "hr",
+    id: "transactions",
+    groupName: "Transactions",
+    icon: <FaExchangeAlt />,
+    colorId: "transactions",
     modules: [
-      { key: "employees", label: "Employees" },
-      { key: "machines", label: "Machines" },
-      { key: "machine-assignments", label: "Machine Assignments" },
-      { key: "shifts", label: "Shift Management" },
-    ],
-  },
-  {
-    id: "products",
-    groupName: "Product Setup",
-    icon: <FaBox />,
-    colorId: "products",
-    modules: [
-      { key: "products", label: "Product Master" },
-      { key: "sales_products", label: "Sales Products" },
-      { key: "categories", label: "Categories" },
-      { key: "uoms", label: "Units of Measure (UOM)" },
-      { key: "raw_materials", label: "Raw Materials" },
-      { key: "raw_material_categories", label: "RM Categories" },
-      { key: "wastage-store", label: "Wastage Store" },
-    ],
-  },
-  {
-    id: "purchase",
-    groupName: "Purchase",
-    icon: <FaBoxOpen />,
-    colorId: "purchase",
-    modules: [
-      { key: "suppliers", label: "Suppliers" },
-      { key: "supplierpricelist", label: "Supplier Pricing" },
-      { key: "purchaseOrders", label: "Purchase Orders" },
-      { key: "invoice", label: "Bill & Invoice" },
-      { key: "expenses", label: "Expenses" },
-      { key: "purchase-returns", label: "Purchase Returns" },
-    ],
-  },
-  {
-    id: "sales",
-    groupName: "Sales",
-    icon: <FaShoppingCart />,
-    colorId: "sales",
-    modules: [
-      { key: "customers", label: "Customers" },
-      { key: "sales-orders", label: "Sales Orders" },
+      { key: "sales-orders", label: "Sales" },
+      { key: "purchaseOrders", label: "Purchase" },
       { key: "quotations", label: "Quotations" },
-      { key: "sales-invoices", label: "Sales Invoice" },
-      { key: "sales-returns", label: "Sales Returns" },
+      { key: "sales-invoices", label: "Sales Order" },
+      { key: "invoice", label: "Purchase Order" },
+      { key: "sales-returns", label: "Sales Return (Cr. Note)" },
+      { key: "purchase-returns", label: "Purchase Return (Dr. Note)" },
+      { key: "vouchers", label: "Payment / Receipt / Journal / Contra / Expenses" },
     ],
   },
   {
@@ -236,15 +165,15 @@ const MODULE_GROUPS: ModuleGroup[] = [
     icon: <FaCogs />,
     colorId: "production",
     modules: [
-      { key: "production_orders", label: "Production Orders" },
-      { key: "weekly_programs", label: "Weekly Schedules" },
-      { key: "daily-machine-planning", label: "Daily Planning" },
-      { key: "hourly_productions", label: "Hourly Reports" },
-      { key: "production-wastages", label: "Production Wastage" },
-      { key: "goods-dispatch", label: "Goods Dispatch" },
-      { key: "bill_of_materials", label: "Bill of Materials" },
-      { key: "shift-execution", label: "Shift Execution Board" },
-      { key: "oee-dashboard", label: "OEE Dashboard" },
+      { key: "production_orders", label: "Production Orders", subGroup: "Production Orders" },
+      { key: "weekly_programs", label: "Weekly Schedules", subGroup: "Planning & Reports" },
+      { key: "daily-machine-planning", label: "Daily Machine Planning", subGroup: "Planning & Reports" },
+      { key: "hourly_productions", label: "Hourly Work Reports", subGroup: "Planning & Reports" },
+      { key: "production-wastages", label: "Production Wastages", subGroup: "Planning & Reports" },
+      { key: "goods-dispatch", label: "Goods Dispatch", subGroup: "Dispatch" },
+      // { key: "bill_of_materials", label: "Bill of Materials" },
+      // { key: "shift-execution", label: "Shift Execution Board" },
+      // { key: "oee-dashboard", label: "OEE Dashboard" },
     ],
   },
   {
@@ -253,49 +182,40 @@ const MODULE_GROUPS: ModuleGroup[] = [
     icon: <FaWarehouse />,
     colorId: "inventory",
     modules: [
-      { key: "raw_material_stocks", label: "Raw Material Stock" },
-      { key: "finished_goods_stocks", label: "Finished Goods Stock" },
-      { key: "wastage-stock", label: "Wastage Stock" },
-      { key: "stock-adjustments", label: "Stock Adjustments" },
-      { key: "eod-stock", label: "EOD Stock" },
+      { key: "categories", label: "Categories", subGroup: "Inventory Masters" },
+      { key: "stores", label: "Storage Stores", subGroup: "Inventory Masters" },
+      { key: "raw_materials", label: "Raw Materials", subGroup: "Inventory Masters" },
+      { key: "wastage-store", label: "Wastage Store", subGroup: "Inventory Masters" },
+      { key: "products", label: "Production Products", subGroup: "Inventory Masters" },
+      { key: "sales_products", label: "Sales Products", subGroup: "Inventory Masters" },
+      { key: "stock-adjustments", label: "Stock Adjustments", subGroup: "Stock Adjustments" },
+      { key: "raw_material_stocks", label: "Raw Material Stock", subGroup: "Stock Status" },
+      { key: "finished_goods_stocks", label: "Finished Goods Stock", subGroup: "Stock Status" },
+      { key: "wastage-stock", label: "Wastage Stock", subGroup: "Stock Status" },
+      // { key: "uoms", label: "Units of Measure (UOM)" },
+      // { key: "raw_material_categories", label: "RM Categories" },
+      // { key: "store-types", label: "Store Types" },
+      // { key: "locations", label: "Locations" },
+      // { key: "eod-stock", label: "EOD Stock" },
     ],
   },
   {
-    id: "stores",
-    groupName: "Store",
-    icon: <FaLayerGroup />,
-    colorId: "stores",
-    modules: [
-      { key: "stores", label: "Storage Stores" },
-      { key: "store-types", label: "Store Types" },
-      { key: "locations", label: "Locations" },
-    ],
-  },
-  {
-    id: "reports",
-    groupName: "Reports",
+    id: "display",
+    groupName: "Display",
     icon: <FaChartBar />,
-    colorId: "reports",
+    colorId: "display",
     modules: [
-      { key: "sales-reports", label: "Sales Reports" },
-      { key: "purchase-reports", label: "Purchase Reports" },
-      { key: "inventory-reports", label: "Inventory Reports" },
-      { key: "production-reports", label: "Production Reports" },
-      { key: "audit-reports", label: "Audit Reports" },
-    ],
-  },
-  {
-    id: "accounts",
-    groupName: "Accounts",
-    icon: <FaDollarSign />,
-    colorId: "accounts",
-    modules: [
-      { key: "accounts", label: "Accounts" },
-      { key: "payable", label: "Accounts Payable" },
-      { key: "receivable", label: "Accounts Receivable" },
-      { key: "vouchers", label: "Vouchers" },
-      { key: "petty-cash", label: "Petty Cash" },
-      { key: "chart-of-accounts", label: "Chart of Accounts" },
+      { key: "company-settings", label: "Company Profile", subGroup: "Company" },
+      { key: "accounts", label: "Accounts (Balance Sheet / P&L / Trial Balance / Ledger)", subGroup: "Final Results & Account Books" },
+      { key: "chart-of-accounts", label: "Chart of Accounts", subGroup: "Final Results & Account Books" },
+      { key: "payable", label: "Amount Payable (Outstanding)", subGroup: "Outstanding Analysis" },
+      { key: "receivable", label: "Amount Receivable (Outstanding)", subGroup: "Outstanding Analysis" },
+      { key: "sales-reports", label: "Sales Reports", subGroup: "MIS Reports" },
+      { key: "purchase-reports", label: "Purchase Reports", subGroup: "MIS Reports" },
+      { key: "inventory-reports", label: "Inventory Reports", subGroup: "MIS Reports" },
+      { key: "production-reports", label: "Production Reports", subGroup: "MIS Reports" },
+      // { key: "audit-reports", label: "Audit Reports" },
+      // { key: "petty-cash", label: "Petty Cash" },
     ],
   },
   {
@@ -317,7 +237,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
 // Action column definitions  (action key matches Permission.action from DB)
 // ─────────────────────────────────────────────────────────────────────────────
 const ACTIONS = [
-  { key: "view", label: "View", headerColor: "text-blue-500", hex: "#2563eb", colBg: "bg-blue-500/5" },
+  { key: "view", label: "List", headerColor: "text-blue-500", hex: "#2563eb", colBg: "bg-blue-500/5" },
   { key: "create", label: "Add", headerColor: "text-emerald-500", hex: "#059669", colBg: "bg-emerald-500/5" },
   { key: "edit", label: "Edit", headerColor: "text-amber-500", hex: "#d97706", colBg: "bg-amber-500/5" },
   { key: "delete", label: "Delete", headerColor: "text-rose-500", hex: "#e11d48", colBg: "bg-rose-500/5" },
@@ -395,6 +315,7 @@ const RolePermissionMapping: React.FC = () => {
 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
   const [activeGroupId, setActiveGroupId] = useState<string>("dashboard");
+  const [collapsedSubGroups, setCollapsedSubGroups] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { loadRoles(); loadPermissions(); }, [loadRoles, loadPermissions]);
@@ -799,8 +720,63 @@ const RolePermissionMapping: React.FC = () => {
                         const extraPerms = mod.extraPerms ?? [];
                         const rowBg = idx % 2 === 1 ? "bg-card-2/40" : "";
 
+                        const prevSubGroup = idx > 0 ? activeGroup.modules[idx - 1].subGroup : undefined;
+                        const showSubGroupHeader = !!mod.subGroup && mod.subGroup !== prevSubGroup;
+                        const subGroupKey = `${activeGroup.id}::${mod.subGroup}`;
+                        const isCollapsed = mod.subGroup ? collapsedSubGroups.has(subGroupKey) : false;
+
+                        // Compute sub-group stats for the header row
+                        let sgTotal = 0;
+                        let sgAssigned = 0;
+                        if (showSubGroupHeader) {
+                          activeGroup.modules.filter(m => m.subGroup === mod.subGroup).forEach(m => {
+                            sgTotal += m.existingPerms.length;
+                            sgAssigned += m.existingPerms.filter(p => assignedIds.has(p.id)).length;
+                          });
+                        }
+
+                        const toggleSubGroup = () => {
+                          setCollapsedSubGroups(prev => {
+                            const next = new Set(prev);
+                            if (next.has(subGroupKey)) next.delete(subGroupKey);
+                            else next.add(subGroupKey);
+                            return next;
+                          });
+                        };
+
                         return (
                           <React.Fragment key={mod.key}>
+                            {showSubGroupHeader && (
+                              <tr
+                                className="bg-card-2/60 cursor-pointer select-none hover:bg-card-2/80 transition-colors"
+                                onClick={toggleSubGroup}
+                              >
+                                <td colSpan={ACTIONS.length + 2} className="py-2.5 px-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      {isCollapsed
+                                        ? <FaChevronRight className="text-[8px] text-ink-subtle" />
+                                        : <FaChevronDown className="text-[8px] text-ink-subtle" />
+                                      }
+                                      <span className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">{mod.subGroup}</span>
+                                      <span className="text-[9px] text-ink-subtle/60 font-medium ml-1">
+                                        {sgAssigned}/{sgTotal}
+                                      </span>
+                                    </div>
+                                    {isCollapsed && sgTotal > 0 && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                        sgAssigned === sgTotal ? "bg-emerald-500/15 text-emerald-400"
+                                          : sgAssigned > 0 ? "bg-amber-500/15 text-amber-400"
+                                          : "bg-slate-500/15 text-slate-400"
+                                      }`}>
+                                        {sgAssigned === sgTotal ? "All" : sgAssigned === 0 ? "None" : "Partial"}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            {!isCollapsed && (
                             <tr className={`transition-colors hover:bg-card-2 ${rowBg} ${extraPerms.length > 0 ? "border-b-0" : ""}`}>
                               {/* Entity name */}
                               <td className="py-2.5 px-4">
@@ -849,9 +825,10 @@ const RolePermissionMapping: React.FC = () => {
                                 )}
                               </td>
                             </tr>
+                            )}
 
                             {/* Dedicated Special Access Row */}
-                            {extraPerms.length > 0 && (
+                            {!isCollapsed && extraPerms.length > 0 && (
                               <tr className="bg-violet-500/10 border-b border-line-soft transition-colors hover:bg-violet-500/15">
                                 <td className="py-3.5 px-5">
                                   <div className="flex items-center gap-2">
