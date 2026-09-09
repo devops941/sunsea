@@ -163,21 +163,49 @@ class SupplierService {
     const adminMap = new Map(admins.map(a => [`admin_${a.id}`, { name: a.fullName, role: a.role?.name || 'Super Admin' }]));
     const userMap = new Map(users.map(u => [u.userId, { name: u.fullName, role: u.role?.name || 'User' }]));
 
-    const suppliersWithNames = suppliers.map(supplier => {
-      const creatorInfo = adminMap.get(supplier.createdBy) || userMap.get(supplier.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
-      const updaterInfo = supplier.updatedBy ? (adminMap.get(supplier.updatedBy) || userMap.get(supplier.updatedBy)) : null;
-      
-      return {
-        ...supplier,
-        createdUserName: creatorInfo.name,
-        createdUserRole: creatorInfo.role,
-        updatedUserName: updaterInfo ? updaterInfo.name : null,
-        updatedUserRole: updaterInfo ? updaterInfo.role : null
-      };
-    });
+    // Compute dynamic balance for each supplier using payable service
+    const { payableService } = require("../accounts/payable.service");
+
+    const suppliersWithBalance = await Promise.all(
+      suppliers.map(async (supplier) => {
+        const creatorInfo = adminMap.get(supplier.createdBy) || userMap.get(supplier.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
+        const updaterInfo = supplier.updatedBy ? (adminMap.get(supplier.updatedBy) || userMap.get(supplier.updatedBy)) : null;
+
+        let netBalance = 0;
+        try {
+          const result = await payableService.getPayableSummaries({ supplierId: supplier.id });
+          const summaries = result?.data || result || [];
+          if (Array.isArray(summaries) && summaries.length > 0) {
+            netBalance = summaries[0].netBalance ?? summaries[0].balanceAsOnDate ?? 0;
+          } else {
+            const opBal = Number(supplier.openingBalance || 0);
+            const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+            netBalance = opType === "DEBIT" ? Math.abs(opBal) : -Math.abs(opBal);
+          }
+        } catch (e) {
+          const opBal = Number(supplier.openingBalance || 0);
+          const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+          netBalance = opType === "DEBIT" ? Math.abs(opBal) : -Math.abs(opBal);
+        }
+
+        const balanceAmount = Math.abs(netBalance);
+        const balanceType = netBalance > 0 ? "Dr" : netBalance < 0 ? "Cr" : "";
+
+        return {
+          ...supplier,
+          createdUserName: creatorInfo.name,
+          createdUserRole: creatorInfo.role,
+          updatedUserName: updaterInfo ? updaterInfo.name : null,
+          updatedUserRole: updaterInfo ? updaterInfo.role : null,
+          netBalance,
+          balanceAmount,
+          balanceType,
+        };
+      })
+    );
 
     return {
-      suppliers: suppliersWithNames,
+      suppliers: suppliersWithBalance,
       pagination: {
         total,
         page,
@@ -238,12 +266,39 @@ class SupplierService {
       }
     }
 
+    // Compute dynamic balance from payable service (same as customer uses receivable)
+    // Payable netBalance: positive = we owe supplier (Cr), negative = advance paid (Dr)
+    let netBalance = 0;
+    try {
+      const { payableService } = require("../accounts/payable.service");
+      const result = await payableService.getPayableSummaries({ supplierId: supplier.id });
+      const summaries = result?.data || result || [];
+      if (Array.isArray(summaries) && summaries.length > 0) {
+        netBalance = summaries[0].netBalance ?? summaries[0].balanceAsOnDate ?? 0;
+      } else {
+        const opBal = Number(supplier.openingBalance || 0);
+        const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+        netBalance = opType === "DEBIT" ? -Math.abs(opBal) : Math.abs(opBal);
+      }
+    } catch (e) {
+      const opBal = Number(supplier.openingBalance || 0);
+      const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+      netBalance = opType === "DEBIT" ? -Math.abs(opBal) : Math.abs(opBal);
+    }
+
+    // Payable: positive = Cr (we owe them), negative = Dr (advance/they owe us)
+    const balanceAmount = Math.abs(netBalance);
+    const balanceType = netBalance > 0 ? "Cr" : netBalance < 0 ? "Dr" : "";
+
     return {
       ...supplier,
       createdUserName,
       createdUserRole,
       updatedUserName,
-      updatedUserRole
+      updatedUserRole,
+      netBalance,
+      balanceAmount,
+      balanceType,
     };
   }
 

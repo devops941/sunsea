@@ -225,6 +225,42 @@ class GrnInvoiceService {
         const referenceNumber = lastPayment ? lastPayment.referenceNumber : null;
         const paymentDate = lastPayment ? new Date(lastPayment.paymentDate) : null;
 
+        // Calculate supplier opening balance (current balance before this invoice)
+        let openingBalance = 0;
+        try {
+            const { payableService } = require("../accounts/payable.service");
+            const result = await payableService.getPayableSummaries({ supplierId: Number(data.supplierId) });
+            const summaries = result?.data || result || [];
+            if (Array.isArray(summaries) && summaries.length > 0) {
+                openingBalance = Number(summaries[0].netBalance ?? summaries[0].balanceAsOnDate ?? 0);
+            } else {
+                const opBal = Number(supplier.openingBalance || 0);
+                const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+                openingBalance = opType === "DEBIT" ? -Math.abs(opBal) : Math.abs(opBal);
+            }
+        } catch {
+            const opBal = Number(supplier.openingBalance || 0);
+            const opType = ((supplier as any).openingBalanceType || "CREDIT").toUpperCase();
+            openingBalance = opType === "DEBIT" ? -Math.abs(opBal) : Math.abs(opBal);
+        }
+        // Parse sundry from remarks to get full invoice total (items + tax + sundry)
+        let sundryTotal = 0;
+        if (data.remarks) {
+            try {
+                const parsed = JSON.parse(data.remarks);
+                if (Array.isArray(parsed?.__billSundry__)) {
+                    sundryTotal = parsed.__billSundry__.reduce((sum: number, r: any) => {
+                        const amt = Number(r.amount) || 0;
+                        const t = (r.type || "").toUpperCase();
+                        const isNeg = t.includes("DISCOUNT") || t.includes("MINUS");
+                        return sum + (isNeg ? -amt : amt);
+                    }, 0);
+                }
+            } catch { /* plain text */ }
+        }
+        const fullInvoiceTotal = Number(netAmount) + sundryTotal;
+        const closingBalance = openingBalance + fullInvoiceTotal;
+
         const grnInvoice = await prisma.$transaction(async (tx) => {
             // Create GRN Invoice
             const grnInvoice = await tx.grnInvoice.create({
@@ -271,6 +307,8 @@ class GrnInvoiceService {
                     totalSgst,
                     totalIgst,
                     netAmount,
+                    openingBalance,
+                    closingBalance,
 
                     companyId: currentUser.companyId,
                     createdBy: currentUser.userId,
@@ -642,6 +680,49 @@ class GrnInvoiceService {
                 computedStatus = totalPaid === 0 ? "Unpaid" : (totalPaid >= Number(netAmount) ? "Closed" : "Partial");
             }
 
+            // Recalculate supplier balance with full invoice total (items + sundry)
+            // Parse old sundry
+            let oldSundry = 0;
+            if (existing.remarks) {
+                try {
+                    const p = JSON.parse(existing.remarks);
+                    if (Array.isArray(p?.__billSundry__)) {
+                        oldSundry = p.__billSundry__.reduce((s: number, r: any) => {
+                            const a = Number(r.amount) || 0; const t = (r.type || "").toUpperCase();
+                            return s + (t.includes("DISCOUNT") || t.includes("MINUS") ? -a : a);
+                        }, 0);
+                    }
+                } catch { /* plain text */ }
+            }
+            // Parse new sundry
+            const updRemarks = data.remarks !== undefined ? data.remarks : existing.remarks;
+            let newSundry = 0;
+            if (updRemarks) {
+                try {
+                    const p = JSON.parse(updRemarks);
+                    if (Array.isArray(p?.__billSundry__)) {
+                        newSundry = p.__billSundry__.reduce((s: number, r: any) => {
+                            const a = Number(r.amount) || 0; const t = (r.type || "").toUpperCase();
+                            return s + (t.includes("DISCOUNT") || t.includes("MINUS") ? -a : a);
+                        }, 0);
+                    }
+                } catch { /* plain text */ }
+            }
+            const oldFullTotal = Number(existing.netAmount) + oldSundry;
+            const newFullTotal = netAmount + newSundry;
+
+            let updOpeningBalance = Number((existing as any).openingBalance ?? 0);
+            try {
+                const { payableService } = require("../accounts/payable.service");
+                const result = await payableService.getPayableSummaries({ supplierId });
+                const summaries = result?.data || result || [];
+                if (Array.isArray(summaries) && summaries.length > 0) {
+                    const currentBal = Number(summaries[0].netBalance ?? summaries[0].balanceAsOnDate ?? 0);
+                    updOpeningBalance = currentBal - oldFullTotal;
+                }
+            } catch { /* keep existing */ }
+            const updClosingBal = updOpeningBalance + newFullTotal;
+
             // Update GRN record
             const updated = await tx.grnInvoice.update({
                 where: { id },
@@ -688,6 +769,8 @@ class GrnInvoiceService {
                     totalSgst,
                     totalIgst,
                     netAmount,
+                    openingBalance: updOpeningBalance,
+                    closingBalance: updClosingBal,
                     poId: data.poId !== undefined ? data.poId : existing.poId,
 
                     ...(data.items && {

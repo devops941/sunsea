@@ -8,7 +8,6 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
-import PricingButton from "../../../components/ui/PricingButton/PricingButton";
 import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
@@ -29,7 +28,6 @@ const SupplierList: React.FC = () => {
     const { can } = usePermission();
     const canEditSupplier = can("suppliers.edit");
     const canDeleteSupplier = can("suppliers.delete");
-    const canViewPricing = can("supplierpricelist.view");
     const canCreateSupplier = can("suppliers.create");
     const canExportSupplier = can("suppliers.export");
 
@@ -164,10 +162,6 @@ const SupplierList: React.FC = () => {
 
     const handleEdit = useCallback((sup: any) => {
         navigate(`/suppliers/edit/${sup.id}`, { state: sup });
-    }, [navigate]);
-
-    const handleViewPricing = useCallback((sup: any) => {
-        navigate(`/suppliers/${sup.id}/material-prices`);
     }, [navigate]);
 
     const triggerDelete = useCallback((id: string) => {
@@ -308,14 +302,13 @@ const SupplierList: React.FC = () => {
                                 {
                                     header: "BALANCE",
                                     align: "right",
-                                    render: (supplier) => {
-                                        const bal = Number(supplier.openingBalance || 0);
-                                        const type = supplier.openingBalanceType || "CREDIT";
-                                        const suffix = type === "CREDIT" ? "Cr" : "Dr";
-                                        const color = bal > 0 ? (type === "CREDIT" ? "text-orange-500" : "text-emerald-500") : "text-ink-subtle";
+                                    render: (supplier: any) => {
+                                        const bal = Number(supplier.balanceAmount ?? supplier.openingBalance ?? 0);
+                                        const type = supplier.balanceType || (supplier.openingBalanceType === "CREDIT" ? "Cr" : supplier.openingBalanceType === "DEBIT" ? "Dr" : "");
+                                        const color = bal > 0 ? (type === "Cr" ? "text-orange-500" : "text-emerald-500") : "text-ink-subtle";
                                         return (
                                             <span className={`font-mono ${color}`}>
-                                                ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {bal > 0 ? suffix : ""}
+                                                ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {bal > 0 ? type : ""}
                                             </span>
                                         );
                                     }
@@ -335,7 +328,6 @@ const SupplierList: React.FC = () => {
                                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                             <ViewButton onClick={() => handleOpenView(supplier)} />
                                             {canEditSupplier && <EditButton onClick={() => handleEdit(supplier)} />}
-                                            {canViewPricing && <PricingButton onClick={() => handleViewPricing(supplier)} />}
                                             {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(String(supplier.id))} />}
                                         </div>
                                     ),

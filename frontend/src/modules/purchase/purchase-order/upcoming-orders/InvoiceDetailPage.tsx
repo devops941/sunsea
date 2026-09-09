@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaPlus, FaTrash, FaArrowLeft, FaBoxOpen, FaFileInvoice, FaMapMarkerAlt, FaTruck, FaUser, FaCreditCard, FaHashtag } from "react-icons/fa";
+import { FaSave, FaUndo } from "react-icons/fa";
+import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
+import type { BusyColumn, SundryRow } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
+import AutocompleteInput from "../../../../components/form/AutocompleteInput/AutocompleteInput";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import CustomButton from "../../../../components/ui/Button/Button";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../../components/form/TextInput/TextInput";
-import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
-import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
-import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
+import { supplierService } from "../../../../services/supplierService";
 import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
@@ -22,8 +22,8 @@ import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
 import { fetchStores } from "../../../../features/stores/storeSlice";
 import { useSelector } from "react-redux";
-import FileUpload from "../../../../components/form/FileUpload/FileUpload";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
+import FileUpload from "../../../../components/form/FileUpload/FileUpload";
 import { getUomMultiplier } from "../utils/uomUtils";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../../hooks/useFormKeyboardNav";
@@ -139,6 +139,10 @@ const InvoiceDetailPage: React.FC = () => {
     });
 
     const [items, setItems] = useState<GRNItem[]>([]);
+    const [sundryRows, setSundryRows] = useState<SundryRow[]>([]);
+    const sundryTableRef = useRef<HTMLDivElement>(null);
+    const itemsTableRef = useRef<HTMLDivElement>(null);
+    const [supplierLiveBalance, setSupplierLiveBalance] = useState<{ amount: number; type: string } | null>(null);
     const isInterState = useMemo(() => {
         if (!companyState || !form.billingState) return false;
         return companyState.toLowerCase().trim() !== form.billingState.toLowerCase().trim();
@@ -148,12 +152,12 @@ const InvoiceDetailPage: React.FC = () => {
     // ── Fetch on mount ────────────────────────────────────────────────────────────
     useEffect(() => {
         dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
-        loadSuppliers();
+        loadSuppliers({ limit: 1000 });
         loadActiveUOMs();
         purchaseOrderService
-            .fetchAll({ status: "APPROVED,OPEN,PARTIALLY_RECEIVED" as any })
+            .fetchAll({ status: "APPROVED,OPEN,PARTIALLY_RECEIVED", pageSize: 1000 } as any)
             .then((res) => {
-                const list = Array.isArray(res) ? res : (res?.data || []);
+                const list = Array.isArray(res) ? res : (res?.data || res?.purchaseOrders || []);
                 setApprovedPOs(list);
             })
             .catch(() => toast.error("Failed to load active orders"))
@@ -204,7 +208,10 @@ const InvoiceDetailPage: React.FC = () => {
                         challanNo: invoice.challanNo || "",
                         transport: invoice.transport || "",
                         eWayBill: invoice.eWayBill || "",
-                        remarks: invoice.remarks || "",
+                        remarks: (() => {
+                            const raw = invoice.remarks || "";
+                            try { const p = JSON.parse(raw); return p?.text || ""; } catch { return raw; }
+                        })(),
                         discountType: invoice.discountType === "PERCENT" ? "percent" : "flat",
                         discountValue: Number(invoice.discountValue) || 0,
                         roundingAdjust: Number(invoice.roundingAdjust) || 0,
@@ -263,6 +270,25 @@ const InvoiceDetailPage: React.FC = () => {
                         isPersisted: true
                     }));
                     setPayments(legacyPayments);
+
+                    // Load bill sundry — try billSundry field first, then parse from remarks
+                    let savedSundry: any[] = [];
+                    if (invoice.billSundry) {
+                        savedSundry = typeof invoice.billSundry === "string" ? JSON.parse(invoice.billSundry) : invoice.billSundry;
+                    } else if (invoice.remarks) {
+                        try {
+                            const parsed = JSON.parse(invoice.remarks);
+                            if (Array.isArray(parsed?.__billSundry__)) savedSundry = parsed.__billSundry__;
+                        } catch { /* not JSON, plain text remarks */ }
+                    }
+                    if (Array.isArray(savedSundry) && savedSundry.length > 0) {
+                        setSundryRows(savedSundry.map((r: any) => ({
+                            id: r.id || `${Date.now()}-${Math.random()}`,
+                            type: r.type || "",
+                            rate: r.rate || "",
+                            amount: String(r.amount || ""),
+                        })));
+                    }
                 })
                 .catch((err) => {
                     console.error("Failed to load GRN Invoice:", err);
@@ -461,6 +487,18 @@ const InvoiceDetailPage: React.FC = () => {
         }
     }, [form.supplierId, form.poId, suppliers]);
 
+    // ── Fetch live supplier balance (current balance after all transactions) ──────
+    useEffect(() => {
+        if (!form.supplierId) { setSupplierLiveBalance(null); return; }
+        supplierService.fetchById(String(form.supplierId))
+            .then((sup: any) => {
+                const bal = Number(sup.balanceAmount ?? sup.netBalance ?? sup.openingBalance ?? 0);
+                const bType = (sup.balanceType || sup.openingBalanceType || "").toString().toUpperCase();
+                setSupplierLiveBalance({ amount: bal, type: bType.startsWith("D") ? "Dr" : bType.startsWith("C") ? "Cr" : "" });
+            })
+            .catch(() => setSupplierLiveBalance(null));
+    }, [form.supplierId]);
+
     // ── When store selected manually → auto-fill shipping from store address ──────
     useEffect(() => {
         if (form.poId || !form.storeId) return;
@@ -499,42 +537,6 @@ const InvoiceDetailPage: React.FC = () => {
         form.billingState,
         form.billingPincode,
     ]);
-
-    const handleBillingStateChange = (stateData: StateCityOption) => {
-        setForm((prev) => ({
-            ...prev,
-            billingState: stateData.name,
-            billingCity: "",
-        }));
-        setErrors((prev) => ({
-            ...prev,
-            billingState: "",
-            billingCity: "",
-        }));
-    };
-
-    const handleBillingCityChange = (cityData: StateCityOption) => {
-        setForm((prev) => ({ ...prev, billingCity: cityData.name }));
-        setErrors((prev) => ({ ...prev, billingCity: "" }));
-    };
-
-    const handleShippingStateChange = (stateData: StateCityOption) => {
-        setForm((prev) => ({
-            ...prev,
-            shippingState: stateData.name,
-            shippingCity: "",
-        }));
-        setErrors((prev) => ({
-            ...prev,
-            shippingState: "",
-            shippingCity: "",
-        }));
-    };
-
-    const handleShippingCityChange = (cityData: StateCityOption) => {
-        setForm((prev) => ({ ...prev, shippingCity: cityData.name }));
-        setErrors((prev) => ({ ...prev, shippingCity: "" }));
-    };
 
     // ── Computed totals ───────────────────────────────────────────────────────────
     const subtotal = useMemo(() => items.reduce((sum, i) => {
@@ -597,10 +599,8 @@ const InvoiceDetailPage: React.FC = () => {
 
     const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
 
-    const grandTotal = useMemo(() => {
-        const rounding = roundingSign === "+" ? Number(form.roundingAdjust || 0) : -Number(form.roundingAdjust || 0);
-        return subtotal - discountAmount + totalTax + rounding;
-    }, [subtotal, discountAmount, totalTax, form.roundingAdjust, roundingSign]);
+    // grandTotal = item subtotal only; sundry (tax, discount, rounding) is added separately via sundryTotal
+    const grandTotal = subtotal;
 
     const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + Number(p.amount || 0), 0), [payments]);
     const balanceDue = useMemo(() => Math.max(0, grandTotal - totalPaid), [grandTotal, totalPaid]);
@@ -650,26 +650,65 @@ const InvoiceDetailPage: React.FC = () => {
     };
 
     // ── Options ───────────────────────────────────────────────────────────────────
-    const poOptions = useMemo(() => [
-        { value: "", label: "Select PO" },
-        ...approvedPOs.map((po: any) => {
+    const poAutocompleteOptions = useMemo(() => {
+        // Show all POs — optionally filter by supplier if one is selected
+        const filtered = form.supplierId
+            ? approvedPOs.filter((po: any) => String(po.supplierId || po.supplier?.id || "") === String(form.supplierId))
+            : approvedPOs;
+        return filtered.map((po: any) => {
             const supplierName = po.supplier?.supplierName || po.supplier?.displayName || po.supplier?.legalName || "";
-            const supplierPart = supplierName ? ` - ${supplierName}` : "";
-            const statusPart = po.status === "PARTIALLY_RECEIVED" ? " (Partially Received)" : "";
+            const dateStr = po.poDate || po.createdAt;
+            const formattedDate = dateStr
+                ? new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                : "";
+            const formattedAmt = po.netAmount !== undefined
+                ? `₹${Number(po.netAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                : "";
+            const statusPart = po.status === "PARTIALLY_RECEIVED" ? " (Partial)" : "";
+            const supplierPart = !form.supplierId && supplierName ? ` — ${supplierName}` : "";
+            const label = `${po.poNumber || ""}${supplierPart}${formattedDate ? ` (${formattedDate})` : ""}${formattedAmt ? ` — ${formattedAmt}` : ""}${statusPart}`;
             return {
                 value: String(po.id || po.purchaseOrderId || ""),
-                label: `${po.poNumber || ""}${supplierPart}${statusPart}`,
+                label,
+                info: (
+                    <div className="flex items-center gap-3 text-[11px]">
+                        {!form.supplierId && supplierName && <span className="text-ink-subtle">{supplierName}</span>}
+                        {formattedDate && <span className="text-ink-subtle">{formattedDate}</span>}
+                        {formattedAmt && <span className="font-semibold text-emerald-500">{formattedAmt}</span>}
+                        {statusPart && <span className="text-amber-400">{statusPart}</span>}
+                    </div>
+                ),
+            };
+        });
+    }, [approvedPOs, form.supplierId]);
+
+    const supplierAutocompleteOptions = useMemo(() =>
+        (suppliers || []).map((s: any) => {
+            const name = s.displayName || s.legalName || s.supplierCode || String(s.id);
+            const city = s.billingCity || "";
+            // Use live balance for the selected supplier, static for others in dropdown
+            const isSelected = String(s.id) === String(form.supplierId);
+            const bal = isSelected && supplierLiveBalance
+                ? supplierLiveBalance.amount
+                : Number(s.balanceAmount ?? s.netBalance ?? s.openingBalance ?? 0);
+            const bType = isSelected && supplierLiveBalance
+                ? supplierLiveBalance.type.charAt(0).toUpperCase()
+                : (s.balanceType || s.openingBalanceType || "").toString().toUpperCase();
+            const isDr = bType.startsWith("D");
+            const balLabel = bal ? `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : ""}` : "";
+            return {
+                value: String(s.id || ""),
+                label: name,
+                selectedLabel: [name, city, balLabel].filter(Boolean).join(" · "),
+                info: (
+                    <div className="flex items-center gap-3 text-[11px]">
+                        {city && <span className="text-ink-subtle">{city}</span>}
+                        {balLabel && <span className={`font-semibold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>{balLabel}</span>}
+                    </div>
+                ),
             };
         }),
-    ], [approvedPOs]);
-
-    const supplierOptions = useMemo(() => [
-        { value: "", label: "Select" },
-        ...(suppliers || []).map((s: any) => ({
-            value: String(s.id || ""),
-            label: `${s.supplierCode || ""} - ${s.legalName || s.displayName || ""}`,
-        })),
-    ], [suppliers]);
+    [suppliers, form.supplierId, supplierLiveBalance]);
 
 
     const storeOptions = useMemo(() => [
@@ -737,15 +776,15 @@ const InvoiceDetailPage: React.FC = () => {
     };
 
     // ── Handlers ─────────────────────────────────────────────────────────────────
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) setForm((prev) => ({ ...prev, invoiceImage: e.target.files![0] }));
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const val = type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
         setForm((prev) => ({ ...prev, [name]: val }));
         if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) setForm((prev) => ({ ...prev, invoiceImage: e.target.files![0] }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -831,8 +870,17 @@ const InvoiceDetailPage: React.FC = () => {
             if (form.challanNo) payload.append("challanNo", form.challanNo);
             if (form.transport) payload.append("transport", form.transport);
             if (form.eWayBill) payload.append("eWayBill", form.eWayBill);
-            if (form.remarks) payload.append("remarks", form.remarks);
+            // Store bill sundry in remarks as hidden JSON (backend doesn't have billSundry column)
+            // Frontend will parse this to display sundry rows and compute correct totals
+            const activeSundry = sundryRows.filter((r) => r.type && Number(r.amount) > 0);
+            const remarksPayload = activeSundry.length > 0
+                ? JSON.stringify({ __billSundry__: activeSundry, text: form.remarks || "" })
+                : (form.remarks || "");
+            if (remarksPayload) payload.append("remarks", remarksPayload);
 
+            // Send clean values to backend — NO sundry mixed in
+            // Backend computes netAmount from: items subtotal + totalTax - discountValue + roundingAdjust
+            // Sundry is handled entirely on the frontend via remarks JSON
             payload.append("discountType", form.discountType.toUpperCase());
             payload.append("discountValue", String(form.discountValue));
             payload.append("roundingAdjust", String(form.roundingAdjust));
@@ -953,201 +1001,452 @@ const InvoiceDetailPage: React.FC = () => {
 
     useFormShortcuts({ onDelete: handleF8 });
 
+    // ─── Order item columns for BusyItemsTable ────────────────────
+    const productAutocompleteOptions = useMemo(() =>
+        (rawMaterials || []).map((rm: any) => ({
+            value: String(rm.rawMaterialId),
+            label: rm.materialName || rm.productName || String(rm.rawMaterialId),
+        })),
+    [rawMaterials]);
+
+    const orderItemColumns: BusyColumn<GRNItem>[] = useMemo(() => [
+        {
+            key: "productId",
+            header: "Product",
+            width: "1fr",
+            render: (_row: GRNItem, index: number) => {
+                const item = items[index];
+                if (!item) return null;
+                if (isPOSelected || isEditMode) {
+                    const itemRawMaterial = (rawMaterials || []).find((rm: any) =>
+                        String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId)
+                    );
+                    const materialName = itemRawMaterial?.materialName || itemRawMaterial?.productName ||
+                        (item.description && item.description !== item.productId ? item.description : "") || item.productId || "—";
+                    return <span className="text-[13px] font-semibold text-ink truncate">{materialName}</span>;
+                }
+                const selectedInOther = new Set(
+                    items.filter((_, i) => i !== index).map(it => String(it.productId)).filter(Boolean)
+                );
+                const opts = productAutocompleteOptions.map(o => ({
+                    ...o,
+                    disabled: selectedInOther.has(o.value),
+                }));
+                return (
+                    <AutocompleteInput
+                        inline
+                        name={`items[${index}].productId`}
+                        value={item.productId ? String(item.productId) : ""}
+                        options={opts}
+                        placeholder="Type to search product..."
+                        error={errors[`items.${index}.productId`]}
+                        onChange={(selId) => {
+                            const selectedRm = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === String(selId));
+                            if (selectedRm) {
+                                const matName = selectedRm.materialName || selectedRm.productName || "";
+                                const uPrice = Number(selectedRm.unitPrice) || 0;
+                                const gRate = Number(selectedRm.gstRate) || 0;
+                                const baseUomVal = selectedRm.baseUom ? selectedRm.baseUom.split(",")[0].trim() : "";
+                                setItems((prev) => {
+                                    const updated = [...prev];
+                                    updated[index] = { ...updated[index], productId: selId, description: matName, unitPrice: uPrice, tax: gRate, uom: baseUomVal || updated[index].uom };
+                                    const lineSubtotal = updated[index].qty * uPrice;
+                                    const totalGstAmount = (lineSubtotal * gRate) / 100;
+                                    updated[index].taxableAmount = lineSubtotal;
+                                    updated[index].netAmount = lineSubtotal + totalGstAmount;
+                                    return updated;
+                                });
+                            } else {
+                                setItems((prev) => {
+                                    const updated = [...prev];
+                                    updated[index] = { ...updated[index], productId: "", description: "" };
+                                    return updated;
+                                });
+                            }
+                            setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`items.${index}.productId`];
+                                delete next[`items.${index}.description`];
+                                if (selectedRm && Number(selectedRm.unitPrice) > 0) {
+                                    delete next[`items.${index}.unitPrice`];
+                                }
+                                return next;
+                            });
+                            setTimeout(() => {
+                                const qtyCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                            }, 50);
+                        }}
+                    />
+                );
+            },
+        },
+        {
+            key: "qty",
+            header: "Qty & UOM",
+            width: "180px",
+            align: "center" as const,
+            render: (_row: GRNItem, index: number) => {
+                const item = items[index];
+                if (!item) return null;
+                const itemRawMaterial = (rawMaterials || []).find((rm: any) =>
+                    String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+                );
+                const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
+                const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+                const uomList = baseUoms.split(",").map((u: string) => u.trim()).filter(Boolean);
+                const uomOptions = uomList.length > 0 ? uomList : [item.uom || "kg"];
+                return (
+                    <div className="flex items-center w-full h-full gap-0">
+                        <input
+                            type="number"
+                            value={item.qty || ""}
+                            onChange={(e) => updateItem(index, "qty", Number(e.target.value))}
+                            placeholder="0"
+                            step="0.01"
+                            disabled={isEditMode}
+                            className="flex-1 min-w-0 bg-transparent text-[13px] text-ink outline-none border-none p-0 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        {uomOptions.length > 1 ? (
+                            <select
+                                value={item.uom || uomOptions[0]}
+                                onChange={(e) => updateItem(index, "uom", e.target.value)}
+                                disabled={isEditMode}
+                                className="bg-transparent text-[11px] font-medium text-ink-subtle border-none outline-none cursor-pointer px-0.5 w-[46px] flex-shrink-0"
+                            >
+                                {uomOptions.map((u: string) => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                        ) : (
+                            <span className="text-[11px] font-medium text-ink-subtle flex-shrink-0 px-0.5">{item.uom || uomOptions[0]}</span>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
+            key: "unitPrice",
+            header: "Unit Price (₹)",
+            width: "120px",
+            align: "right" as const,
+            render: (_row: GRNItem, index: number) => {
+                const item = items[index];
+                if (!item) return null;
+                return (
+                    <input
+                        type="number"
+                        value={item.unitPrice || ""}
+                        onChange={(e) => updateItem(index, "unitPrice", Number(e.target.value))}
+                        placeholder="0.00"
+                        step="0.01"
+                        min={0}
+                        disabled={isEditMode}
+                        className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                );
+            },
+        },
+        {
+            key: "netAmount",
+            header: "Total (₹)",
+            width: "110px",
+            align: "right" as const,
+            render: (_row: GRNItem, index: number) => {
+                const item = items[index];
+                if (!item) return null;
+                const itemRawMaterial = (rawMaterials || []).find((rm: any) =>
+                    String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+                );
+                const mult = getUomMultiplier(item.uom, itemRawMaterial?.baseUom);
+                const lineTotal = item.qty * mult * item.unitPrice;
+                return <span className="text-[13px] font-bold text-ink">₹{lineTotal.toFixed(2)}</span>;
+            },
+        },
+    ], [items, productAutocompleteOptions, rawMaterials, activeUOMs, errors, isEditMode, isPOSelected, updateItem]);
+
+    // ─── Bill Sundry columns ────────────────────────────────────────
+    const sundryColumns: BusyColumn<SundryRow>[] = useMemo(() => [
+        {
+            key: "type",
+            header: "Bill Sundry",
+            width: "1fr",
+            render: (row: SundryRow, index: number, update: (patch: Partial<SundryRow>) => void) => (
+                <AutocompleteInput
+                    inline
+                    name={`sundry.${index}.type`}
+                    value={row.type || ""}
+                    options={DEFAULT_SUNDRY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                    placeholder="Select bill sundry..."
+                    onChange={(val) => {
+                        update({ type: val });
+                        setTimeout(() => {
+                            const hasRate = val.startsWith("BILL_TAX") || val.startsWith("DISCOUNT");
+                            const targetCol = hasRate ? 1 : 2;
+                            const cell = sundryTableRef.current?.querySelector(`[data-r="${index}"][data-c="${targetCol}"]`) as HTMLElement | null;
+                            const input = cell?.querySelector("input") as HTMLInputElement | null;
+                            if (input) { input.focus(); input.select?.(); }
+                        }, 50);
+                    }}
+                />
+            ),
+        },
+        {
+            key: "rate",
+            header: "@",
+            width: "100px",
+            align: "right" as const,
+            render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
+                const hasRate = Boolean(row.type && (row.type.startsWith("BILL_TAX") || row.type.startsWith("DISCOUNT")));
+                if (!hasRate) return null;
+                return (
+                    <div className="flex items-center gap-0.5 w-full justify-end">
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={row.rate}
+                            onChange={(e) => {
+                                const rate = e.target.value.replace(/[^0-9.]/g, "");
+                                const rateNum = Number(rate) || 0;
+                                const calcAmount = ((subtotal * rateNum) / 100).toFixed(2);
+                                update({ rate, amount: rateNum > 0 ? calcAmount : "" });
+                            }}
+                            placeholder="0.000"
+                            disabled={isEditMode}
+                            className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right"
+                        />
+                        <span className="text-[11px] text-ink-subtle">%</span>
+                    </div>
+                );
+            },
+        },
+        {
+            key: "amount",
+            header: "Amount (₹)",
+            width: "120px",
+            align: "right" as const,
+            render: (row: SundryRow, _index: number, update: (patch: Partial<SundryRow>) => void) => {
+                const isNeg = DEFAULT_SUNDRY_OPTIONS.find((o) => o.value === row.type)?.sign === -1;
+                return (
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        value={row.amount}
+                        onChange={(e) => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
+                        placeholder="0.00"
+                        disabled={isEditMode}
+                        className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right font-semibold"
+                        style={{ color: isNeg ? "#ef4444" : "var(--color-ink)" }}
+                    />
+                );
+            },
+        },
+    ], [isEditMode, subtotal]);
+
+    const sundryEmptyRow: SundryRow = useMemo(() => ({
+        id: `${Date.now()}-${Math.random()}`, type: "", rate: "", amount: "",
+    }), []);
+
+    const sundryTotal = useMemo(() => sundryRows.reduce((s, r) => {
+        const a = Number(r.amount) || 0;
+        const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
+        return s + (o?.sign === -1 ? -a : a);
+    }, 0), [sundryRows]);
+
     if (loadingPOs) {
         return <CommonLoader text="Loading..." fullScreen={false} />;
     }
 
     return (
-        <div className="w-full max-w-[1200px] mr-auto grn-form-compact">
-            <style>{`
-                .grn-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
-                .grn-form-compact input, .grn-form-compact select,
-                .grn-form-compact button[role="combobox"],
-                .grn-form-compact .react-datepicker-wrapper input,
-                .grn-form-compact input[type="date"] { height: 32px !important; min-height: 32px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
-                .grn-form-compact .group > div.flex.relative { height: 32px !important; }
-                .grn-form-compact .group > div.flex.relative input { font-size: 12px !important; }
-                .grn-form-compact .group > div.flex.relative select { height: 32px !important; font-size: 11px !important; }
-                .grn-form-compact .group > div.flex.relative span { font-size: 11px !important; }
-                .grn-form-compact .group { margin-bottom: 0 !important; }
-                .grn-form-compact textarea { font-size: 12px !important; }
-            `}</style>
-            <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible">
+        <div className="w-full">
+            <div className="bg-card rounded-2xl shadow-sm border border-line max-w-[1600px] overflow-visible">
 
                 {/* Header */}
-                <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
-                    <h2 className="text-base font-bold text-ink">{isEditMode ? "Edit GRN / Invoice" : "Create GRN / Invoice"}</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
+                    <h2 className="text-lg font-bold text-ink flex items-start">
+                        {isEditMode ? "Edit GRN / Invoice" : "Create GRN / Invoice"}
+                        {form.grnNumber && <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{form.grnNumber}</span>}
+                    </h2>
                     <BackButton text="Back to List" />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
                     <div className="px-5 py-3 space-y-3">
 
-                        {/* ── Section 1: GRN Details ── */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">GRN Details</h3>
-                            </div>
-                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
-                                <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} disabled={isEditMode} />
-                                <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />
-                                <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} disabled={isEditMode} />
-                                <DatePickerCalendar label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required error={errors.grnDate} disabled={isEditMode} />
-                                <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable error={errors.supplierId} />
-                                <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable error={errors.storeId} />
+                        {/* ── Row 1: Supplier & PO ── */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                            <AutocompleteInput
+                                horizontal
+                                label="Supplier"
+                                name="supplierId"
+                                required
+                                value={form.supplierId}
+                                disabled={isEditMode || isPOSelected}
+                                error={errors.supplierId}
+                                options={supplierAutocompleteOptions}
+                                placeholder="Type to search supplier..."
+                                onChange={(val) => {
+                                    setForm((prev) => ({ ...prev, supplierId: val }));
+                                    if (errors.supplierId) setErrors((prev) => ({ ...prev, supplierId: "" }));
+                                }}
+                            />
+                            <AutocompleteInput
+                                horizontal
+                                label="Purchase Order"
+                                name="poId"
+                                value={form.poId}
+                                disabled={isEditMode}
+                                options={poAutocompleteOptions}
+                                placeholder="Type to search order..."
+                                onChange={(val) => {
+                                    handleChange({ target: { name: "poId", value: val, type: "text" } } as any);
+                                }}
+                            />
+                        </div>
+
+                        {/* ── Row 2: Invoice No, GRN Date, Store ── */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
+                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} disabled={isEditMode} horizontal />
+                            <DatePickerCalendar label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required error={errors.grnDate} disabled={isEditMode} horizontal />
+                            <div className="lg:col-span-2">
+                                <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable error={errors.storeId} horizontal />
                             </div>
                         </div>
 
-                        {/* ── Section 2: Billing Address ── */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Billing Address</h3>
-                            </div>
-                            <AddressForm addressValue={form.billingAddressLine1} onAddressChange={(val) => setForm((prev) => ({ ...prev, billingAddressLine1: val }))} addressError={errors.billingAddressLine1} countryValue={form.billingCountry || "India"} onCountryChange={(val) => setForm((prev) => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))} countryError={errors.billingCountry} stateValue={form.billingState} onStateChange={(val) => handleBillingStateChange({ id: 0, name: val, isoCode: "" })} stateError={errors.billingState} cityValue={form.billingCity} onCityChange={(val) => handleBillingCityChange({ id: 0, name: val, isoCode: "" })} cityError={errors.billingCity} pincodeValue={form.billingPincode} onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))} pincodeError={errors.billingPincode} required />
-                        </div>
-
-                        {/* ── Section 3: Shipping Address ── */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Shipping Address</h3>
-                            </div>
-                            <AddressForm addressValue={form.shippingAddressLine1} onAddressChange={(val) => setForm((prev) => ({ ...prev, shippingAddressLine1: val }))} addressError={errors.shippingAddressLine1} countryValue={form.shippingCountry || "India"} onCountryChange={(val) => setForm((prev) => ({ ...prev, shippingCountry: val }))} countryError={errors.shippingCountry} stateValue={form.shippingState} onStateChange={(val) => handleShippingStateChange({ id: 0, name: val, isoCode: "" })} stateError={errors.shippingState} cityValue={form.shippingCity} onCityChange={(val) => handleShippingCityChange({ id: 0, name: val, isoCode: "" })} cityError={errors.shippingCity} pincodeValue={form.shippingPincode} onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))} pincodeError={errors.shippingPincode} required={!form.sameAsBilling} disabled={form.sameAsBilling} />
-                        </div>
-
-                        {/* ── Section 4: Receipt Details ── */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Receipt Details</h3>
-                            </div>
-                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
-                                <DatePickerCalendar label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} disabled={isEditMode} />
-                                <DatePickerCalendar label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} disabled={isEditMode} />
-                                <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
-                                <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
-                                <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
-                                {!isEditMode && <FileUpload label={form.invoiceImage ? `Invoice: ${form.invoiceImage}` : "Upload Invoice"} name="invoiceImage" onChange={handleFileChange} />}
-                            </div>
-                        </div>
-
-                        {/* ── Section 5: Order Items ── */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Order Items</h3>
-                                {!isEditMode && <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} size="sm" />}
-                            </div>
-                            <div className="rounded-lg border border-line-soft bg-card-2 overflow-visible [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
-                                <table className="min-w-full divide-y divide-line-soft">
-                                    <thead className="bg-card-2 border-b border-line-soft">
-                                        <tr>
-                                            <th className="px-2 py-1.5 text-center text-[10px] font-extrabold text-ink-subtle uppercase w-8">#</th>
-                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Product</th>
-                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase min-w-[160px]">Qty & UOM</th>
-                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Unit Price (₹)</th>
-                                            <th className="px-2 py-1.5 text-left text-[10px] font-extrabold text-ink-subtle uppercase">Tax %</th>
-                                            <th className="px-2 py-1.5 text-right text-[10px] font-extrabold text-ink-subtle uppercase">Net (₹)</th>
-                                            <th className="px-2 py-1.5 w-10"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-line-soft bg-card">
-                                        {items.map((item, idx) => {
-                                            const itemRawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId));
-                                            const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
-                                            const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
-                                            const materialName = itemRawMaterial?.materialName || itemRawMaterial?.productName || (item.description && item.description !== item.productId ? item.description : "") || item.productId || "—";
-                                            return (
-                                                <tr key={idx} className="hover:bg-card-2/50 transition-colors">
-                                                    <td className="px-2 py-1 text-[11px] font-bold text-ink-subtle text-center">{idx + 1}</td>
-                                                    <td className="px-2 py-1">
-                                                        {isPOSelected || isEditMode ? (
-                                                            <span className="font-semibold text-ink text-[11px]">{materialName}</span>
-                                                        ) : (
-                                                            <SelectInput label="" noMargin={true} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...(rawMaterials || []).map((rm: any) => ({ value: String(rm.rawMaterialId), label: rm.materialName || rm.productName || String(rm.rawMaterialId) }))]} error={errors[`items.${idx}.productId`]} onChange={(e) => { const selId = e.target.value; const selectedRm = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === String(selId)); if (selectedRm) { const matName = selectedRm.materialName || selectedRm.productName || ""; const uPrice = Number(selectedRm.unitPrice) || 0; const gRate = Number(selectedRm.gstRate) || 0; const baseUomVal = selectedRm.baseUom ? selectedRm.baseUom.split(",")[0].trim() : ""; setItems((prev) => { const updated = [...prev]; updated[idx] = { ...updated[idx], productId: selId, description: matName, unitPrice: uPrice, tax: gRate, uom: baseUomVal || updated[idx].uom }; const lineSubtotal = updated[idx].qty * uPrice; const totalGstAmount = (lineSubtotal * gRate) / 100; updated[idx].taxableAmount = lineSubtotal; updated[idx].netAmount = lineSubtotal + totalGstAmount; return updated; }); } else { setItems((prev) => { const updated = [...prev]; updated[idx] = { ...updated[idx], productId: "", description: "" }; return updated; }); } setErrors((prev) => { const next = { ...prev }; delete next[`items.${idx}.productId`]; delete next[`items.${idx}.description`]; if (selectedRm && Number(selectedRm.unitPrice) > 0) { delete next[`items.${idx}.unitPrice`]; } return next; }); }} />
-                                                        )}
-                                                    </td>
-                                                    <td className="px-2 py-1">
-                                                        <QuantityInput label="" name={`items[${idx}].qty`} value={item.qty} baseUoms={baseUoms} uom={item.uom} onUomChange={(newUom) => updateItem(idx, "uom", newUom)} disabled={isEditMode} error={errors[`items.${idx}.qty`]} onChange={(e) => updateItem(idx, "qty", Number(e.target.value))} />
-                                                    </td>
-                                                    <td className="px-2 py-1">
-                                                        <TextInput label="" name={`items[${idx}].unitPrice`} type="number" step="0.01" placeholder="0.00" preventNegative={true} value={String(item.unitPrice)} error={errors[`items.${idx}.unitPrice`]} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} disabled={isEditMode} />
-                                                    </td>
-                                                    <td className="px-2 py-1">
-                                                        <TextInput name={`items[${idx}].tax`} type="number" value={String(item.tax || 0)} onChange={(e) => updateItem(idx, "tax", Number(e.target.value))} min={0} max={100} step={0.01} placeholder="0" disabled={isEditMode} />
-                                                    </td>
-                                                    <td className="px-2 py-1 text-right text-[11px] font-extrabold text-ink">₹{item.netAmount.toFixed(2)}</td>
-                                                    <td className="px-2 py-1 text-center">
-                                                        {!isEditMode && <button type="button" className="text-rose-400 hover:text-rose-600 p-1 rounded transition-colors" onClick={() => removeItem(idx)}><FaTrash size={11} /></button>}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {items.length === 0 && (
-                                            <tr><td colSpan={7} className="text-center text-ink-subtle py-4 text-[11px]">No items added</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* ── Section 6: Remarks + Summary ── */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="col-span-2">
-                                <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={3} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} disabled={isEditMode} />
-                            </div>
-                            <div className="bg-card-2 rounded-lg border border-line-soft px-3 py-2.5 shadow-xs">
-                                <h6 className="mb-1.5 font-extrabold text-primary text-xs">Order Summary</h6>
-                                <div className="flex justify-between mb-1 text-ink-subtle text-[11px] font-semibold">
-                                    <span>Subtotal:</span><span className="text-ink font-extrabold">₹{subtotal.toFixed(2)}</span>
+                        {/* ── Addresses (compact read-only cards) ── */}
+                        {(form.billingAddressLine1 || form.billingCity) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="p-2 border border-line-soft rounded-lg bg-card">
+                                    <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
+                                    <p className="text-xs text-ink-subtle mt-1">
+                                        {[form.billingAddressLine1, form.billingCity, form.billingState, form.billingCountry, form.billingPincode].filter(Boolean).join(", ") || "No address configured"}
+                                    </p>
                                 </div>
-                                <div className="flex justify-between items-center mb-1 text-[11px] text-ink-muted">
-                                    <span>Discount</span>
-                                    <div className="flex items-center gap-1">
-                                        <select className="border border-line-soft rounded px-1 py-0.5 text-[11px] outline-none w-12 bg-card text-ink" value={form.discountType} onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as any }))} disabled={isEditMode}>
-                                            <option value="flat">flat</option><option value="percent">%</option>
-                                        </select>
-                                        <input type="number" min={0} step={0.01} value={form.discountValue} onChange={(e) => setForm((p) => ({ ...p, discountValue: Number(e.target.value) }))} className="border border-line-soft rounded px-1 py-0.5 text-[11px] outline-none w-16 text-right bg-card text-ink" disabled={isEditMode} />
+                                <div className="p-2 border border-line-soft rounded-lg bg-card">
+                                    <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
+                                    <p className="text-xs text-ink-subtle mt-1">
+                                        {[form.shippingAddressLine1, form.shippingCity, form.shippingState, form.shippingCountry, form.shippingPincode].filter(Boolean).join(", ") || "Same as billing"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Receipt Details ── */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
+                            <DatePickerCalendar label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} disabled={isEditMode} horizontal />
+                            <DatePickerCalendar label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} disabled={isEditMode} horizontal />
+                            <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" disabled={isEditMode} horizontal />
+                            <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" disabled={isEditMode} horizontal />
+                        </div>
+                        {!isEditMode && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
+                                <FileUpload label={form.invoiceImage ? `Invoice: ${(form.invoiceImage as File).name}` : "Upload Invoice"} name="invoiceImage" onChange={handleFileChange} />
+                            </div>
+                        )}
+
+                        {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
+                        <div className="flex gap-3">
+                            <div ref={itemsTableRef} className="w-[65%]">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-sm font-semibold text-ink">Invoice Items</span>
+                                </div>
+                                <BusyItemsTable
+                                    columns={orderItemColumns}
+                                    rows={items}
+                                    onAdd={addItem}
+                                    onRemove={(i) => removeItem(i)}
+                                    editable={!isEditMode}
+                                    visibleRows={10}
+                                    showTotals={[
+                                        { colKey: "netAmount", value: `₹${subtotal.toFixed(2)}` },
+                                    ]}
+                                />
+                            </div>
+                            <div ref={sundryTableRef} className="w-[35%]">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-sm font-semibold text-ink">Bill Sundry</span>
+                                </div>
+                                <BusyItemsTable
+                                    columns={sundryColumns}
+                                    rows={sundryRows}
+                                    onChange={setSundryRows}
+                                    emptyRow={sundryEmptyRow}
+                                    editable={false}
+                                    visibleRows={5}
+                                    showTotals={[
+                                        {
+                                            colKey: "amount",
+                                            value: sundryTotal !== 0 ? `${sundryTotal > 0 ? "+" : "-"} ₹${Math.abs(sundryTotal).toFixed(2)}` : "0.00",
+                                        },
+                                    ]}
+                                />
+
+                                {/* Grand Total */}
+                                <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
+                                    <div className="text-right">
+                                        <span className="text-base font-bold text-blue-600">
+                                            ₹{(grandTotal + sundryTotal).toFixed(2)}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center mb-1 text-[11px] text-ink-muted">
-                                    <span>Rounding</span>
-                                    <div className="flex items-center gap-1">
-                                        <div className="flex">
-                                            <button type="button" onClick={() => setRoundingSign("+")} disabled={isEditMode} className={`px-1.5 py-0.5 border border-line-soft rounded-l text-[10px] font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-card text-ink-muted"}`}>+</button>
-                                            <button type="button" onClick={() => setRoundingSign("-")} disabled={isEditMode} className={`px-1.5 py-0.5 border border-line-soft border-l-0 rounded-r text-[10px] font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-card text-ink-muted"}`}>-</button>
+
+                                {/* Supplier Balance Summary */}
+                                {supplierLiveBalance && (() => {
+                                    const currentBal = supplierLiveBalance.amount;
+                                    const isDr = supplierLiveBalance.type === "Dr";
+                                    // Full invoice total (items + sundry) — sundry is now posted to ledger
+                                    const invoiceAmt = (grandTotal + sundryTotal) || 0;
+
+                                    // In edit mode: current balance already includes this invoice, subtract to get opening
+                                    // In create mode: current balance is the opening (invoice not saved yet)
+                                    let openBal = currentBal;
+                                    if (isEditMode) {
+                                        openBal = isDr ? currentBal + invoiceAmt : currentBal - invoiceAmt;
+                                    }
+                                    const openAbs = Math.abs(openBal);
+                                    const openType = openBal > 0 ? (isDr ? "Dr" : "Cr") : openBal < 0 ? (isDr ? "Cr" : "Dr") : isDr ? "Dr" : "Cr";
+
+                                    // Closing = opening + invoice effect
+                                    const closingRaw = isDr ? openAbs - invoiceAmt : openAbs + invoiceAmt;
+                                    const closingAbs = Math.abs(closingRaw);
+                                    const closingType = closingRaw > 0 ? (isDr ? "Dr" : "Cr") : closingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+
+                                    return (
+                                        <div className="mt-3 border border-line-soft rounded-lg overflow-hidden text-xs">
+                                            <div className="flex justify-between px-3 py-2 border-b border-line-soft bg-card-2">
+                                                <span className="font-semibold text-ink-muted">Opening Balance</span>
+                                                <span className={`font-bold ${openType === "Dr" ? "text-rose-500" : "text-emerald-500"}`}>
+                                                    ₹{openAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openType}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between px-3 py-2 border-b border-line-soft">
+                                                <span className="font-semibold text-ink-muted">Invoice Amount</span>
+                                                <span className="font-bold text-blue-500">₹{invoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between px-3 py-2 bg-card-2">
+                                                <span className="font-bold text-ink">Closing Balance</span>
+                                                <span className={`font-bold ${closingType === "Dr" ? "text-rose-500" : "text-emerald-500"}`}>
+                                                    ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <input type="number" min={0} step={0.01} value={form.roundingAdjust} onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))} className="border border-line-soft rounded px-1 py-0.5 text-[11px] outline-none w-16 text-right bg-card text-ink" placeholder="0.00" disabled={isEditMode} />
-                                    </div>
-                                </div>
-                                {isInterState ? (
-                                    gstRateBreakdown.length === 0 ? (
-                                        <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total IGST:</span><span>+₹{totalIgst.toFixed(2)}</span></div>
-                                    ) : gstRateBreakdown.map((group) => (
-                                        <div key={`igst-${group.gstRate}`} className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>IGST {group.gstRate}%:</span><span>+₹{group.igstAmount.toFixed(2)}</span></div>
-                                    ))
-                                ) : (
-                                    gstRateBreakdown.length === 0 ? (
-                                        <>
-                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total CGST:</span><span>+₹{totalCgst.toFixed(2)}</span></div>
-                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>Total SGST:</span><span>+₹{totalSgst.toFixed(2)}</span></div>
-                                        </>
-                                    ) : gstRateBreakdown.map((group) => (
-                                        <React.Fragment key={`gst-${group.gstRate}`}>
-                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>CGST {group.cgstRate}%:</span><span>+₹{group.cgstAmount.toFixed(2)}</span></div>
-                                            <div className="flex justify-between mb-1 text-emerald-400 font-semibold text-[11px]"><span>SGST {group.sgstRate}%:</span><span>+₹{group.sgstAmount.toFixed(2)}</span></div>
-                                        </React.Fragment>
-                                    ))
-                                )}
-                                <hr className="my-1.5 border-line-soft" />
-                                <div className="flex justify-between text-xs font-extrabold text-ink">
-                                    <span>Net Amount:</span><span className="text-primary font-black">₹{grandTotal.toFixed(2)}</span>
-                                </div>
+                                    );
+                                })()}
                             </div>
+                        </div>
+
+                        {/* ── Notes ── */}
+                        <div className="w-full md:w-1/2">
+                            <TextArea label="Notes" name="remarks" value={form.remarks} placeholder="Optional notes..." rows={2} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} disabled={isEditMode} />
                         </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2">
-                        <CustomButton text="Cancel" type="button" onClick={() => navigate("/invoice")} variant="secondary" />
-                        <CustomButton text={saving ? "Saving…" : (isEditMode ? "Update Bill" : "Create Bill & Update Stock")} type="submit" disabled={saving} />
+                    <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
+                        {!isEditMode && (
+                            <CustomButton text="Clear Form" type="button" variant="secondary" icon={FaUndo} onClick={handleF8} />
+                        )}
+                        <CustomButton text="Cancel" type="button" variant="secondary" onClick={() => navigate("/invoice")} />
+                        <CustomButton text={saving ? "Saving..." : (isEditMode ? "Update Invoice" : "Confirm Invoice")} icon={FaSave} type="submit" disabled={saving} variant="primary" />
                     </div>
                 </form>
             </div>

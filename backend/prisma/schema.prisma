@@ -1372,6 +1372,8 @@ model GrnInvoice {
   totalSgst            Decimal             @default(0) @db.Decimal(12, 2)
   totalIgst            Decimal             @default(0) @db.Decimal(12, 2)
   netAmount            Decimal             @default(0) @db.Decimal(12, 2)
+  openingBalance       Decimal?            @map("opening_balance") @db.Decimal(14, 2)
+  closingBalance       Decimal?            @map("closing_balance") @db.Decimal(14, 2)
   companyId            String              @map("company_id") @db.Uuid
   createdBy            String?             @map("created_by")
   createdAt            DateTime            @default(now()) @map("created_at")
