@@ -241,7 +241,7 @@ const WhatsappCreatePage: React.FC = () => {
         setSaveConfirmOpen(false);
         setTimeout(() => {
             if (!validate()) {
-                toast.error("Required fields fill pannunga — please fill all required fields.");
+                toast.error("Please fill all required fields.");
                 return;
             }
             submitForm();

@@ -408,7 +408,7 @@ const DepartmentList: React.FC = () => {
         setTimeout(() => {
             const isValid = validateForm();
             if (!isValid) {
-                toast.error("Required fields fill pannunga — please fill all required fields.");
+                toast.error("Please fill all required fields.");
                 return;
             }
             submitForm();

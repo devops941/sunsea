@@ -275,32 +275,32 @@ const AmountPayablePage: React.FC = () => {
         <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
           <FaTruck className="text-red-500 text-sm" /> Amount Payable
         </h3>
-        <span className="text-[11px] text-ink-muted">
+        <span className="text-[13px] text-ink-muted">
           As On <b className="text-ink">{displayDate(asOnDate)}</b>
           <span className="text-ink-subtle"> · </span>
           <b className="text-ink">{rows.length} supplier{rows.length === 1 ? "" : "s"}</b>
         </span>
         {refreshing && (
-          <span className="flex items-center gap-1 text-[10px] text-red-400">
+          <span className="flex items-center gap-1 text-[13px] text-red-400">
             <FaSync className="animate-spin" /> Syncing…
           </span>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
           {/* Inline row search — F3 to focus, matches Busy's Search-F3. */}
           <div className="relative">
-            <FaSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-ink-subtle" />
+            <FaSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-[13px] text-ink-subtle" />
             <input
               ref={rowSearchRef}
               type="text"
               value={rowSearch}
               onChange={(e) => setRowSearch(e.target.value)}
               placeholder="Search name/code…"
-              className="w-40 pl-6 pr-6 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+              className="w-40 pl-6 pr-6 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
             />
             {rowSearch && (
               <button
                 onClick={() => setRowSearch("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[10px]"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[13px]"
                 title="Clear"
               >
                 <FaTimes />
@@ -312,13 +312,13 @@ const AmountPayablePage: React.FC = () => {
           <div className="relative" ref={columnsMenuRef}>
             <button
               onClick={() => setShowColumnsMenu((s) => !s)}
-              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
               title="Show / hide columns"
             >
-              <FaColumns className="text-[10px]" /> Columns
+              <FaColumns className="text-[13px]" /> Columns
             </button>
             {showColumnsMenu && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-line rounded shadow-2xl z-30 py-1 text-[11px]">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-line rounded shadow-2xl z-30 py-1 text-[13px]">
                 {([
                   { key: "showType", label: "Type" },
                   { key: "showOverdueColumns", label: "Overdue / Days" },
@@ -362,21 +362,21 @@ const AmountPayablePage: React.FC = () => {
 
           <button
             onClick={() => setShowOptionsDialog(true)}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
             title="Change filters (Esc)"
           >
             Filters
           </button>
           <button onClick={handlePrint} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaPrint /> Print
           </button>
           <button onClick={exportCSV} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaDownload /> Export
           </button>
           <button onClick={refresh} disabled={refreshing}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
           </button>
         </div>
@@ -399,7 +399,7 @@ const AmountPayablePage: React.FC = () => {
               className="bg-card border border-line rounded-md overflow-hidden shadow-sm flex flex-col"
               style={{ height: "calc(100vh - 200px)" }}
             >
-              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0 flex items-center justify-between">
+              <div className="px-3 py-1 border-b border-line text-[13px] text-ink-muted shrink-0 flex items-center justify-between">
                 <span>As On : <b className="text-ink">{displayDate(asOnDate)}</b></span>
                 <span className="text-ink font-semibold">
                   {options.showOverdueOnly ? "Overdue Only" : "All Payables"}
@@ -410,19 +410,19 @@ const AmountPayablePage: React.FC = () => {
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-head border-b-2 border-line">
-                      <th className="px-3 py-1 text-[11px] font-bold text-ink border-r border-line bg-head w-[36%]">
+                      <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[36%]">
                         {options.shownBy === "code" ? "Code / Supplier" : "Supplier"}
                       </th>
                       {options.showType && (
-                        <th className="px-3 py-1 text-[11px] font-bold text-ink border-r border-line bg-head w-[14%]">Type</th>
+                        <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[14%]">Type</th>
                       )}
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Debit</th>
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Credit</th>
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Net Balance</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Debit</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Credit</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Net Balance</th>
                       {options.showOverdueColumns && (
                         <>
-                          <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[10%]">Overdue</th>
-                          <th className="px-3 py-1 text-[11px] font-bold text-right text-ink bg-head w-[8%]">Days</th>
+                          <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[10%]">Overdue</th>
+                          <th className="px-3 py-1 text-[13px] font-bold text-right text-ink bg-head w-[8%]">Days</th>
                         </>
                       )}
                     </tr>
@@ -442,10 +442,10 @@ const AmountPayablePage: React.FC = () => {
                           className="border-b border-line-soft/60 hover:bg-card-2/40 cursor-pointer"
                           title="Double-click (or Enter) to drill into supplier breakdown"
                         >
-                          <td className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 uppercase ${cls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase ${cls}`}>
                             {options.shownBy === "code" ? (
                               <>
-                                <span className="font-mono text-[10px] text-ink-subtle mr-2">{r.supplierCode}</span>
+                                <span className="font-mono text-[13px] text-ink-subtle mr-2">{r.supplierCode}</span>
                                 {r.legalName}
                               </>
                             ) : (
@@ -453,17 +453,17 @@ const AmountPayablePage: React.FC = () => {
                             )}
                           </td>
                           {options.showType && (
-                            <td className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 uppercase text-ink-muted ${cls}`}>
+                            <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase text-ink-muted ${cls}`}>
                               {r.vendorType || ""}
                             </td>
                           )}
-                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
                             {fmt(debit)}
                           </td>
-                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
                             {fmt(credit)}
                           </td>
-                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono font-semibold border-r border-line-soft/50 ${
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono font-semibold border-r border-line-soft/50 ${
                             !isHl && r.balanceAsOnDate > 0 ? "text-red-600" :
                             !isHl && r.balanceAsOnDate < 0 ? "text-emerald-600" :
                             ""
@@ -472,12 +472,12 @@ const AmountPayablePage: React.FC = () => {
                           </td>
                           {options.showOverdueColumns && (
                             <>
-                              <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${
+                              <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${
                                 !isHl && (r.overdueAmount || 0) > 0 ? "text-red-600" : ""
                               } ${cls}`}>
                                 {fmt(r.overdueAmount || 0)}
                               </td>
-                              <td className={`px-3 py-0.5 text-[11px] text-right font-mono ${
+                              <td className={`px-3 py-0.5 text-[13px] text-right font-mono ${
                                 !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
                               } ${cls}`}>
                                 {r.isOverdue && r.dueDays !== null ? r.dueDays : ""}
@@ -505,14 +505,14 @@ const AmountPayablePage: React.FC = () => {
                   </tbody>
                   <tfoot className="sticky bottom-0 z-10">
                     <tr className="bg-card-2 border-t-2 border-line">
-                      <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
+                      <td className="px-3 py-1 text-[13px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
                       {options.showType && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
-                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.debit)}</td>
-                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit)}</td>
-                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit - totals.debit)}</td>
+                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.debit)}</td>
+                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit)}</td>
+                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit - totals.debit)}</td>
                       {options.showOverdueColumns && (
                         <>
-                          <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-red-600 border-r border-line bg-card-2">{fmt(totals.overdue)}</td>
+                          <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-red-600 border-r border-line bg-card-2">{fmt(totals.overdue)}</td>
                           <td className="px-3 py-1 bg-card-2">&nbsp;</td>
                         </>
                       )}
@@ -521,7 +521,7 @@ const AmountPayablePage: React.FC = () => {
                 </table>
               </div>
 
-              <div className="px-3 py-1 text-[10px] border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0 italic text-ink-subtle">
+              <div className="px-3 py-1 text-[13px] border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0 italic text-ink-subtle">
                 <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
@@ -538,11 +538,11 @@ const AmountPayablePage: React.FC = () => {
       {showOptionsDialog && (
         <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center shrink-0">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center shrink-0">
               Amount Payable
             </div>
 
-            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[13px] items-center">
               <label className="col-span-6 text-ink-subtle font-semibold">Report Date</label>
               <div className="col-span-6">
                 <DatePickerCalendar
@@ -557,7 +557,7 @@ const AmountPayablePage: React.FC = () => {
                 <select
                   value={draftOptions.shownBy}
                   onChange={(e) => setOpt("shownBy", e.target.value as ShownBy)}
-                  className="w-full px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                  className="w-full px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                 >
                   <option value="name">Name</option>
                   <option value="code">Code</option>
@@ -591,7 +591,7 @@ const AmountPayablePage: React.FC = () => {
                             if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
                           }
                         }}
-                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                       >
                         <option value="Y">Y</option>
                         <option value="N">N</option>
@@ -602,13 +602,13 @@ const AmountPayablePage: React.FC = () => {
               })()}
             </div>
 
-            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[13px]">
               <span className="text-ink-subtle italic">
                 Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
               </span>
               <button
                 onClick={commitOptions}
-                className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                className="px-3 py-0.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
               >
                 <FaPlay className="text-[9px]" /> OK (F2)
               </button>

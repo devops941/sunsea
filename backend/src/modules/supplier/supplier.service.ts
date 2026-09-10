@@ -293,6 +293,16 @@ class SupplierService {
     const balanceAmount = Math.abs(netBalance);
     const balanceType = netBalance > 0 ? "Cr" : netBalance < 0 ? "Dr" : "";
 
+    // Check if supplier has real transactions (beyond the opening balance voucher)
+    const supplierLedger = await prisma.accountLedger.findUnique({
+      where: { supplierId: Number(id) },
+      include: { debitItems: { include: { voucher: true } }, creditItems: { include: { voucher: true } } },
+    });
+    const allJournalItems = [...(supplierLedger?.debitItems || []), ...(supplierLedger?.creditItems || [])];
+    const hasTransactions = allJournalItems.some(
+      (item: any) => item.voucher?.refDocType !== "SUPPLIER_OPENING_BALANCE"
+    );
+
     return {
       ...supplier,
       createdUserName,
@@ -302,6 +312,7 @@ class SupplierService {
       netBalance,
       balanceAmount,
       balanceType,
+      hasTransactions,
     };
   }
 
@@ -323,12 +334,18 @@ class SupplierService {
       }
     }
 
-    const { addresses, userId, materialPrices, phones, ...supplierData } = data as any;
+    const { addresses, userId, materialPrices, phones, openingBalance, openingBalanceType, ...supplierData } = data as any;
+
+    // Handle opening balance update — only if supplier has no real transactions
+    const wantsOpeningBalanceUpdate = openingBalance !== undefined || openingBalanceType !== undefined;
+    if (wantsOpeningBalanceUpdate && supplier.hasTransactions) {
+      throw new ApiError(400, "Cannot update opening balance — supplier has existing transactions");
+    }
 
     // We no longer need to map to a fallback user because updatedBy is a plain string
     let updatedByUserId = userId;
 
-    return prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
       if (addresses !== undefined) {
         // Delete all old addresses
         await tx.supplierAddress.deleteMany({
@@ -354,6 +371,10 @@ class SupplierService {
       const updateData: Prisma.SupplierUpdateInput = {
         ...supplierData,
         ...(mobileData !== undefined && { mobile: mobileData as any }),
+        ...(wantsOpeningBalanceUpdate && {
+          openingBalance: openingBalance ?? Number(supplier.openingBalance ?? 0),
+          openingBalanceType: openingBalanceType ?? supplier.openingBalanceType ?? "CREDIT",
+        }),
         updatedBy: updatedByUserId ? updatedByUserId : undefined,
       };
 
@@ -366,6 +387,27 @@ class SupplierService {
         },
       });
     });
+
+    // Re-post opening balance voucher if opening balance was changed
+    if (wantsOpeningBalanceUpdate) {
+      try {
+        await prisma.voucher.deleteMany({
+          where: { refDocType: "SUPPLIER_OPENING_BALANCE", refDocId: String(id) },
+        });
+      } catch { /* no existing voucher — that's fine */ }
+
+      const newBalance = openingBalance ?? Number(supplier.openingBalance ?? 0);
+      if (newBalance > 0) {
+        const newType = ((openingBalanceType ?? supplier.openingBalanceType ?? "CREDIT") as string).toUpperCase() as "DEBIT" | "CREDIT";
+        await voucherPostingService.postSupplierOpeningBalanceVoucher(
+          { id: updated.id, supplierCode: updated.supplierCode, legalName: updated.legalName },
+          newBalance,
+          newType
+        );
+      }
+    }
+
+    return updated;
   }
 
   async deleteSupplier(

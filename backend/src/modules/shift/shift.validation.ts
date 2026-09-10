@@ -27,8 +27,6 @@ export const createShiftSchema = z.object({
 
     breakDuration: numericStringOrNumber.optional().nullable(),
 
-    gracePeriod: numericStringOrNumber.optional().nullable(),
-
     isActive: z.boolean().optional(),
   }),
 });
@@ -50,8 +48,6 @@ export const updateShiftSchema = z.object({
       .optional(),
 
     breakDuration: numericStringOrNumber.optional().nullable(),
-
-    gracePeriod: numericStringOrNumber.optional().nullable(),
 
     isActive: z.boolean().optional(),
   }),

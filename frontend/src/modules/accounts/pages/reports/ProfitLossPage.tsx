@@ -451,7 +451,7 @@ const ProfitLossPage: React.FC = () => {
           <FaChartLine className="text-red-500 text-sm" /> Profit &amp; Loss A/c
         </h3>
         {view && (
-          <span className="text-[11px] text-ink-muted">
+          <span className="text-[13px] text-ink-muted">
             For the period ending <b className="text-ink">{displayDate(endDate)}</b>
             {options.scaleFactor > 1 && (
               <span className="ml-2 text-ink-subtle">· Scale × {options.scaleFactor.toLocaleString("en-IN")}</span>
@@ -459,28 +459,28 @@ const ProfitLossPage: React.FC = () => {
           </span>
         )}
         {refreshing && (
-          <span className="flex items-center gap-1 text-[10px] text-red-400">
+          <span className="flex items-center gap-1 text-[13px] text-red-400">
             <FaSync className="animate-spin" /> Syncing…
           </span>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
           <button
             onClick={() => setShowOptionsDialog(true)}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
             title="Change filters (Esc)"
           >
             Filters
           </button>
           <button onClick={handlePrint} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaPrint /> Print
           </button>
           <button onClick={exportCSV} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaDownload /> Export
           </button>
           <button onClick={refresh} disabled={refreshing}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
           </button>
         </div>
@@ -507,7 +507,7 @@ const ProfitLossPage: React.FC = () => {
               style={{ height: "calc(100vh - 200px)" }}
             >
               {/* "For the period ending" strip */}
-              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0">
+              <div className="px-3 py-1 border-b border-line text-[13px] text-ink-muted shrink-0">
                 For the period ending <b className="text-ink">{displayDate(endDate)}</b>
               </div>
 
@@ -515,10 +515,10 @@ const ProfitLossPage: React.FC = () => {
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-head border-b-2 border-line">
-                      <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>D E B I T &nbsp;(Rs.)</th>
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
-                      <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>C R E D I T &nbsp;(Rs.)</th>
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                      <th className="px-3 py-1 text-[13px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>D E B I T &nbsp;(Rs.)</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                      <th className="px-3 py-1 text-[13px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>C R E D I T &nbsp;(Rs.)</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -576,14 +576,14 @@ const ProfitLossPage: React.FC = () => {
                                   onClick={onLClick}
                                   onDoubleClick={onLDbl}
                                   title={canDrill(L) ? "Double-click (or Enter) to drill into ledger" : undefined}
-                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${lCursor} ${rowClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
+                                  className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 ${lCursor} ${rowClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
                                 >
                                   {L.name}
                                 </td>
                                 <td
                                   onClick={onLClick}
                                   onDoubleClick={onLDbl}
-                                  className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${lCursor} ${amtClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
+                                  className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${lCursor} ${amtClassL(L)} ${lHl ? "bg-black text-white" : ""}`}
                                 >
                                   {L.balance !== 0 && fmt(Math.abs(L.balance), options.scaleFactor)}
                                 </td>
@@ -602,14 +602,14 @@ const ProfitLossPage: React.FC = () => {
                                   onClick={onRClick}
                                   onDoubleClick={onRDbl}
                                   title={canDrill(R) ? "Double-click (or Enter) to drill into ledger" : undefined}
-                                  className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 ${rCursor} ${rowClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
+                                  className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 ${rCursor} ${rowClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
                                 >
                                   {R.name}
                                 </td>
                                 <td
                                   onClick={onRClick}
                                   onDoubleClick={onRDbl}
-                                  className={`px-3 py-0.5 text-[11px] text-right font-mono ${rCursor} ${amtClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
+                                  className={`px-3 py-0.5 text-[13px] text-right font-mono ${rCursor} ${amtClassR(R)} ${rHl ? "bg-black text-white" : ""}`}
                                 >
                                   {R.balance !== 0 && fmt(Math.abs(R.balance), options.scaleFactor)}
                                 </td>
@@ -642,7 +642,7 @@ const ProfitLossPage: React.FC = () => {
               </div>
 
               {/* Footer strip */}
-              <div className="px-3 py-1 text-[10px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
+              <div className="px-3 py-1 text-[13px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
                 <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓ ← →</kbd> nav</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill into ledger</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Home / End</kbd> jump</span>
@@ -664,11 +664,11 @@ const ProfitLossPage: React.FC = () => {
       {showOptionsDialog && (
         <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
               <span className="flex-1 text-center">Profit &amp; Loss A/c</span>
             </div>
 
-            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[13px] items-center">
               <label className="col-span-6 text-ink-subtle font-semibold">Starting Date</label>
               <div className="col-span-6">
                 <DatePickerCalendar
@@ -713,7 +713,7 @@ const ProfitLossPage: React.FC = () => {
                             if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
                           }
                         }}
-                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                       >
                         <option value="Y">Y</option>
                         <option value="N">N</option>
@@ -734,7 +734,7 @@ const ProfitLossPage: React.FC = () => {
                       commitOptions();
                     }
                   }}
-                  className="w-[110px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                  className="w-[110px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                 >
                   <option value="1">1</option>
                   <option value="10">10</option>
@@ -747,14 +747,14 @@ const ProfitLossPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[13px]">
               <span className="text-ink-subtle italic">
                 Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={commitOptions}
-                  className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                  className="px-3 py-0.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
                 >
                   <FaPlay className="text-[9px]" /> OK (F2)
                 </button>

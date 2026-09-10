@@ -248,7 +248,7 @@ export const SalesReturnCreatePage: React.FC = () => {
         label: name,
         selectedLabel: `${name}${grade !== "—" ? ` · ${grade}` : ""}${balLabel ? ` · ${balLabel}` : ""}`,
         info: (
-          <div className="flex items-center gap-3 text-[11px]">
+          <div className="flex items-center gap-3 text-[13px]">
             {group !== "—" && <span className="text-ink-subtle">{group}</span>}
             {grade !== "—" && <span className="text-ink-subtle">{grade}</span>}
             {balLabel && (
@@ -266,7 +266,7 @@ export const SalesReturnCreatePage: React.FC = () => {
       value: String(p.productId),
       label: p.description,
       info: (
-        <span className="text-[11px] text-ink-subtle font-mono">
+        <span className="text-[13px] text-ink-subtle font-mono">
           ₹{Number(p.unitPrice).toFixed(2)}
         </span>
       ),
@@ -612,9 +612,9 @@ export const SalesReturnCreatePage: React.FC = () => {
           <div className="ml-6 rounded-md border border-line-soft overflow-hidden">
             <div className="grid grid-cols-[auto_1fr_auto_80px] gap-2 px-3 py-1.5 bg-card-2 border-b border-line-soft">
               <div className="w-4" />
-              <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
-              <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
-              <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
+              <span className="text-[13px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+              <span className="text-[13px] font-bold text-ink-subtle uppercase tracking-wider text-center w-12">Per Unit</span>
+              <span className="text-[13px] font-bold text-ink-subtle uppercase tracking-wider text-center">Qty</span>
             </div>
             {row.components.map((comp, compIdx) => (
               <div
@@ -640,7 +640,7 @@ export const SalesReturnCreatePage: React.FC = () => {
                 <span className={`text-xs ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
                   {comp.productName}
                 </span>
-                <span className="text-[11px] text-ink-subtle text-center w-12">x{comp.perUnit}</span>
+                <span className="text-[13px] text-ink-subtle text-center w-12">x{comp.perUnit}</span>
                 <span className="text-xs text-ink font-medium text-center">
                   {comp.included ? comp.perUnit * row.quantity : 0}
                 </span>
@@ -859,13 +859,13 @@ export const SalesReturnCreatePage: React.FC = () => {
                         {customerHeaderInfo.name}
                       </span>
                       {customerHeaderInfo.group && (
-                        <span className="text-ink-subtle text-[11px]">{customerHeaderInfo.group}</span>
+                        <span className="text-ink-subtle text-[13px]">{customerHeaderInfo.group}</span>
                       )}
                       {customerHeaderInfo.grade && (
-                        <span className="text-ink-subtle text-[11px]">{customerHeaderInfo.grade}</span>
+                        <span className="text-ink-subtle text-[13px]">{customerHeaderInfo.grade}</span>
                       )}
                       {customerHeaderInfo.balLabel && (
-                        <span className={`text-[11px] font-semibold ${customerHeaderInfo.isDr ? "text-rose-500" : "text-emerald-500"}`}>
+                        <span className={`text-[13px] font-semibold ${customerHeaderInfo.isDr ? "text-rose-500" : "text-emerald-500"}`}>
                           {customerHeaderInfo.balLabel}
                         </span>
                       )}

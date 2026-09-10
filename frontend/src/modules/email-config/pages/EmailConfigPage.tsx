@@ -232,7 +232,7 @@ const EmailConfigPage: React.FC = () => {
     setSaveConfirmOpen(false);
     setTimeout(() => {
       if (!validateConfig()) {
-        toast.error("Required fields fill pannunga — please fill all required fields.");
+        toast.error("please fill all required fields.");
         return;
       }
       handleSaveConfig();

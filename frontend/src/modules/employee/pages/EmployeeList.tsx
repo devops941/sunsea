@@ -27,6 +27,7 @@ const SORT_STORAGE_KEY = "sunsea_employee_sort_name";
 type SortOrder = "default" | "asc" | "desc";
 
 const STATUS_OPTIONS = [
+  { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
   { value: "resigned", label: "Resigned" },
@@ -99,7 +100,7 @@ const Employeelist: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchEmployeesForExport = useCallback(async () => {
-    const res = await employeeService.fetchAll({ limit: 100000 });
+    const res = await employeeService.fetchAll({ limit: 100000, includeDrafts: true });
     return Array.isArray(res) ? res : (res?.employees || res?.data || []);
   }, []);
 
@@ -120,7 +121,7 @@ const Employeelist: React.FC = () => {
 
   // Fetch employees (cached)
   const fetcher = useCallback(async (_signal: AbortSignal) => {
-    const res = await employeeService.fetchAll({ limit: 10000 });
+    const res = await employeeService.fetchAll({ limit: 10000, includeDrafts: true });
     const list = Array.isArray(res) ? res : (res.employees || res.data || []);
     return { data: list, total: res.total || list.length };
   }, []);
@@ -322,7 +323,7 @@ const Employeelist: React.FC = () => {
       align: "center",
       render: (emp) => {
         const statusMap: Record<string, string> = {
-          active: "ACTIVE", inactive: "INACTIVE", resigned: "RESIGNED", terminated: "TERMINATED",
+          draft: "DRAFT", active: "ACTIVE", inactive: "INACTIVE", resigned: "RESIGNED", terminated: "TERMINATED",
         };
         return <StatusBadge status={statusMap[emp.status] ?? emp.status?.toUpperCase() ?? "INACTIVE"} />;
       },

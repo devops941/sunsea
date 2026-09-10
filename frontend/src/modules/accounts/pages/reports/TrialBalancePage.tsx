@@ -372,34 +372,34 @@ const TrialBalancePage: React.FC = () => {
         <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
           <FaBalanceScale className="text-red-500 text-sm" /> Trial Balance
         </h3>
-        <span className="text-[11px] text-ink-muted">
+        <span className="text-[13px] text-ink-muted">
           As On <b className="text-ink">{displayDate(asOnDate)}</b>
           <span className="text-ink-subtle"> · </span>
           <b className="text-ink">{scopeLabel}</b>
         </span>
         {refreshing && (
-          <span className="flex items-center gap-1 text-[10px] text-red-400">
+          <span className="flex items-center gap-1 text-[13px] text-red-400">
             <FaSync className="animate-spin" /> Syncing…
           </span>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
           <button
             onClick={() => setShowOptionsDialog(true)}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
             title="Change filters (Esc)"
           >
             Filters
           </button>
           <button onClick={handlePrint} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaPrint /> Print
           </button>
           <button onClick={exportCSV} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaDownload /> Export
           </button>
           <button onClick={refresh} disabled={refreshing}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
           </button>
         </div>
@@ -426,7 +426,7 @@ const TrialBalancePage: React.FC = () => {
               style={{ height: "calc(100vh - 200px)" }}
             >
               {/* "As On: date" + scope strip */}
-              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0 flex items-center justify-between">
+              <div className="px-3 py-1 border-b border-line text-[13px] text-ink-muted shrink-0 flex items-center justify-between">
                 <span>As On : <b className="text-ink">{displayDate(asOnDate)}</b></span>
                 <span className="text-ink font-semibold">{scopeLabel}</span>
               </div>
@@ -435,13 +435,13 @@ const TrialBalancePage: React.FC = () => {
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-head border-b-2 border-line">
-                      <th className="px-3 py-1 text-[11px] font-bold text-ink border-r border-line bg-head w-[36%]">Account</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[36%]">Account</th>
                       {options.showParentGroup && (
-                        <th className="px-3 py-1 text-[11px] font-bold text-ink border-r border-line bg-head w-[24%]">Parent Group</th>
+                        <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[24%]">Parent Group</th>
                       )}
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Debit Bal.</th>
-                      <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Credit Bal.</th>
-                      <th className="px-3 py-1 text-[11px] font-bold text-ink bg-head">Notes</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Debit Bal.</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Credit Bal.</th>
+                      <th className="px-3 py-1 text-[13px] font-bold text-ink bg-head">Notes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -459,21 +459,21 @@ const TrialBalancePage: React.FC = () => {
                           className="border-b border-line-soft/60 hover:bg-card-2/40 cursor-pointer"
                           title="Double-click (or Enter) to drill into ledger statement"
                         >
-                          <td className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 uppercase ${rowCls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase ${rowCls}`}>
                             {options.accountBy === "code" ? r.code : r.name}
                           </td>
                           {options.showParentGroup && (
-                            <td className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 uppercase text-ink-muted ${rowCls}`}>
+                            <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase text-ink-muted ${rowCls}`}>
                               {r.group}
                             </td>
                           )}
-                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${rowCls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${rowCls}`}>
                             {fmt(r.debitBalance)}
                           </td>
-                          <td className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 ${rowCls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${rowCls}`}>
                             {fmt(r.creditBalance)}
                           </td>
-                          <td className={`px-3 py-0.5 text-[11px] text-ink-subtle ${rowCls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] text-ink-subtle ${rowCls}`}>
                             &nbsp;
                           </td>
                         </tr>
@@ -494,14 +494,14 @@ const TrialBalancePage: React.FC = () => {
                   </tbody>
                   <tfoot className="sticky bottom-0 z-10">
                     <tr className="bg-card-2 border-t-2 border-line">
-                      <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
+                      <td className="px-3 py-1 text-[13px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
                       {options.showParentGroup && (
                         <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>
                       )}
-                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">
+                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">
                         {fmt(totals.dr)}
                       </td>
-                      <td className="px-3 py-1 text-[12px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">
+                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">
                         {fmt(totals.cr)}
                       </td>
                       <td className="px-3 py-1 bg-card-2">&nbsp;</td>
@@ -511,7 +511,7 @@ const TrialBalancePage: React.FC = () => {
               </div>
 
               {/* Difference + keyboard hints strip */}
-              <div className="px-3 py-1 text-[10px] border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
+              <div className="px-3 py-1 text-[13px] border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
                 {Math.abs(totals.diff) > 0.01 ? (
                   <span className="text-red-600 font-semibold">
                     Difference in Trial Balance: ₹{fmt(Math.abs(totals.diff))} {totals.diff > 0 ? "Dr" : "Cr"}
@@ -534,7 +534,7 @@ const TrialBalancePage: React.FC = () => {
       {showModeDialog && (
         <div className="fixed top-[100px] left-1/2 -translate-x-1/2 z-30 w-[520px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden">
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center">
               Trial Balance
             </div>
             <div className="p-5">
@@ -566,11 +566,11 @@ const TrialBalancePage: React.FC = () => {
                     <div className={`flex items-center gap-1.5 text-xs font-bold ${modeHlIdx === idx ? "text-red-300" : "text-ink"}`}>
                       {m.icon} {m.label}
                     </div>
-                    <div className="text-[10px] text-ink-subtle mt-1">{m.desc}</div>
+                    <div className="text-[13px] text-ink-subtle mt-1">{m.desc}</div>
                   </button>
                 ))}
               </div>
-              <div className="text-center text-[10px] text-ink-subtle italic pt-3">
+              <div className="text-center text-[13px] text-ink-subtle italic pt-3">
                 <kbd className="px-1 border border-line rounded bg-card">← →</kbd> select ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> back
@@ -588,19 +588,19 @@ const TrialBalancePage: React.FC = () => {
       {showOptionsDialog && (
         <div className="fixed top-[80px] left-4 z-30 w-[460px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full flex flex-col overflow-visible">
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
               <span className="flex-1 text-center">
                 Trial Balance — {viewMode === "all" ? "All Accounts" : viewMode === "group" ? "Group of Accounts" : "Selected Accounts"}
               </span>
               <button
                 onClick={() => { setShowOptionsDialog(false); setShowModeDialog(true); }}
-                className="text-white/80 hover:text-white text-[10px] px-1.5 py-0.5 rounded border border-white/30"
+                className="text-white/80 hover:text-white text-[13px] px-1.5 py-0.5 rounded border border-white/30"
               >
                 ← Back
               </button>
             </div>
 
-            <div className="px-3 py-2 overflow-visible grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+            <div className="px-3 py-2 overflow-visible grid grid-cols-12 gap-x-2 gap-y-1 text-[13px] items-center">
               {/* Group picker (only for group mode) */}
               {viewMode === "group" && (
                 <>
@@ -651,7 +651,7 @@ const TrialBalancePage: React.FC = () => {
                             (e.target as HTMLInputElement).blur();
                           }
                         }}
-                        className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                        className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                       />
                       {groupPickerOpen && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-line rounded shadow-2xl max-h-[220px] overflow-auto z-[9999]">
@@ -659,7 +659,7 @@ const TrialBalancePage: React.FC = () => {
                             const q = groupPickerQuery.trim().toLowerCase();
                             const list = groupList.filter((g) => !q || g.toLowerCase().includes(q));
                             if (list.length === 0) return (
-                              <div className="px-2 py-3 text-center text-[10px] text-ink-subtle italic">No groups</div>
+                              <div className="px-2 py-3 text-center text-[13px] text-ink-subtle italic">No groups</div>
                             );
                             return list.map((g, idx) => {
                               const isHl = idx === Math.min(Math.max(groupPickerHlIdx, 0), list.length - 1);
@@ -675,7 +675,7 @@ const TrialBalancePage: React.FC = () => {
                                     setGroupPickerQuery("");
                                   }}
                                   onMouseEnter={() => setGroupPickerHlIdx(idx)}
-                                  className={`w-full text-left px-2 py-1 text-[11px] uppercase font-semibold border-b border-line-soft last:border-b-0 ${
+                                  className={`w-full text-left px-2 py-1 text-[13px] uppercase font-semibold border-b border-line-soft last:border-b-0 ${
                                     isHl
                                       ? "bg-red-500/20 text-red-300"
                                       : draftGroup === g
@@ -711,19 +711,19 @@ const TrialBalancePage: React.FC = () => {
                             if (n.has(l.id)) n.delete(l.id); else n.add(l.id);
                             return n;
                           })}
-                          className={`w-full flex items-center gap-2 px-2 py-0.5 text-left text-[11px] border-b border-line-soft/50 last:border-b-0 ${
+                          className={`w-full flex items-center gap-2 px-2 py-0.5 text-left text-[13px] border-b border-line-soft/50 last:border-b-0 ${
                             on ? "bg-red-500/10 text-red-400" : "hover:bg-card-2 text-ink-muted"
                           }`}
                         >
                           <span className="w-3 text-center">{on ? "✓" : ""}</span>
-                          <span className="font-mono text-[10px] text-ink-subtle w-16">{l.code}</span>
+                          <span className="font-mono text-[13px] text-ink-subtle w-16">{l.code}</span>
                           <span className="uppercase font-semibold flex-1 truncate">{l.name}</span>
-                          <span className="text-[10px] text-ink-subtle">{l.group}</span>
+                          <span className="text-[13px] text-ink-subtle">{l.group}</span>
                         </button>
                       );
                     })}
                   </div>
-                  <div className="col-span-12 text-[10px] text-ink-subtle">
+                  <div className="col-span-12 text-[13px] text-ink-subtle">
                     {draftLedgerIds.size} selected
                   </div>
                 </>
@@ -745,7 +745,7 @@ const TrialBalancePage: React.FC = () => {
                 <select
                   value={draftOptions.accountBy}
                   onChange={(e) => setOpt("accountBy", e.target.value as AccountBy)}
-                  className="w-full px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                  className="w-full px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                 >
                   <option value="name">Name</option>
                   <option value="code">Code</option>
@@ -778,7 +778,7 @@ const TrialBalancePage: React.FC = () => {
                             if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
                           }
                         }}
-                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                       >
                         <option value="Y">Y</option>
                         <option value="N">N</option>
@@ -789,13 +789,13 @@ const TrialBalancePage: React.FC = () => {
               })()}
             </div>
 
-            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[13px]">
               <span className="text-ink-subtle italic">
                 Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
               </span>
               <button
                 onClick={commitOptions}
-                className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                className="px-3 py-0.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
               >
                 <FaPlay className="text-[9px]" /> OK (F2)
               </button>

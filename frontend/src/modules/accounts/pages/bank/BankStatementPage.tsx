@@ -322,10 +322,10 @@ const BankStatementPage: React.FC = () => {
       <div data-escape-guarded className="p-3">
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
-            <div className="bg-blue-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+            <div className="bg-blue-600/90 text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
               Bank / Cash Statement Filter
             </div>
-            <div className="p-4 space-y-2.5 text-[11px]">
+            <div className="p-4 space-y-2.5 text-[13px]">
               <FilterRow label="Starting Date">
                 <DatePickerCalendar
                   name="startDate"
@@ -365,20 +365,20 @@ const BankStatementPage: React.FC = () => {
                     setApplied(pending);
                     setPanelOpen(false);
                   }}
-                  className="px-6 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-[11px] transition cursor-pointer"
+                  className="px-6 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-[13px] transition cursor-pointer"
                 >
                   OK (F2)
                 </button>
               </div>
-              <div className="text-center text-[10px] text-ink-subtle italic pt-1">
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">Esc</kbd> to quit ·
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">F2</kbd> to submit
+              <div className="text-center text-[13px] text-ink-subtle italic pt-1">
+                <kbd className="px-1 border border-line rounded bg-card text-[13px]">Esc</kbd> to quit ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[13px]">F2</kbd> to submit
               </div>
               <div className="text-center pt-1">
                 <button
                   type="button"
                   onClick={() => navigate("/accounts/bank-accounts")}
-                  className="text-[10px] text-ink-subtle hover:text-blue-600 underline"
+                  className="text-[13px] text-ink-subtle hover:text-blue-600 underline"
                 >
                   ← Back to Bank & Cash Accounts
                 </button>
@@ -399,13 +399,13 @@ const BankStatementPage: React.FC = () => {
           <FaUniversity className="text-blue-600 text-sm" />
           {data?.ledger?.name || "Bank Statement"}
           {data?.ledger && (
-            <span className="text-[10px] uppercase tracking-wide font-mono text-ink-subtle">
+            <span className="text-[13px] uppercase tracking-wide font-mono text-ink-subtle">
               · {data.ledger.code} · {data.ledger.group}
             </span>
           )}
-          {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
+          {refreshing && <FaSync className="animate-spin text-blue-600 text-[13px]" />}
         </h2>
-        <span className="text-[10px] text-ink-subtle italic">
+        <span className="text-[13px] text-ink-subtle italic">
           {applied.startDate || applied.endDate ? (
             <>
               From <b className="text-ink">{formatDateDMY(applied.startDate) || "…"}</b> to{" "}
@@ -425,7 +425,7 @@ const BankStatementPage: React.FC = () => {
             className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line cursor-pointer"
             title="Change filters"
           >
-            <FaFilter className="text-[10px]" /> Change Filters
+            <FaFilter className="text-[13px]" /> Change Filters
           </button>
           <button
             onClick={refresh}
@@ -438,7 +438,7 @@ const BankStatementPage: React.FC = () => {
             className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line cursor-pointer"
             title="Print current filtered view"
           >
-            <FaPrint className="text-[10px]" /> Print
+            <FaPrint className="text-[13px]" /> Print
           </button>
           <ExportCSVButton
             data={csvData}
@@ -450,7 +450,7 @@ const BankStatementPage: React.FC = () => {
             onClick={() => navigate("/accounts/bank-accounts")}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line cursor-pointer"
           >
-            <FaArrowLeft className="text-[10px]" /> Back
+            <FaArrowLeft className="text-[13px]" /> Back
           </button>
         </div>
       </div>
@@ -461,28 +461,28 @@ const BankStatementPage: React.FC = () => {
           {/* LEFT: table title + transactions count */}
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-semibold text-ink">Transaction Statement</h2>
-            <span className="text-[11px] text-ink-subtle font-mono">
+            <span className="text-[13px] text-ink-subtle font-mono">
               · {data?.entries.length || 0} entries
             </span>
           </div>
           {/* RIGHT: opening + closing balances inline */}
           {data && (
-            <div className="flex items-center gap-4 text-[11px]">
+            <div className="flex items-center gap-4 text-[13px]">
               <span className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Opening</span>
+                <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Opening</span>
                 <span className=" font-bold text-ink">
                   ₹{formatAmount(Math.abs(data.openingBalance))}
-                  <span className="ml-1 text-[10px] text-ink-subtle">
+                  <span className="ml-1 text-[13px] text-ink-subtle">
                     {data.openingBalance >= 0 ? "Dr" : "Cr"}
                   </span>
                 </span>
               </span>
               <span className="text-ink-subtle">|</span>
               <span className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Closing</span>
+                <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Closing</span>
                 <span className={` font-bold ${data.closingBalance >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                   ₹{formatAmount(Math.abs(data.closingBalance))}
-                  <span className="ml-1 text-[10px]">
+                  <span className="ml-1 text-[13px]">
                     {data.closingBalance >= 0 ? "Dr" : "Cr"}
                   </span>
                 </span>
@@ -494,7 +494,7 @@ const BankStatementPage: React.FC = () => {
         {!data && loading ? (
           <div className="p-8 text-center text-xs text-ink-subtle">
             <span className="inline-flex items-center gap-2">
-              <FaSync className="animate-spin text-blue-600 text-[10px]" />
+              <FaSync className="animate-spin text-blue-600 text-[13px]" />
               Loading statement…
             </span>
           </div>
@@ -503,7 +503,7 @@ const BankStatementPage: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-ink-muted border-collapse">
-              <thead className="bg-head text-ink text-[10px] uppercase font-bold tracking-wide border-b border-line">
+              <thead className="bg-head text-ink text-[13px] uppercase font-bold tracking-wide border-b border-line">
                 <tr>
                   <th className="px-3 py-1.5 text-xs">Date</th>
                   <th className="px-3 py-1.5 text-xs">Voucher No</th>
@@ -526,7 +526,7 @@ const BankStatementPage: React.FC = () => {
                     </td>
                     {applied.showType && (
                       <td className="px-3 py-1.5 text-xs">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        <span className={`px-1.5 py-0.5 rounded text-[13px] font-bold uppercase ${
                           entry.voucherType === "RECEIPT" ? "bg-emerald-500/10 text-emerald-500" :
                           entry.voucherType === "PAYMENT" ? "bg-red-500/10 text-red-500" :
                           entry.voucherType === "CONTRA" ? "bg-purple-500/10 text-purple-500" :
@@ -573,7 +573,7 @@ const BankStatementPage: React.FC = () => {
                             running balance means the ledger sits on Cr (overdraft /
                             cash shortage). Show "Cr" so the sign matches accounting
                             convention. */}
-                        {entry.runningBalance < 0 && <span className="text-[10px] text-red-500 ml-1">Cr</span>}
+                        {entry.runningBalance < 0 && <span className="text-[13px] text-red-500 ml-1">Cr</span>}
                       </td>
                     )}
                   </tr>
@@ -606,7 +606,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       <button
         type="button"
         onClick={() => onChange(true)}
-        className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
+        className={`px-3 py-0.5 rounded text-[13px] font-mono font-bold border cursor-pointer ${
           value
             ? "bg-blue-600 text-white border-blue-600"
             : "bg-card text-ink-muted border-line hover:bg-card-2"
@@ -617,7 +617,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       <button
         type="button"
         onClick={() => onChange(false)}
-        className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
+        className={`px-3 py-0.5 rounded text-[13px] font-mono font-bold border cursor-pointer ${
           !value
             ? "bg-card-2 text-ink border-line"
             : "bg-card text-ink-muted border-line hover:bg-card-2"

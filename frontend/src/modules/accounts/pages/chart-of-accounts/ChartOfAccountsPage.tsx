@@ -198,7 +198,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                 onChange={(e) => setDraftSearchTerm(e.target.value)}
                 placeholder="Code / name / group..."
               />
-              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[10px]" />
+              <FaSearch className="absolute left-2.5 top-2.5 text-ink-subtle text-[13px]" />
             </div>
           </div>
 
@@ -254,7 +254,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               onClick={() => setShowModal(true)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-semibold cursor-pointer"
             >
-              <FaPlus className="text-[10px]" /> New Ledger
+              <FaPlus className="text-[13px]" /> New Ledger
             </button>
           </div>
         </div>
@@ -268,9 +268,9 @@ export const ChartOfAccountsPage: React.FC = () => {
           <div className="px-3 py-1.5 border-b border-line bg-card-2 flex items-center justify-between gap-2 shrink-0">
             <h2 className="text-xs font-semibold text-ink flex items-center gap-1.5">
               <FaSitemap className="text-slate-500 text-xs" /> Chart of Accounts
-              {refreshing && <FaSync className="animate-spin text-slate-500 text-[10px]" />}
+              {refreshing && <FaSync className="animate-spin text-slate-500 text-[13px]" />}
             </h2>
-            <span className="text-[11px] text-ink-subtle font-mono">
+            <span className="text-[13px] text-ink-subtle font-mono">
               Total: {filteredLedgers.length}
             </span>
           </div>
@@ -279,7 +279,7 @@ export const ChartOfAccountsPage: React.FC = () => {
             <div className="p-8 text-center text-xs text-ink-subtle flex-1">
               {loading ? (
                 <span className="inline-flex items-center gap-2">
-                  <FaSync className="animate-spin text-slate-500 text-[10px]" />
+                  <FaSync className="animate-spin text-slate-500 text-[13px]" />
                   Loading chart of accounts…
                 </span>
               ) : (
@@ -288,9 +288,9 @@ export const ChartOfAccountsPage: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-auto flex-1">
-              <table className="w-full text-left text-[11px] text-ink-muted border-collapse">
+              <table className="w-full text-left text-[13px] text-ink-muted border-collapse">
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-card-2 text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                  <tr className="bg-card-2 text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
                     <th className="px-2 py-1.5 border-r border-line w-10 text-center">#</th>
                     <th className="px-2 py-1.5 border-r border-line w-28">Code</th>
                     <th className="px-2 py-1.5 border-r border-line">Account Name</th>
@@ -315,7 +315,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                               : "bg-card-2/20 hover:bg-card-2/70"
                         }`}
                       >
-                        <td className="px-2 py-1 border-r border-line-soft text-center font-mono text-[11px] text-ink-subtle">
+                        <td className="px-2 py-1 border-r border-line-soft text-center font-mono text-[13px] text-ink-subtle">
                           {rowIdx + 1}
                         </td>
                         <td className="px-2 py-1 border-r border-line-soft font-mono font-bold text-ink whitespace-nowrap">
@@ -325,35 +325,35 @@ export const ChartOfAccountsPage: React.FC = () => {
                           {item.name}
                         </td>
                         <td className="px-2 py-1 border-r border-line-soft text-center">
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${getTypeBadgeClass(item.type)}`}>
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[13px] font-bold border ${getTypeBadgeClass(item.type)}`}>
                             {item.type}
                           </span>
                         </td>
                         <td className="px-2 py-1 border-r border-line-soft">
-                          <span className="flex items-center gap-1 text-ink-muted text-[11px]">
+                          <span className="flex items-center gap-1 text-ink-muted text-[13px]">
                             <FaFolder className="text-slate-500 text-[9px] shrink-0" /> {item.group}
                           </span>
                         </td>
                         <td className="px-2 py-1 border-r border-line-soft">
                           {item.customer ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            <span className="px-1.5 py-0.5 rounded text-[13px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                               Customer: {item.customer.firmName} ({item.customer.customerCode})
                             </span>
                           ) : item.supplier ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                            <span className="px-1.5 py-0.5 rounded text-[13px] bg-amber-500/10 text-amber-600 border border-amber-500/20">
                               Supplier: {item.supplier.legalName} ({item.supplier.supplierCode})
                             </span>
                           ) : (
-                            <span className="text-[11px] text-ink-subtle italic">General System Ledger</span>
+                            <span className="text-[13px] text-ink-subtle italic">General System Ledger</span>
                           )}
                         </td>
                         <td className="px-2 py-1 text-center">
                           {item.isActive ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                               <FaCheckCircle className="text-[9px]" /> Active
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-ink-subtle bg-card-2 px-1.5 py-0.5 rounded border border-line">
+                            <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink-subtle bg-card-2 px-1.5 py-0.5 rounded border border-line">
                               <FaTimesCircle className="text-[9px]" /> Inactive
                             </span>
                           )}
@@ -379,7 +379,7 @@ export const ChartOfAccountsPage: React.FC = () => {
           )}
 
           {/* Busy-style status bar */}
-          <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[10px] font-mono text-ink-subtle shrink-0">
+          <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[13px] font-mono text-ink-subtle shrink-0">
             <div className="flex gap-4">
               <span>
                 Entry No: <b className="text-ink">{filteredLedgers.length > 0 ? 1 : 0} / {filteredLedgers.length}</b>
@@ -404,37 +404,37 @@ export const ChartOfAccountsPage: React.FC = () => {
       {/* Right sidebar — Summary. Amounts render on their own row so
          crores-scale values never squeeze the label or overflow the card. */}
       <aside className="w-[220px] shrink-0 bg-card border border-line rounded-md shadow-sm overflow-hidden self-start">
-        <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[11px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
+        <div className="px-3 py-1.5 bg-card-2 border-b border-line text-[13px] font-bold uppercase tracking-wide text-ink flex items-center gap-1.5">
           <FaSitemap className="text-slate-500 text-xs" /> Summary
         </div>
         <div className="divide-y divide-line-soft">
           <div className="px-3 py-2 bg-slate-500/5">
-            <div className="text-[11px] font-semibold text-ink-muted mb-1">Total Ledgers</div>
+            <div className="text-[13px] font-semibold text-ink-muted mb-1">Total Ledgers</div>
             <div className="text-sm font-mono font-bold text-ink break-all leading-tight">
               {summary.total}
             </div>
           </div>
           <div className="px-3 py-2">
-            <div className="text-[11px] font-semibold text-ink-muted mb-1">Active</div>
+            <div className="text-[13px] font-semibold text-ink-muted mb-1">Active</div>
             <div className="text-sm font-mono font-bold text-emerald-600 break-all leading-tight">
               {summary.active}
             </div>
           </div>
           <div className="px-3 py-2">
-            <div className="text-[11px] font-semibold text-ink-muted mb-1">Inactive</div>
+            <div className="text-[13px] font-semibold text-ink-muted mb-1">Inactive</div>
             <div className="text-sm font-mono font-bold text-ink-subtle break-all leading-tight">
               {summary.inactive}
             </div>
           </div>
           <div className="px-3 py-2">
-            <div className="text-[11px] font-semibold text-ink-muted mb-1">Groups</div>
+            <div className="text-[13px] font-semibold text-ink-muted mb-1">Groups</div>
             <div className="text-sm font-mono font-bold text-ink break-all leading-tight">
               {summary.groupsCount}
             </div>
           </div>
           <div className="px-3 py-2">
-            <div className="text-[11px] font-semibold text-ink-muted mb-2">By Type</div>
-            <div className="space-y-1 text-[11px]">
+            <div className="text-[13px] font-semibold text-ink-muted mb-2">By Type</div>
+            <div className="space-y-1 text-[13px]">
               <div className="flex items-center justify-between">
                 <span className="text-emerald-600 font-semibold">Assets</span>
                 <span className="font-mono font-bold text-ink">{summary.byType.ASSET}</span>
@@ -465,7 +465,7 @@ export const ChartOfAccountsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3">
           <div className="bg-card rounded-md border border-line w-full max-w-md overflow-hidden shadow-2xl">
             <div className="px-3 py-1.5 border-b border-line bg-slate-700 text-white flex items-center justify-between">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-2">
+              <h2 className="text-[13px] font-bold uppercase tracking-wide flex items-center gap-2">
                 <FaSitemap className="text-xs" /> New Account Ledger
               </h2>
               <button
@@ -478,7 +478,7 @@ export const ChartOfAccountsPage: React.FC = () => {
 
             <form onSubmit={handleCreateLedger} className="p-3 space-y-2">
               <div>
-                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                <label className="block mb-0.5 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Ledger Code <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -492,7 +492,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                <label className="block mb-0.5 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Account Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -506,7 +506,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                <label className="block mb-0.5 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Ledger Type <span className="text-red-500">*</span>
                 </label>
                 <SelectInput
@@ -528,7 +528,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                <label className="block mb-0.5 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Group Name <span className="text-red-500">*</span>
                 </label>
                 <input

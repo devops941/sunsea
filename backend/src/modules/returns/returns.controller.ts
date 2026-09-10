@@ -103,6 +103,40 @@ class ReturnsController {
       next(error);
     }
   }
+  async getPurchaseReturnById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const data = await returnsService.getPurchaseReturnById(id);
+      return res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePurchaseReturn(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = createPurchaseReturnSchema.parse(req.body);
+      const updatedBy = (req as any).user?.id || (req as any).user?.userId;
+      const data = await returnsService.updatePurchaseReturn(id, input, updatedBy);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("purchaseReturn:updated", data);
+        io.emit("rawMaterial:updated", { source: "purchaseReturn" });
+        io.emit("voucher:created", { source: "purchaseReturn" });
+        io.emit("payment:created", { source: "purchaseReturn" });
+        io.emit("accountLedger:updated", { source: "purchaseReturn" });
+      } catch (sErr) {
+        console.error("[Socket Emit Error] purchaseReturn:updated", sErr);
+      }
+
+      return res.status(200).json({ success: true, message: "Purchase return updated", data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const returnsController = new ReturnsController();

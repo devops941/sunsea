@@ -8,7 +8,7 @@ import {
   FaUser, FaPhone, FaUsers, FaIdCard, FaMapMarkerAlt,
   FaBriefcase, FaCalendarAlt, FaClock, FaMoneyBillWave, FaKey,
   FaClipboardList, FaSave, FaChevronLeft, FaChevronRight, FaCamera,
-  FaRandom, FaEye, FaEyeSlash, FaCheck, FaTimes, FaSpinner,
+  FaRandom, FaEye, FaEyeSlash, FaCheck, FaTimes, FaSpinner, FaRegSave,
 } from "react-icons/fa";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
@@ -266,6 +266,7 @@ const EmployeeForm: React.FC = () => {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(isEdit);
+  const [isOriginallyDraft, setIsOriginallyDraft] = useState(false);
   const [shifts, setShifts] = useState<any[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -278,9 +279,11 @@ const EmployeeForm: React.FC = () => {
 
   const [isDirty, setIsDirty] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const isDirtyRef = useRef(isDirty);
   const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  const isOriginallyDraftRef = useRef(false);
 
   useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
@@ -313,6 +316,7 @@ const EmployeeForm: React.FC = () => {
     if (isEdit && id) {
       setIsLoading(true);
       employeeService.fetchById(id).then((emp: any) => {
+        if (emp.status === "draft") { setIsOriginallyDraft(true); isOriginallyDraftRef.current = true; }
         setForm({
           empCode: emp.empCode || "",
           fullName: emp.fullName || "",
@@ -427,11 +431,6 @@ const EmployeeForm: React.FC = () => {
       }).catch(() => {
         toast.error("Failed to load employee data");
       }).finally(() => setIsLoading(false));
-    } else {
-      // Create mode — fetch next employee code
-      employeeService.fetchNextCode().then((code: string) => {
-        if (code) setForm((p) => ({ ...p, empCode: code }));
-      }).catch(() => {});
     }
   }, [id, isEdit, loadDepartments, loadRoles]);
 
@@ -698,7 +697,7 @@ const EmployeeForm: React.FC = () => {
       if (form.dateOfBirth) fd.append("dateOfBirth", form.dateOfBirth);
       if (form.bloodGroup) fd.append("bloodGroup", form.bloodGroup);
       if (form.maritalStatus) fd.append("maritalStatus", form.maritalStatus);
-      fd.append("status", form.employeeStatus || "active");
+      fd.append("status", isOriginallyDraft ? "active" : (form.employeeStatus || "active"));
 
       if (form.photoFile) fd.append("photo", form.photoFile);
 
@@ -812,6 +811,118 @@ const EmployeeForm: React.FC = () => {
     }
   };
 
+  // ── Save Draft (empCode required, other fields optional) ──────────────────
+  const handleSaveDraft = async () => {
+    if (isSavingDraft || isSubmitting) return;
+    if (!form.empCode.trim()) {
+      setErrors((p) => ({ ...p, empCode: "Employee code is required" }));
+      toast.error("Employee code is required to save draft");
+      setActiveTab(0);
+      return;
+    }
+    setIsSavingDraft(true);
+    try {
+      const fd = new FormData();
+      fd.append("empCode", form.empCode);
+      fd.append("fullName", form.fullName || "");
+      fd.append("status", "draft");
+
+      if (form.gender) fd.append("gender", form.gender);
+      if (form.dateOfBirth) fd.append("dateOfBirth", form.dateOfBirth);
+      if (form.bloodGroup) fd.append("bloodGroup", form.bloodGroup);
+      if (form.maritalStatus) fd.append("maritalStatus", form.maritalStatus);
+      if (form.photoFile) fd.append("photo", form.photoFile);
+
+      fd.append("personalMobile", form.personalMobile || "");
+      fd.append("mobile", form.officialMobile || "");
+      fd.append("personalEmail", form.personalEmail || "");
+      fd.append("email", form.officialEmail || "");
+      fd.append("emergencyContactName", form.emergencyContactName || "");
+      fd.append("emergencyContactNumber", form.emergencyContactNumber || "");
+
+      fd.append("fatherName", form.fatherName || "");
+      fd.append("motherName", form.motherName || "");
+      fd.append("spouseName", form.spouseName || "");
+      fd.append("guardianName", form.guardianName || "");
+      fd.append("guardianRelationship", form.guardianRelationship || "");
+
+      fd.append("aadhaarNumber", form.aadhaarNumber || "");
+      fd.append("panNumber", form.panNumber || "");
+      fd.append("drivingLicense", form.drivingLicense || "");
+      fd.append("voterId", form.voterId || "");
+
+      fd.append("permanentAddressLine1", form.permAddress1 || "");
+      fd.append("permanentAddressLine2", form.permAddress2 || "");
+      fd.append("permanentCity", form.permCity || "");
+      fd.append("permanentState", form.permState || "");
+      fd.append("permanentPincode", form.permPincode || "");
+      fd.append("presentAddressLine1", form.presAddress1 || "");
+      fd.append("presentAddressLine2", form.presAddress2 || "");
+      fd.append("presentCity", form.presCity || "");
+      fd.append("presentState", form.presState || "");
+      fd.append("presentPincode", form.presPincode || "");
+
+      if (form.departmentId) fd.append("departmentId", form.departmentId);
+      if (form.roleId) fd.append("roleId", form.roleId);
+      if (form.designation) fd.append("designation", form.designation);
+      if (form.employeeType) fd.append("employeeType", form.employeeType);
+      if (form.employeeCategory) fd.append("employeeCategory", form.employeeCategory);
+
+      if (form.dateOfJoining) fd.append("dateOfJoining", form.dateOfJoining);
+      if (form.relievingDate) fd.append("relievingDate", form.relievingDate);
+      if (form.previousExperience) fd.append("previousExperience", form.previousExperience);
+      if (form.probationPeriod) fd.append("probationPeriod", form.probationPeriod);
+      if (form.noticePeriod) fd.append("noticePeriod", form.noticePeriod);
+
+      if (form.shiftId) fd.append("shiftId", form.shiftId);
+
+      if (form.salaryType) fd.append("salaryType", form.salaryType.toLowerCase());
+      const st = (form.salaryType || "MONTHLY").toUpperCase();
+      if (st === "MONTHLY" && form.monthlySalary) fd.append("grossSalary", form.monthlySalary);
+      else if (st === "WEEKLY" && form.weeklySalary) fd.append("grossSalary", form.weeklySalary);
+      else if (st === "DAILY" && form.dailySalary) fd.append("grossSalary", form.dailySalary);
+      else if (st === "HOURLY" && form.hourlySalary) fd.append("grossSalary", form.hourlySalary);
+
+      if (form.paymentMode === "BANK") {
+        if (form.basicSalary) fd.append("basicSalary", form.basicSalary);
+        if (form.da) fd.append("da", form.da);
+        if (form.hra) fd.append("hra", form.hra);
+        if (form.otherAllowance) fd.append("otherAllowance", form.otherAllowance);
+      }
+      if (form.cashInHand) fd.append("cashInHand", form.cashInHand);
+      fd.append("pfApplicable", String(form.pfApplicable));
+      if (form.pfNumber) fd.append("pfNumber", form.pfNumber);
+      if (form.uanNumber) fd.append("uanNumber", form.uanNumber);
+      fd.append("esiApplicable", String(form.esiApplicable));
+      if (form.esiNumber) fd.append("esiNumber", form.esiNumber);
+      fd.append("professionalTax", String(form.professionalTax));
+      fd.append("paymentMode", form.paymentMode || "CASH");
+      if (form.bankName) fd.append("bankName", form.bankName);
+      if (form.bankBranch) fd.append("bankBranch", form.bankBranch);
+      if (form.accountNumber) fd.append("accountNumber", form.accountNumber);
+      if (form.ifscCode) fd.append("ifscCode", form.ifscCode);
+      if (form.accountHolderName) fd.append("accountHolderName", form.accountHolderName);
+
+      fd.append("createLoginAccount", "false");
+
+      if (isEdit && id) {
+        if (user?.userId) fd.append("updatedBy", String(user.userId));
+        await employeeService.update(id, fd as any);
+        toast.success("Draft updated successfully!");
+      } else {
+        if (user?.userId) fd.append("createdBy", String(user.userId));
+        await employeeService.create(fd as any);
+        toast.success("Draft saved successfully!");
+      }
+      setIsDirty(false);
+      navigate("/employees");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to save draft");
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   // Keep submitRef current on every render so useFormShortcuts (F2/F9) always calls the latest handleSubmit
   handleSubmitRef.current = handleSubmit;
 
@@ -823,14 +934,16 @@ const EmployeeForm: React.FC = () => {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+      const openPortal = document.querySelector("[data-select-portal]");
+      if (openPortal && openPortal.contains(document.activeElement)) return;
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
 
       if (saveConfirmOpenRef.current) {
         setSaveConfirmOpen(false);
         setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
-      } else if (isDirtyRef.current) {
+      } else if (isDirtyRef.current || isOriginallyDraftRef.current) {
         lastFocusedRef.current = document.activeElement as HTMLElement | null;
         setSaveConfirmOpen(true);
       } else {
@@ -934,7 +1047,7 @@ const EmployeeForm: React.FC = () => {
     <div>
       <SectionHeader icon={FaUser} title="Basic Information" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 md:gap-x-10 lg:gap-x-16 gap-y-3 md:gap-y-4">
-        <TextInput horizontal label="Employee Code" name="empCode" value={form.empCode} onChange={handleChange} required error={errors.empCode} placeholder="e.g. EMP001" disabled={isEdit} />
+        <TextInput horizontal label="Employee Code" name="empCode" value={form.empCode} onChange={handleChange} required error={errors.empCode} placeholder="e.g. EMP001" />
         <TextInput horizontal label="Employee Name" name="fullName" value={form.fullName} onChange={handleChange} required error={errors.fullName} placeholder="Full name" />
         <SelectInput horizontal label="Gender" name="gender" value={form.gender} onChange={handleChange}
           defaultOptionLabel="Select Gender"
@@ -1367,6 +1480,17 @@ const EmployeeForm: React.FC = () => {
             <span className="text-xs text-ink-muted font-medium">
               {activeTab + 1} / {TABS.length}
             </span>
+            {(!isEdit || isOriginallyDraft) && (
+              <button
+                type="button"
+                disabled={isSavingDraft}
+                onClick={handleSaveDraft}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              >
+                <FaRegSave size={13} />
+                {isSavingDraft ? "Saving..." : "Save Draft"}
+              </button>
+            )}
             <CustomButton
               text={isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Employee")}
               icon={FaSave}
@@ -1399,21 +1523,31 @@ const EmployeeForm: React.FC = () => {
         isOpen={saveConfirmOpen}
         onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
         onCancel={() => { setSaveConfirmOpen(false); navigate("/employees"); }}
-        onConfirm={() => {
-          setSaveConfirmOpen(false);
-          setTimeout(() => {
-            handleSubmitRef.current();
-            setTimeout(() => tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-          }, 150);
-        }}
-        title="Discard Changes?"
-        message="Are you sure you want to leave? Any unsaved employee details will be lost."
-        warningText="Save to keep your changes, or Discard to leave."
+        onConfirm={
+          (!isEdit || isOriginallyDraft)
+            ? async () => { setSaveConfirmOpen(false); await handleSaveDraft(); }
+            : () => {
+                setSaveConfirmOpen(false);
+                setTimeout(() => {
+                  handleSubmitRef.current();
+                  setTimeout(() => tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
+                }, 150);
+              }
+        }
+        title="Unsaved Changes"
+        message={(!isEdit || isOriginallyDraft)
+          ? "You have unsaved employee details. Would you like to save them as a draft?"
+          : "Are you sure you want to leave? Any unsaved employee details will be lost."
+        }
+        warningText={(!isEdit || isOriginallyDraft)
+          ? "Save as draft to continue later, or Discard to leave."
+          : "Save to keep your changes, or Discard to leave."
+        }
         cancelText="Discard"
         cancelVariant="danger"
-        confirmText="Save"
+        confirmText={(!isEdit || isOriginallyDraft) ? "Save Draft" : "Save"}
         confirmVariant="primary"
-        confirmIcon={FaCheck}
+        confirmIcon={(!isEdit || isOriginallyDraft) ? FaRegSave : FaCheck}
         isDangerous={false}
         defaultFocusCancel={false}
       />

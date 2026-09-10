@@ -407,7 +407,7 @@ const BalanceSheetPage: React.FC = () => {
           <FaBalanceScale className="text-red-500 text-sm" /> Balance Sheet
         </h3>
         {view && (
-          <span className="text-[11px] text-ink-muted">
+          <span className="text-[13px] text-ink-muted">
             At the end of <b className="text-ink">{displayDate(endDate)}</b>
             {options.scaleFactor > 1 && (
               <span className="ml-2 text-ink-subtle">· Scale × {options.scaleFactor.toLocaleString("en-IN")}</span>
@@ -415,28 +415,28 @@ const BalanceSheetPage: React.FC = () => {
           </span>
         )}
         {refreshing && (
-          <span className="flex items-center gap-1 text-[10px] text-red-400">
+          <span className="flex items-center gap-1 text-[13px] text-red-400">
             <FaSync className="animate-spin" /> Syncing…
           </span>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
           <button
             onClick={() => setShowOptionsDialog(true)}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line"
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
             title="Change filters (Esc)"
           >
             Filters
           </button>
           <button onClick={handlePrint} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaPrint /> Print
           </button>
           <button onClick={exportCSV} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaDownload /> Export
           </button>
           <button onClick={refresh} disabled={refreshing}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[11px] font-semibold border border-line disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
             <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
           </button>
         </div>
@@ -463,7 +463,7 @@ const BalanceSheetPage: React.FC = () => {
               style={{ height: "calc(100vh - 200px)" }}
             >
               {/* "At the end of : date" strip */}
-              <div className="px-3 py-1 border-b border-line text-[11px] text-ink-muted shrink-0">
+              <div className="px-3 py-1 border-b border-line text-[13px] text-ink-muted shrink-0">
                 At the end of : <b className="text-ink">{displayDate(endDate)}</b>
               </div>
 
@@ -473,10 +473,10 @@ const BalanceSheetPage: React.FC = () => {
               <table className="w-full text-left border-collapse table-fixed">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-head border-b-2 border-line">
-                    <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>L I A B I L I T I E S</th>
-                    <th className="px-3 py-1 text-[11px] font-bold text-right text-ink border-r border-line w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
-                    <th className="px-3 py-1 text-[11px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>A S S E T S</th>
-                    <th className="px-3 py-1 text-[11px] font-bold text-right text-ink w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                    <th className="px-3 py-1 text-[13px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>L I A B I L I T I E S</th>
+                    <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
+                    <th className="px-3 py-1 text-[13px] font-bold uppercase text-blue-600 border-r border-line w-[38%] bg-head" style={{ letterSpacing: "0.15em" }}>A S S E T S</th>
+                    <th className="px-3 py-1 text-[13px] font-bold text-right text-ink w-[12%] bg-head">Amount ({options.scaleFactor === 1 ? "₹" : `₹ × ${options.scaleFactor}`})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -522,7 +522,7 @@ const BalanceSheetPage: React.FC = () => {
                                 onClick={onLClick}
                                 onDoubleClick={onLDbl}
                                 title="Double-click (or Enter) to drill into ledger"
-                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 cursor-pointer ${
+                                className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 cursor-pointer ${
                                   L.kind === "group"
                                     ? `font-bold uppercase ${isLPnl ? lPnlClass : "text-ink"}`
                                     : "pl-6 text-ink-muted"
@@ -533,7 +533,7 @@ const BalanceSheetPage: React.FC = () => {
                               <td
                                 onClick={onLClick}
                                 onDoubleClick={onLDbl}
-                                className={`px-3 py-0.5 text-[11px] text-right font-mono border-r border-line-soft/50 cursor-pointer ${
+                                className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 cursor-pointer ${
                                   L.kind === "group" ? `font-bold ${lPnlClass}` : "text-ink-muted"
                                 } ${lHl ? "bg-black text-white" : ""}`}
                               >
@@ -556,7 +556,7 @@ const BalanceSheetPage: React.FC = () => {
                                 onClick={onRClick}
                                 onDoubleClick={onRDbl}
                                 title="Double-click (or Enter) to drill into ledger"
-                                className={`px-3 py-0.5 text-[11px] border-r border-line-soft/50 cursor-pointer ${
+                                className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 cursor-pointer ${
                                   R.kind === "group"
                                     ? "font-bold uppercase text-ink"
                                     : "pl-6 text-ink-muted"
@@ -567,7 +567,7 @@ const BalanceSheetPage: React.FC = () => {
                               <td
                                 onClick={onRClick}
                                 onDoubleClick={onRDbl}
-                                className={`px-3 py-0.5 text-[11px] text-right font-mono cursor-pointer ${
+                                className={`px-3 py-0.5 text-[13px] text-right font-mono cursor-pointer ${
                                   R.kind === "group" ? "font-bold text-ink" : "text-ink-muted"
                                 } ${rHl ? "bg-black text-white" : ""}`}
                               >
@@ -603,18 +603,18 @@ const BalanceSheetPage: React.FC = () => {
                 </tbody>
                 <tfoot className="sticky bottom-0 z-10">
                   <tr className="bg-card-2 border-t-2 border-line">
-                    <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">Total</td>
-                    <td className={`px-3 py-1 text-[12px] text-right font-mono font-bold border-r border-line bg-card-2 ${view.isBalanced ? "text-ink" : "text-red-600"}`}>
+                    <td className="px-3 py-1 text-[13px] font-bold uppercase text-ink border-r border-line bg-card-2">Total</td>
+                    <td className={`px-3 py-1 text-[13px] text-right font-mono font-bold border-r border-line bg-card-2 ${view.isBalanced ? "text-ink" : "text-red-600"}`}>
                       {fmt(view.leftTotal, options.scaleFactor)}
                     </td>
-                    <td className="px-3 py-1 text-[11px] font-bold uppercase text-ink border-r border-line bg-card-2">Total</td>
-                    <td className={`px-3 py-1 text-[12px] text-right font-mono font-bold bg-card-2 ${view.isBalanced ? "text-ink" : "text-red-600"}`}>
+                    <td className="px-3 py-1 text-[13px] font-bold uppercase text-ink border-r border-line bg-card-2">Total</td>
+                    <td className={`px-3 py-1 text-[13px] text-right font-mono font-bold bg-card-2 ${view.isBalanced ? "text-ink" : "text-red-600"}`}>
                       {fmt(view.rightTotal, options.scaleFactor)}
                     </td>
                   </tr>
                   {!view.isBalanced && (
                     <tr className="bg-red-500/5">
-                      <td colSpan={4} className="px-3 py-1 text-[11px] text-center text-red-600 font-semibold bg-red-500/5">
+                      <td colSpan={4} className="px-3 py-1 text-[13px] text-center text-red-600 font-semibold bg-red-500/5">
                         Not balanced · Difference: ₹{fmt(Math.abs(view.leftTotal - view.rightTotal), options.scaleFactor)}
                       </td>
                     </tr>
@@ -623,7 +623,7 @@ const BalanceSheetPage: React.FC = () => {
               </table>
               </div>
 
-              <div className="px-3 py-1 text-[10px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
+              <div className="px-3 py-1 text-[13px] text-ink-subtle italic border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0">
                 <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓ ← →</kbd> nav</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill into ledger</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Home / End</kbd> jump</span>
@@ -639,12 +639,12 @@ const BalanceSheetPage: React.FC = () => {
         <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden flex flex-col">
             {/* Red header */}
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
               <span className="flex-1 text-center">Balance Sheet</span>
             </div>
 
             {/* Body — 12-col grid, compact Busy density */}
-            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[13px] items-center">
               {/* Starting Date */}
               <label className="col-span-6 text-ink-subtle font-semibold">Starting Date</label>
               <div className="col-span-6">
@@ -695,7 +695,7 @@ const BalanceSheetPage: React.FC = () => {
                             if (idx >= 0 && tabbables[idx + 1]) tabbables[idx + 1].focus();
                           }
                         }}
-                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                        className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                       >
                         <option value="Y">Y</option>
                         <option value="N">N</option>
@@ -717,7 +717,7 @@ const BalanceSheetPage: React.FC = () => {
                       commitOptions();
                     }
                   }}
-                  className="w-[110px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                  className="w-[110px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                 >
                   <option value="1">1</option>
                   <option value="10">10</option>
@@ -731,18 +731,18 @@ const BalanceSheetPage: React.FC = () => {
 
               {/* Cur. String (Busy placeholder — grayed) */}
               <label className="col-span-6 text-ink-subtle/50 font-semibold italic">Cur. String</label>
-              <div className="col-span-6 text-[10px] text-ink-subtle/50 italic">—</div>
+              <div className="col-span-6 text-[13px] text-ink-subtle/50 italic">—</div>
             </div>
 
             {/* Footer — OK(F2) button + hint */}
-            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[13px]">
               <span className="text-ink-subtle italic">
                 Press <b>F2</b> or click OK to load report · <b>Esc</b> to go back
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={commitOptions}
-                  className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                  className="px-3 py-0.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
                 >
                   <FaPlay className="text-[9px]" /> OK (F2)
                 </button>

@@ -766,7 +766,7 @@ class HourlyProductionService {
         where: { id: { in: operatorIds } }
       });
       employees.forEach(emp => {
-        operatorMap.set(emp.id.toString(), emp.fullName);
+        operatorMap.set(emp.id.toString(), emp.fullName || "");
       });
     }
 

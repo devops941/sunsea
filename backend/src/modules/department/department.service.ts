@@ -86,6 +86,7 @@ export const deleteDepartmentService =
     const employeesWithDepartment = await prisma.employee.findFirst({
       where: {
         departmentId: id,
+        status: { not: "draft" },
       },
     });
 

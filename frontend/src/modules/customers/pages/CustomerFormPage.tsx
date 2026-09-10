@@ -383,7 +383,7 @@ const CustomerFormPage: React.FC = () => {
       handleSubmit(
         onSubmit,
         (fieldErrors) => {
-          toast.error("Required fields fill pannuga — please fill all required fields.");
+          toast.error("Please fill all required fields.");
 
           // Walk the visual field order and focus the first one that has an error.
           // focusFieldByName uses a direct DOM query (name attr + data-nav) so it

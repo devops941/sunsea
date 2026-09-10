@@ -84,10 +84,11 @@ export const createSupplierSchema = z.object({
 
 /**
  * Update Supplier Validation
+ * openingBalance + openingBalanceType are allowed in updates but only applied
+ * when the supplier has no real transactions (enforced in the service layer).
  */
 export const updateSupplierSchema = z.object({
-  // openingBalance is intentionally excluded from updates — it is immutable after creation
-  body: createSupplierSchema.shape.body.omit({ openingBalance: true }).partial(),
+  body: createSupplierSchema.shape.body.partial(),
   params: z.object({
     id: z.string(),
   }),

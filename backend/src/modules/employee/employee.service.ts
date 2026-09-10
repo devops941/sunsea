@@ -14,8 +14,8 @@ class EmployeeService {
     }
 
     const createdEmployee = (await prisma.$transaction(async (tx) => {
-      // Check if email already exists
-      if (employeeData.email) {
+      // Check if email already exists (skip for drafts)
+      if (employeeData.email && employeeData.status !== "draft") {
         const existingEmail = await tx.employee.findUnique({
           where: { email: employeeData.email },
         });
@@ -30,40 +30,58 @@ class EmployeeService {
           where: { empCode: employeeData.empCode },
         });
         if (existingCode) {
-          throw new ApiError(400, "Employee code already exists");
+          // If saving a draft and existing is also a draft, update it instead
+          if (employeeData.status === "draft" && existingCode.status === "draft") {
+            await tx.employee.update({
+              where: { id: existingCode.id },
+              data: employeeData,
+            });
+            return tx.employee.findUnique({
+              where: { id: existingCode.id },
+              include: { user: { include: { role: true } }, role: true, department: true, shift: true, payrollConfig: true },
+            });
+          }
+          // If saving a real employee and existing is a draft, allow (draft will be overwritten)
+          if (employeeData.status !== "draft" && existingCode.status === "draft") {
+            await tx.employee.delete({ where: { id: existingCode.id } });
+          } else {
+            throw new ApiError(400, "Employee code already exists");
+          }
         }
       }
 
-      // Check unique identity fields
-      if (employeeData.aadhaarNumber) {
-        const existing = await tx.employee.findUnique({
-          where: { aadhaarNumber: employeeData.aadhaarNumber },
-        });
-        if (existing) throw new ApiError(400, "Aadhaar number already exists");
-      }
-      if (employeeData.panNumber) {
-        const existing = await tx.employee.findUnique({
-          where: { panNumber: employeeData.panNumber },
-        });
-        if (existing) throw new ApiError(400, "PAN number already exists");
-      }
-      if (employeeData.pfNumber) {
-        const existing = await tx.employee.findUnique({
-          where: { pfNumber: employeeData.pfNumber },
-        });
-        if (existing) throw new ApiError(400, "PF number already exists");
-      }
-      if (employeeData.uanNumber) {
-        const existing = await tx.employee.findUnique({
-          where: { uanNumber: employeeData.uanNumber },
-        });
-        if (existing) throw new ApiError(400, "UAN number already exists");
-      }
-      if (employeeData.esiNumber) {
-        const existing = await tx.employee.findUnique({
-          where: { esiNumber: employeeData.esiNumber },
-        });
-        if (existing) throw new ApiError(400, "ESI number already exists");
+      // Check unique identity fields (skip for drafts — validated on final save)
+      if (employeeData.status !== "draft") {
+        if (employeeData.aadhaarNumber) {
+          const existing = await tx.employee.findUnique({
+            where: { aadhaarNumber: employeeData.aadhaarNumber },
+          });
+          if (existing) throw new ApiError(400, "Aadhaar number already exists");
+        }
+        if (employeeData.panNumber) {
+          const existing = await tx.employee.findUnique({
+            where: { panNumber: employeeData.panNumber },
+          });
+          if (existing) throw new ApiError(400, "PAN number already exists");
+        }
+        if (employeeData.pfNumber) {
+          const existing = await tx.employee.findUnique({
+            where: { pfNumber: employeeData.pfNumber },
+          });
+          if (existing) throw new ApiError(400, "PF number already exists");
+        }
+        if (employeeData.uanNumber) {
+          const existing = await tx.employee.findUnique({
+            where: { uanNumber: employeeData.uanNumber },
+          });
+          if (existing) throw new ApiError(400, "UAN number already exists");
+        }
+        if (employeeData.esiNumber) {
+          const existing = await tx.employee.findUnique({
+            where: { esiNumber: employeeData.esiNumber },
+          });
+          if (existing) throw new ApiError(400, "ESI number already exists");
+        }
       }
 
       // Create employee
@@ -125,7 +143,7 @@ class EmployeeService {
         await tx.user.create({
           data: {
             username: loginAccount.username,
-            fullName: employeeData.fullName,
+            fullName: employeeData.fullName || "",
             email: employeeData.email || null,
             passwordHash,
             employeeId: employee.id,
@@ -159,7 +177,7 @@ class EmployeeService {
           to: recipientEmail,
           subject: "Welcome to Sunsea — Your Account Has Been Created",
           html: generateWelcomeEmailHtml({
-            fullName: createdEmployee.fullName,
+            fullName: createdEmployee.fullName || "",
             empCode: createdEmployee.empCode,
             username: loginAccount.username,
             password: loginAccount.password,
@@ -181,10 +199,11 @@ class EmployeeService {
     departmentId?: number;
     roleId?: number;
     status?: string;
+    includeDrafts?: boolean;
     page?: number;
     limit?: number;
   }) {
-    const { search, departmentId, roleId, status, page = 1, limit = 10 } = params;
+    const { search, departmentId, roleId, status, includeDrafts, page = 1, limit = 10 } = params;
 
     const where: any = {};
 
@@ -198,6 +217,9 @@ class EmployeeService {
 
     if (status) {
       where.status = status;
+    } else if (!includeDrafts) {
+      // Exclude draft employees by default — only show when explicitly filtered
+      where.status = { not: "draft" };
     }
 
     if (search) {
@@ -447,7 +469,7 @@ class EmployeeService {
           to: recipientEmail,
           subject: "Sunsea — Your Login Account Credentials",
           html: generateWelcomeEmailHtml({
-            fullName: updatedEmployee.fullName,
+            fullName: updatedEmployee.fullName || "",
             empCode: updatedEmployee.empCode,
             username: loginAccount.username,
             password: loginAccount.password,
@@ -466,6 +488,7 @@ class EmployeeService {
 
   async getNextEmployeeCode() {
     const lastEmployee = await prisma.employee.findFirst({
+      where: { status: { not: "draft" } },
       orderBy: {
         empCode: "desc",
       },

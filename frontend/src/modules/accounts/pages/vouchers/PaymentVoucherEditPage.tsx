@@ -261,18 +261,18 @@ const PaymentVoucherEditPage: React.FC = () => {
           onSubmit={handleSubmit}
           className="bg-card border border-line rounded-md overflow-hidden shadow-sm"
         >
-          <div className="text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line bg-red-600/90">
+          <div className="text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line bg-red-600/90">
             Modify Payment Voucher
           </div>
 
-          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-3 gap-y-1.5 text-[11px] items-center">
+          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-3 gap-y-1.5 text-[13px] items-center">
             <label className="col-span-2 text-ink-subtle font-semibold">Date</label>
             <div className="col-span-4">
               <DatePickerCalendar name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
 
             <label className="col-span-2 text-ink-subtle font-semibold">Vch No.</label>
-            <div className="col-span-4 text-ink font-mono font-bold text-[12px]">
+            <div className="col-span-4 text-ink font-mono font-bold text-[13px]">
               {voucher ? displayVoucherNo(voucher.voucherNo) : "…"}
             </div>
 
@@ -288,14 +288,14 @@ const PaymentVoucherEditPage: React.FC = () => {
                     focusCell(0, "account");
                   }
                 }}
-                className={`w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none ${ACTIVE_CELL}`}
+                className={`w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none ${ACTIVE_CELL}`}
               />
             </div>
             <div className="col-span-6" />
           </div>
 
           <div className="border-b border-line" ref={tableRef}>
-            <table className="w-full text-[11px] border-collapse">
+            <table className="w-full text-[13px] border-collapse">
               <thead>
                 <tr className="bg-card-2 text-ink font-bold border-b border-line">
                   <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
@@ -313,7 +313,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                       key={row.id}
                       className={`border-b border-line-soft last:border-b-0 ${unlocked ? "" : "bg-card-2/10"}`}
                     >
-                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[11px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
+                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[13px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
                         {idx + 1}
                       </td>
                       <td className="px-0 py-0 border-r border-line">
@@ -361,7 +361,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                           // first digit you type overwrites the old value).
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
-                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />
                       </td>
                       <td className="px-0 py-0">
@@ -373,7 +373,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                           onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
-                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />
                       </td>
                     </tr>
@@ -386,7 +386,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={addRow}
-                      className="flex items-center gap-1 text-[10px] font-semibold text-red-500 hover:text-red-600 cursor-pointer"
+                      className="flex items-center gap-1 text-[13px] font-semibold text-red-500 hover:text-red-600 cursor-pointer"
                     >
                       <FaPlus className="w-2 h-2" /> Add Row
                     </button>
@@ -394,7 +394,7 @@ const PaymentVoucherEditPage: React.FC = () => {
                   <td className="w-32 px-2 py-1 text-right font-mono font-bold text-ink border-l border-line">
                     {formatAmount(totalAmount)}
                   </td>
-                  <td className="px-2 py-1 text-[10px] text-ink-subtle italic">
+                  <td className="px-2 py-1 text-[13px] text-ink-subtle italic">
                     {validCount} valid entries
                   </td>
                 </tr>
@@ -403,7 +403,7 @@ const PaymentVoucherEditPage: React.FC = () => {
           </div>
 
           <div className="px-3 py-2 flex items-center justify-between bg-card-2/40">
-            <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
+            <div className="flex items-center gap-2 text-[13px] text-ink-subtle">
               <FaMoneyBillWave className="text-red-500" />
               <span>Modify existing voucher — items will be fully replaced on save</span>
             </div>
@@ -411,14 +411,14 @@ const PaymentVoucherEditPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate("/accounts/payment-voucher")}
-                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
+                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[13px] transition cursor-pointer"
               >
                 Quit
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold text-[11px] transition disabled:opacity-50 cursor-pointer"
+                className="px-5 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold text-[13px] transition disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Saving..." : "Save"}
               </button>

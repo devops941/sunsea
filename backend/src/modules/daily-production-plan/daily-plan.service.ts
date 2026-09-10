@@ -105,7 +105,7 @@ class DailyPlanService {
     const opsToCheckCreate = (data.selectedOperatorIds && data.selectedOperatorIds.trim() !== "")
       ? assignment.operators.filter(op => {
           const ids = data.selectedOperatorIds!.split(",").map(id => id.trim());
-          return ids.includes(op.id?.toString()) || ids.includes((op as any).employeeId?.toString()) || ids.includes(op.fullName) || ids.includes(op.empCode);
+          return ids.includes(op.id?.toString()) || ids.includes((op as any).employeeId?.toString()) || ids.includes(op.fullName || "") || ids.includes(op.empCode);
         })
       : assignment.operators;
     const inactiveOp = opsToCheckCreate.find(op => op.status !== "active");
@@ -254,7 +254,7 @@ class DailyPlanService {
     const opsToCheckUpdate = (data.selectedOperatorIds && data.selectedOperatorIds.trim() !== "")
       ? assignment.operators.filter(op => {
           const ids = data.selectedOperatorIds!.split(",").map(id => id.trim());
-          return ids.includes(op.id?.toString()) || ids.includes((op as any).employeeId?.toString()) || ids.includes(op.fullName) || ids.includes(op.empCode);
+          return ids.includes(op.id?.toString()) || ids.includes((op as any).employeeId?.toString()) || ids.includes(op.fullName || "") || ids.includes(op.empCode);
         })
       : assignment.operators;
     const inactiveOp = opsToCheckUpdate.find(op => op.status !== "active");
@@ -617,7 +617,7 @@ class DailyPlanService {
           }
           if (whereClauses.length > 0) {
             const missingEmps = await prisma.employee.findMany({
-              where: { OR: whereClauses }
+              where: { OR: whereClauses, status: { not: "draft" } }
             });
             for (const emp of missingEmps) {
               if (!filtered.some((f: any) => f.id === emp.id.toString())) {

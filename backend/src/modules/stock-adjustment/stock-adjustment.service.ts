@@ -157,7 +157,7 @@ export class StockAdjustmentService {
 
     const nameMap = new Map<string, string>();
     users.forEach((u) => nameMap.set(u.userId, u.fullName));
-    employees.forEach((e) => nameMap.set(String(e.id), e.fullName));
+    employees.forEach((e) => nameMap.set(String(e.id), e.fullName || ""));
 
     const enriched = data.map((d) => ({
       ...d,

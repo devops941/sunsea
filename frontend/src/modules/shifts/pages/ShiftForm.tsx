@@ -21,7 +21,6 @@ const initialFormState = {
     startTime: "",
     endTime: "",
     breakDuration: "",
-    gracePeriod: "",
     isActive: true,
 };
 interface FormErrors {
@@ -29,7 +28,6 @@ interface FormErrors {
     startTime?: string;
     endTime?: string;
     breakDuration?: string;
-    gracePeriod?: string;
 }
 const ShiftForm: React.FC = () => {
     const navigate = useNavigate();
@@ -73,7 +71,6 @@ const ShiftForm: React.FC = () => {
                         startTime: shift.startTime || "",
                         endTime: shift.endTime || "",
                         breakDuration: shift.breakDuration !== null && shift.breakDuration !== undefined ? String(shift.breakDuration) : "",
-                        gracePeriod: shift.gracePeriod !== null && shift.gracePeriod !== undefined ? String(shift.gracePeriod) : "",
                         isActive: shift.isActive ?? true,
                     });
                 })
@@ -105,7 +102,6 @@ const ShiftForm: React.FC = () => {
             newErrors.endTime = "Start time and end time cannot be the same";
         }
         if (formData.breakDuration && Number(formData.breakDuration) < 0) newErrors.breakDuration = "Break duration cannot be negative";
-        if (formData.gracePeriod && Number(formData.gracePeriod) < 0) newErrors.gracePeriod = "Grace period cannot be negative";
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -120,7 +116,6 @@ const ShiftForm: React.FC = () => {
             startTime: formData.startTime,
             endTime: formData.endTime,
             breakDuration: formData.breakDuration ? Number(formData.breakDuration) : null,
-            gracePeriod: formData.gracePeriod ? Number(formData.gracePeriod) : null,
             isActive: formData.isActive,
         };
         try {
@@ -182,7 +177,6 @@ const ShiftForm: React.FC = () => {
                             startTime: shift.startTime || "",
                             endTime: shift.endTime || "",
                             breakDuration: shift.breakDuration !== null && shift.breakDuration !== undefined ? String(shift.breakDuration) : "",
-                            gracePeriod: shift.gracePeriod !== null && shift.gracePeriod !== undefined ? String(shift.gracePeriod) : "",
                             isActive: shift.isActive ?? true,
                         });
                         setIsDirty(false);
@@ -269,17 +263,6 @@ const ShiftForm: React.FC = () => {
                                 horizontal
                                 onChange={handleChange}
                                 error={errors.breakDuration}
-                            />
-                            <TextInput
-                                label="Grace (mins)"
-                                name="gracePeriod"
-                                value={formData.gracePeriod}
-                                type="number"
-                                min={0}
-                                placeholder="e.g. 15"
-                                horizontal
-                                onChange={handleChange}
-                                error={errors.gracePeriod}
                             />
                         </div>
                     </div>

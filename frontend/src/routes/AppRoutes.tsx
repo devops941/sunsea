@@ -241,6 +241,9 @@ const SalesReturnCreatePage = lazy(() =>
 const PurchaseReturnPage = lazy(() =>
   import("../modules/accounts/pages/returns/PurchaseReturnPage").then((m) => ({ default: m.PurchaseReturnPage }))
 );
+const PurchaseReturnCreatePage = lazy(() =>
+  import("../modules/accounts/pages/returns/PurchaseReturnCreatePage").then((m) => ({ default: m.PurchaseReturnCreatePage }))
+);
 
 // ===========================================================================
 // PAYROLL
@@ -684,6 +687,12 @@ const AppRoutes = () => {
               <Route path="/sales-returns/edit/:id" element={<SalesReturnCreatePage />} />
               <Route path="/accounts/sales-returns/create" element={<SalesReturnCreatePage />} />
               <Route path="/accounts/sales-returns/edit/:id" element={<SalesReturnCreatePage />} />
+            </Route>
+            <Route element={<ProtectedRoute permissionAny={["purchase-returns.view", "purchaseOrders.view"]} />}>
+              <Route path="/purchase-returns/create" element={<PurchaseReturnCreatePage />} />
+              <Route path="/purchase-returns/edit/:id" element={<PurchaseReturnCreatePage />} />
+              <Route path="/accounts/purchase-returns/create" element={<PurchaseReturnCreatePage />} />
+              <Route path="/accounts/purchase-returns/edit/:id" element={<PurchaseReturnCreatePage />} />
             </Route>
 
             {/* ---------- Purchase ---------- */}

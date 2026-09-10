@@ -885,7 +885,7 @@ const SalesInvoiceForm: React.FC = () => {
   const handleSubmit = async (e?: React.SyntheticEvent, _asDraft: boolean = false) => {
     if (e) e.preventDefault();
     if (!validate()) {
-      toast.error("Required fields fill pannuga — please fill all required fields.");
+      toast.error("Please fill all required fields.");
       setTimeout(() => {
         if (!customerId) {
           focusFieldByName("customerId");

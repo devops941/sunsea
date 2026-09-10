@@ -31,6 +31,7 @@ export interface Supplier {
   stateCode: string;
   openingBalance?: number | string | null;
   openingBalanceType?: string | null;
+  hasTransactions?: boolean;
   status: string;
   addresses?: SupplierAddress[];
   materialPrices?: SupplierMaterialPrice[];

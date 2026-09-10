@@ -27,7 +27,6 @@ class ShiftService {
         startTime: data.startTime,
         endTime: data.endTime,
         breakDuration: data.breakDuration !== undefined && data.breakDuration !== "" ? Number(data.breakDuration) : null,
-        gracePeriod: data.gracePeriod !== undefined && data.gracePeriod !== "" ? Number(data.gracePeriod) : null,
         isActive: data.isActive ?? true,
       },
     });
@@ -97,7 +96,6 @@ class ShiftService {
         startTime: data.startTime ?? undefined,
         endTime: data.endTime ?? undefined,
         breakDuration: data.breakDuration !== undefined ? (data.breakDuration !== "" ? Number(data.breakDuration) : null) : undefined,
-        gracePeriod: data.gracePeriod !== undefined ? (data.gracePeriod !== "" ? Number(data.gracePeriod) : null) : undefined,
         isActive: data.isActive ?? undefined,
       },
     });
