@@ -356,10 +356,9 @@ const ShiftList: React.FC = () => {
                             ]
                         },
                         {
-                            title: "Break & Grace",
+                            title: "Break & Status",
                             fields: [
                                 { label: "Break Duration", value: selectedItem.breakDuration ? `${selectedItem.breakDuration} mins` : "N/A" },
-                                { label: "Grace Period", value: selectedItem.gracePeriod ? `${selectedItem.gracePeriod} mins` : "N/A" },
                                 { label: "Working Hours", value: calculateWorkingHours(selectedItem.startTime, selectedItem.endTime, selectedItem.breakDuration) },
                                 { label: "Status", value: selectedItem.isActive ? "Active" : "Inactive" },
                             ]

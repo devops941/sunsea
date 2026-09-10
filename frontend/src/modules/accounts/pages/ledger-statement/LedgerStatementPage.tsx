@@ -886,7 +886,7 @@ export const LedgerStatementPage: React.FC = () => {
       {showMergedDialog && (
         <div className="fixed top-[80px] left-4 z-30 w-[420px] max-w-[95vw]">
           <div className="bg-card border border-line rounded-md shadow-2xl w-full overflow-hidden">
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide px-2 py-1 border-b border-line bg-red-600/90 text-center">
               Merged Ledger !
             </div>
             <div className="p-4 text-center">
@@ -948,7 +948,7 @@ export const LedgerStatementPage: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div className="text-[10px] text-ink-subtle italic pt-3">
+              <div className="text-[13px] text-ink-subtle italic pt-3">
                 <kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> cancel
               </div>
@@ -1036,7 +1036,7 @@ export const LedgerStatementPage: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div className="text-center text-[10px] text-ink-subtle italic pt-3">
+              <div className="text-center text-[13px] text-ink-subtle italic pt-3">
                 <kbd className="px-1 border border-line rounded bg-card">← →</kbd> select ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> cancel
@@ -1056,7 +1056,7 @@ export const LedgerStatementPage: React.FC = () => {
               <h2 className="text-sm font-bold flex-1">Account Ledger</h2>
               <button
                 onClick={() => { setShowModeDialog(false); setShowFormatDialog(true); }}
-                className="text-white/80 hover:text-white text-[11px] px-2 py-0.5 rounded border border-white/30"
+                className="text-white/80 hover:text-white text-[13px] px-2 py-0.5 rounded border border-white/30"
                 title="Back to format selection"
               >
                 ← Back
@@ -1066,7 +1066,7 @@ export const LedgerStatementPage: React.FC = () => {
               <div className="text-center mb-4">
                 <FaBook className="text-blue-500/60 text-3xl mx-auto mb-2" />
                 <div className="text-sm font-semibold text-ink">Ledger to be shown for</div>
-                <div className="text-[11px] text-ink-subtle mt-1">Choose how you want to view the ledger data</div>
+                <div className="text-[13px] text-ink-subtle mt-1">Choose how you want to view the ledger data</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
@@ -1138,31 +1138,31 @@ export const LedgerStatementPage: React.FC = () => {
                     }`}>
                       {m.icon} {m.label}
                     </div>
-                    <div className="text-[10px] text-ink-subtle mt-1">{m.desc}</div>
+                    <div className="text-[13px] text-ink-subtle mt-1">{m.desc}</div>
                   </button>
                 ))}
               </div>
-              <div className="text-center text-[10px] text-ink-subtle italic pt-3">
+              <div className="text-center text-[13px] text-ink-subtle italic pt-3">
                 <kbd className="px-1 border border-line rounded bg-card">← → ↑ ↓</kbd> select ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Enter</kbd> pick ·
                 {" "}<kbd className="px-1 border border-line rounded bg-card">Esc</kbd> back
               </div>
             </div>
             <div className="px-4 py-2 border-t border-line bg-card-2/50 flex items-center justify-between">
-              <span className="text-[10px] text-ink-subtle italic">You can change the mode later from the sidebar</span>
+              <span className="text-[13px] text-ink-subtle italic">You can change the mode later from the sidebar</span>
             </div>
           </div>
         </div>
       )}
 
       {/* Step 2: Busy-compact Options Dialog. Density matches Payment /
-         Receipt add pages: text-[11px], 12-col grid, px-2 py-1 inputs,
+         Receipt add pages: text-[13px], 12-col grid, px-2 py-1 inputs,
          tight vertical rhythm. */}
       {showOptionsDialog && (
         <div className="fixed top-[80px] left-4 z-30 w-2xl max-w-2xl" style={{ maxHeight: "calc(100vh - 100px)" }}>
           <div className="bg-card border border-line rounded-md shadow-sm w-full overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 100px)" }}>
             {/* Busy-style header bar (red, centered, uppercase, tight) */}
-            <div className="text-white text-[11px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
+            <div className="text-white text-[13px] font-bold uppercase tracking-wide flex items-center justify-between px-2 py-1 border-b border-line bg-red-600/90 shrink-0">
               <span className="flex-1 text-center">
                 {format === "t-format"
                   ? "Account Ledger — T-Format"
@@ -1177,14 +1177,14 @@ export const LedgerStatementPage: React.FC = () => {
                   else if (format === "t-format") setShowFormatDialog(true);
                   else setShowModeDialog(true);
                 }}
-                className="text-white/80 hover:text-white text-[10px] px-1.5 py-0.5 rounded border border-white/30"
+                className="text-white/80 hover:text-white text-[13px] px-1.5 py-0.5 rounded border border-white/30"
               >
                 ← Back
               </button>
             </div>
 
             {/* Body — 12-col grid, col-span-4 label + col-span-8 value */}
-            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[11px] items-center">
+            <div className="px-3 py-2 overflow-auto grid grid-cols-12 gap-x-2 gap-y-1 text-[13px] items-center">
               {viewMode === "one" && (
                 <>
                   <label className="col-span-4 text-ink-subtle font-semibold">Select Account *</label>
@@ -1213,7 +1213,7 @@ export const LedgerStatementPage: React.FC = () => {
                     const l = ledgers.find((x) => x.id === draftLedgerId);
                     if (!l) return null;
                     return (
-                      <div className="col-span-12 text-[10px] px-2 py-1 bg-card-2/40 border border-line-soft rounded flex items-center gap-2 flex-wrap">
+                      <div className="col-span-12 text-[13px] px-2 py-1 bg-card-2/40 border border-line-soft rounded flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-blue-400">{l.code}</span>
                         <span className="text-ink-subtle">·</span>
                         <span className="text-ink-muted">{l.group}</span>
@@ -1295,7 +1295,7 @@ export const LedgerStatementPage: React.FC = () => {
                             (e.target as HTMLInputElement).blur();
                           }
                         }}
-                        className="w-full px-2 py-1 pr-6 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                        className="w-full px-2 py-1 pr-6 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                         autoComplete="off"
                       />
                       {draftGroup && !groupPickerOpen && (
@@ -1305,7 +1305,7 @@ export const LedgerStatementPage: React.FC = () => {
                             e.preventDefault();
                             setDraftGroup(null);
                           }}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[11px]"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[13px]"
                           title="Clear"
                         >
                           ×
@@ -1320,7 +1320,7 @@ export const LedgerStatementPage: React.FC = () => {
                             );
                             if (list.length === 0) {
                               return (
-                                <div className="px-2 py-3 text-center text-[10px] text-ink-subtle italic">
+                                <div className="px-2 py-3 text-center text-[13px] text-ink-subtle italic">
                                   No groups found
                                 </div>
                               );
@@ -1344,7 +1344,7 @@ export const LedgerStatementPage: React.FC = () => {
                                     setGroupPickerQuery("");
                                   }}
                                   onMouseEnter={() => setGroupPickerHlIdx(idx)}
-                                  className={`w-full text-left px-2 py-1 text-[11px] flex items-center justify-between border-b border-line-soft last:border-b-0 ${
+                                  className={`w-full text-left px-2 py-1 text-[13px] flex items-center justify-between border-b border-line-soft last:border-b-0 ${
                                     isHl
                                       ? "bg-red-500/20 text-red-300"
                                       : draftGroup === g.group
@@ -1368,7 +1368,7 @@ export const LedgerStatementPage: React.FC = () => {
                     const g = groupedLedgers.find((x) => x.group === draftGroup);
                     if (!g) return null;
                     return (
-                      <div className="col-span-12 text-[10px] px-2 py-1 bg-card-2/40 border border-line-soft rounded text-ink-muted">
+                      <div className="col-span-12 text-[13px] px-2 py-1 bg-card-2/40 border border-line-soft rounded text-ink-muted">
                         <span className="font-semibold text-ink">{g.group}</span>
                         <span className="text-ink-subtle"> · {g.ledgers.length} account{g.ledgers.length === 1 ? "" : "s"}</span>
                       </div>
@@ -1492,11 +1492,11 @@ export const LedgerStatementPage: React.FC = () => {
                        Show List button. Kept minimal (no dates / toggles)
                        exactly like Busy screenshots 1-2. */}
                     <div className="col-span-12 border border-line rounded p-2 bg-card-2/30">
-                      <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle mb-1">
+                      <div className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle mb-1">
                         Select Accounts ({draftLedgerIds.size} ticked)
                       </div>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <label className="flex items-center gap-1.5 text-[11px] text-ink cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-[13px] text-ink cursor-pointer">
                           <input
                             type="radio"
                             name="selFilter"
@@ -1510,7 +1510,7 @@ export const LedgerStatementPage: React.FC = () => {
                           />
                           All Accounts
                         </label>
-                        <label className="flex items-center gap-1.5 text-[11px] text-ink cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-[13px] text-ink cursor-pointer">
                           <input
                             type="radio"
                             name="selFilter"
@@ -1544,7 +1544,7 @@ export const LedgerStatementPage: React.FC = () => {
                                   (e.target as HTMLInputElement).blur();
                                 }
                               }}
-                              className="w-full px-2 py-1 pr-6 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                              className="w-full px-2 py-1 pr-6 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                               autoComplete="off"
                             />
                             {selFilterGroup && !selGroupPickerOpen && (
@@ -1555,7 +1555,7 @@ export const LedgerStatementPage: React.FC = () => {
                                   setSelFilterGroup(null);
                                   setSelListShown(false);
                                 }}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[11px]"
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[13px]"
                                 title="Clear"
                               >
                                 ×
@@ -1570,7 +1570,7 @@ export const LedgerStatementPage: React.FC = () => {
                                   );
                                   if (list.length === 0) {
                                     return (
-                                      <div className="px-2 py-3 text-center text-[10px] text-ink-subtle italic">
+                                      <div className="px-2 py-3 text-center text-[13px] text-ink-subtle italic">
                                         No groups found
                                       </div>
                                     );
@@ -1586,7 +1586,7 @@ export const LedgerStatementPage: React.FC = () => {
                                         setSelGroupPickerQuery("");
                                         setSelListShown(false);
                                       }}
-                                      className={`w-full text-left px-2 py-1 text-[11px] flex items-center justify-between border-b border-line-soft last:border-b-0 hover:bg-card-2 ${
+                                      className={`w-full text-left px-2 py-1 text-[13px] flex items-center justify-between border-b border-line-soft last:border-b-0 hover:bg-card-2 ${
                                         selFilterGroup === g.group ? "bg-blue-500/10 text-blue-400" : "text-ink-muted"
                                       }`}
                                     >
@@ -1610,7 +1610,7 @@ export const LedgerStatementPage: React.FC = () => {
                             }
                             setSelListShown(true);
                           }}
-                          className="ml-auto px-3 py-0.5 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded"
+                          className="ml-auto px-3 py-0.5 text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded"
                         >
                           Show List
                         </button>
@@ -1623,11 +1623,11 @@ export const LedgerStatementPage: React.FC = () => {
                        when the list is empty / short. */}
                     <div className="col-span-12">
                       <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-                        <div className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle flex items-center gap-2">
+                        <div className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle flex items-center gap-2">
                           <span>List of Accounts</span>
                           {selListShown && <span className="text-ink normal-case">· {filtered.length}</span>}
                           {selListQuery && (
-                            <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 bg-blue-500/15 border border-blue-500/40 text-blue-400 rounded flex items-center gap-1">
+                            <span className="normal-case text-[13px] font-mono px-1.5 py-0.5 bg-blue-500/15 border border-blue-500/40 text-blue-400 rounded flex items-center gap-1">
                               🔍 {selListQuery}
                               <button
                                 type="button"
@@ -1697,7 +1697,7 @@ export const LedgerStatementPage: React.FC = () => {
                                   key={l.id}
                                   data-sel-row={i}
                                   onMouseEnter={() => setSelHighlightIdx(i)}
-                                  className={`flex items-center gap-2 px-2 py-0.5 text-[10px] border-b border-line-soft cursor-pointer ${
+                                  className={`flex items-center gap-2 px-2 py-0.5 text-[13px] border-b border-line-soft cursor-pointer ${
                                     selHighlightIdx === i
                                       ? "bg-blue-600/20 text-ink"
                                       : i % 2 === 1
@@ -1722,12 +1722,12 @@ export const LedgerStatementPage: React.FC = () => {
                               {/* Empty status message overlays the first blank
                                  row so panel doesn't look broken. */}
                               {!selListShown && (
-                                <div className="px-2 py-2 text-center text-[10px] text-ink-subtle italic border-b border-line-soft">
+                                <div className="px-2 py-2 text-center text-[13px] text-ink-subtle italic border-b border-line-soft">
                                   Start typing to load & filter, or click <b>Show List</b> above.
                                 </div>
                               )}
                               {selListShown && filtered.length === 0 && (
-                                <div className="px-2 py-2 text-center text-[10px] text-ink-subtle italic border-b border-line-soft">
+                                <div className="px-2 py-2 text-center text-[13px] text-ink-subtle italic border-b border-line-soft">
                                   {pool.length === 0 ? "No accounts in this filter" : `No matches for "${selListQuery}"`}
                                 </div>
                               )}
@@ -1735,7 +1735,7 @@ export const LedgerStatementPage: React.FC = () => {
                               {Array.from({ length: fillerCount }).map((_, i) => (
                                 <div
                                   key={`empty-${i}`}
-                                  className={`px-2 py-0.5 text-[10px] border-b border-line-soft ${
+                                  className={`px-2 py-0.5 text-[13px] border-b border-line-soft ${
                                     (visible.length + i) % 2 === 1 ? "bg-card-2/20" : ""
                                   }`}
                                 >
@@ -1752,7 +1752,7 @@ export const LedgerStatementPage: React.FC = () => {
                        "Select All" operates on the CURRENTLY FILTERED pool so
                        ticking after typing a search term ticks only matches. */}
                     {selListShown && (
-                      <div className="col-span-12 flex items-center gap-3 text-[11px]">
+                      <div className="col-span-12 flex items-center gap-3 text-[13px]">
                         <label className="flex items-center gap-1.5 text-ink cursor-pointer">
                           <input
                             type="checkbox"
@@ -1770,7 +1770,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setDraftLedgerIds(new Set())}
-                          className="text-[10px] text-ink-muted hover:text-ink border border-line px-2 py-0.5 rounded"
+                          className="text-[13px] text-ink-muted hover:text-ink border border-line px-2 py-0.5 rounded"
                         >
                           Clear
                         </button>
@@ -1783,13 +1783,13 @@ export const LedgerStatementPage: React.FC = () => {
               {/* Selected mode: mini header shown on the config step so user
                  knows how many accounts they picked in step 1. */}
               {viewMode === "selected" && selectedStep === "config" && (
-                <div className="col-span-12 border border-line rounded px-2 py-1 bg-card-2/30 text-[11px] flex items-center gap-2">
+                <div className="col-span-12 border border-line rounded px-2 py-1 bg-card-2/30 text-[13px] flex items-center gap-2">
                   <span className="text-ink-subtle font-semibold">Selected:</span>
                   <span className="text-ink font-bold">{draftLedgerIds.size} accounts</span>
                   <button
                     type="button"
                     onClick={() => setSelectedStep("panel")}
-                    className="ml-auto text-[10px] text-blue-500 hover:text-blue-400 font-semibold px-2 py-0.5 border border-blue-500/30 rounded"
+                    className="ml-auto text-[13px] text-blue-500 hover:text-blue-400 font-semibold px-2 py-0.5 border border-blue-500/30 rounded"
                   >
                     ← Change
                   </button>
@@ -1797,7 +1797,7 @@ export const LedgerStatementPage: React.FC = () => {
               )}
 
               {viewMode === "all" && (
-                <div className="col-span-12 text-[10px] text-ink-subtle italic text-center py-1">
+                <div className="col-span-12 text-[13px] text-ink-subtle italic text-center py-1">
                   Combined statement across every ledger
                 </div>
               )}
@@ -1839,7 +1839,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <select
                           value={draftOptions.accountBy}
                           onChange={(e) => setDraftOptions((p) => ({ ...p, accountBy: e.target.value as AccountBy }))}
-                          className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                          className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                         >
                           <option value="name">Name</option>
                           <option value="code">Code</option>
@@ -1850,7 +1850,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <select
                           value={draftOptions.showActualName ? "Y" : "N"}
                           onChange={(e) => setDraftOptions((p) => ({ ...p, showActualName: e.target.value === "Y" }))}
-                          className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                          className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                         >
                           <option value="Y">Y</option>
                           <option value="N">N</option>
@@ -1864,7 +1864,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <select
                           value={draftOptions.balanceShownAs}
                           onChange={(e) => setDraftOptions((p) => ({ ...p, balanceShownAs: e.target.value as BalanceShown }))}
-                          className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                          className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                         >
                           <option value="daily">Daily</option>
                           <option value="monthly">Monthly</option>
@@ -1876,7 +1876,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <select
                           value={draftOptions.accountBy}
                           onChange={(e) => setDraftOptions((p) => ({ ...p, accountBy: e.target.value as AccountBy }))}
-                          className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                          className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                         >
                           <option value="name">Name</option>
                           <option value="code">Code</option>
@@ -1887,7 +1887,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <select
                           value={draftOptions.shortNarration ? "Y" : "N"}
                           onChange={(e) => setDraftOptions((p) => ({ ...p, shortNarration: e.target.value === "Y" }))}
-                          className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+                          className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
                         >
                           <option value="Y">Y</option>
                           <option value="N">N</option>
@@ -1949,7 +1949,7 @@ export const LedgerStatementPage: React.FC = () => {
                                   }
                                 }}
                                 disabled={r.disabled}
-                                className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none disabled:opacity-40"
+                                className="w-[50px] px-1 py-0.5 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none disabled:opacity-40"
                               >
                                 <option value="Y">Y</option>
                                 <option value="N">N</option>
@@ -1965,11 +1965,11 @@ export const LedgerStatementPage: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[10px]">
+            <div className="px-3 py-1.5 border-t border-line bg-card-2 flex items-center justify-between shrink-0 text-[13px]">
               <span className="text-ink-subtle italic flex items-center gap-1.5">
                 {prefetching ? (
                   <>
-                    <FaSync className="animate-spin text-blue-500 text-[10px]" />
+                    <FaSync className="animate-spin text-blue-500 text-[13px]" />
                     <span className="text-blue-400 not-italic">Pre-loading data in background…</span>
                   </>
                 ) : (
@@ -1983,7 +1983,7 @@ export const LedgerStatementPage: React.FC = () => {
                   // skip Cancel and land on OK, so the operator can commit
                   // by simply pressing Enter through the final field.
                   tabIndex={-1}
-                  className="px-2 py-0.5 text-[11px] font-semibold text-ink-muted hover:text-ink hover:bg-card rounded border border-line"
+                  className="px-2 py-0.5 text-[13px] font-semibold text-ink-muted hover:text-ink hover:bg-card rounded border border-line"
                 >
                   Cancel
                 </button>
@@ -2018,7 +2018,7 @@ export const LedgerStatementPage: React.FC = () => {
                       to: draftEndDate || null,
                     });
                   }}
-                  className="px-3 py-0.5 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
+                  className="px-3 py-0.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1"
                 >
                   {(viewMode === "selected" && selectedStep === "panel") ? (
                     <><FaPlay className="text-[9px]" /> Next →</>
@@ -2044,7 +2044,7 @@ export const LedgerStatementPage: React.FC = () => {
 
         {/* Busy-style mode selector */}
         <div className="p-2 border-b border-line bg-card-2/40 shrink-0">
-          <div className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold mb-1">Ledger to be shown for</div>
+          <div className="text-[13px] uppercase tracking-wide text-ink-subtle font-semibold mb-1">Ledger to be shown for</div>
           <div className="grid grid-cols-2 gap-1">
             {[
               { key: "one" as const, label: "One Account", icon: <FaUser /> },
@@ -2057,7 +2057,7 @@ export const LedgerStatementPage: React.FC = () => {
                 onClick={() => {
                   setViewMode(m.key);
                 }}
-                className={`px-2 py-1 text-[10px] font-semibold rounded flex items-center justify-center gap-1 border transition-colors ${
+                className={`px-2 py-1 text-[13px] font-semibold rounded flex items-center justify-center gap-1 border transition-colors ${
                   viewMode === m.key
                     ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
                     : "bg-card border-line text-ink-muted hover:bg-card-2/60"
@@ -2073,7 +2073,7 @@ export const LedgerStatementPage: React.FC = () => {
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-semibold disabled:opacity-50"
+              className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[13px] font-semibold disabled:opacity-50"
             >
               <FaPlay className="text-[9px]" /> {refreshing ? "Refreshing..." : "Reload Combined Statement"}
             </button>
@@ -2083,13 +2083,13 @@ export const LedgerStatementPage: React.FC = () => {
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-semibold disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[13px] font-semibold disabled:opacity-50"
               >
                 <FaPlay className="text-[9px]" /> Reload ({selectedLedgerIds.size})
               </button>
               <button
                 onClick={() => setSelectedLedgerIds(new Set())}
-                className="px-2 py-1 border border-line rounded text-[10px] text-ink-muted hover:bg-card-2"
+                className="px-2 py-1 border border-line rounded text-[13px] text-ink-muted hover:bg-card-2"
               >
                 Clear
               </button>
@@ -2108,7 +2108,7 @@ export const LedgerStatementPage: React.FC = () => {
                 placeholder="Search ledgers..."
                 className="w-full border border-line rounded pl-7 pr-2 py-1 text-xs bg-card text-ink focus:outline-none focus:ring-1 focus:ring-blue-500/40 focus:border-blue-500"
               />
-              <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[10px]" />
+              <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[13px]" />
             </div>
           </div>
         )}
@@ -2117,15 +2117,15 @@ export const LedgerStatementPage: React.FC = () => {
         {viewMode === "all" ? (
           <div className="overflow-auto flex-1 min-h-0 p-3 text-center">
             <FaGlobe className="text-blue-500/40 text-2xl mx-auto mb-2 mt-6" />
-            <div className="text-[11px] text-ink-muted font-semibold">All Accounts mode</div>
-            <div className="text-[10px] text-ink-subtle mt-1">Click "Show Combined Statement" to load a merged ledger for every account.</div>
+            <div className="text-[13px] text-ink-muted font-semibold">All Accounts mode</div>
+            <div className="text-[13px] text-ink-subtle mt-1">Click "Show Combined Statement" to load a merged ledger for every account.</div>
           </div>
         ) : (
           <div className="overflow-auto flex-1 min-h-0 p-2">
             {ledgers.length === 0 ? (
-              <div className="text-[11px] text-ink-subtle italic px-2 py-4 text-center">Loading ledgers...</div>
+              <div className="text-[13px] text-ink-subtle italic px-2 py-4 text-center">Loading ledgers...</div>
             ) : groupedLedgers.length === 0 ? (
-              <div className="text-[11px] text-ink-subtle italic px-2 py-4 text-center">No ledgers match</div>
+              <div className="text-[13px] text-ink-subtle italic px-2 py-4 text-center">No ledgers match</div>
             ) : (
               groupedLedgers.map(({ group: gname, ledgers: gledgers }) => {
                 const isExpanded = expandedGroups.has(gname) || !!sidebarSearch.trim();
@@ -2143,7 +2143,7 @@ export const LedgerStatementPage: React.FC = () => {
                           toggleGroup(gname);
                         }
                       }}
-                      className={`w-full flex items-center gap-1.5 text-[11px] font-bold px-1 py-1 hover:bg-card-2/60 rounded ${
+                      className={`w-full flex items-center gap-1.5 text-[13px] font-bold px-1 py-1 hover:bg-card-2/60 rounded ${
                         groupSelected ? "bg-blue-500/15 text-blue-400" : "text-ink"
                       }`}
                     >
@@ -2172,7 +2172,7 @@ export const LedgerStatementPage: React.FC = () => {
                           className="w-3 h-3 accent-blue-500"
                         />
                       )}
-                      <FaFolderOpen className="text-[10px] text-blue-400" />
+                      <FaFolderOpen className="text-[13px] text-blue-400" />
                       <span className="truncate flex-1 text-left">{gname}</span>
                       <span className="text-[9px] text-ink-subtle font-mono">{gledgers.length}</span>
                     </button>
@@ -2181,7 +2181,7 @@ export const LedgerStatementPage: React.FC = () => {
                         {gledgers.map((l) => (
                           <div
                             key={l.id}
-                            className={`flex items-center gap-1.5 px-2 py-1 text-[11px] rounded transition-colors ${
+                            className={`flex items-center gap-1.5 px-2 py-1 text-[13px] rounded transition-colors ${
                               (viewMode === "one" && selectedLedgerId === l.id) ||
                               (viewMode === "selected" && selectedLedgerIds.has(l.id))
                                 ? "bg-blue-500/15 text-blue-400 font-semibold"
@@ -2232,7 +2232,7 @@ export const LedgerStatementPage: React.FC = () => {
           </div>
         )}
 
-        <div className="px-3 py-1.5 border-t border-line text-[10px] text-ink-subtle italic shrink-0">
+        <div className="px-3 py-1.5 border-t border-line text-[13px] text-ink-subtle italic shrink-0">
           <FaFileAlt className="inline mr-1" />
           {viewMode === "one" && "Click any ledger to view"}
           {viewMode === "group" && "Click a group header to view combined"}
@@ -2255,7 +2255,7 @@ export const LedgerStatementPage: React.FC = () => {
           <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
             <FaBook className="text-blue-500 text-sm" /> Ledger Statement
             {statement && (
-              <span className="text-[10px] font-medium text-ink-subtle uppercase tracking-wide">
+              <span className="text-[13px] font-medium text-ink-subtle uppercase tracking-wide">
                 · {statement.mode === "multi" ? statement.label : statement.ledger.name}
                 <span className="ml-2 px-1.5 py-0.5 bg-card border border-line rounded font-mono text-[9px] uppercase tracking-wide">
                   {format === "t-format" ? "T-Format" : "Standard"}
@@ -2263,7 +2263,7 @@ export const LedgerStatementPage: React.FC = () => {
               </span>
             )}
           </h3>
-          <span className="text-[10px] text-ink-subtle italic">
+          <span className="text-[13px] text-ink-subtle italic">
             From <b className="text-ink">{startDate}</b> to <b className="text-ink">{endDate}</b>
           </span>
 
@@ -2289,7 +2289,7 @@ export const LedgerStatementPage: React.FC = () => {
               className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold"
               title="Change account / group selection"
             >
-              <FaBook className="text-[10px]" /> Change Account
+              <FaBook className="text-[13px]" /> Change Account
             </button>
             <button
               onClick={refresh}
@@ -2316,7 +2316,7 @@ export const LedgerStatementPage: React.FC = () => {
             <div className="text-sm text-ink-muted font-semibold mb-1">
               {loading ? "Fetching statement…" : "Select a ledger from the sidebar"}
             </div>
-            <div className="text-[11px]">
+            <div className="text-[13px]">
               {loading
                 ? viewMode === "all"
                   ? "Combining every ledger — this can take a moment on first load"
@@ -2333,21 +2333,21 @@ export const LedgerStatementPage: React.FC = () => {
               <div className="flex items-center gap-2 min-w-0">
                 {statement.mode === "multi" ? (
                   <>
-                    <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded font-mono font-bold text-[10px] uppercase tracking-wide border border-blue-500/20 shrink-0">
+                    <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded font-mono font-bold text-[13px] uppercase tracking-wide border border-blue-500/20 shrink-0">
                       {viewMode === "all" ? "ALL" : viewMode === "group" ? "GRP" : "SEL"}
                     </span>
                     <span className="text-sm font-bold text-ink truncate">{statement.label}</span>
-                    <span className="text-[11px] text-ink-subtle whitespace-nowrap">
+                    <span className="text-[13px] text-ink-subtle whitespace-nowrap">
                       · {statement.ledgerCount} accounts merged
                     </span>
                   </>
                 ) : (
                   <>
-                    <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded font-mono font-bold text-[10px] uppercase tracking-wide border border-blue-500/20 shrink-0">
+                    <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded font-mono font-bold text-[13px] uppercase tracking-wide border border-blue-500/20 shrink-0">
                       {statement.ledger.code}
                     </span>
                     <span className="text-sm font-bold text-ink truncate">{statement.ledger.name}</span>
-                    <span className="text-[11px] text-ink-subtle whitespace-nowrap">
+                    <span className="text-[13px] text-ink-subtle whitespace-nowrap">
                       · {statement.ledger.group} · {statement.ledger.type}
                     </span>
                   </>
@@ -2356,21 +2356,21 @@ export const LedgerStatementPage: React.FC = () => {
 
               <div className="flex items-center gap-4 text-right shrink-0">
                 <div>
-                  <span className="text-[10px] text-ink-subtle font-semibold uppercase tracking-wide block leading-tight">
+                  <span className="text-[13px] text-ink-subtle font-semibold uppercase tracking-wide block leading-tight">
                     Opening
                   </span>
                   <span className="text-sm font-mono font-bold text-ink">
                     ₹ {formatAmount(Math.abs(statement.openingBalance))}
-                    <span className="ml-1 text-[10px]">{statement.openingBalance >= 0 ? "Dr" : "Cr"}</span>
+                    <span className="ml-1 text-[13px]">{statement.openingBalance >= 0 ? "Dr" : "Cr"}</span>
                   </span>
                 </div>
                 <div className="border-l border-line pl-4">
-                  <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wide block leading-tight">
+                  <span className="text-[13px] text-blue-500 font-semibold uppercase tracking-wide block leading-tight">
                     Closing
                   </span>
                   <span className="text-sm font-mono font-black text-blue-500">
                     ₹ {formatAmount(Math.abs(statement.closingBalance))}
-                    <span className="ml-1 text-[10px]">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
+                    <span className="ml-1 text-[13px]">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                   </span>
                 </div>
               </div>
@@ -2392,7 +2392,7 @@ export const LedgerStatementPage: React.FC = () => {
                   const closingOnCr = sumDr + openingBal >= sumCr;
 
                   const cell = "px-2 py-1 border-r border-line-soft";
-                  const hdrCell = "py-1.5 px-2 bg-head text-ink-muted font-bold text-[10px] uppercase tracking-wide border-r border-line";
+                  const hdrCell = "py-1.5 px-2 bg-head text-ink-muted font-bold text-[13px] uppercase tracking-wide border-r border-line";
 
                   const renderSide = (
                     entries: any[],
@@ -2414,7 +2414,7 @@ export const LedgerStatementPage: React.FC = () => {
                             <th className={hdrCell}>Type</th>
                             <th className={hdrCell}>Vch No</th>
                             <th className={hdrCell}>Particulars</th>
-                            <th className="py-1.5 px-2 bg-head text-ink-muted font-bold text-[10px] uppercase tracking-wide text-right">
+                            <th className="py-1.5 px-2 bg-head text-ink-muted font-bold text-[13px] uppercase tracking-wide text-right">
                               Amount ({kind === "dr" ? "Dr" : "Cr"})
                             </th>
                           </tr>
@@ -2438,9 +2438,9 @@ export const LedgerStatementPage: React.FC = () => {
                               key={row.id}
                               className={`border-b border-line-soft ${i % 2 === 1 ? "bg-card-2/20" : ""} hover:bg-card-2/70`}
                             >
-                              <td className={`${cell} font-mono text-[11px] whitespace-nowrap`}>{row.date}</td>
+                              <td className={`${cell} font-mono text-[13px] whitespace-nowrap`}>{row.date}</td>
                               <td className={`${cell} whitespace-nowrap`}>
-                                <span className="px-1 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
+                                <span className="px-1 py-0.5 rounded text-[13px] font-semibold bg-card-2 text-ink-muted border border-line">
                                   {shortVoucherType(row.voucherType)}
                                 </span>
                               </td>
@@ -2510,7 +2510,7 @@ export const LedgerStatementPage: React.FC = () => {
             <div className="overflow-auto flex-1 min-h-0">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-head text-ink-muted font-bold border-b border-line text-[10px] uppercase tracking-wide">
+                  <tr className="bg-head text-ink-muted font-bold border-b border-line text-[13px] uppercase tracking-wide">
                     <th className="py-2 px-3 bg-head">Date</th>  
                     <th className="py-2 px-3 bg-head">Type</th>
                     <th className="py-2 px-3 bg-head">DC No</th>
@@ -2567,14 +2567,14 @@ export const LedgerStatementPage: React.FC = () => {
                               : "hover:bg-card-2/70"
                         }`}
                       >
-                        <td className={`${cellBase} font-mono text-[11px] whitespace-nowrap`}>{row.date}</td>
+                        <td className={`${cellBase} font-mono text-[13px] whitespace-nowrap`}>{row.date}</td>
                         
                         <td className={`${cellBase} whitespace-nowrap`}>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
+                          <span className="px-1.5 py-0.5 rounded text-[13px] font-semibold bg-card-2 text-ink-muted border border-line">
                             {shortVoucherType(row.voucherType)}
                           </span>
                         </td>
-                        <td className={`${cellBase} font-mono text-[11px] text-ink-muted whitespace-nowrap`}>
+                        <td className={`${cellBase} font-mono text-[13px] text-ink-muted whitespace-nowrap`}>
                           {row.dcNo || "-"}
                         </td>
                         <td className={`${cellBase} font-mono font-bold whitespace-nowrap text-ink`}>
@@ -2585,7 +2585,7 @@ export const LedgerStatementPage: React.FC = () => {
                         </td>
                         
                         {narrCol > 0 && (
-                          <td className={`${cellBase} text-ink-subtle text-[11px] ${options.longNarration ? "" : "max-w-xs truncate"}`}>
+                          <td className={`${cellBase} text-ink-subtle text-[13px] ${options.longNarration ? "" : "max-w-xs truncate"}`}>
                             {row.narration || "-"}
                           </td>
                         )}
@@ -2601,7 +2601,7 @@ export const LedgerStatementPage: React.FC = () => {
                           ) : (
                             <>
                               ₹ {formatAmount(Math.abs(row.runningBalance))}
-                              <span className="ml-1 text-[10px] text-ink-subtle">{row.runningBalance >= 0 ? "Dr" : "Cr"}</span>
+                              <span className="ml-1 text-[13px] text-ink-subtle">{row.runningBalance >= 0 ? "Dr" : "Cr"}</span>
                             </>
                           )}
                         </td>
@@ -2614,7 +2614,7 @@ export const LedgerStatementPage: React.FC = () => {
                     // and bill sundry lines (Lorry Freight / Discount / etc.).
                     // Uses the Particulars column (spans across type + vch
                     // no + acc) to show the details.
-                    // Sub-row uses the SAME typography as the main row (text-[11px],
+                    // Sub-row uses the SAME typography as the main row (text-[13px],
                     // text-ink font-semibold, no italic, no muted variants) so the
                     // Details section reads as a natural continuation of the
                     // invoice line — matching Busy's reference screenshot.
@@ -2623,7 +2623,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <td className={cellBase}></td>
                         <td className={cellBase}></td>
                         <td className={cellBase}></td>
-                        <td className={`${cellBase} text-[11px] font-semibold text-ink pl-4`}>{content}</td>
+                        <td className={`${cellBase} text-[13px] font-semibold text-ink pl-4`}>{content}</td>
                         {narrCol > 0 && <td className={cellBase}></td>}
                         <td className={cellBase}></td>
                         <td className={cellBase}></td>
@@ -2788,17 +2788,17 @@ export const LedgerStatementPage: React.FC = () => {
                           <tr className="bg-blue-500/10">
                             <td
                               colSpan={totalCols}
-                              className="py-1 px-3 text-[11px] font-bold text-blue-400 uppercase tracking-wide border-b border-line-soft"
+                              className="py-1 px-3 text-[13px] font-bold text-blue-400 uppercase tracking-wide border-b border-line-soft"
                             >
                               *** {g.name} ***
                             </td>
                           </tr>
                           {groupRows}
                           <tr className="bg-card-2/50 border-b border-line-soft">
-                            <td colSpan={6 + narrCol} className={`${cellBase} text-[11px] font-bold text-blue-400 text-right`}>
+                            <td colSpan={6 + narrCol} className={`${cellBase} text-[13px] font-bold text-blue-400 text-right`}>
                               Closing Balance
                             </td>
-                            <td className="px-2 py-1 text-right font-mono font-bold text-blue-500 text-[11px] whitespace-nowrap">
+                            <td className="px-2 py-1 text-right font-mono font-bold text-blue-500 text-[13px] whitespace-nowrap">
                               {bal ? (
                                 <>₹ {formatAmount(bal.closing)} {bal.closingSide}</>
                               ) : (
@@ -2836,7 +2836,7 @@ export const LedgerStatementPage: React.FC = () => {
                 </span>
                 <span className="font-mono font-black text-blue-500">
                   Closing ₹ {formatAmount(Math.abs(statement.closingBalance))}
-                  <span className="ml-1 text-[10px] font-semibold">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
+                  <span className="ml-1 text-[13px] font-semibold">{statement.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                 </span>
               </div>
             </div>

@@ -247,18 +247,18 @@ const ContraVoucherEditPage: React.FC = () => {
     <div className="p-3">
       <div className="w-full lg:w-7xl max-w-full">
         <form onSubmit={handleSubmit} className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
-          <div className="bg-rose-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+          <div className="bg-rose-600/90 text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
             Modify Contra Voucher
           </div>
 
-          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[11px] items-center">
+          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[13px] items-center">
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Date</label>
             <div className="col-span-4">
               <DatePickerCalendar name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
 
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Vch No.</label>
-            <div className="col-span-6 text-ink font-mono font-bold text-[12px]">
+            <div className="col-span-6 text-ink font-mono font-bold text-[13px]">
               {voucher ? displayVoucherNo(voucher.voucherNo) : "..."}
             </div>
 
@@ -274,13 +274,13 @@ const ContraVoucherEditPage: React.FC = () => {
                     focusCell(0, "dc");
                   }
                 }}
-                className={`w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none ${ACTIVE_CELL}`}
+                className={`w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none ${ACTIVE_CELL}`}
               />
             </div>
           </div>
 
           <div className="border-b border-line" ref={tableRef}>
-            <table className="w-full text-[11px] border-collapse">
+            <table className="w-full text-[13px] border-collapse">
               <thead>
                 <tr className="bg-card-2 text-ink font-bold border-b border-line">
                   <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
@@ -305,7 +305,7 @@ const ContraVoucherEditPage: React.FC = () => {
                       key={row.id}
                       className={`border-b border-line-soft last:border-b-0 ${unlocked ? "" : "bg-card-2/10"}`}
                     >
-                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[11px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
+                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[13px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
                         {idx + 1}
                       </td>
                       <td className="w-20 px-0 py-0 border-r border-line text-center">
@@ -314,7 +314,7 @@ const ContraVoucherEditPage: React.FC = () => {
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
                           disabled={!unlocked}
-                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center focus:outline-none ${
+                          className={`w-full px-1 py-1 bg-transparent border-0 text-[13px] font-bold font-mono text-center focus:outline-none ${
                             row.dc === "D" ? "text-red-400" : "text-emerald-500"
                           } ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         >
@@ -351,7 +351,7 @@ const ContraVoucherEditPage: React.FC = () => {
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-red-400 text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-red-400 text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -371,7 +371,7 @@ const ContraVoucherEditPage: React.FC = () => {
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-emerald-500 text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-emerald-500 text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -387,7 +387,7 @@ const ContraVoucherEditPage: React.FC = () => {
                           onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
-                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />
                       </td>
                     </tr>
@@ -400,7 +400,7 @@ const ContraVoucherEditPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={addRow}
-                      className="flex items-center gap-1 text-[10px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer"
+                      className="flex items-center gap-1 text-[13px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer"
                     >
                       <FaPlus className="w-2 h-2" /> Add Row
                     </button>
@@ -411,7 +411,7 @@ const ContraVoucherEditPage: React.FC = () => {
                   <td className="w-28 px-2 py-1 text-right font-mono font-bold text-emerald-500 border-l border-line">
                     {formatAmount(totalCredit)}
                   </td>
-                  <td className="px-2 py-1 text-[10px] italic">
+                  <td className="px-2 py-1 text-[13px] italic">
                     {hasAnyAmount ? (
                       isBalanced ? (
                         <span className="text-emerald-600 font-semibold">Balanced · {validCount} entries</span>
@@ -430,7 +430,7 @@ const ContraVoucherEditPage: React.FC = () => {
           </div>
 
           <div className="px-3 py-2 flex items-center justify-between bg-card-2/40">
-            <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
+            <div className="flex items-center gap-2 text-[13px] text-ink-subtle">
               <FaExchangeAlt className="text-rose-500" />
               <span>Modify existing voucher — items will be fully replaced on save</span>
             </div>
@@ -438,14 +438,14 @@ const ContraVoucherEditPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate("/accounts/contra-entry")}
-                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
+                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[13px] transition cursor-pointer"
               >
                 Quit
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold text-[11px] transition disabled:opacity-50 cursor-pointer"
+                className="px-5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold text-[13px] transition disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Saving..." : "Save"}
               </button>

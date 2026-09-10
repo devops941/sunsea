@@ -5,7 +5,7 @@ export interface Shift {
   startTime: string;
   endTime: string;
   breakDuration?: string | number | null;
-  gracePeriod?: string | number | null;
+
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -17,7 +17,7 @@ export interface CreateShiftDto {
   startTime: string;
   endTime: string;
   breakDuration?: string | number | null;
-  gracePeriod?: string | number | null;
+
   isActive?: boolean;
 }
 

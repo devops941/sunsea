@@ -253,15 +253,15 @@ const ContraVoucherPage: React.FC = () => {
       <div data-escape-guarded className="p-3">
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
-            <div className="bg-rose-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+            <div className="bg-rose-600/90 text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
               List of Contra Vouchers
             </div>
-            <div className="p-4 space-y-2.5 text-[11px]">
+            <div className="p-4 space-y-2.5 text-[13px]">
               <FilterRow label="Voucher Series">
                 <select
                   value={pending.voucherSeries}
                   onChange={(e) => setPending({ ...pending, voucherSeries: e.target.value })}
-                  className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none"
+                  className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none"
                 >
                   <option value="<<-ALL->>">{"<<-ALL->>"}</option>
                   <option value="Main">Main</option>
@@ -290,7 +290,7 @@ const ContraVoucherPage: React.FC = () => {
                   onChange={(e) =>
                     setPending({ ...pending, accountShownBy: e.target.value as "Name" | "Alias" | "Code" })
                   }
-                  className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none"
+                  className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-rose-500/40 focus:border-rose-500 focus:outline-none"
                 >
                   <option value="Name">Name</option>
                   <option value="Alias">Alias</option>
@@ -311,14 +311,14 @@ const ContraVoucherPage: React.FC = () => {
                     setApplied(pending);
                     setPanelOpen(false);
                   }}
-                  className="px-6 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold text-[11px] transition cursor-pointer"
+                  className="px-6 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold text-[13px] transition cursor-pointer"
                 >
                   OK (F2)
                 </button>
               </div>
-              <div className="text-center text-[10px] text-ink-subtle italic pt-1">
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">Esc</kbd> to quit ·
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">F2</kbd> to submit
+              <div className="text-center text-[13px] text-ink-subtle italic pt-1">
+                <kbd className="px-1 border border-line rounded bg-card text-[13px]">Esc</kbd> to quit ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[13px]">F2</kbd> to submit
               </div>
             </div>
           </div>
@@ -332,11 +332,11 @@ const ContraVoucherPage: React.FC = () => {
     <div data-escape-guarded className="p-3 space-y-2 w-full max-w-7xl">
       {/* Header bar */}
       <div className="bg-card rounded-md border border-line px-3 py-1.5 flex flex-wrap items-center gap-2 shadow-sm">
-        <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
-          <FaExchangeAlt className="text-rose-500 text-sm" /> List of Contra Vouchers
-          {refreshing && <FaSync className="animate-spin text-rose-500 text-[10px]" />}
+        <h1 className="text-[13px] font-bold text-ink flex items-center gap-2 mr-2">
+          <FaExchangeAlt className="text-rose-500 text-[13px]" /> List of Contra Vouchers
+          {refreshing && <FaSync className="animate-spin text-rose-500 text-[13px]" />}
         </h1>
-        <span className="text-[10px] text-ink-subtle italic">
+        <span className="text-[13px] text-ink-subtle italic">
           Series: <b className="text-ink">{applied.voucherSeries}</b> · From{" "}
           <b className="text-ink">{applied.startDate}</b> to <b className="text-ink">{applied.endDate}</b>
         </span>
@@ -350,7 +350,7 @@ const ContraVoucherPage: React.FC = () => {
             className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line cursor-pointer"
             title="Change filters"
           >
-            <FaFilter className="text-[10px]" /> Change Filters
+            <FaFilter className="text-[13px]" /> Change Filters
           </button>
           <button
             onClick={refresh}
@@ -364,7 +364,7 @@ const ContraVoucherPage: React.FC = () => {
               disabled={deleting}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold border border-red-700 disabled:opacity-50 cursor-pointer"
             >
-              <FaTrash className="text-[10px]" />
+              <FaTrash className="text-[13px]" />
               {deleting ? "Deleting..." : `Delete (${selectedIds.size})`}
             </button>
           )}
@@ -372,7 +372,7 @@ const ContraVoucherPage: React.FC = () => {
             onClick={() => navigate("/accounts/contra-entry/add")}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold transition cursor-pointer"
           >
-            <FaPlus className="text-[10px]" /> New Contra
+            <FaPlus className="text-[13px]" /> New Contra
           </button>
         </div>
       </div>
@@ -386,7 +386,7 @@ const ContraVoucherPage: React.FC = () => {
           <div className="p-8 text-center text-xs text-ink-subtle">
             {loading ? (
               <span className="inline-flex items-center gap-2">
-                <FaSync className="animate-spin text-teal-500 text-[10px]" />
+                <FaSync className="animate-spin text-teal-500 text-[13px]" />
                 Loading contra vouchers…
               </span>
             ) : (
@@ -395,9 +395,9 @@ const ContraVoucherPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-auto flex-1">
-            <table className="w-full text-left text-[11px] text-ink-muted border-collapse">
+            <table className="w-full text-left text-[13px] text-ink-muted border-collapse">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-card-2 text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                <tr className="bg-card-2 text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
                   <th className="px-2 py-1.5 border-r border-line w-8 text-center">
                     <button type="button" onClick={toggleAll} className="text-ink-subtle hover:text-rose-500">
                       {allSelected ? <FaCheckSquare className="text-rose-500" /> : <FaSquare />}
@@ -446,7 +446,7 @@ const ContraVoucherPage: React.FC = () => {
                           </button>
                         )}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-mono text-[11px]">
+                      <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
                         {isFirst ? new Date(voucher.date).toLocaleDateString("en-GB") : ""}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-rose-500 text-center">
@@ -488,13 +488,13 @@ const ContraVoucherPage: React.FC = () => {
               </tbody>
               <tfoot className="sticky bottom-0 z-10 bg-card-2 border-t-2 border-line">
                 <tr>
-                  <td colSpan={4} className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide border-r border-line">
+                  <td colSpan={4} className="px-2 py-1.5 text-right text-[13px] font-bold text-ink uppercase tracking-wide border-r border-line">
                     Page Total ({vouchers.length} vouchers · {flatRows.length} entries)
                   </td>
-                  <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">
+                  <td className="px-2 py-1.5 text-right font-bold text-[13px] text-ink font-mono border-r border-line">
                     {formatAmount(totalDebit)}
                   </td>
-                  <td className="px-2 py-1.5 text-right font-bold text-sm text-ink font-mono border-r border-line">
+                  <td className="px-2 py-1.5 text-right font-bold text-[13px] text-ink font-mono border-r border-line">
                     {formatAmount(totalCredit)}
                   </td>
                   {applied.showNarration && <td></td>}
@@ -505,7 +505,7 @@ const ContraVoucherPage: React.FC = () => {
         )}
 
         {/* Busy-style status bar */}
-        <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[10px] font-mono text-ink-subtle">
+        <div className="border-t border-line bg-card-2/60 px-3 py-1 flex items-center justify-between text-[13px] font-mono text-ink-subtle">
           <div className="flex gap-4">
             <span>
               Entry No: <b className="text-ink">{vouchers.length > 0 ? 1 : 0} / {vouchers.length}</b>
@@ -547,7 +547,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       <button
         type="button"
         onClick={() => onChange(true)}
-        className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
+        className={`px-3 py-0.5 rounded text-[13px] font-mono font-bold border cursor-pointer ${
           value
             ? "bg-rose-600 text-white border-rose-600"
             : "bg-card text-ink-muted border-line hover:bg-card-2"
@@ -558,7 +558,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       <button
         type="button"
         onClick={() => onChange(false)}
-        className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
+        className={`px-3 py-0.5 rounded text-[13px] font-mono font-bold border cursor-pointer ${
           !value
             ? "bg-card-2 text-ink border-line"
             : "bg-card text-ink-muted border-line hover:bg-card-2"

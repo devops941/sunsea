@@ -100,6 +100,7 @@ const SupplierForm: React.FC = () => {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(false);
+    const [hasTransactions, setHasTransactions] = useState(false);
     const [phones, setPhones] = useState<PhoneEntry[]>([]);
     const [initialSupplier, setInitialSupplier] = useState<any>(null);
     const [isDirty, setIsDirty] = useState(false);
@@ -218,6 +219,7 @@ const SupplierForm: React.FC = () => {
             openingBalanceType: supplier.openingBalanceType || "CREDIT",
             status: supplier.status || "Active",
         });
+        if (supplier.hasTransactions) setHasTransactions(true);
 
         if (supplier.addresses && supplier.addresses.length > 0) {
             setAddresses(supplier.addresses);
@@ -417,7 +419,7 @@ const SupplierForm: React.FC = () => {
             addresses: addresses.map((addr) => { const copy = { ...addr }; delete copy.id; return copy; }),
         };
 
-        if (!isEdit) {
+        if (!isEdit || !hasTransactions) {
             payload.openingBalance = Number(formData.openingBalance || 0);
             payload.openingBalanceType = formData.openingBalanceType || "CREDIT";
         }
@@ -618,10 +620,10 @@ const SupplierForm: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
                                 <div>
-                                    <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} disabled={isEdit} />
-                                    {!isEdit && <p className="mt-0.5 text-[10px] text-amber-600">Set once. Cannot be edited later.</p>}
+                                    <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} disabled={isEdit && hasTransactions} />
+                                    {isEdit && hasTransactions && <p className="mt-0.5 text-[10px] text-amber-600">Cannot edit — supplier has existing transactions.</p>}
                                 </div>
-                                <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} disabled={isEdit} />
+                                <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} disabled={isEdit && hasTransactions} />
                             </div>
                         </div>
                     </div>

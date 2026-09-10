@@ -231,7 +231,7 @@ export const SupplierBreakdownPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <span className="font-mono font-bold text-ink">{item.voucherNo}</span>
           {item.postedToLedger === false && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+            <span className="px-1.5 py-0.5 rounded text-[13px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
               Not posted
             </span>
           )}
@@ -245,7 +245,7 @@ export const SupplierBreakdownPage: React.FC = () => {
     {
       header: "PAYMENT MODE",
       render: (item: any) => (
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
+        <span className="px-1.5 py-0.5 rounded text-[13px] font-semibold bg-card-2 text-ink-muted border border-line">
           {item.paymentMode || "General"}
         </span>
       ),
@@ -260,11 +260,11 @@ export const SupplierBreakdownPage: React.FC = () => {
     },
     {
       header: "REFERENCE NO",
-      render: (item: any) => <span className="text-ink-muted font-mono text-[11px]">{item.referenceNo || "-"}</span>,
+      render: (item: any) => <span className="text-ink-muted font-mono text-[13px]">{item.referenceNo || "-"}</span>,
     },
     {
       header: "NARRATION",
-      render: (item: any) => <span className="text-ink-muted text-[11px]">{item.narration || "-"}</span>,
+      render: (item: any) => <span className="text-ink-muted text-[13px]">{item.narration || "-"}</span>,
     },
   ];
 
@@ -285,7 +285,7 @@ export const SupplierBreakdownPage: React.FC = () => {
     },
     {
       header: "PARTICULARS",
-      render: (item: any) => <span className="text-ink text-[11px] font-medium">{item.particulars}</span>,
+      render: (item: any) => <span className="text-ink text-[13px] font-medium">{item.particulars}</span>,
     },
     {
       header: "DEBIT (DR)",
@@ -321,17 +321,17 @@ export const SupplierBreakdownPage: React.FC = () => {
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => navigate("/accounts/payable")}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted font-semibold rounded text-[11px] transition-colors border border-line shrink-0"
+              className="inline-flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted font-semibold rounded text-[13px] transition-colors border border-line shrink-0"
             >
               <FaArrowLeft size={9} /> Back
             </button>
             <h1 className="text-sm font-bold text-ink flex items-center gap-2 min-w-0 truncate">
               <FaBuilding className="text-orange-600 text-sm shrink-0" />
               <span className="truncate">{supplierDetail?.supplier.legalName || "Supplier Breakdown"}</span>
-              {refreshing && <FaSync className="animate-spin text-orange-600 text-[10px]" />}
+              {refreshing && <FaSync className="animate-spin text-orange-600 text-[13px]" />}
             </h1>
             {supplierDetail?.supplier.supplierCode && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded font-mono uppercase tracking-wide shrink-0">
+              <span className="text-[13px] font-semibold px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded font-mono uppercase tracking-wide shrink-0">
                 {supplierDetail.supplier.supplierCode}
               </span>
             )}
@@ -357,7 +357,7 @@ export const SupplierBreakdownPage: React.FC = () => {
         {/* Filter Row - single compact row */}
         <div className="px-3 py-2 bg-card-2 flex flex-wrap items-end gap-2">
           <div className="w-[140px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+            <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
             <SelectInput
               name="dateRangePreset"
               value={dateRangePreset}
@@ -368,7 +368,7 @@ export const SupplierBreakdownPage: React.FC = () => {
           </div>
 
           <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+            <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
             <DatePickerCalendar
               name="draftStartDate"
               value={draftStartDate}
@@ -377,7 +377,7 @@ export const SupplierBreakdownPage: React.FC = () => {
           </div>
 
           <div className="w-[130px]">
-            <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+            <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
             <DatePickerCalendar
               name="draftEndDate"
               value={draftEndDate}
@@ -416,46 +416,46 @@ export const SupplierBreakdownPage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-card border border-line rounded-lg p-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Opening</span>
+              <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Opening</span>
               <FaMoneyBillWave className="text-ink-muted text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-ink mt-1">
               ₹ {formatAmount(supplierDetail.summary.openingBalance)}
             </div>
-            <div className="text-[10px] text-ink-subtle mt-0.5">Starting liability</div>
+            <div className="text-[13px] text-ink-subtle mt-0.5">Starting liability</div>
           </div>
 
           <div className="bg-card border border-line rounded-lg p-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Invoiced</span>
+              <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Invoiced</span>
               <FaBuilding className="text-orange-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-ink mt-1">
               ₹ {formatAmount(supplierDetail.summary.totalBilled)}
             </div>
-            <div className="text-[10px] text-ink-subtle mt-0.5">GRN bills posted</div>
+            <div className="text-[13px] text-ink-subtle mt-0.5">GRN bills posted</div>
           </div>
 
           <div className="bg-card border border-line rounded-lg p-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Paid</span>
+              <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Paid</span>
               <FaCheckCircle className="text-emerald-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-emerald-600 mt-1">
               ₹ {formatAmount(supplierDetail.summary.totalPaid)}
             </div>
-            <div className="text-[10px] text-ink-subtle mt-0.5">Payments settled</div>
+            <div className="text-[13px] text-ink-subtle mt-0.5">Payments settled</div>
           </div>
 
           <div className="bg-card border border-line rounded-lg p-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Outstanding</span>
+              <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Outstanding</span>
               <FaExclamationTriangle className="text-amber-600 text-xs" />
             </div>
             <div className="text-lg font-mono font-bold text-orange-600 mt-1">
               ₹ {formatAmount(supplierDetail.summary.closingBalance)}
             </div>
-            <div className="text-[10px] text-ink-subtle mt-0.5">Net balance due</div>
+            <div className="text-[13px] text-ink-subtle mt-0.5">Net balance due</div>
           </div>
         </div>
       )}
@@ -471,7 +471,7 @@ export const SupplierBreakdownPage: React.FC = () => {
                 : "border-transparent text-ink-subtle hover:text-ink"
             }`}
           >
-            <FaFileInvoice className="text-[10px]" /> Invoices ({supplierDetail?.invoices?.length || 0})
+            <FaFileInvoice className="text-[13px]" /> Invoices ({supplierDetail?.invoices?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab("payments")}
@@ -481,7 +481,7 @@ export const SupplierBreakdownPage: React.FC = () => {
                 : "border-transparent text-ink-subtle hover:text-ink"
             }`}
           >
-            <FaHistory className="text-[10px]" /> Payments ({supplierDetail?.paymentHistory?.length || 0})
+            <FaHistory className="text-[13px]" /> Payments ({supplierDetail?.paymentHistory?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab("statement")}
@@ -491,7 +491,7 @@ export const SupplierBreakdownPage: React.FC = () => {
                 : "border-transparent text-ink-subtle hover:text-ink"
             }`}
           >
-            <FaList className="text-[10px]" /> Ledger ({supplierDetail?.statementEntries?.length || 0})
+            <FaList className="text-[13px]" /> Ledger ({supplierDetail?.statementEntries?.length || 0})
           </button>
         </div>
 

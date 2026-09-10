@@ -139,27 +139,27 @@ export const VoucherListPage: React.FC = () => {
     const s = (statusStr || "POSTED").toUpperCase();
     if (s === "POSTED" || s === "CLOSED") {
       return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[13px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
           POSTED
         </span>
       );
     }
     if (s === "DRAFT") {
       return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[13px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
           DRAFT
         </span>
       );
     }
     if (s === "CANCELLED" || s === "VOID") {
       return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[13px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
           CANCELLED
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[13px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
         {s}
       </span>
     );
@@ -228,13 +228,13 @@ export const VoucherListPage: React.FC = () => {
     <div className="p-3 space-y-3 min-h-screen">
       {/* Single-row Header + Filters (Busy-style compact) */}
       <div className="bg-card rounded-lg border border-line px-3 py-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
-          <FaFileInvoiceDollar className="text-blue-600 text-sm" /> Accounting Vouchers
-          {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
+        <h2 className="text-[13px] font-bold text-ink flex items-center gap-2 mr-2">
+          <FaFileInvoiceDollar className="text-blue-600 text-[13px]" /> Accounting Vouchers
+          {refreshing && <FaSync className="animate-spin text-blue-600 text-[13px]" />}
         </h2>
 
         <div className="flex items-center gap-1.5">
-          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Type</label>
+          <label className="text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Type</label>
           <select
             value={typeFilter}
             onChange={(e) => handleTypeChange(e.target.value)}
@@ -247,7 +247,7 @@ export const VoucherListPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
+          <label className="text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Range</label>
           <div className="w-[130px]">
             <SelectInput
               name="dateRangePreset"
@@ -260,7 +260,7 @@ export const VoucherListPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
+          <label className="text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">From</label>
           <div className="w-[130px]">
             <DatePickerCalendar
               name="draftStartDate"
@@ -271,7 +271,7 @@ export const VoucherListPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <label className="text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
+          <label className="text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">To</label>
           <div className="w-[130px]">
             <DatePickerCalendar
               name="draftEndDate"
@@ -290,7 +290,7 @@ export const VoucherListPage: React.FC = () => {
             onChange={(e) => setDraftSearchTerm(e.target.value)}
             placeholder="Search voucher no or narration..."
           />
-          <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[10px]" />
+          <FaSearch className="absolute left-2 top-2 text-ink-subtle text-[13px]" />
         </div>
 
         <button
@@ -331,7 +331,7 @@ export const VoucherListPage: React.FC = () => {
           <h2 className="text-xs font-semibold text-ink">
             {typeFilter === "ALL" ? "All Registered Vouchers" : `${typeFilter} Vouchers`}
           </h2>
-          <span className="text-[11px] text-ink-subtle font-mono">Total: {total}</span>
+          <span className="text-[13px] text-ink-subtle font-mono">Total: {total}</span>
         </div>
 
         {vouchers.length === 0 ? (
@@ -339,7 +339,7 @@ export const VoucherListPage: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-ink-muted">
-              <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+              <thead className="bg-head text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
                 <tr>
                   <th className="px-3 py-2">Voucher No</th>
                   <th className="px-3 py-2">Type</th>
@@ -376,11 +376,11 @@ export const VoucherListPage: React.FC = () => {
                         </button>
                       </td>
                       <td className="px-3 py-1.5">
-                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink border border-line">
+                        <span className="inline-flex px-1.5 py-0.5 rounded text-[13px] font-semibold bg-card-2 text-ink border border-line">
                           {v.type}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-[11px]">
+                      <td className="px-3 py-1.5 font-mono text-[13px]">
                         {new Date(v.date).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",
@@ -410,7 +410,7 @@ export const VoucherListPage: React.FC = () => {
                                   openViewModal(v);
                                 }
                               }}
-                              className="p-1 text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 border border-blue-200 rounded transition inline-flex items-center justify-center gap-1 text-[10px] font-semibold cursor-pointer"
+                              className="p-1 text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 border border-blue-200 rounded transition inline-flex items-center justify-center gap-1 text-[13px] font-semibold cursor-pointer"
                               title="View GRN / Purchase Invoice Detail"
                             >
                               <FaEye className="w-2.5 h-2.5" />
@@ -426,14 +426,14 @@ export const VoucherListPage: React.FC = () => {
                                   openViewModal(v);
                                 }
                               }}
-                              className="p-1 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 border border-emerald-200 rounded transition inline-flex items-center justify-center gap-1 text-[10px] font-semibold cursor-pointer"
+                              className="p-1 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 border border-emerald-200 rounded transition inline-flex items-center justify-center gap-1 text-[13px] font-semibold cursor-pointer"
                               title="View Sales Invoice Detail"
                             >
                               <FaEye className="w-2.5 h-2.5" />
                               <span>View</span>
                             </button>
                           ) : (
-                            <span className="text-ink-subtle text-[11px]">—</span>
+                            <span className="text-ink-subtle text-[13px]">—</span>
                           )}
                         </td>
                       )}
@@ -455,13 +455,13 @@ export const VoucherListPage: React.FC = () => {
             <div className="px-3 py-2 border-b border-line bg-card-2 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold font-mono text-ink">{selectedVoucher.voucherNo}</h2>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/20 text-blue-500 border border-blue-500/30">
+                  <h2 className="text-[13px] font-bold font-mono text-ink">{selectedVoucher.voucherNo}</h2>
+                  <span className="px-1.5 py-0.5 rounded text-[13px] font-semibold bg-blue-500/20 text-blue-500 border border-blue-500/30">
                     {selectedVoucher.type}
                   </span>
                   {renderStatusBadge(selectedVoucher.status)}
                 </div>
-                <p className="text-[11px] text-ink-subtle mt-0.5">
+                <p className="text-[13px] text-ink-subtle mt-0.5">
                   Date: {new Date(selectedVoucher.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
                 </p>
               </div>
@@ -478,17 +478,17 @@ export const VoucherListPage: React.FC = () => {
               {/* Ref Document Info */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-card-2 p-2 rounded border border-line">
                 <div>
-                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block">Invoice Number</span>
+                  <span className="text-[13px] font-semibold text-ink-subtle uppercase tracking-wide block">Invoice Number</span>
                   <span className="font-bold text-ink text-xs">{selectedVoucher.refDoc?.invoiceNo || "-"}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block">GRN / PO Ref</span>
+                  <span className="text-[13px] font-semibold text-ink-subtle uppercase tracking-wide block">GRN / PO Ref</span>
                   <span className="font-mono font-medium text-ink text-xs">{getGrnRef(selectedVoucher)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block">Supplier / Customer</span>
+                  <span className="text-[13px] font-semibold text-ink-subtle uppercase tracking-wide block">Supplier / Customer</span>
                   <span className="font-bold text-blue-600 flex items-center gap-1 mt-0.5 text-xs">
-                    <FaBuilding className="text-ink-subtle text-[10px]" />
+                    <FaBuilding className="text-ink-subtle text-[13px]" />
                     {getPartyName(selectedVoucher)}
                   </span>
                 </div>
@@ -498,11 +498,11 @@ export const VoucherListPage: React.FC = () => {
               {selectedVoucher.refDoc?.items && selectedVoucher.refDoc.items.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold text-ink mb-1.5 flex items-center gap-1.5">
-                    <FaReceipt className="text-blue-600 text-[10px]" /> Item Description & Quantities
+                    <FaReceipt className="text-blue-600 text-[13px]" /> Item Description & Quantities
                   </h3>
                   <div className="border border-line rounded overflow-hidden">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                      <thead className="bg-head text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
                         <tr>
                           <th className="px-3 py-1.5">Item Description</th>
                           <th className="px-3 py-1.5 text-center">UOM</th>
@@ -534,11 +534,11 @@ export const VoucherListPage: React.FC = () => {
               {/* Journal Postings */}
               <div>
                 <h3 className="text-xs font-semibold text-ink mb-1.5 flex items-center gap-1.5">
-                  <FaInfoCircle className="text-ink-subtle text-[10px]" /> Journal Postings (Debit / Credit Ledgers)
+                  <FaInfoCircle className="text-ink-subtle text-[13px]" /> Journal Postings (Debit / Credit Ledgers)
                 </h3>
                 <div className="border border-line rounded overflow-hidden">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                    <thead className="bg-head text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
                       <tr>
                         <th className="px-3 py-1.5">Debit Ledger</th>
                         <th className="px-3 py-1.5">Credit Ledger</th>
@@ -575,7 +575,7 @@ export const VoucherListPage: React.FC = () => {
               {/* Narration */}
               {selectedVoucher.narration && (
                 <div className="bg-card-2 p-2 rounded border border-line">
-                  <span className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wide block mb-0.5">Narration</span>
+                  <span className="text-[13px] font-semibold text-ink-subtle uppercase tracking-wide block mb-0.5">Narration</span>
                   <p className="text-ink-muted italic text-xs">{selectedVoucher.narration}</p>
                 </div>
               )}

@@ -10,7 +10,7 @@ datasource db {
 model Employee {
   id            BigInt         @id @default(autoincrement())
   empCode       String         @unique
-  fullName      String
+  fullName      String?
   mobile        String?        @db.VarChar(20)
   email         String?        @unique @db.VarChar(100)
   dateOfJoining DateTime?
@@ -556,7 +556,6 @@ model Shift {
   startTime            String
   endTime              String
   breakDuration        Int?
-  gracePeriod          Int?
   isActive             Boolean                      @default(true)
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
@@ -1848,6 +1847,7 @@ enum DiscountType {
 }
 
 enum EmployeeStatus {
+  draft
   active
   inactive
   resigned

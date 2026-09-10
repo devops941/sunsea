@@ -188,21 +188,21 @@ const JournalEntryAddPage: React.FC = () => {
       <div className="w-full lg:w-7xl max-w-full">
         <form onSubmit={handleSubmit} className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
           {/* Title bar — Journal uses purple accent */}
-          <div className="bg-purple-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+          <div className="bg-purple-600/90 text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
             Add Journal Voucher
           </div>
 
           {/* Top meta grid — Journal has NO Mode field (unlike Payment/Receipt).
              Labels are col-span-1 and right-aligned so they sit close to the
              input instead of leaving big empty gaps on a wide (7xl) container. */}
-          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[11px] items-center">
+          <div className="px-3 py-2 border-b border-line grid grid-cols-12 gap-x-2 gap-y-1.5 text-[13px] items-center">
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Date</label>
             <div className="col-span-4">
               <DatePickerCalendar name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
 
             <label className="col-span-1 text-ink-subtle font-semibold text-right">Vch No.</label>
-            <div className="col-span-6 text-ink-subtle font-mono text-[11px] italic">
+            <div className="col-span-6 text-ink-subtle font-mono text-[13px] italic">
               (auto)
             </div>
 
@@ -219,14 +219,14 @@ const JournalEntryAddPage: React.FC = () => {
                     focusCell(0, "dc");
                   }
                 }}
-                className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-purple-500/40 focus:border-purple-500 focus:outline-none"
+                className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-purple-500/40 focus:border-purple-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Spreadsheet items grid — with D/C column + separate Dr/Cr */}
           <div className="border-b border-line" ref={tableRef}>
-            <table className="w-full text-[11px] border-collapse">
+            <table className="w-full text-[13px] border-collapse">
               <thead>
                 <tr className="bg-card-2 text-ink font-bold border-b border-line">
                   <th className="w-10 px-2 py-1 text-center border-r border-line">S.No</th>
@@ -246,7 +246,7 @@ const JournalEntryAddPage: React.FC = () => {
                       key={row.id}
                       className={`border-b border-line-soft last:border-b-0 ${unlocked ? "" : "bg-card-2/10"}`}
                     >
-                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[11px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
+                      <td className={`w-10 px-2 py-0 text-center border-r border-line font-mono text-[13px] ${unlocked ? "text-ink-subtle bg-card-2/40" : "text-ink-subtle/40 bg-card-2/20"}`}>
                         {idx + 1}
                       </td>
                       <td className="w-12 px-0 py-0 border-r border-line text-center">
@@ -255,7 +255,7 @@ const JournalEntryAddPage: React.FC = () => {
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
                           disabled={!unlocked}
-                          className={`w-full px-1 py-1 bg-transparent border-0 text-[11px] font-bold font-mono text-center text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-1 py-1 bg-transparent border-0 text-[13px] font-bold font-mono text-center text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         >
                           <option value="D">D</option>
                           <option value="C">C</option>
@@ -289,7 +289,7 @@ const JournalEntryAddPage: React.FC = () => {
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -309,7 +309,7 @@ const JournalEntryAddPage: React.FC = () => {
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
                             onKeyDown={(e) => handleAmountKeyDown(e, idx)}
                             disabled={!unlocked}
-                            className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
                         ) : (
                           <div className="w-full px-2 py-1 text-right text-ink-subtle/30 font-mono">-</div>
@@ -324,7 +324,7 @@ const JournalEntryAddPage: React.FC = () => {
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
                           onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
                           disabled={!unlocked}
-                          className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                          className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />
                       </td>
                     </tr>
@@ -337,7 +337,7 @@ const JournalEntryAddPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={addRow}
-                      className="flex items-center gap-1 text-[10px] font-semibold text-purple-500 hover:text-purple-600 cursor-pointer"
+                      className="flex items-center gap-1 text-[13px] font-semibold text-purple-500 hover:text-purple-600 cursor-pointer"
                     >
                       <FaPlus className="w-2 h-2" /> Add Row
                     </button>
@@ -348,7 +348,7 @@ const JournalEntryAddPage: React.FC = () => {
                   <td className="w-28 px-2 py-1 text-right font-mono font-bold text-red-500 border-l border-line">
                     {formatAmount(totalCredit)}
                   </td>
-                  <td className="px-2 py-1 text-[10px] italic">
+                  <td className="px-2 py-1 text-[13px] italic">
                     {hasAnyAmount ? (
                       isBalanced ? (
                         <span className="text-emerald-600 font-semibold">Balanced · {validCount} entries</span>
@@ -368,26 +368,26 @@ const JournalEntryAddPage: React.FC = () => {
 
           {/* Bottom action bar */}
           <div className="px-3 py-2 flex items-center justify-between bg-card-2/40">
-            <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
+            <div className="flex items-center gap-2 text-[13px] text-ink-subtle">
               <FaBookOpen className="text-purple-500" />
               <span>
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">D</kbd> /
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">C</kbd> in D/C column •
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> to move forward
+                <kbd className="px-1 border border-line rounded bg-card text-[13px]">D</kbd> /
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[13px]">C</kbd> in D/C column •
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[13px]">Enter</kbd> to move forward
               </span>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => navigate("/accounts/journal-entry")}
-                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
+                className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[13px] transition cursor-pointer"
               >
                 Quit
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-semibold text-[11px] transition disabled:opacity-50 cursor-pointer"
+                className="px-5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-semibold text-[13px] transition disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Saving..." : "Save"}
               </button>

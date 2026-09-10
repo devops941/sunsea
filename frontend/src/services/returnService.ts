@@ -130,4 +130,14 @@ export const returnService = {
     const response = await apiClient.post("/returns/purchase", data);
     return response.data?.data;
   },
+
+  fetchPurchaseReturnById: async (id: string): Promise<PurchaseReturn> => {
+    const response = await apiClient.get(`/returns/purchase/${id}`);
+    return response.data?.data;
+  },
+
+  updatePurchaseReturn: async (id: string, data: CreatePurchaseReturnDto): Promise<PurchaseReturn> => {
+    const response = await apiClient.put(`/returns/purchase/${id}`, data);
+    return response.data?.data;
+  },
 };

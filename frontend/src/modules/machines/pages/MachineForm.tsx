@@ -335,16 +335,10 @@ const MachineForm: React.FC = () => {
                                 value={formData.technologyType}
                                 defaultOptionLabel="Select Technology"
                                 options={[
+                                    { label: 'Mixer', value: 'Mixer' },
+                                    { label: 'Grinding', value: 'GRINDING' },
                                     { label: 'Injection Moulding', value: 'INJECTION_MOULDING' },
-                                    { label: 'Extrusion', value: 'EXTRUSION' },
-                                    { label: 'Blow Moulding', value: 'BLOW_MOULDING' },
-                                    { label: 'Rotational Moulding', value: 'ROTATIONAL_MOULDING' },
-                                    { label: 'Thermoforming', value: 'THERMOFORMING' },
-                                    { label: 'Compression Moulding', value: 'COMPRESSION_MOULDING' },
                                     { label: 'Printing', value: 'PRINTING' },
-                                    { label: 'Granulation', value: 'GRANULATION' },
-                                    { label: 'Mixing', value: 'MIXING' },
-                                    { label: 'Recycling', value: 'RECYCLING' },
                                 ]}
                                 required
                                 horizontal

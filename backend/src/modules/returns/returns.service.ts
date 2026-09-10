@@ -448,6 +448,85 @@ class ReturnsService {
 
     return purchaseReturn;
   }
+
+  async getPurchaseReturnById(id: string) {
+    const returnRecord = await prisma.purchaseReturn.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, legalName: true, supplierCode: true } },
+        grnInvoice: { select: { id: true, invoiceNo: true } },
+        items: {
+          include: {
+            rawMaterial: { select: { rawMaterialId: true, materialName: true } },
+          },
+        },
+      },
+    });
+    if (!returnRecord) throw new ApiError(404, "Purchase return not found");
+    return returnRecord;
+  }
+
+  async updatePurchaseReturn(id: string, data: CreatePurchaseReturnInput, _updatedBy?: string) {
+    const existing = await prisma.purchaseReturn.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!existing) throw new ApiError(404, "Purchase return not found");
+
+    const supplier = await prisma.supplier.findUnique({ where: { id: data.supplierId } });
+    if (!supplier) throw new ApiError(404, "Supplier not found");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. Delete previous items
+      await tx.purchaseReturnItem.deleteMany({ where: { purchaseReturnId: id } });
+
+      // 2. Compute totals
+      let grandTotal = 0;
+      const itemsData = data.items.map((item) => {
+        const lineTotal = item.quantity * item.unitPrice;
+        grandTotal += lineTotal;
+
+        return {
+          rawMaterialId: item.rawMaterialId,
+          quantity: new Prisma.Decimal(item.quantity),
+          unitPrice: new Prisma.Decimal(item.unitPrice),
+          lineTotal: new Prisma.Decimal(lineTotal),
+          reason: item.reason || data.reason || null,
+        };
+      });
+
+      const record = await tx.purchaseReturn.update({
+        where: { id },
+        data: {
+          supplierId: data.supplierId,
+          grnInvoiceId: data.grnInvoiceId || null,
+          reason: data.reason || null,
+          grandTotal: new Prisma.Decimal(grandTotal),
+          status: "APPROVED",
+          narration: data.narration || null,
+          companyId: data.companyId,
+          items: {
+            create: itemsData,
+          },
+        },
+        include: {
+          items: true,
+          supplier: true,
+        },
+      });
+
+      return record;
+    });
+
+    try {
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postPurchaseReturnVoucher(updated.id);
+    } catch (vErr) {
+      console.error("[Auto-Post Voucher Error] Failed to post Purchase Return Voucher on update:", vErr);
+    }
+
+    return updated;
+  }
 }
 
 export const returnsService = new ReturnsService();

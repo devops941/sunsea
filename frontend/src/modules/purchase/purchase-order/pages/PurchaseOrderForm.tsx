@@ -1114,7 +1114,7 @@ const PurchaseOrderForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-[1400px] xl:mr-auto">
+    <div className="max-w-[1200px] xl:mr-auto">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
 
         {/* Header */}

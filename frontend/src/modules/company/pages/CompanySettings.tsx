@@ -248,7 +248,7 @@ const CompanySettings: React.FC = () => {
     setSaveConfirmOpen(false);
     setTimeout(() => {
       if (!validate()) {
-        toast.error("Required fields fill pannunga — please fill all required fields.");
+        toast.error("please fill all required fields.");
         return;
       }
       submitForm();

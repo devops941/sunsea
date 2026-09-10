@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaBoxes, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
@@ -47,6 +48,7 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 export const PurchaseReturnPage: React.FC = () => {
+  const navigate = useNavigate();
   const { can } = usePermission();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -548,10 +550,7 @@ export const PurchaseReturnPage: React.FC = () => {
             <CustomButton
               text="New Purchase Return"
               icon={FaPlus}
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
+              onClick={() => navigate("/purchase-returns/create")}
             />
           </div>
         </div>
@@ -614,21 +613,21 @@ export const PurchaseReturnPage: React.FC = () => {
                 {/* ── Return Details ── */}
                 <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                   <div>
-                    <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Supplier <span className="text-red-500">*</span></label>
+                    <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Supplier <span className="text-red-500">*</span></label>
                     <select value={supplierId} required onChange={(e) => setSupplierId(e.target.value)} className="w-full px-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary">
                       <option value="">Select Supplier</option>
                       {suppliers.map((s) => (<option key={s.id} value={String(s.id)}>{s.supplierCode} - {s.legalName}</option>))}
                     </select>
                   </div>
                   <div>
-                    <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Store / Warehouse <span className="text-red-500">*</span></label>
+                    <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Store / Warehouse <span className="text-red-500">*</span></label>
                     <select value={selectedStoreId} required onChange={(e) => setSelectedStoreId(e.target.value)} className="w-full px-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary">
                       <option value="">Select Store</option>
                       {stores.map((st) => (<option key={String(st.storeId || st.id)} value={String(st.storeId || st.id)}>{st.storeCode ? `${st.storeCode} - ` : ""}{st.storeName || st.name}</option>))}
                     </select>
                   </div>
                   <div>
-                    <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Refund Mode <span className="text-red-500">*</span></label>
+                    <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Refund Mode <span className="text-red-500">*</span></label>
                     <select value={refundMode} required onChange={(e) => setRefundMode(e.target.value as any)} className="w-full px-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary">
                       <option value="CREDIT_NOTE">Debit Note</option>
                       <option value="CASH">Cash Refund</option>
@@ -636,7 +635,7 @@ export const PurchaseReturnPage: React.FC = () => {
                     </select>
                   </div>
                   <div className="col-span-3">
-                    <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Reason for Return <span className="text-red-500">*</span></label>
+                    <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Reason for Return <span className="text-red-500">*</span></label>
                     <input type="text" value={reason} required placeholder="e.g. Damaged material / Substandard quality" onChange={(e) => setReason(e.target.value)} className="w-full px-2 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary" />
                   </div>
                 </div>
@@ -644,16 +643,16 @@ export const PurchaseReturnPage: React.FC = () => {
                 {/* ── Return Items ── */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[10px] font-semibold text-ink uppercase tracking-wide">Return Raw Materials</label>
-                    <button type="button" onClick={handleAddManualRow} className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 cursor-pointer"><FaPlus className="w-2.5 h-2.5" /> Add Row</button>
+                    <label className="text-[13px] font-semibold text-ink uppercase tracking-wide">Return Raw Materials</label>
+                    <button type="button" onClick={handleAddManualRow} className="flex items-center gap-1 text-[13px] font-semibold text-primary hover:text-primary/80 cursor-pointer"><FaPlus className="w-2.5 h-2.5" /> Add Row</button>
                   </div>
 
                   {returnRows.length === 0 ? (
-                    <div className="p-3 border border-dashed border-line rounded text-center text-[11px] text-ink-subtle">Click Add Row to select raw materials.</div>
+                    <div className="p-3 border border-dashed border-line rounded text-center text-[13px] text-ink-subtle">Click Add Row to select raw materials.</div>
                   ) : (
                     <div className="border border-line rounded overflow-hidden">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] tracking-wide font-bold border-b border-line">
+                        <thead className="bg-card-2 text-ink-subtle uppercase text-[13px] tracking-wide font-bold border-b border-line">
                           <tr>
                             <th className="px-2 py-1.5 w-8 text-center">#</th>
                             <th className="px-2 py-1.5">Raw Material</th>
@@ -671,23 +670,23 @@ export const PurchaseReturnPage: React.FC = () => {
                             const uomList = (matchedMat?.baseUom || row.uom || "").split(",").map((u: string) => u.trim()).filter(Boolean);
                             return (
                               <tr key={idx} className="hover:bg-card-2/50 transition-colors">
-                                <td className="px-2 py-1 text-center text-[11px] font-bold text-ink-subtle">{idx + 1}</td>
+                                <td className="px-2 py-1 text-center text-[13px] font-bold text-ink-subtle">{idx + 1}</td>
                                 <td className="px-2 py-1">
                                   {row.isGrnLinked ? (
-                                    <div className="font-semibold text-ink text-[11px]">{row.materialName}</div>
+                                    <div className="font-semibold text-ink text-[13px]">{row.materialName}</div>
                                   ) : (
-                                    <select value={row.rawMaterialId} onChange={(e) => handleRowMaterialChange(idx, e.target.value)} className="w-full px-1 border border-line rounded text-[11px] bg-card text-ink focus:outline-none focus:border-primary">
+                                    <select value={row.rawMaterialId} onChange={(e) => handleRowMaterialChange(idx, e.target.value)} className="w-full px-1 border border-line rounded text-[13px] bg-card text-ink focus:outline-none focus:border-primary">
                                       {materials.map((m) => { const rmId = String(m.rawMaterialId || m.id); return (<option key={rmId} value={rmId}>{m.materialName || m.name || rmId}</option>); })}
                                     </select>
                                   )}
                                 </td>
                                 <td className="px-2 py-1">
                                   {uomList.length > 1 ? (
-                                    <select value={row.uom} onChange={(e) => setReturnRows((prev) => { const u = [...prev]; u[idx] = { ...u[idx], uom: e.target.value }; return u; })} className="w-full px-1 border border-line rounded text-[11px] font-mono bg-card text-ink focus:outline-none focus:border-primary">
+                                    <select value={row.uom} onChange={(e) => setReturnRows((prev) => { const u = [...prev]; u[idx] = { ...u[idx], uom: e.target.value }; return u; })} className="w-full px-1 border border-line rounded text-[13px] font-mono bg-card text-ink focus:outline-none focus:border-primary">
                                       {uomList.map((u: string) => (<option key={u} value={u}>{u}</option>))}
                                     </select>
                                   ) : (
-                                    <span className="block text-center text-[11px] font-mono text-ink-muted">{row.uom || "—"}</span>
+                                    <span className="block text-center text-[13px] font-mono text-ink-muted">{row.uom || "—"}</span>
                                   )}
                                 </td>
                                 <td className="px-2 py-1">
@@ -696,7 +695,7 @@ export const PurchaseReturnPage: React.FC = () => {
                                 <td className="px-2 py-1">
                                   <input type="number" min="0" step="0.01" value={row.unitPrice || ""} disabled={row.isGrnLinked} onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)} onBlur={formatAmountOnBlur((val) => handleRowPriceChange(idx, parseFloat(val)))} className="w-full px-1 border border-line rounded text-right font-mono bg-card text-ink focus:outline-none focus:border-primary disabled:opacity-60" />
                                 </td>
-                                <td className="px-2 py-1 text-right font-mono font-semibold text-ink text-[11px]">₹{lineTot.toFixed(2)}</td>
+                                <td className="px-2 py-1 text-right font-mono font-semibold text-ink text-[13px]">₹{lineTot.toFixed(2)}</td>
                                 <td className="px-2 py-1 text-center">
                                   <button type="button" onClick={() => handleRemoveRow(idx)} className="p-0.5 text-rose-500 hover:text-rose-600 rounded transition cursor-pointer"><FaTrash className="w-2.5 h-2.5" /></button>
                                 </td>
@@ -706,7 +705,7 @@ export const PurchaseReturnPage: React.FC = () => {
                         </tbody>
                         <tfoot className="border-t-2 border-line bg-card-2">
                           <tr>
-                            <td colSpan={5} className="px-2 py-1.5 text-right text-[10px] font-bold text-ink uppercase tracking-wide">Grand Total:</td>
+                            <td colSpan={5} className="px-2 py-1.5 text-right text-[13px] font-bold text-ink uppercase tracking-wide">Grand Total:</td>
                             <td className="px-2 py-1.5 text-right font-bold text-sm text-primary font-mono">₹{grandTotal.toFixed(2)}</td>
                             <td></td>
                           </tr>
@@ -718,7 +717,7 @@ export const PurchaseReturnPage: React.FC = () => {
 
                 {/* ── Narration ── */}
                 <div>
-                  <label className="block mb-0.5 text-[10px] uppercase tracking-wide text-ink-subtle font-semibold">Narration / Internal Notes</label>
+                  <label className="block mb-0.5 text-[13px] uppercase tracking-wide text-ink-subtle font-semibold">Narration / Internal Notes</label>
                   <textarea value={narration} rows={2} placeholder="Additional accounting notes..." onChange={(e) => setNarration(e.target.value)} className="w-full px-2 py-1.5 border border-line bg-card-2 rounded text-xs text-ink focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary" />
                 </div>
               </div>
@@ -774,12 +773,12 @@ export const PurchaseReturnPage: React.FC = () => {
           selectedViewReturn && (
             <div className="space-y-3">
               <div>
-                <h4 className="font-semibold text-ink mb-1.5 text-[10px] uppercase tracking-wide">
+                <h4 className="font-semibold text-ink mb-1.5 text-[13px] uppercase tracking-wide">
                   Returned Raw Materials
                 </h4>
                 <div className="border border-line rounded overflow-hidden">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-head text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+                    <thead className="bg-head text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
                       <tr>
                         <th className="px-3 py-1.5">Material ID</th>
                         <th className="px-3 py-1.5">Material Name</th>
@@ -823,7 +822,7 @@ export const PurchaseReturnPage: React.FC = () => {
 
               {selectedViewReturn.narration && (
                 <div className="bg-card-2 p-2 rounded border border-line text-xs">
-                  <span className="font-semibold text-ink block mb-0.5 text-[10px] uppercase tracking-wide">
+                  <span className="font-semibold text-ink block mb-0.5 text-[13px] uppercase tracking-wide">
                     Narration / Notes
                   </span>
                   <p className="text-ink-muted leading-relaxed">{selectedViewReturn.narration}</p>

@@ -229,10 +229,10 @@ const DayBookPage: React.FC = () => {
       <div data-escape-guarded className="p-3">
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
-            <div className="bg-indigo-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+            <div className="bg-indigo-600/90 text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
               Day Book
             </div>
-            <div className="p-4 space-y-2.5 text-[11px]">
+            <div className="p-4 space-y-2.5 text-[13px]">
               <FilterRow label="Starting Date">
                 <DatePickerCalendar
                   name="startDate"
@@ -255,7 +255,7 @@ const DayBookPage: React.FC = () => {
                   onChange={(e) =>
                     setPending({ ...pending, accountShownBy: e.target.value as "Name" | "Code" })
                   }
-                  className="w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink focus:ring-1 focus:ring-indigo-500/40 focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-2 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-indigo-500/40 focus:border-indigo-500 focus:outline-none"
                 >
                   <option value="Name">Name</option>
                   <option value="Code">Code</option>
@@ -280,14 +280,14 @@ const DayBookPage: React.FC = () => {
                     setApplied(pending);
                     setPanelOpen(false);
                   }}
-                  className="px-6 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold text-[11px] transition cursor-pointer"
+                  className="px-6 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold text-[13px] transition cursor-pointer"
                 >
                   OK (F2)
                 </button>
               </div>
-              <div className="text-center text-[10px] text-ink-subtle italic pt-1">
-                <kbd className="px-1 border border-line rounded bg-card text-[10px]">Esc</kbd> to quit ·
-                {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">F2</kbd> to submit
+              <div className="text-center text-[13px] text-ink-subtle italic pt-1">
+                <kbd className="px-1 border border-line rounded bg-card text-[13px]">Esc</kbd> to quit ·
+                {" "}<kbd className="px-1 border border-line rounded bg-card text-[13px]">F2</kbd> to submit
               </div>
             </div>
           </div>
@@ -303,9 +303,9 @@ const DayBookPage: React.FC = () => {
       <div className="bg-card rounded-md border border-line px-3 py-1.5 flex flex-wrap items-center gap-2 shadow-sm">
         <h1 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
           <FaBook className="text-indigo-500 text-sm" /> Day Book
-          {refreshing && <FaSync className="animate-spin text-indigo-500 text-[10px]" />}
+          {refreshing && <FaSync className="animate-spin text-indigo-500 text-[13px]" />}
         </h1>
-        <span className="text-[10px] text-ink-subtle italic">
+        <span className="text-[13px] text-ink-subtle italic">
           From <b className="text-ink">{formatDateDMY(applied.startDate)}</b> to{" "}
           <b className="text-ink">{formatDateDMY(applied.endDate)}</b>
           {dayBook && (
@@ -323,7 +323,7 @@ const DayBookPage: React.FC = () => {
             }}
             className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold border border-line cursor-pointer"
           >
-            <FaFilter className="text-[10px]" /> Change Filters
+            <FaFilter className="text-[13px]" /> Change Filters
           </button>
           <button
             onClick={refresh}
@@ -344,7 +344,7 @@ const DayBookPage: React.FC = () => {
       >
         {loading && !dayBook ? (
           <div className="p-8 text-center text-xs text-ink-subtle">
-            <FaSync className="inline animate-spin text-indigo-500 text-[10px] mr-2" />
+            <FaSync className="inline animate-spin text-indigo-500 text-[13px] mr-2" />
             Loading day book…
           </div>
         ) : !dayBook || (dayBook.debitRows.length === 0 && dayBook.creditRows.length === 0) ? (
@@ -391,7 +391,7 @@ const DayBookPage: React.FC = () => {
 
       {/* Cash reconciliation banner — validates the Real-Account rule invariant. */}
       {dayBook && applied.showCashBalances && (
-        <div className="bg-card-2/40 border border-line rounded-md px-3 py-1.5 text-[10px] font-mono text-ink-subtle flex flex-wrap items-center gap-x-4 gap-y-0.5">
+        <div className="bg-card-2/40 border border-line rounded-md px-3 py-1.5 text-[13px] font-mono text-ink-subtle flex flex-wrap items-center gap-x-4 gap-y-0.5">
           <span>
             Opening Cash: <b className="text-ink">{fmt(dayBook.openingCashBalance)}</b>
           </span>
@@ -456,15 +456,15 @@ const ViewOptionsModal: React.FC<{
         className="w-[380px] bg-card border border-line rounded-md overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-indigo-600/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
+        <div className="bg-indigo-600/90 text-white text-[13px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
           View Options
         </div>
-        <div className="p-4 text-[11px] space-y-2">
+        <div className="p-4 text-[13px] space-y-2">
           <div className="bg-indigo-600/10 border border-indigo-500/30 rounded px-3 py-2">
-            <div className="text-ink font-semibold text-[12px] mb-0.5">
+            <div className="text-ink font-semibold text-[13px] mb-0.5">
               View Voucher — {displayVoucherNo(row.voucherNo)}
             </div>
-            <div className="text-ink-subtle text-[10px]">
+            <div className="text-ink-subtle text-[13px]">
               {row.typeShort} · {row.particulars}
               {" "}·{" "}
               <span className="font-mono">
@@ -480,21 +480,21 @@ const ViewOptionsModal: React.FC<{
               // Cancel and land on OK so the operator can commit with a
               // single Enter after the last field.
               tabIndex={-1}
-              className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
+              className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[13px] transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={onConfirm}
-              className="px-6 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold text-[11px] transition cursor-pointer"
+              className="px-6 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold text-[13px] transition cursor-pointer"
             >
               OK
             </button>
           </div>
-          <div className="text-center text-[10px] text-ink-subtle italic pt-1">
-            <kbd className="px-1 border border-line rounded bg-card text-[10px]">Esc</kbd> to cancel ·
-            {" "}<kbd className="px-1 border border-line rounded bg-card text-[10px]">Enter</kbd> to confirm
+          <div className="text-center text-[13px] text-ink-subtle italic pt-1">
+            <kbd className="px-1 border border-line rounded bg-card text-[13px]">Esc</kbd> to cancel ·
+            {" "}<kbd className="px-1 border border-line rounded bg-card text-[13px]">Enter</kbd> to confirm
           </div>
         </div>
       </div>
@@ -557,10 +557,10 @@ const DayBookSide: React.FC<{
   const borderCls = side === "Dr" ? "border-r border-line" : "";
 
   return (
-    <div className={`${borderCls} text-[11px]`}>
+    <div className={`${borderCls} text-[13px]`}>
       <table className="w-full border-collapse">
         <thead className="sticky top-0 z-10 bg-card-2">
-          <tr className="text-ink uppercase font-bold text-[10px] tracking-wide border-b border-line">
+          <tr className="text-ink uppercase font-bold text-[13px] tracking-wide border-b border-line">
             <th className="px-2 py-1 text-left border-r border-line-soft bg-card-2">Particulars</th>
             <th className="px-2 py-1 text-left border-r border-line-soft w-12 bg-card-2">Type</th>
             {applied.showVchNo && (
@@ -606,7 +606,7 @@ const DayBookSide: React.FC<{
               <tr className="bg-card-2/40 border-b border-line-soft">
                 <td
                   colSpan={applied.showVchNo ? 5 : 4}
-                  className="px-2 py-0.5 text-[10px] font-mono font-semibold text-indigo-500"
+                  className="px-2 py-0.5 text-[13px] font-mono font-semibold text-indigo-500"
                 >
                   {formatDateDMY(grp.date)}
                 </td>
@@ -689,7 +689,7 @@ const DayBookSide: React.FC<{
           <tr className="bg-card-2 border-t-2 border-line font-bold">
             <td
               colSpan={applied.showVchNo ? 3 : 2}
-              className="px-2 py-1 text-right text-[10px] uppercase text-ink border-r border-line-soft"
+              className="px-2 py-1 text-right text-[13px] uppercase text-ink border-r border-line-soft"
             >
               Total
             </td>
@@ -729,7 +729,7 @@ const DayBookSide: React.FC<{
           <tr className="bg-indigo-500/10 border-t-2 border-line font-bold">
             <td
               colSpan={applied.showVchNo ? 3 : 2}
-              className="px-2 py-1 text-right text-[10px] uppercase text-ink border-r border-line-soft"
+              className="px-2 py-1 text-right text-[13px] uppercase text-ink border-r border-line-soft"
             >
               Grand Total
             </td>
@@ -766,7 +766,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       <button
         type="button"
         onClick={() => onChange(true)}
-        className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
+        className={`px-3 py-0.5 rounded text-[13px] font-mono font-bold border cursor-pointer ${
           value
             ? "bg-indigo-600 text-white border-indigo-600"
             : "bg-card text-ink-muted border-line hover:bg-card-2"
@@ -777,7 +777,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       <button
         type="button"
         onClick={() => onChange(false)}
-        className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
+        className={`px-3 py-0.5 rounded text-[13px] font-mono font-bold border cursor-pointer ${
           !value
             ? "bg-card-2 text-ink border-line"
             : "bg-card text-ink-muted border-line hover:bg-card-2"

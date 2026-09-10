@@ -175,7 +175,7 @@ const BankAccountsPage: React.FC = () => {
               : filterType === "bank" ? <FaUniversity className="text-blue-600 text-sm" />
               : <FaUniversity className="text-blue-600 text-sm" />}
             {filterType === "cash" ? "Cash Accounts" : filterType === "bank" ? "Bank Accounts" : "Bank & Cash Accounts"}
-            {refreshing && <FaSync className="animate-spin text-blue-600 text-[10px]" />}
+            {refreshing && <FaSync className="animate-spin text-blue-600 text-[13px]" />}
           </h2>
           <div className="flex items-center gap-1.5">
             <button
@@ -213,7 +213,7 @@ const BankAccountsPage: React.FC = () => {
               onClick={() => setShowAddForm(true)}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition cursor-pointer"
             >
-              <FaPlus className="text-[10px]" /> Add Account
+              <FaPlus className="text-[13px]" /> Add Account
             </button>
           </div>
         </div>
@@ -223,7 +223,7 @@ const BankAccountsPage: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setSearchParams({})}
-              className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors ${
+              className={`px-2 py-1 rounded text-[13px] font-bold uppercase tracking-wide border transition-colors ${
                 !filterType ? "bg-blue-600 text-white border-blue-600" : "bg-card text-ink-muted border-line hover:border-blue-500/50"
               }`}
             >
@@ -231,7 +231,7 @@ const BankAccountsPage: React.FC = () => {
             </button>
             <button
               onClick={() => setSearchParams({ filter: "cash" })}
-              className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors flex items-center gap-1 ${
+              className={`px-2 py-1 rounded text-[13px] font-bold uppercase tracking-wide border transition-colors flex items-center gap-1 ${
                 filterType === "cash" ? "bg-emerald-600 text-white border-emerald-600" : "bg-card text-ink-muted border-line hover:border-emerald-500/50"
               }`}
             >
@@ -239,7 +239,7 @@ const BankAccountsPage: React.FC = () => {
             </button>
             <button
               onClick={() => setSearchParams({ filter: "bank" })}
-              className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors flex items-center gap-1 ${
+              className={`px-2 py-1 rounded text-[13px] font-bold uppercase tracking-wide border transition-colors flex items-center gap-1 ${
                 filterType === "bank" ? "bg-blue-600 text-white border-blue-600" : "bg-card text-ink-muted border-line hover:border-blue-500/50"
               }`}
             >
@@ -247,7 +247,7 @@ const BankAccountsPage: React.FC = () => {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+            <span className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
               {filterType === "cash" ? "Cash Balance" : filterType === "bank" ? "Bank Balance" : "Total Balance"}
             </span>
             <span className={`text-lg font-mono font-bold ${filteredBalance < 0 ? "text-red-500" : "text-ink"}`}>
@@ -275,7 +275,7 @@ const BankAccountsPage: React.FC = () => {
               <div className="flex items-start justify-between mb-2 gap-2">
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-ink truncate">{acc.name}</h3>
-                  <p className="text-[10px] uppercase tracking-wide font-mono text-ink-subtle mt-0.5">{acc.code}</p>
+                  <p className="text-[13px] uppercase tracking-wide font-mono text-ink-subtle mt-0.5">{acc.code}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {!acc.hasOpeningBalance && (
@@ -292,7 +292,7 @@ const BankAccountsPage: React.FC = () => {
                       <FaPen className="text-[9px]" />
                     </button>
                   )}
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  <span className={`px-1.5 py-0.5 rounded text-[13px] font-bold uppercase ${
                     isCashAccount(acc.group, acc.name)
                       ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                       : "bg-blue-500/10 text-blue-500 border border-blue-500/20"
@@ -302,7 +302,7 @@ const BankAccountsPage: React.FC = () => {
                 </div>
               </div>
               <div className="border-t border-line pt-2">
-                <p className="text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Current Balance</p>
+                <p className="text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Current Balance</p>
                 <p className={`text-base font-mono font-bold mt-0.5 ${
                   acc.currentBalance >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}>
@@ -310,13 +310,13 @@ const BankAccountsPage: React.FC = () => {
                   {/* Bank/Cash = ASSET, natural side is Dr. Positive balance
                       shows (Dr), negative balance (overdraft/shortage) shows (Cr).
                       The reverse mapping was flipping every card's label. */}
-                  <span className="text-[10px] ml-1">
+                  <span className="text-[13px] ml-1">
                     {acc.currentBalance >= 0 ? "(Dr)" : "(Cr)"}
                   </span>
                 </p>
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-line-soft">
-                <div className="text-[11px] text-ink-subtle">
+                <div className="text-[13px] text-ink-subtle">
                   <span className="text-emerald-500 font-semibold">↑ ₹{formatAmount(acc.totalDebit)}</span>
                   {" / "}
                   <span className="text-red-500 font-semibold">↓ ₹{formatAmount(acc.totalCredit)}</span>
@@ -346,7 +346,7 @@ const BankAccountsPage: React.FC = () => {
             <form onSubmit={handleAddBank} className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                  <label className="block mb-1 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                     Account Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -361,7 +361,7 @@ const BankAccountsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                  <label className="block mb-1 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                     Account Code <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -375,7 +375,7 @@ const BankAccountsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">Type</label>
+                  <label className="block mb-1 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">Type</label>
                   <select
                     value={newGroup}
                     onChange={(e) => setNewGroup(e.target.value)}
@@ -387,7 +387,7 @@ const BankAccountsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                  <label className="block mb-1 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                     Opening Balance (₹)
                   </label>
                   <div className="flex gap-1">
@@ -418,7 +418,7 @@ const BankAccountsPage: React.FC = () => {
 
               </div>
 
-              <div className="text-[10px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
+              <div className="text-[13px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
                 💡 <b>Tip:</b> Enter the actual bank balance shown in your bank statement/passbook.
                 A JV will auto-post: <b>Debit</b> {newName || "this account"} ₹{parseFloat(newOpeningBalance) || 0}
                 {" · "}<b>Credit</b> Opening Balance Equity. Every subsequent transaction updates from this starting balance.
@@ -440,7 +440,7 @@ const BankAccountsPage: React.FC = () => {
                   disabled={submitting}
                   className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {submitting ? <><FaSync className="animate-spin text-[10px]" /> Creating...</> : <><FaPlus className="text-[10px]" /> Create Account</>}
+                  {submitting ? <><FaSync className="animate-spin text-[13px]" /> Creating...</> : <><FaPlus className="text-[13px]" /> Create Account</>}
                 </button>
               </div>
             </form>
@@ -492,7 +492,7 @@ const BankAccountsPage: React.FC = () => {
               className="p-4 space-y-3"
             >
               <div>
-                <label className="block mb-1 text-[10px] uppercase tracking-wide font-semibold text-ink-subtle">
+                <label className="block mb-1 text-[13px] uppercase tracking-wide font-semibold text-ink-subtle">
                   Actual Opening Balance (₹)
                 </label>
                 <input
@@ -508,7 +508,7 @@ const BankAccountsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="text-[10px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
+              <div className="text-[13px] text-ink-subtle bg-card-2 border border-line rounded p-2 leading-relaxed">
                 💡 A JV will auto-post: <b>Debit</b> {editingBank.name} ₹{parseFloat(editOpeningBalance) || 0}
                 {" · "}<b>Credit</b> Opening Balance Equity. Any previous opening JV for this account is replaced.
               </div>
@@ -527,7 +527,7 @@ const BankAccountsPage: React.FC = () => {
                   disabled={editSubmitting}
                   className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {editSubmitting ? <><FaSync className="animate-spin text-[10px]" /> Saving...</> : "Save Opening Balance"}
+                  {editSubmitting ? <><FaSync className="animate-spin text-[13px]" /> Saving...</> : "Save Opening Balance"}
                 </button>
               </div>
             </form>

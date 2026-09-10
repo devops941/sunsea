@@ -3,7 +3,7 @@ import config from "../api/config";
 import type { Employee, CreateEmployeeDto, UpdateEmployeeDto } from "../features/employee/types";
 
 export const employeeService = {
-  fetchAll: async (params?: { search?: string; departmentId?: string | number; roleId?: string | number; status?: string; page?: number; limit?: number }): Promise<any> => {
+  fetchAll: async (params?: { search?: string; departmentId?: string | number; roleId?: string | number; status?: string; includeDrafts?: boolean; page?: number; limit?: number }): Promise<any> => {
     const response = await apiClient.get(config.employee.base, { params });
     return response.data?.data || response.data;
   },
