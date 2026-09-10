@@ -10,6 +10,44 @@ import { accountsService } from "../accounts/accounts.service";
 import { voucherPostingService } from "../accounts/voucherPosting.service";
 
 class CustomerService {
+  /**
+   * Derive lastPurchaseDate and lastPaymentDate from the account ledger.
+   * - lastPurchaseDate = date of the most recent SALES voucher where the customer ledger is debited
+   * - lastPaymentDate  = date of the most recent RECEIPT voucher where the customer ledger is credited
+   */
+  async getCustomerLedgerDates(customerId: string): Promise<{ lastPurchaseDate: Date | null; lastPaymentDate: Date | null }> {
+    const ledger = await prisma.accountLedger.findUnique({
+      where: { customerId },
+      select: { id: true },
+    });
+    if (!ledger) return { lastPurchaseDate: null, lastPaymentDate: null };
+
+    // Last SALES voucher date (customer ledger debited = purchase/invoice)
+    const lastSalesItem = await prisma.journalItem.findFirst({
+      where: {
+        debitLedgerId: ledger.id,
+        voucher: { type: "SALES" },
+      },
+      orderBy: { voucher: { date: "desc" } },
+      select: { voucher: { select: { date: true } } },
+    });
+
+    // Last RECEIPT voucher date (customer ledger credited = payment received)
+    const lastReceiptItem = await prisma.journalItem.findFirst({
+      where: {
+        creditLedgerId: ledger.id,
+        voucher: { type: "RECEIPT" },
+      },
+      orderBy: { voucher: { date: "desc" } },
+      select: { voucher: { select: { date: true } } },
+    });
+
+    return {
+      lastPurchaseDate: lastSalesItem?.voucher?.date ?? null,
+      lastPaymentDate: lastReceiptItem?.voucher?.date ?? null,
+    };
+  }
+
   async createCustomer(data: CreateCustomerInput, currentUser: { userId: string; companyId: string }) {
     const existingCustomer = await prisma.customer.findFirst({
       where: {
@@ -271,6 +309,9 @@ class CustomerService {
       (item: any) => item.voucher?.refDocType !== "CUSTOMER_OPENING_BALANCE"
     );
 
+    // Derive last purchase / payment dates from ledger
+    const { lastPurchaseDate, lastPaymentDate } = await this.getCustomerLedgerDates(id);
+
     return {
       ...customer,
       createdUserName,
@@ -279,6 +320,8 @@ class CustomerService {
       balanceAmount,
       balanceType,
       hasTransactions,
+      lastPurchaseDate,
+      lastPaymentDate,
     };
   }
 

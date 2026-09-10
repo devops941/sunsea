@@ -34,6 +34,15 @@ export interface AccountsSummaryTxn {
   creditLedger: string;
 }
 
+export interface CreditDaysOverdueItem {
+  customerId: string;
+  name: string;
+  daysSince: number;
+  creditDays: number;
+  outstanding: number;
+  lastDate: string;
+}
+
 export interface AccountsSummary {
   totalSales: number;
   salesVoucherCount: number;
@@ -56,6 +65,8 @@ export interface AccountsSummary {
   todayPaymentCount: number;
   recentTransactions: AccountsSummaryTxn[];
   alerts: AccountsSummaryAlert[];
+  purchaseOverdue: CreditDaysOverdueItem[];
+  paymentOverdue: CreditDaysOverdueItem[];
 }
 
 export interface TvSeriesPoint { day: string; value: number }
