@@ -543,6 +543,142 @@ const dashboardController = {
         });
       }
 
+      // ─── Credit Days Overdue — Purchase & Payment (separate sections) ───
+      // Derive lastPurchaseDate / lastPaymentDate from the account ledger (vouchers)
+      // for customers who have creditDays set and outstanding balance > 0
+      const purchaseOverdue: Array<{ customerId: string; name: string; daysSince: number; creditDays: number; outstanding: number; lastDate: string }> = [];
+      const paymentOverdue: Array<{ customerId: string; name: string; daysSince: number; creditDays: number; outstanding: number; lastDate: string }> = [];
+      try {
+        const creditCustomers = await prisma.customer.findMany({
+          where: {
+            creditDays: { not: null, gt: 0 },
+            status: "Active",
+          },
+          select: {
+            id: true,
+            firmName: true,
+            displayName: true,
+            creditDays: true,
+            outstandingAmount: true,
+            accountLedger: { select: { id: true } },
+          },
+        });
+
+        // Get customers with ledger accounts
+        const custsWithLedger = creditCustomers.filter(c => c.accountLedger);
+        const ledgerIdToCustomer = new Map<number, typeof custsWithLedger[0]>();
+        for (const c of custsWithLedger) {
+          if (c.accountLedger) ledgerIdToCustomer.set(c.accountLedger.id, c);
+        }
+
+        if (ledgerIdToCustomer.size > 0) {
+          const ledgerIds = [...ledgerIdToCustomer.keys()];
+
+          // Compute real net balance per customer ledger from journal items (debit - credit)
+          const balanceRaw: any[] = await prisma.$queryRaw`
+            SELECT
+              COALESCE(d."ledgerId", c."ledgerId") AS "ledgerId",
+              COALESCE(d."totalDebit", 0) - COALESCE(c."totalCredit", 0) AS "netBalance"
+            FROM
+              (SELECT "debitLedgerId" AS "ledgerId", SUM("debitAmount") AS "totalDebit"
+               FROM journal_items WHERE "debitLedgerId" = ANY(${ledgerIds}::int[]) GROUP BY "debitLedgerId") d
+            FULL OUTER JOIN
+              (SELECT "creditLedgerId" AS "ledgerId", SUM("creditAmount") AS "totalCredit"
+               FROM journal_items WHERE "creditLedgerId" = ANY(${ledgerIds}::int[]) GROUP BY "creditLedgerId") c
+            ON d."ledgerId" = c."ledgerId"
+          `;
+          const balanceMap = new Map<number, number>(balanceRaw.map(r => [r.ledgerId, Number(r.netBalance || 0)]));
+
+
+          const lastSalesRaw: any[] = await prisma.$queryRaw`
+            SELECT ji."debitLedgerId" AS "ledgerId", MAX(v."date") AS "lastDate"
+            FROM journal_items ji
+            JOIN vouchers v ON v.id = ji."voucherId"
+            WHERE ji."debitLedgerId" = ANY(${ledgerIds}::int[])
+              AND v."type" = 'SALES'
+            GROUP BY ji."debitLedgerId"
+          `;
+          const lastSalesMap = new Map<number, Date>(lastSalesRaw.map(r => [r.ledgerId, new Date(r.lastDate)]));
+
+          const lastReceiptRaw: any[] = await prisma.$queryRaw`
+            SELECT ji."creditLedgerId" AS "ledgerId", MAX(v."date") AS "lastDate"
+            FROM journal_items ji
+            JOIN vouchers v ON v.id = ji."voucherId"
+            WHERE ji."creditLedgerId" = ANY(${ledgerIds}::int[])
+              AND v."type" = 'RECEIPT'
+            GROUP BY ji."creditLedgerId"
+          `;
+          const lastReceiptMap = new Map<number, Date>(lastReceiptRaw.map(r => [r.ledgerId, new Date(r.lastDate)]));
+
+          // TODO: REMOVE — simulate Sep 17 for testing overdue alerts
+          const nowMs = new Date("2026-09-18").getTime();
+          // const nowMs = Date.now();
+
+          for (const [ledgerId, c] of ledgerIdToCustomer) {
+            const creditDays = c.creditDays!;
+            const custName = c.displayName || c.firmName;
+            const outstanding = balanceMap.get(ledgerId) || 0;
+
+            // Purchase Overdue — show if no purchase in credit days period
+            // (regardless of balance — customer is inactive, needs follow-up)
+            const lastPurchaseDate = lastSalesMap.get(ledgerId);
+            if (lastPurchaseDate) {
+              const daysSincePurchase = Math.floor((nowMs - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+              if (daysSincePurchase > creditDays) {
+                purchaseOverdue.push({
+                  customerId: c.id,
+                  name: custName,
+                  daysSince: daysSincePurchase,
+                  creditDays,
+                  outstanding,
+                  lastDate: lastPurchaseDate.toISOString(),
+                });
+              }
+            }
+
+            // Payment Overdue — only show if outstanding > 0
+            // (if fully paid, no need to alert about payment)
+            if (outstanding > 0) {
+              const lastPaymentDate = lastReceiptMap.get(ledgerId);
+              if (lastPaymentDate) {
+                // Has paid before — check if last payment exceeded credit days
+                const daysSincePayment = Math.floor((nowMs - lastPaymentDate.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSincePayment > creditDays) {
+                  paymentOverdue.push({
+                    customerId: c.id,
+                    name: custName,
+                    daysSince: daysSincePayment,
+                    creditDays,
+                    outstanding,
+                    lastDate: lastPaymentDate.toISOString(),
+                  });
+                }
+              } else if (lastPurchaseDate) {
+                // Never paid at all — use last purchase date to calculate overdue
+                const daysSincePurchase = Math.floor((nowMs - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSincePurchase > creditDays) {
+                  paymentOverdue.push({
+                    customerId: c.id,
+                    name: custName,
+                    daysSince: daysSincePurchase,
+                    creditDays,
+                    outstanding,
+                    lastDate: lastPurchaseDate.toISOString(),
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Credit days overdue alert error:", err);
+      }
+
+      // Sort by days overdue descending (most overdue first)
+      purchaseOverdue.sort((a, b) => b.daysSince - a.daysSince);
+      paymentOverdue.sort((a, b) => b.daysSince - a.daysSince);
+
+
       return res.json({
         success: true,
         data: {
@@ -561,6 +697,9 @@ const dashboardController = {
           todayReceipts, todayPayments, todayReceiptCount, todayPaymentCount,
           recentTransactions,
           alerts,
+          // Credit days overdue — separate lists for dedicated UI sections
+          purchaseOverdue,
+          paymentOverdue,
         },
       });
     } catch (error) {

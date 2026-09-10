@@ -51,6 +51,8 @@ export interface Customer {
   stateCode?: string;
   creditLimit?: number | string | null;
   creditDays?: number | null;
+  lastPurchaseDate?: string | null;
+  lastPaymentDate?: string | null;
   openingBalance?: number | string | null;
   openingBalanceType?: string | null;
   priceList?: string | null;

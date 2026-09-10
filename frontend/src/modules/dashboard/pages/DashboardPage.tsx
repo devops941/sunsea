@@ -216,7 +216,7 @@ const DashboardPage: React.FC = () => {
   const isSyncingAccounts = accountsSummaryCache.refreshing;
   const refreshAccountsSummary = accountsSummaryCache.refresh;
   const rawAccountsSummary = accSummaryList[0] || null;
-  const accountsSummary = rawAccountsSummary ? { ...rawAccountsSummary, alerts: rawAccountsSummary.alerts || [], recentTransactions: rawAccountsSummary.recentTransactions || [] } : null;
+  const accountsSummary = rawAccountsSummary ? { ...rawAccountsSummary, alerts: rawAccountsSummary.alerts || [], recentTransactions: rawAccountsSummary.recentTransactions || [], purchaseOverdue: rawAccountsSummary.purchaseOverdue || [], paymentOverdue: rawAccountsSummary.paymentOverdue || [] } : null;
   const isAccountsLoading = accountsSummaryCache.loading || !accountsSummary;
 
   usePageSocketSync(
@@ -1502,6 +1502,143 @@ const DashboardPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* ══════════════════════════════════════════════════════
+           ROW 3.5  –  Purchase Overdue (Left) + Payment Overdue (Right)
+           ══════════════════════════════════════════════════════ */}
+        {accountsSummary && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+            {/* Purchase Overdue */}
+            <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden" style={{ height: "420px" }}>
+              <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
+                  <FaShoppingCart className="text-amber-400 text-xs" />
+                  <span>Purchase Overdue</span>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                  accountsSummary.purchaseOverdue.length > 0
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                }`}>
+                  {accountsSummary.purchaseOverdue.length} Customer{accountsSummary.purchaseOverdue.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto">
+                {accountsSummary.purchaseOverdue.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+                    <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-2">
+                      <FaCheckCircle className="text-sm" />
+                    </div>
+                    <p className="text-xs font-bold text-ink">All Clear</p>
+                    <p className="text-[10px] text-ink-subtle mt-0.5">No purchase overdue customers</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
+                      <tr>
+                        <th className="px-3 py-2 bg-card-2">Customer</th>
+                        <th className="px-2 py-2 bg-card-2 text-center">Days Overdue</th>
+                        <th className="px-2 py-2 bg-card-2 text-center">Credit Days</th>
+                        <th className="px-2 py-2 bg-card-2">Last Purchase</th>
+                        <th className="px-3 py-2 bg-card-2 text-right">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-soft">
+                      {accountsSummary.purchaseOverdue.map((item) => (
+                        <tr key={item.customerId} className="hover:bg-card-2 transition-colors">
+                          <td className="px-3 py-2 text-[11px] font-semibold text-ink truncate max-w-[160px]">{item.name}</td>
+                          <td className="px-2 py-2 text-center">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                              {item.daysSince}d
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-center text-[11px] text-ink-muted font-mono">{item.creditDays}d</td>
+                          <td className="px-2 py-2 text-[10px] font-mono text-ink-muted whitespace-nowrap">
+                            {new Date(item.lastDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
+                            ₹{item.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              {accountsSummary.purchaseOverdue.length > 0 && (
+                <div className="shrink-0 px-3 py-1.5 bg-card-2/50 border-t border-line-soft flex items-center justify-between text-[10px] text-ink-subtle">
+                  <span className="font-medium">Total: {accountsSummary.purchaseOverdue.length} customer{accountsSummary.purchaseOverdue.length !== 1 ? "s" : ""}</span>
+                  {accountsSummary.purchaseOverdue.length > 10 && <span className="text-[9px] text-ink-muted">Scroll to see all</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Payment Overdue */}
+            <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden" style={{ height: "420px" }}>
+              <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
+                <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
+                  <FaMoneyBillWave className="text-rose-400 text-xs" />
+                  <span>Payment Overdue</span>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                  accountsSummary.paymentOverdue.length > 0
+                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                }`}>
+                  {accountsSummary.paymentOverdue.length} Customer{accountsSummary.paymentOverdue.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto">
+                {accountsSummary.paymentOverdue.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+                    <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-2">
+                      <FaCheckCircle className="text-sm" />
+                    </div>
+                    <p className="text-xs font-bold text-ink">All Clear</p>
+                    <p className="text-[10px] text-ink-subtle mt-0.5">No payment overdue customers</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
+                      <tr>
+                        <th className="px-3 py-2 bg-card-2">Customer</th>
+                        <th className="px-2 py-2 bg-card-2 text-center">Days Overdue</th>
+                        <th className="px-2 py-2 bg-card-2 text-center">Credit Days</th>
+                        <th className="px-2 py-2 bg-card-2">Last Payment</th>
+                        <th className="px-3 py-2 bg-card-2 text-right">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-soft">
+                      {accountsSummary.paymentOverdue.map((item) => (
+                        <tr key={item.customerId} className="hover:bg-card-2 transition-colors">
+                          <td className="px-3 py-2 text-[11px] font-semibold text-ink truncate max-w-[160px]">{item.name}</td>
+                          <td className="px-2 py-2 text-center">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/25">
+                              {item.daysSince}d
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-center text-[11px] text-ink-muted font-mono">{item.creditDays}d</td>
+                          <td className="px-2 py-2 text-[10px] font-mono text-ink-muted whitespace-nowrap">
+                            {new Date(item.lastDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
+                            ₹{item.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              {accountsSummary.paymentOverdue.length > 0 && (
+                <div className="shrink-0 px-3 py-1.5 bg-card-2/50 border-t border-line-soft flex items-center justify-between text-[10px] text-ink-subtle">
+                  <span className="font-medium">Total: {accountsSummary.paymentOverdue.length} customer{accountsSummary.paymentOverdue.length !== 1 ? "s" : ""}</span>
+                  {accountsSummary.paymentOverdue.length > 10 && <span className="text-[9px] text-ink-muted">Scroll to see all</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════
            ROW 4  –  Customer Product Purchase Report (Left) + Sales Person Location (Right)
