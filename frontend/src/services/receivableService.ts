@@ -8,6 +8,9 @@ export interface CustomerReceivableSummary {
   gstin?: string | null;
   phone?: string | null;
   customerType?: string | null;
+  /** YYYY-MM-DD of the latest voucher touching this customer's ledger
+   * (excluding the auto-posted opening balance JV). Null when no real txn yet. */
+  lastTransactionDate?: string | null;
   openingBalance: number;
   totalBilled: number;
   totalPaid: number;
@@ -17,7 +20,7 @@ export interface CustomerReceivableSummary {
   netBalance: number;
   balanceAsOnDate: number;
   overdueAmount: number;
-  dueDays: number;
+  dueDays: number | null;
   isOverdue: boolean;
 }
 

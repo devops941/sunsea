@@ -848,7 +848,7 @@ const SalesOrderForm: React.FC = () => {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-line">
                     <h2 className="text-lg font-bold text-ink flex items-start">
-                        {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
+                        {isEditMode ? "Sales Order" : "Sales Order"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("orderNo")}</span>
                     </h2>
                     <BackButton text="Back to List" />

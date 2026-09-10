@@ -12,6 +12,11 @@ export interface SupplierPayableSummary {
   gstin?: string | null;
   vendorType?: string | null;
   phone?: string | null;
+  /** Date (YYYY-MM-DD) of the most recent voucher touching this supplier's
+   * ledger, excluding the auto-posted opening balance JV. Null if the only
+   * activity is the opening balance. Populated for the Amount Payable list
+   * so the operator can see when the last transaction happened. */
+  lastTransactionDate?: string | null;
   openingBalance: number;
   totalBilled: number;
   totalPaid: number;
@@ -23,6 +28,23 @@ export interface SupplierPayableSummary {
   overdueAmount: number;
   dueDays: number | null;
   isOverdue: boolean;
+}
+
+/** Extract the primary phone number from either a scalar string or the
+ * `mobile` JSON column shape used by Customer/Supplier
+ * (`[{ number, label, isPrimary? }, ...]`). Returns null if no digits found. */
+function extractPrimaryPhone(raw: any): string | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") return raw.trim() || null;
+  if (Array.isArray(raw) && raw.length) {
+    // Prefer the entry flagged primary, else first entry with a `number`.
+    const primary = raw.find((p) => p && (p.isPrimary || p.is_primary || p.isDefault));
+    const pick = primary || raw.find((p) => p && p.number);
+    if (pick && pick.number) return String(pick.number).trim() || null;
+    return null;
+  }
+  if (typeof raw === "object" && raw.number) return String(raw.number).trim() || null;
+  return null;
 }
 
 export interface SupplierPayableDetail {
@@ -212,10 +234,19 @@ class PayableService {
       let totalBilled = 0;
       let totalPaid = 0;
       let totalReturned = 0;
+      /** Newest voucher.date across all non-opening-balance items. Kept as a
+       * Date object so we can compare with getTime(); serialized below. */
+      let lastTxnDateObj: Date | null = null;
 
       for (const item of journalItems) {
         if (item.voucher.refDocType === "SUPPLIER_OPENING_BALANCE" || item.narration?.includes("Opening balance")) {
           continue;
+        }
+
+        // Track the most recent real transaction date (excludes opening JV).
+        const vDate = item.voucher.date instanceof Date ? item.voucher.date : new Date(item.voucher.date as any);
+        if (!isNaN(vDate.getTime()) && (!lastTxnDateObj || vDate.getTime() > lastTxnDateObj.getTime())) {
+          lastTxnDateObj = vDate;
         }
 
         let isCredit = item.creditLedgerId === ledger?.id;
@@ -278,7 +309,8 @@ class PayableService {
         legalName: supplier.legalName,
         gstin: supplier.gstin,
         vendorType: (supplier as any).vendorType || "SUPPLIER",
-        phone: (supplier as any).phone || (supplier as any).mobile || null,
+        phone: extractPrimaryPhone((supplier as any).phone ?? (supplier as any).mobile),
+        lastTransactionDate: lastTxnDateObj ? lastTxnDateObj.toISOString().split("T")[0] : null,
         openingBalance,
         totalBilled,
         totalPaid,

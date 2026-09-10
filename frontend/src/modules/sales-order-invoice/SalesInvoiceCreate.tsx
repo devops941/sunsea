@@ -1440,7 +1440,7 @@ const SalesInvoiceForm: React.FC = () => {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
           <h2 className="text-lg font-bold text-ink flex items-start">
-            {isEditMode ? "Edit Sales Invoice" : "Create Sales Invoice"}
+            {isEditMode ? "Sales Invoice" : " Sales Invoice"}
             <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{previewInvoiceNo || "Auto"}</span>
           </h2>
           <CustomButton

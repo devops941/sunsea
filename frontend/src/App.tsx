@@ -4,6 +4,7 @@ import { initializeAuth } from './features/auth/authSlice';
 import AppRoutes from './routes/AppRoutes';
 import CommonLoader from './components/ui/Loader/CommonLoader';
 import { SocketProvider } from './providers/SocketProvider';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -20,9 +21,11 @@ const App: React.FC = () => {
   }
 
   return (
-    <SocketProvider>
-      <AppRoutes />
-    </SocketProvider>
+    <ErrorBoundary>
+      <SocketProvider>
+        <AppRoutes />
+      </SocketProvider>
+    </ErrorBoundary>
   );
 };
 

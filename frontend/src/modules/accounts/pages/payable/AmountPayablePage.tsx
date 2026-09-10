@@ -24,16 +24,21 @@ type Options = {
   showZeroBalance: boolean;
   showOverdueOnly: boolean;
   showType: boolean;
-  showOverdueColumns: boolean;
+  /** When true, adds a "Mobile" column populated from Supplier.mobile
+   * (primary phone number extracted server-side). */
+  showMobile: boolean;
 };
 
-const OPTIONS_KEY = "sunsea:payable:options:v1";
+// v2 key — v1 stored `showOverdueColumns` which no longer exists. Old saved
+// value would deserialize as unknown property (harmless) but bumping the key
+// avoids reviving obsolete state.
+const OPTIONS_KEY = "sunsea:payable:options:v2";
 const DEFAULT_OPTIONS: Options = {
   shownBy: "name",
   showZeroBalance: false,
   showOverdueOnly: false,
   showType: true,
-  showOverdueColumns: true,
+  showMobile: false,
 };
 
 const loadSaved = (): Partial<Options> | null => {
@@ -142,12 +147,12 @@ const AmountPayablePage: React.FC = () => {
   }, [data, options.showZeroBalance, options.showOverdueOnly, options.shownBy, rowSearch]);
 
   const totals = useMemo(() => {
-    // For payables, positive balanceAsOnDate = we owe supplier (credit).
-    // Split into Debit / Credit columns the way Busy shows them.
-    const credit = rows.reduce((s, r) => s + Math.max(r.balanceAsOnDate, 0), 0);
-    const debit = rows.reduce((s, r) => s + Math.max(-r.balanceAsOnDate, 0), 0);
+    // Only the signed Net Balance total is shown in the footer now — Debit /
+    // Credit split columns were dropped per the simplified UI spec. Overdue
+    // amount is still summed for the badge on the status line.
+    const net = rows.reduce((s, r) => s + (r.balanceAsOnDate || 0), 0);
     const overdue = rows.reduce((s, r) => s + (r.overdueAmount || 0), 0);
-    return { debit, credit, overdue };
+    return { net, overdue };
   }, [rows]);
 
   const commitOptions = useCallback(() => {
@@ -240,21 +245,21 @@ const AmountPayablePage: React.FC = () => {
     lines.push([]);
     const header = ["Supplier"];
     if (options.showType) header.push("Type");
-    header.push("Debit", "Credit", "Net Balance");
-    if (options.showOverdueColumns) header.push("Overdue", "Days");
+    if (options.showMobile) header.push("Mobile");
+    header.push("Net Balance", "Last Transaction");
     lines.push(header);
     for (const r of rows) {
       const line: string[] = [options.shownBy === "code" ? r.supplierCode : r.legalName];
       if (options.showType) line.push(r.vendorType || "");
-      line.push(fmt(Math.max(-r.balanceAsOnDate, 0)), fmt(Math.max(r.balanceAsOnDate, 0)), fmt(r.balanceAsOnDate));
-      if (options.showOverdueColumns) line.push(fmt(r.overdueAmount || 0), r.isOverdue && r.dueDays !== null ? String(r.dueDays) : "");
+      if (options.showMobile) line.push(r.phone || "");
+      line.push(fmt(r.balanceAsOnDate), r.lastTransactionDate ? displayDate(r.lastTransactionDate) : "");
       lines.push(line);
     }
     lines.push([]);
     const totalLine: string[] = ["TOTAL"];
     if (options.showType) totalLine.push("");
-    totalLine.push(fmt(totals.debit), fmt(totals.credit), fmt(totals.credit - totals.debit));
-    if (options.showOverdueColumns) totalLine.push(fmt(totals.overdue), "");
+    if (options.showMobile) totalLine.push("");
+    totalLine.push(fmt(totals.net), "");
     lines.push(totalLine);
     const csv = lines.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -321,8 +326,8 @@ const AmountPayablePage: React.FC = () => {
               <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-line rounded shadow-2xl z-30 py-1 text-[13px]">
                 {([
                   { key: "showType", label: "Type" },
-                  { key: "showOverdueColumns", label: "Overdue / Days" },
-                ] as { key: "showType" | "showOverdueColumns"; label: string }[]).map((c) => {
+                  { key: "showMobile", label: "Mobile Number" },
+                ] as { key: "showType" | "showMobile"; label: string }[]).map((c) => {
                   const on = options[c.key] as boolean;
                   return (
                     <button
@@ -410,29 +415,26 @@ const AmountPayablePage: React.FC = () => {
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-head border-b-2 border-line">
-                      <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[36%]">
+                      <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[38%]">
                         {options.shownBy === "code" ? "Code / Supplier" : "Supplier"}
                       </th>
                       {options.showType && (
                         <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[14%]">Type</th>
                       )}
-                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Debit</th>
-                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[12%]">Credit</th>
-                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[14%]">Net Balance</th>
-                      {options.showOverdueColumns && (
-                        <>
-                          <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[10%]">Overdue</th>
-                          <th className="px-3 py-1 text-[13px] font-bold text-right text-ink bg-head w-[8%]">Days</th>
-                        </>
+                      {options.showMobile && (
+                        <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[18%]">Mobile</th>
                       )}
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[18%]">Net Balance</th>
+                      {/* "Days" header preserved per spec — value below is the
+                          date of the LAST transaction with this supplier, not
+                          an overdue-days count. */}
+                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink bg-head w-[12%]">Days</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r, i) => {
                       const isHl = rowIdx === i;
                       const cls = isHl ? "bg-black text-white" : "";
-                      const debit = Math.max(-r.balanceAsOnDate, 0);
-                      const credit = Math.max(r.balanceAsOnDate, 0);
                       return (
                         <tr
                           key={r.supplierId}
@@ -457,12 +459,11 @@ const AmountPayablePage: React.FC = () => {
                               {r.vendorType || ""}
                             </td>
                           )}
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
-                            {fmt(debit)}
-                          </td>
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${cls}`}>
-                            {fmt(credit)}
-                          </td>
+                          {options.showMobile && (
+                            <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 font-mono ${cls}`}>
+                              {r.phone || ""}
+                            </td>
+                          )}
                           <td className={`px-3 py-0.5 text-[13px] text-right font-mono font-semibold border-r border-line-soft/50 ${
                             !isHl && r.balanceAsOnDate > 0 ? "text-red-600" :
                             !isHl && r.balanceAsOnDate < 0 ? "text-emerald-600" :
@@ -470,20 +471,11 @@ const AmountPayablePage: React.FC = () => {
                           } ${cls}`}>
                             {fmt(Math.abs(r.balanceAsOnDate))}
                           </td>
-                          {options.showOverdueColumns && (
-                            <>
-                              <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${
-                                !isHl && (r.overdueAmount || 0) > 0 ? "text-red-600" : ""
-                              } ${cls}`}>
-                                {fmt(r.overdueAmount || 0)}
-                              </td>
-                              <td className={`px-3 py-0.5 text-[13px] text-right font-mono ${
-                                !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
-                              } ${cls}`}>
-                                {r.isOverdue && r.dueDays !== null ? r.dueDays : ""}
-                              </td>
-                            </>
-                          )}
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono ${
+                            !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
+                          } ${cls}`}>
+                            {r.lastTransactionDate ? displayDate(r.lastTransactionDate) : ""}
+                          </td>
                         </tr>
                       );
                     })}
@@ -491,15 +483,9 @@ const AmountPayablePage: React.FC = () => {
                       <tr key={`ap-empty-${i}`} className="border-b border-line-soft/60">
                         <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
                         {options.showType && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
+                        {options.showMobile && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
                         <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
-                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
-                        <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
-                        {options.showOverdueColumns && (
-                          <>
-                            <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
-                            <td className="px-3 py-0.5">&nbsp;</td>
-                          </>
-                        )}
+                        <td className="px-3 py-0.5">&nbsp;</td>
                       </tr>
                     ))}
                   </tbody>
@@ -507,15 +493,9 @@ const AmountPayablePage: React.FC = () => {
                     <tr className="bg-card-2 border-t-2 border-line">
                       <td className="px-3 py-1 text-[13px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
                       {options.showType && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
-                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.debit)}</td>
-                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit)}</td>
-                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(totals.credit - totals.debit)}</td>
-                      {options.showOverdueColumns && (
-                        <>
-                          <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-red-600 border-r border-line bg-card-2">{fmt(totals.overdue)}</td>
-                          <td className="px-3 py-1 bg-card-2">&nbsp;</td>
-                        </>
-                      )}
+                      {options.showMobile && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
+                      <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(Math.abs(totals.net))}</td>
+                      <td className="px-3 py-1 bg-card-2">&nbsp;</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -565,12 +545,12 @@ const AmountPayablePage: React.FC = () => {
               </div>
 
               {(() => {
-                type Row = { key: "showZeroBalance" | "showOverdueOnly" | "showType" | "showOverdueColumns"; label: string };
+                type Row = { key: "showZeroBalance" | "showOverdueOnly" | "showType" | "showMobile"; label: string };
                 const rows: Row[] = [
                   { key: "showZeroBalance", label: "Show Zero Balance Suppliers ?" },
                   { key: "showOverdueOnly", label: "Show Only Overdue ?" },
                   { key: "showType", label: "Show Type Column ?" },
-                  { key: "showOverdueColumns", label: "Show Overdue Columns ?" },
+                  { key: "showMobile", label: "Show Mobile Number ?" },
                 ];
                 return rows.map((r) => (
                   <React.Fragment key={r.key}>

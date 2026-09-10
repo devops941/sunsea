@@ -7,12 +7,16 @@ export interface SupplierPayableSummary {
   gstin?: string | null;
   vendorType?: string | null;
   phone?: string | null;
+  /** YYYY-MM-DD of the latest voucher touching this supplier's ledger
+   * (excluding the auto-posted opening balance JV). Null when no real txn yet. */
+  lastTransactionDate?: string | null;
   openingBalance: number;
   totalBilled: number;
   totalPaid: number;
   totalReturned: number;
   debit?: number;
   credit?: number;
+  netBalance?: number;
   balanceAsOnDate: number;
   overdueAmount: number;
   dueDays: number | null;
