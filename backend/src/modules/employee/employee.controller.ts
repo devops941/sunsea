@@ -64,7 +64,7 @@ function parseEmployeeBody(body: Record<string, any>) {
     "permanentCity", "permanentState", "permanentPincode",
     "presentAddressLine1", "presentAddressLine2",
     "presentCity", "presentState", "presentPincode",
-    "designation", "employeeType",
+    "designation", "employeeType", "employeeCategory",
     "previousExperience",
     "shiftId",
     "salaryType", "paymentMode",
@@ -105,7 +105,7 @@ function parseEmployeeBody(body: Record<string, any>) {
   // Photo upload is handled in the controller via ImageKit (async).
 
   // ── Normalize lowercase enums expected by Prisma ─────────────────────────────
-  const lowercaseEnums = ["salaryType", "employeeType", "status", "gender", "maritalStatus"];
+  const lowercaseEnums = ["salaryType", "employeeType", "employeeCategory", "status", "gender", "maritalStatus"];
   for (const field of lowercaseEnums) {
     if (parsed[field] && typeof parsed[field] === "string") {
       parsed[field] = parsed[field].toLowerCase();

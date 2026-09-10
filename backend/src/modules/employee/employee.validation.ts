@@ -87,6 +87,10 @@ const employeeBodySchema = z.object({
     .enum(["permanent", "contract", "intern", "consultant", "operator", "supervisor"])
     .optional()
     .nullable(),
+  employeeCategory: z
+    .enum(["office_staff", "labour"])
+    .optional()
+    .nullable(),
 
   // ── Section 7: Joining Details ────────────────────────────────────────────
   dateOfJoining: z

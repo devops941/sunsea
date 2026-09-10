@@ -313,6 +313,11 @@ export default function EmployeeViewPage() {
               {employee.employeeType && (
                 <span className="px-2 py-0.5 rounded-full bg-card-2 text-ink-subtle text-[10px] font-semibold border border-line-soft capitalize">{employee.employeeType}</span>
               )}
+              {employee.employeeCategory && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold border border-emerald-500/20">
+                  {employee.employeeCategory.replace("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -385,6 +390,7 @@ export default function EmployeeViewPage() {
           <InfoRow label="Department"    value={employee.department?.name} />
           <InfoRow label="Role"          value={employee.role?.name || employee.user?.role?.name} />
           <InfoRow label="Employee Type" value={employee.employeeType ? employee.employeeType.charAt(0).toUpperCase() + employee.employeeType.slice(1) : null} />
+          <InfoRow label="Employee Category" value={employee.employeeCategory ? employee.employeeCategory.replace("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : null} />
           <InfoRow label="Status"        value={<StatusBadge status={STATUS_MAP[employee.status] ?? employee.status?.toUpperCase() ?? "INACTIVE"} />} />
         </FieldGrid>
 

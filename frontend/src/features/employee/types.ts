@@ -1,4 +1,5 @@
 export type EmployeeStatus = "active" | "inactive" | "resigned" | "terminated";
+export type EmployeeCategory = "office_staff" | "labour";
 
 export interface Employee {
   id: string;
@@ -9,6 +10,7 @@ export interface Employee {
   dateOfJoining: string | null;
   departmentId: number | null;
   designationId: number | null;
+  employeeCategory: EmployeeCategory | null;
   status: EmployeeStatus;
   createdAt: string;
   updatedAt: string;
@@ -32,6 +34,7 @@ export interface CreateEmployeeDto {
   dateOfJoining?: string;
   departmentId?: number;
   designationId?: number;
+  employeeCategory?: EmployeeCategory;
   status?: EmployeeStatus;
 }
 
@@ -43,6 +46,7 @@ export interface UpdateEmployeeDto {
   dateOfJoining?: string;
   departmentId?: number;
   designationId?: number;
+  employeeCategory?: EmployeeCategory;
   status?: EmployeeStatus;
 }
 

@@ -675,6 +675,7 @@ class AccountsService {
               id: true,
               transport: true,
               numberOfBundle: true,
+              dcNo: true,
               billSundry: true,
               items: {
                 select: {
@@ -748,6 +749,7 @@ class AccountsService {
           })),
           transport: transportLabel(si.transport),
           numberOfBundle: si.numberOfBundle != null ? Number(si.numberOfBundle) : null,
+          dcNo: si.dcNo || null,
           billSundry: normaliseSundry(si.billSundry),
         },
       ])
@@ -773,7 +775,7 @@ class AccountsService {
     return entries.map((e) => {
       if (e.refDocType === "SALES_INVOICE" && e.refDocId) {
         const rec = siMap.get(String(e.refDocId));
-        return rec ? { ...e, items: rec.items, meta: {
+        return rec ? { ...e, items: rec.items, dcNo: rec.dcNo, meta: {
           transport: rec.transport,
           numberOfBundle: rec.numberOfBundle,
           billSundry: rec.billSundry,

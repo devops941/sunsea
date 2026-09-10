@@ -60,9 +60,10 @@ model Employee {
   presentPincode        String?
 
   // Section 6: Official Info
-  designation  String?
-  employeeType EmployeeType?
-  roleId       Int?
+     designation      String?
+  employeeType     EmployeeType?
+  employeeCategory EmployeeCategory?
+  roleId           Int?
 
   // Section 7: Joining Details
   relievingDate      DateTime?
@@ -1628,6 +1629,7 @@ model SalesInvoice {
   narration      String?               @db.VarChar(2000)
   transport      Json?                 @map("transport")
   numberOfBundle Int?                  @map("number_of_bundle")
+  dcNo           String?               @map("dc_no") @db.VarChar(50)
   billSundry     Json?                 @map("bill_sundry")
   openingBalance Decimal?              @map("opening_balance") @db.Decimal(14, 2)
   closingBalance Decimal?              @map("closing_balance") @db.Decimal(14, 2)
@@ -1946,6 +1948,11 @@ enum EmployeeType {
   consultant
   operator
   supervisor
+}
+
+enum EmployeeCategory {
+  office_staff
+  labour
 }
 
 enum SalaryType {
