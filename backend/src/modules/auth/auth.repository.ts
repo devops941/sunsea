@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { AuditAction } from "@prisma/client";
 import { serializeBigInt } from "../../utils/serializeBigInt";
 import { UserStatus, CreateAuditLogDto, LoginAttemptDto } from "../../types/auth.types";
+import { env } from "../../config/env";
 
 interface PrismaUser {
   userId: string;
@@ -189,8 +190,10 @@ export class AuthRepository {
 
   /**
    * Creates a new user session with automatic device limit management.
-   * Maximum 4 active sessions per user/admin.
-   * Oldest session is automatically removed when limit is exceeded.
+   * Cap is env.MAX_SESSIONS_PER_USER (default 100). Oldest session is deleted
+   * when the cap is exceeded — a low cap silently signs earlier devices out on
+   * their next request, so keep it well above the number of concurrent users
+   * likely to share an admin account for testing.
    */
   async createUserSession(payload: {
     userId?: string;
@@ -201,7 +204,7 @@ export class AuthRepository {
     deviceLabel?: string;
   }): Promise<any> {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    const MAX_SESSIONS = 4;
+    const MAX_SESSIONS = env.MAX_SESSIONS_PER_USER;
 
     return prisma.$transaction(async (tx) => {
       // Get all active sessions for this user/admin
