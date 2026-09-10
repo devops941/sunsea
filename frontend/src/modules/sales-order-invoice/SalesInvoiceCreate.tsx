@@ -22,6 +22,7 @@ import {
   computeChargeTotals,
 } from "../../components/sales/AdditionalChargesTable";
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import DecimalCell from "../../components/form/DecimalCell/DecimalCell";
 
 import { fetchCompany } from "../../features/company/companySlice";
 import { invoiceSettingsService } from "../../services/invoiceSettingsService";
@@ -58,6 +59,7 @@ interface ItemOption {
   name: string;
   defaultRate: number;
   gstRate: number;
+  gradeRates: Record<string, number> | null;
 }
 
 const emptyLine = (): InvoiceLineItem => ({
@@ -190,6 +192,7 @@ const SalesInvoiceForm: React.FC = () => {
   const [selectedTransport, setSelectedTransport] = useState<any>(null);
   
   const [numberOfBundle, setNumberOfBundle] = useState<string>("");
+  const [dcNo, setDcNo] = useState<string>("");
 
   const formRef = useRef<HTMLFormElement>(null);
   const handleFormKeyDown = useFormKeyboardNav(formRef);
@@ -229,12 +232,13 @@ const SalesInvoiceForm: React.FC = () => {
         selectedSalesOrderId ||
         notes ||
         numberOfBundle ||
+        dcNo ||
         lines.some((l) => Boolean(l.itemId)) ||
         sundryRows.length > 0
       );
     }
     return false;
-  }, [isEditMode, customerId, selectedSalesOrderId, notes, numberOfBundle, lines, sundryRows]);
+  }, [isEditMode, customerId, selectedSalesOrderId, notes, numberOfBundle, dcNo, lines, sundryRows]);
 
   const openDiscardModal = useCallback(() => {
     lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
@@ -310,6 +314,7 @@ const SalesInvoiceForm: React.FC = () => {
         setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
         if (invoice.transport) setSelectedTransport(invoice.transport);
         if (invoice.numberOfBundle != null) setNumberOfBundle(String(invoice.numberOfBundle));
+        if (invoice.dcNo) setDcNo(invoice.dcNo);
         if (invoice.salesOrder) {
           setEditInvoiceSalesOrder(invoice.salesOrder);
         }
@@ -443,8 +448,9 @@ const SalesInvoiceForm: React.FC = () => {
           .map((p: any) => ({
             id: String(p.id),
             name: p.productName,
-            defaultRate: Number(p.mrp) || Number(p.b2b) || 0,
+            defaultRate: Number(p.rate) || Number(p.mrp) || Number(p.b2b) || 0,
             gstRate: Number(p.gstRate) || 0,
+            gradeRates: p.gradeRates && typeof p.gradeRates === "object" ? p.gradeRates : null,
           })));
 
         const ordersList = ordersResponse?.data || (ordersResponse as any)?.orders || [];
@@ -705,6 +711,24 @@ const SalesInvoiceForm: React.FC = () => {
     }
   };
 
+  // ---- Resolve grade-specific price for a product ----
+  const getGradeRate = useCallback((product: ItemOption): number => {
+    const selectedCustomer = customersRaw.find((c) => String(c.id) === customerId);
+    const gradeName = selectedCustomer?.customerGrade?.name;
+    if (gradeName && product.gradeRates) {
+      const gClean = gradeName.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      for (const [k, val] of Object.entries(product.gradeRates)) {
+        const kClean = k.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (kClean === gClean || kClean.endsWith(gClean) || gClean.endsWith(kClean)) {
+          if (val != null && !isNaN(Number(val)) && Number(val) > 0) {
+            return Number(val);
+          }
+        }
+      }
+    }
+    return product.defaultRate;
+  }, [customersRaw, customerId]);
+
   // ---- Line item handlers ----
   const recalcLine = (line: InvoiceLineItem): InvoiceLineItem => {
     const amount = line.qty * line.rate;
@@ -722,7 +746,7 @@ const SalesInvoiceForm: React.FC = () => {
           const selected = items.find((i) => i.id === value);
           if (selected) {
             updated.itemName = selected.name;
-            updated.rate = selected.defaultRate ?? 0;
+            updated.rate = getGradeRate(selected);
             updated.discountAmount = 0;
             updated.taxPercent = selected.gstRate ?? 0;
             updated.amount = updated.qty * updated.rate;
@@ -756,6 +780,26 @@ const SalesInvoiceForm: React.FC = () => {
     if (!company?.state || !selectedCustomer?.billingState) return false;
     return company.state.toLowerCase().trim() !== selectedCustomer.billingState.toLowerCase().trim();
   }, [company, customersRaw, customerId]);
+
+  // Recalculate line prices when customer changes (grade-based pricing)
+  const prevCustomerIdRef = useRef(customerId);
+  useEffect(() => {
+    if (prevCustomerIdRef.current === customerId) return;
+    prevCustomerIdRef.current = customerId;
+    if (!customerId) return;
+    setLines((prev) =>
+      prev.map((line) => {
+        if (!line.itemId) return line;
+        const product = items.find((i) => i.id === line.itemId);
+        if (!product) return line;
+        const newRate = getGradeRate(product);
+        const amount = line.qty * newRate;
+        const taxableAmount = amount - (line.discountAmount || 0);
+        const taxAmount = (taxableAmount * line.taxPercent) / 100;
+        return { ...line, rate: newRate, amount, taxAmount, total: taxableAmount + taxAmount };
+      })
+    );
+  }, [customerId, items, getGradeRate]);
 
   // ---- Auto-calculate due date from customer creditDays ----
   useEffect(() => {
@@ -903,6 +947,7 @@ const SalesInvoiceForm: React.FC = () => {
         billSundry: sundryRows.length > 0 ? sundryRows : null,
         transport: selectedTransport || null,
         numberOfBundle: numberOfBundle ? Number(numberOfBundle) : null,
+        dcNo: dcNo.trim() || null,
         payments: [],
       };
 
@@ -974,6 +1019,7 @@ const SalesInvoiceForm: React.FC = () => {
             setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
             if (invoice.transport) setSelectedTransport(invoice.transport);
             if (invoice.numberOfBundle != null) setNumberOfBundle(String(invoice.numberOfBundle));
+            if (invoice.dcNo) setDcNo(invoice.dcNo);
             if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate.split("T")[0]);
             setNotes(invoice.notes || "");
             setPreviewInvoiceNo(invoice.invoiceNo || "");
@@ -1122,7 +1168,7 @@ const SalesInvoiceForm: React.FC = () => {
               updateLine(row.id, "itemId", val);
               const selectedProd = items.find((p) => p.id === val);
               if (selectedProd) {
-                updateLine(row.id, "rate", selectedProd.defaultRate);
+                updateLine(row.id, "rate", getGradeRate(selectedProd));
                 updateLine(row.id, "taxPercent", selectedProd.gstRate);
               }
               setTimeout(() => {
@@ -1171,15 +1217,11 @@ const SalesInvoiceForm: React.FC = () => {
       width: "100px",
       align: "right" as const,
       render: (row: InvoiceLineItem) => (
-        <input
-          type="text"
-          inputMode="decimal"
-          value={row.rate === 0 && !row.itemId ? "" : row.rate}
+        <DecimalCell
+          value={row.rate}
           disabled={isLocked}
-          onChange={(e) => {
-            const val = e.target.value.replace(/[^0-9.]/g, "");
-            updateLine(row.id, "rate", val === "" ? 0 : Number(val));
-          }}
+          showEmpty={!row.itemId}
+          onChange={(n) => updateLine(row.id, "rate", n)}
           className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full"
           placeholder="0.00"
         />
@@ -1211,12 +1253,16 @@ const SalesInvoiceForm: React.FC = () => {
       width: "110px",
       align: "right" as const,
       render: (row: InvoiceLineItem) => {
-        if (row.amount <= 0) return <span className="text-[13px] text-ink-subtle">—</span>;
+        if (!row.itemId) return <span className="text-[13px] text-ink-subtle">—</span>;
         return (
-          <div className="text-right">
-            <span className="text-emerald-500 text-[13px] font-bold">₹{row.total.toFixed(2)}</span>
-            {row.taxAmount > 0 && (<span className="block text-[10px] text-ink-subtle">(+₹{row.taxAmount.toFixed(2)})</span>)}
-          </div>
+          <DecimalCell
+            value={row.amount}
+            disabled={isLocked}
+            showEmpty={!row.itemId}
+            onChange={(newAmount) => updateLine(row.id, "amount", newAmount)}
+            className="w-full bg-transparent text-[13px] text-emerald-500 font-bold text-right outline-none border-none p-0 h-full"
+            placeholder="0.00"
+          />
         );
       },
     },
@@ -1463,8 +1509,8 @@ const SalesInvoiceForm: React.FC = () => {
             />
           </div>
 
-          {/* ── Row 2: Invoice Date, Due Date, Transport, No. of Bundle ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
+          {/* ── Row 2: Invoice Date, Due Date, Transport, No. of Bundle, DC No ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
             <DatePickerCalendar
               label="Invoice Date"
               name="invoiceDate"
@@ -1509,6 +1555,15 @@ const SalesInvoiceForm: React.FC = () => {
               placeholder="Enter"
               disabled={isLocked}
               onChange={(e) => setNumberOfBundle(e.target.value)}
+            />
+            <TextInput
+              horizontal
+              label="DC No"
+              name="dcNo"
+              value={dcNo}
+              placeholder="Enter DC No"
+              disabled={isLocked}
+              onChange={(e) => setDcNo(e.target.value)}
             />
           </div>
 

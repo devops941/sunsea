@@ -506,6 +506,9 @@ const SalesInvoiceView: React.FC = () => {
                                         {invoice.numberOfBundle && (
                                             <MetaRow label="No. of Bundle" value={String(invoice.numberOfBundle)} />
                                         )}
+                                        {invoice.dcNo && (
+                                            <MetaRow label="DC No" value={invoice.dcNo} />
+                                        )}
                                     </div>
                                 </div>
 

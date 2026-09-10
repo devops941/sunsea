@@ -126,6 +126,7 @@ interface FormState {
   departmentId: string;
   designation: string;
   employeeType: string;
+  employeeCategory: string;
   dateOfJoining: string;
   relievingDate: string;
   previousExperience: string;
@@ -191,7 +192,7 @@ const INITIAL_STATE: FormState = {
   permAddress1: "", permAddress2: "", permCity: "", permState: "", permPincode: "",
   sameAsPermanent: false,
   presAddress1: "", presAddress2: "", presCity: "", presState: "", presPincode: "",
-  departmentId: "", designation: "", employeeType: "",
+  departmentId: "", designation: "", employeeType: "", employeeCategory: "",
   dateOfJoining: "", relievingDate: "", previousExperience: "",
   probationPeriod: "", noticePeriod: "",
   shiftId: "",
@@ -352,6 +353,7 @@ const EmployeeForm: React.FC = () => {
           departmentId: emp.departmentId ? String(emp.departmentId) : "",
           designation: emp.designation || "",
           employeeType: emp.employeeType || "",
+          employeeCategory: emp.employeeCategory || "",
           dateOfJoining: fmtDate(emp.dateOfJoining),
           relievingDate: fmtDate(emp.relievingDate),
           previousExperience: emp.previousExperience || "",
@@ -736,6 +738,7 @@ const EmployeeForm: React.FC = () => {
       if (form.roleId)       fd.append("roleId",       form.roleId);
       if (form.designation)  fd.append("designation",  form.designation);
       if (form.employeeType) fd.append("employeeType", form.employeeType);
+      if (form.employeeCategory) fd.append("employeeCategory", form.employeeCategory);
 
       if (form.dateOfJoining) fd.append("dateOfJoining", form.dateOfJoining);
       if (form.relievingDate) fd.append("relievingDate", form.relievingDate);
@@ -1129,6 +1132,9 @@ const EmployeeForm: React.FC = () => {
         <SelectInput horizontal label="Employee Type" name="employeeType" value={form.employeeType} onChange={handleChange}
           defaultOptionLabel="Select Type"
           options={["Permanent","Contract","Intern","Consultant","Operator","Supervisor"].map((t) => ({ value: t.toLowerCase(), label: t }))} />
+        <SelectInput horizontal label="Employee Category" name="employeeCategory" value={form.employeeCategory} onChange={handleChange}
+          defaultOptionLabel="Select Category"
+          options={[{ value: "office_staff", label: "Office Staff" }, { value: "labour", label: "Labour" }]} />
         <SelectInput horizontal label="Employment Status" name="employeeStatus" value={form.employeeStatus} onChange={handleChange}
           options={[
             { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" },

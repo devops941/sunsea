@@ -310,12 +310,7 @@ class SalesOrderService {
         const conditions: any[] = [];
 
         if ((query as any).quotationOnly) {
-            conditions.push({
-                OR: [
-                    { items: { some: { quotationUnitPrice: { not: null } } } },
-                    { status: "QUOTED" },
-                ],
-            });
+            conditions.push({ status: "QUOTED" });
         }
 
         const customerFilter: any = {};

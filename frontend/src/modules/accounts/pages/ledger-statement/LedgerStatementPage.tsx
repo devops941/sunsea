@@ -785,6 +785,7 @@ export const LedgerStatementPage: React.FC = () => {
     const isMulti = statement.mode === "multi";
     const columns = [
       { header: "Date", accessor: (item: any) => item.date },
+      { header: "DC No", accessor: (item: any) => item.dcNo || "-" },
       { header: "Voucher No", accessor: (item: any) => ledgerVoucherLabel(item.voucherNo) },
       { header: "Type", accessor: (item: any) => item.voucherType },
       ...(isMulti ? [{ header: "Account", accessor: (item: any) => item.accountName || "-" }] : []),
@@ -2510,8 +2511,9 @@ export const LedgerStatementPage: React.FC = () => {
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-head text-ink-muted font-bold border-b border-line text-[10px] uppercase tracking-wide">
-                    <th className="py-2 px-3 bg-head">Date</th>
+                    <th className="py-2 px-3 bg-head">Date</th>  
                     <th className="py-2 px-3 bg-head">Type</th>
+                    <th className="py-2 px-3 bg-head">DC No</th>
                     <th className="py-2 px-3 bg-head">Vch/Bill No</th>
                     {/* Merged Ledger's Particulars column is really the contra
                        account — Busy labels it "Account" in that view. */}
@@ -2531,7 +2533,7 @@ export const LedgerStatementPage: React.FC = () => {
                     <tr>
                       <td
                         colSpan={
-                          7 + ((options.longNarration || options.shortNarration) ? 1 : 0)
+                          8 + ((options.longNarration || options.shortNarration) ? 1 : 0)
                         }
                         className="text-center py-3 text-ink-subtle text-xs italic border-b border-line-soft bg-card-2/30"
                       >
@@ -2541,7 +2543,7 @@ export const LedgerStatementPage: React.FC = () => {
                   )}
                   {(() => {
                     const narrCol = (options.longNarration || options.shortNarration) ? 1 : 0;
-                    const totalCols = 7 + narrCol;
+                    const totalCols = 8 + narrCol;
                     // Grid + zebra cell classes matching PaymentVoucherPage list
                     const cellBase = "px-2 py-1 border-r border-line-soft";
 
@@ -2566,10 +2568,14 @@ export const LedgerStatementPage: React.FC = () => {
                         }`}
                       >
                         <td className={`${cellBase} font-mono text-[11px] whitespace-nowrap`}>{row.date}</td>
+                        
                         <td className={`${cellBase} whitespace-nowrap`}>
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-card-2 text-ink-muted border border-line">
                             {shortVoucherType(row.voucherType)}
                           </span>
+                        </td>
+                        <td className={`${cellBase} font-mono text-[11px] text-ink-muted whitespace-nowrap`}>
+                          {row.dcNo || "-"}
                         </td>
                         <td className={`${cellBase} font-mono font-bold whitespace-nowrap text-ink`}>
                           {ledgerVoucherLabel(row.voucherNo)}
@@ -2577,6 +2583,7 @@ export const LedgerStatementPage: React.FC = () => {
                         <td className={`${cellBase} font-semibold text-ink whitespace-nowrap`}>
                           {row.particulars}
                         </td>
+                        
                         {narrCol > 0 && (
                           <td className={`${cellBase} text-ink-subtle text-[11px] ${options.longNarration ? "" : "max-w-xs truncate"}`}>
                             {row.narration || "-"}

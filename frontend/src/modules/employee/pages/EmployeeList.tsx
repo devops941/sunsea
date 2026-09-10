@@ -239,6 +239,7 @@ const Employeelist: React.FC = () => {
       { header: "Mobile", accessor: (emp: any) => emp.mobile || "—" },
       { header: "Role", accessor: (emp: any) => emp.role?.name || emp.user?.role?.name || "—" },
       { header: "Department", accessor: (emp: any) => emp.department?.name || "—" },
+      { header: "Employee Category", accessor: (emp: any) => emp.employeeCategory ? emp.employeeCategory.replace("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "—" },
       {
         header: "Login Account",
         accessor: (emp: any) =>
