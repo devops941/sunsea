@@ -42,6 +42,20 @@ const envSchema = z.object({
     .url()
     .optional()
     .default("http://localhost:5000"),
+
+  // Max concurrent active sessions per user/admin. When exceeded, the OLDEST
+  // session is deleted — so a low value kicks earlier devices out. Default 100
+  // is high enough that team-testing with shared admin accounts won't evict
+  // anyone; tune down only if a strict device cap is desired.
+  MAX_SESSIONS_PER_USER: z
+    .string()
+    .optional()
+    .default("100")
+    .transform((v) => {
+      const n = parseInt(v, 10);
+      if (!Number.isFinite(n) || n < 1) throw new Error("MAX_SESSIONS_PER_USER must be a positive integer");
+      return n;
+    }),
 });
 
 /**
