@@ -196,6 +196,172 @@ export const sidebarItems: SidebarItem[] = [
     ],
   },
 
+    // ── 5. Inventory (Standalone Top-Level Header Module) ─────────────────────
+  {
+    title: "Inventory",
+    icon: FiPackage,
+    path: "/stock",
+    pathsByPermission: [
+      { permission: "categories.view", path: "/categories" },
+      { permission: "stores.view", path: "/storage-stores" },
+      { permission: "raw_materials.view", path: "/raw-materials" },
+      { permission: "products.view", path: "/products" },
+      { permission: "raw_material_stocks.view", path: "/stock" },
+      { permission: "stock-adjustments.view", path: "/inventory/stock-adjustments" },
+    ],
+    children: [
+      // ── 1. Inventory Masters ──
+      {
+        title: "Inventory Masters",
+        permissionAny: [
+          "categories.view",
+          "stores.view",
+          "raw_materials.view",
+          "wastage-store.view",
+          "products.view",
+          "sales_products.view",
+        ],
+        children: [
+          {
+            title: "Categories",
+            permission: "categories.view",
+            children: [
+              {
+                title: "Add",
+                path: "/categories/create",
+                permission: "categories.create",
+              },
+              {
+                title: "List",
+                path: "/categories",
+                permission: "categories.view",
+              },
+            ],
+          },
+          {
+            title: "Storage Stores",
+            permission: "stores.view",
+            children: [
+              {
+                title: "Add",
+                path: "/storage-stores/create",
+                permission: "stores.create",
+              },
+              {
+                title: "List",
+                path: "/storage-stores",
+                permission: "stores.view",
+              },
+            ],
+          },
+          {
+            title: "Raw Materials",
+            permission: "raw_materials.view",
+            children: [
+              {
+                title: "Add",
+                path: "/raw-materials/create",
+                permission: "raw_materials.create",
+              },
+              {
+                title: "List",
+                path: "/raw-materials",
+                permission: "raw_materials.view",
+              },
+            ],
+          },
+          {
+            title: "Wastage Store",
+            permission: "wastage-store.view",
+            children: [
+              {
+                title: "Add",
+                path: "/wastage-store/create",
+                permission: "raw_materials.create",
+              },
+              {
+                title: "List",
+                path: "/wastage-store",
+                permission: "wastage-store.view",
+              },
+            ],
+          },
+          {
+            title: "Production Products",
+            permission: "products.view",
+            children: [
+              {
+                title: "Add",
+                path: "/products/create",
+                permission: "products.create",
+              },
+              { title: "List", path: "/products", permission: "products.view" },
+            ],
+          },
+          {
+            title: "Sales Products",
+            permission: "sales_products.view",
+            children: [
+              {
+                title: "Add",
+                path: "/sales-products/create",
+                permission: "sales_products.create",
+              },
+              {
+                title: "List",
+                path: "/sales-products",
+                permission: "sales_products.view",
+              },
+            ],
+          },
+        ],
+      },
+      // ── 2. Stock Adjustments ──
+      {
+        title: "Stock Adjustments",
+        permission: "stock-adjustments.view",
+        children: [
+          { title: "Add", path: "/inventory/stock-adjustments/create", permission: "stock-adjustments.create" },
+          { title: "List", path: "/inventory/stock-adjustments", permission: "stock-adjustments.view" },
+        ],
+      },
+      // ── 3. Stock Status ──
+      {
+        title: "Stock Status",
+        permissionAny: ["raw_material_stocks.view", "finished_goods_stocks.view", "wastage-stock.view"],
+        children: [
+          { title: "Raw Material Stock", path: "/stock", permission: "raw_material_stocks.view", badge: "Ctrl+K" },
+          { title: "Finished Goods Stock", path: "/finished-stock", permission: "finished_goods_stocks.view" },
+          { title: "Wastage Stock", path: "/wastage-stock", permission: "wastage-stock.view" },
+        ],
+      },
+    ],
+    activePaths: [
+      "/categories",
+      "/storage-stores",
+      "/raw-materials",
+      "/wastage-store",
+      "/products",
+      "/sales-products",
+      "/inventory/stock-adjustments",
+      "/stock",
+      "/finished-stock",
+      "/wastage-stock",
+    ],
+    permissionAny: [
+      "categories.view",
+      "stores.view",
+      "raw_materials.view",
+      "wastage-store.view",
+      "products.view",
+      "sales_products.view",
+      "stock-adjustments.view",
+      "raw_material_stocks.view",
+      "finished_goods_stocks.view",
+      "wastage-stock.view",
+    ],
+  },
+
   // ── 3. Transactions (Sales, Purchase, Vouchers, Quotes) ───────────────────
   {
     title: "Transactions",
@@ -210,7 +376,7 @@ export const sidebarItems: SidebarItem[] = [
     children: [
       // ── Sales Order ──
       {
-        title: "Sales",
+        title: "Sales Order",
         permission: "sales-orders.view",
         children: [
           { title: "Add", path: "/sales-order/create", permission: "sales-orders.create", badge: "Ctrl+O" },
@@ -219,7 +385,7 @@ export const sidebarItems: SidebarItem[] = [
       },
       // ── Purchase Order ──
       {
-        title: "Purchase",
+        title: "Purchase Order",
         permission: "purchaseOrders.view",
         children: [
           { title: "Add", path: "/purchase-orders/create", permission: "purchaseOrders.create", badge: "Ctrl+X" },
@@ -237,7 +403,7 @@ export const sidebarItems: SidebarItem[] = [
       },
       // ── Sales (Invoice) ──
       {
-        title: "Sales Order",
+        title: "Sales Invoice",
         permission: "sales-invoices.view",
         children: [
           { title: "Add", path: "/sales-invoices/create", permission: "sales-invoices.create", badge: "Ctrl+V" },
@@ -246,7 +412,7 @@ export const sidebarItems: SidebarItem[] = [
       },
       // ── Purchase (GRN) ──
       {
-        title: "Purchase Order",
+        title: "Purchase Invoice",
         permission: "invoice.view",
         children: [
           { title: "Add", path: "/invoice/create", permission: "invoice.create", badge: "Ctrl+U" },
@@ -412,171 +578,7 @@ export const sidebarItems: SidebarItem[] = [
     ],
   },
 
-  // ── 5. Inventory (Standalone Top-Level Header Module) ─────────────────────
-  {
-    title: "Inventory",
-    icon: FiPackage,
-    path: "/stock",
-    pathsByPermission: [
-      { permission: "categories.view", path: "/categories" },
-      { permission: "stores.view", path: "/storage-stores" },
-      { permission: "raw_materials.view", path: "/raw-materials" },
-      { permission: "products.view", path: "/products" },
-      { permission: "raw_material_stocks.view", path: "/stock" },
-      { permission: "stock-adjustments.view", path: "/inventory/stock-adjustments" },
-    ],
-    children: [
-      // ── 1. Inventory Masters ──
-      {
-        title: "Inventory Masters",
-        permissionAny: [
-          "categories.view",
-          "stores.view",
-          "raw_materials.view",
-          "wastage-store.view",
-          "products.view",
-          "sales_products.view",
-        ],
-        children: [
-          {
-            title: "Categories",
-            permission: "categories.view",
-            children: [
-              {
-                title: "Add",
-                path: "/categories/create",
-                permission: "categories.create",
-              },
-              {
-                title: "List",
-                path: "/categories",
-                permission: "categories.view",
-              },
-            ],
-          },
-          {
-            title: "Storage Stores",
-            permission: "stores.view",
-            children: [
-              {
-                title: "Add",
-                path: "/storage-stores/create",
-                permission: "stores.create",
-              },
-              {
-                title: "List",
-                path: "/storage-stores",
-                permission: "stores.view",
-              },
-            ],
-          },
-          {
-            title: "Raw Materials",
-            permission: "raw_materials.view",
-            children: [
-              {
-                title: "Add",
-                path: "/raw-materials/create",
-                permission: "raw_materials.create",
-              },
-              {
-                title: "List",
-                path: "/raw-materials",
-                permission: "raw_materials.view",
-              },
-            ],
-          },
-          {
-            title: "Wastage Store",
-            permission: "wastage-store.view",
-            children: [
-              {
-                title: "Add",
-                path: "/wastage-store/create",
-                permission: "raw_materials.create",
-              },
-              {
-                title: "List",
-                path: "/wastage-store",
-                permission: "wastage-store.view",
-              },
-            ],
-          },
-          {
-            title: "Production Products",
-            permission: "products.view",
-            children: [
-              {
-                title: "Add",
-                path: "/products/create",
-                permission: "products.create",
-              },
-              { title: "List", path: "/products", permission: "products.view" },
-            ],
-          },
-          {
-            title: "Sales Products",
-            permission: "sales_products.view",
-            children: [
-              {
-                title: "Add",
-                path: "/sales-products/create",
-                permission: "sales_products.create",
-              },
-              {
-                title: "List",
-                path: "/sales-products",
-                permission: "sales_products.view",
-              },
-            ],
-          },
-        ],
-      },
-      // ── 2. Stock Adjustments ──
-      {
-        title: "Stock Adjustments",
-        permission: "stock-adjustments.view",
-        children: [
-          { title: "Add", path: "/inventory/stock-adjustments/create", permission: "stock-adjustments.create" },
-          { title: "List", path: "/inventory/stock-adjustments", permission: "stock-adjustments.view" },
-        ],
-      },
-      // ── 3. Stock Status ──
-      {
-        title: "Stock Status",
-        permissionAny: ["raw_material_stocks.view", "finished_goods_stocks.view", "wastage-stock.view"],
-        children: [
-          { title: "Raw Material Stock", path: "/stock", permission: "raw_material_stocks.view", badge: "Ctrl+K" },
-          { title: "Finished Goods Stock", path: "/finished-stock", permission: "finished_goods_stocks.view" },
-          { title: "Wastage Stock", path: "/wastage-stock", permission: "wastage-stock.view" },
-        ],
-      },
-    ],
-    activePaths: [
-      "/categories",
-      "/storage-stores",
-      "/raw-materials",
-      "/wastage-store",
-      "/products",
-      "/sales-products",
-      "/inventory/stock-adjustments",
-      "/stock",
-      "/finished-stock",
-      "/wastage-stock",
-    ],
-    permissionAny: [
-      "categories.view",
-      "stores.view",
-      "raw_materials.view",
-      "wastage-store.view",
-      "products.view",
-      "sales_products.view",
-      "stock-adjustments.view",
-      "raw_material_stocks.view",
-      "finished_goods_stocks.view",
-      "wastage-stock.view",
-    ],
-  },
+
 
   // ── 3. Transactions (Busy ERP Style: Sales, Purchase, Vouchers, Production)
   // {

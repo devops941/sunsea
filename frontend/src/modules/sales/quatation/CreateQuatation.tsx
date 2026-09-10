@@ -1355,7 +1355,7 @@ const QuotationForm: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-line">
                     <h2 className="text-lg font-bold text-ink flex items-start">
-                        {isEditMode ? "Edit Quotation" : "Create Quotation"}
+                        {isEditMode ? " Quotation" : " Quotation"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("quotationNo")}</span>
                     </h2>
                     <BackButton text="Back to List" />
