@@ -23,22 +23,22 @@ type Options = {
   shownBy: ShownBy;
   showZeroBalance: boolean;
   showOverdueOnly: boolean;
-  showType: boolean;
   /** When true, adds a "Mobile" column populated from Supplier.mobile
    * (primary phone number extracted server-side). */
   showMobile: boolean;
+  showTxnDate: boolean;
+  showDays: boolean;
 };
 
-// v2 key — v1 stored `showOverdueColumns` which no longer exists. Old saved
-// value would deserialize as unknown property (harmless) but bumping the key
-// avoids reviving obsolete state.
-const OPTIONS_KEY = "sunsea:payable:options:v2";
+// v4 key — removed showType
+const OPTIONS_KEY = "sunsea:payable:options:v4";
 const DEFAULT_OPTIONS: Options = {
   shownBy: "name",
   showZeroBalance: false,
   showOverdueOnly: false,
-  showType: true,
   showMobile: false,
+  showTxnDate: true,
+  showDays: true,
 };
 
 const loadSaved = (): Partial<Options> | null => {
@@ -54,6 +54,16 @@ const displayDate = (iso: string) => {
   return `${d}-${m}-${y}`;
 };
 const isoToday = () => new Date().toISOString().split("T")[0];
+
+const getDaysElapsed = (txnDateStr?: string | null, targetDateStr?: string): string | number => {
+  if (!txnDateStr) return "";
+  const txn = new Date(txnDateStr);
+  const target = new Date(targetDateStr || new Date().toISOString().split("T")[0]);
+  if (isNaN(txn.getTime()) || isNaN(target.getTime())) return "";
+  const diffTime = target.getTime() - txn.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 ? diffDays : 0;
+};
 
 // Backend returns payable summaries either as a bare array OR as
 // { data, total, page, totalPages }. Normalise here so the rest of the
@@ -124,6 +134,68 @@ const AmountPayablePage: React.FC = () => {
     });
   }, []);
 
+  // ─── Resizable Column Widths ──────────────────────────────────
+  type ColumnKey = "name" | "mobile" | "balance" | "txnDate" | "days";
+  const COL_WIDTHS_KEY = "sunsea:payable:colWidths:v1";
+  const DEFAULT_COL_WIDTHS: Record<ColumnKey, number> = {
+    name: 320,
+    mobile: 150,
+    balance: 160,
+    txnDate: 150,
+    days: 100,
+  };
+
+  const [colWidths, setColWidths] = useState<Record<ColumnKey, number>>(() => {
+    try {
+      const raw = localStorage.getItem(COL_WIDTHS_KEY);
+      return raw ? { ...DEFAULT_COL_WIDTHS, ...JSON.parse(raw) } : DEFAULT_COL_WIDTHS;
+    } catch {
+      return DEFAULT_COL_WIDTHS;
+    }
+  });
+
+  const startResizing = useCallback((colKey: ColumnKey, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = colWidths[colKey] || DEFAULT_COL_WIDTHS[colKey];
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(70, startWidth + deltaX);
+      setColWidths((prev) => {
+        const next = { ...prev, [colKey]: newWidth };
+        try { localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+        return next;
+      });
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [colWidths]);
+
+  const activeColKeys = useMemo<ColumnKey[]>(() => {
+    const keys: ColumnKey[] = ["name"];
+    if (options.showMobile) keys.push("mobile");
+    keys.push("balance");
+    if (options.showTxnDate) keys.push("txnDate");
+    if (options.showDays) keys.push("days");
+    return keys;
+  }, [options.showMobile, options.showTxnDate, options.showDays]);
+
+  const totalTableWidth = useMemo(() => {
+    return activeColKeys.reduce((sum, key) => sum + (colWidths[key] || DEFAULT_COL_WIDTHS[key]), 0);
+  }, [activeColKeys, colWidths]);
+
   useEffect(() => {
     if (!showColumnsMenu) return;
     const onClick = (e: MouseEvent) => {
@@ -155,7 +227,7 @@ const AmountPayablePage: React.FC = () => {
     socketModule: "voucher",
     fetcher,
   });
-// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
+  // F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
   const rows = useMemo<SupplierPayableSummary[]>(() => {
     let list = data ?? [];
@@ -282,22 +354,25 @@ const AmountPayablePage: React.FC = () => {
     lines.push(["As On:", displayDate(asOnDate)]);
     lines.push([]);
     const header = ["Supplier"];
-    if (options.showType) header.push("Type");
     if (options.showMobile) header.push("Mobile");
-    header.push("Net Balance", "Last Transaction");
+    header.push("Net Balance");
+    if (options.showTxnDate) header.push("Transaction Date");
+    if (options.showDays) header.push("Days");
     lines.push(header);
     for (const r of rows) {
       const line: string[] = [options.shownBy === "code" ? r.supplierCode : r.legalName];
-      if (options.showType) line.push(r.vendorType || "");
       if (options.showMobile) line.push(r.phone || "");
-      line.push(fmt(r.balanceAsOnDate), r.lastTransactionDate ? displayDate(r.lastTransactionDate) : "");
+      line.push(fmt(r.balanceAsOnDate));
+      if (options.showTxnDate) line.push(r.lastTransactionDate ? displayDate(r.lastTransactionDate) : "");
+      if (options.showDays) line.push(String(getDaysElapsed(r.lastTransactionDate, asOnDate)));
       lines.push(line);
     }
     lines.push([]);
     const totalLine: string[] = ["TOTAL"];
-    if (options.showType) totalLine.push("");
     if (options.showMobile) totalLine.push("");
-    totalLine.push(fmt(totals.net), "");
+    totalLine.push(fmt(totals.net));
+    if (options.showTxnDate) totalLine.push("");
+    if (options.showDays) totalLine.push("");
     lines.push(totalLine);
     const csv = lines.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -314,116 +389,115 @@ const AmountPayablePage: React.FC = () => {
     // our own handler owns the local modal-stack nav.
     <div data-escape-guarded className="p-2 font-sans text-ink" style={{ minHeight: "calc(100vh - 100px)" }}>
       {!showOptionsDialog && (
-      <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
-        <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
-          <FaTruck className="text-red-500 text-sm" /> Amount Payable
-        </h3>
-        <span className="text-[13px] text-ink-muted">
-          As On <b className="text-ink">{displayDate(asOnDate)}</b>
-          <span className="text-ink-subtle"> · </span>
-          <b className="text-ink">{rows.length} supplier{rows.length === 1 ? "" : "s"}</b>
-        </span>
-        {refreshing && (
-          <span className="flex items-center gap-1 text-[13px] text-red-400">
-            <FaSync className="animate-spin" /> Syncing…
+        <div className="bg-card rounded border border-line px-3 py-1.5 mb-2 flex items-center gap-3">
+          <h3 className="text-sm font-bold text-ink flex items-center gap-2 mr-2">
+            <FaTruck className="text-red-500 text-sm" /> Amount Payable
+          </h3>
+          <span className="text-[13px] text-ink-muted">
+            As On <b className="text-ink">{displayDate(asOnDate)}</b>
+            <span className="text-ink-subtle"> · </span>
+            <b className="text-ink">{rows.length} supplier{rows.length === 1 ? "" : "s"}</b>
           </span>
-        )}
-        <div className="flex items-center gap-1.5 ml-auto">
-          {/* Inline row search — F3 to focus, matches Busy's Search-F3. */}
-          <div className="relative">
-            <FaSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-[13px] text-ink-subtle" />
-            <input
-              ref={rowSearchRef}
-              type="text"
-              value={rowSearch}
-              onChange={(e) => setRowSearch(e.target.value)}
-              placeholder="Search name/code…"
-              className="w-40 pl-6 pr-6 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
-            />
-            {rowSearch && (
+          {refreshing && (
+            <span className="flex items-center gap-1 text-[13px] text-red-400">
+              <FaSync className="animate-spin" /> Syncing…
+            </span>
+          )}
+          <div className="flex items-center gap-1.5 ml-auto">
+            {/* Inline row search — F3 to focus, matches Busy's Search-F3. */}
+            <div className="relative">
+              <FaSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-[13px] text-ink-subtle" />
+              <input
+                ref={rowSearchRef}
+                type="text"
+                value={rowSearch}
+                onChange={(e) => setRowSearch(e.target.value)}
+                placeholder="Search name/code…"
+                className="w-40 pl-6 pr-6 py-1 border border-line bg-card rounded text-[13px] text-ink focus:ring-1 focus:ring-red-500/40 focus:border-red-500 focus:outline-none"
+              />
+              {rowSearch && (
+                <button
+                  onClick={() => setRowSearch("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[13px]"
+                  title="Clear"
+                >
+                  <FaTimes />
+                </button>
+              )}
+            </div>
+
+            {/* Columns — toggle column visibility inline. */}
+            <div className="relative" ref={columnsMenuRef}>
               <button
-                onClick={() => setRowSearch("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink text-[13px]"
-                title="Clear"
+                onClick={() => setShowColumnsMenu((s) => !s)}
+                className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
+                title="Show / hide columns"
               >
-                <FaTimes />
+                <FaColumns className="text-[13px]" /> Columns
               </button>
-            )}
-          </div>
+              {showColumnsMenu && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-line rounded shadow-2xl z-30 py-1 text-[13px]">
+                  {([
+                    { key: "showMobile", label: "Mobile Number" },
+                    { key: "showTxnDate", label: "Transaction Date" },
+                    { key: "showDays", label: "Days" },
+                  ] as { key: "showMobile" | "showTxnDate" | "showDays"; label: string }[]).map((c) => {
+                    const on = options[c.key] as boolean;
+                    return (
+                      <button
+                        key={c.key}
+                        onClick={() => setOptions((p) => ({ ...p, [c.key]: !on }))}
+                        className={`w-full flex items-center gap-2 px-3 py-1 text-left hover:bg-card-2 ${on ? "text-ink" : "text-ink-subtle"
+                          }`}
+                      >
+                        <span className="w-3 text-center">{on ? "✓" : ""}</span>
+                        <span>{c.label}</span>
+                      </button>
+                    );
+                  })}
+                  <div className="border-t border-line my-1"></div>
+                  {([
+                    { key: "showZeroBalance", label: "Show Zero Balance" },
+                    { key: "showOverdueOnly", label: "Show Only Overdue" },
+                  ] as { key: "showZeroBalance" | "showOverdueOnly"; label: string }[]).map((c) => {
+                    const on = options[c.key] as boolean;
+                    return (
+                      <button
+                        key={c.key}
+                        onClick={() => setOptions((p) => ({ ...p, [c.key]: !on }))}
+                        className={`w-full flex items-center gap-2 px-3 py-1 text-left hover:bg-card-2 ${on ? "text-ink" : "text-ink-subtle"
+                          }`}
+                      >
+                        <span className="w-3 text-center">{on ? "✓" : ""}</span>
+                        <span>{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-          {/* Columns — toggle column visibility inline. */}
-          <div className="relative" ref={columnsMenuRef}>
             <button
-              onClick={() => setShowColumnsMenu((s) => !s)}
+              onClick={() => setShowOptionsDialog(true)}
               className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
-              title="Show / hide columns"
+              title="Change filters (Esc)"
             >
-              <FaColumns className="text-[13px]" /> Columns
+              Filters
             </button>
-            {showColumnsMenu && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-line rounded shadow-2xl z-30 py-1 text-[13px]">
-                {([
-                  { key: "showType", label: "Type" },
-                  { key: "showMobile", label: "Mobile Number" },
-                ] as { key: "showType" | "showMobile"; label: string }[]).map((c) => {
-                  const on = options[c.key] as boolean;
-                  return (
-                    <button
-                      key={c.key}
-                      onClick={() => setOptions((p) => ({ ...p, [c.key]: !on }))}
-                      className={`w-full flex items-center gap-2 px-3 py-1 text-left hover:bg-card-2 ${
-                        on ? "text-ink" : "text-ink-subtle"
-                      }`}
-                    >
-                      <span className="w-3 text-center">{on ? "✓" : ""}</span>
-                      <span>{c.label}</span>
-                    </button>
-                  );
-                })}
-                <div className="border-t border-line my-1"></div>
-                {([
-                  { key: "showZeroBalance", label: "Show Zero Balance" },
-                  { key: "showOverdueOnly", label: "Show Only Overdue" },
-                ] as { key: "showZeroBalance" | "showOverdueOnly"; label: string }[]).map((c) => {
-                  const on = options[c.key] as boolean;
-                  return (
-                    <button
-                      key={c.key}
-                      onClick={() => setOptions((p) => ({ ...p, [c.key]: !on }))}
-                      className={`w-full flex items-center gap-2 px-3 py-1 text-left hover:bg-card-2 ${
-                        on ? "text-ink" : "text-ink-subtle"
-                      }`}
-                    >
-                      <span className="w-3 text-center">{on ? "✓" : ""}</span>
-                      <span>{c.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <button onClick={handlePrint} disabled={!data}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
+              <FaPrint /> Print
+            </button>
+            <button onClick={exportCSV} disabled={!data}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
+              <FaDownload /> Export
+            </button>
+            <button onClick={refresh} disabled={refreshing}
+              className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
+              <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
+            </button>
           </div>
-
-          <button
-            onClick={() => setShowOptionsDialog(true)}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line"
-            title="Change filters (Esc)"
-          >
-            Filters
-          </button>
-          <button onClick={handlePrint} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
-            <FaPrint /> Print
-          </button>
-          <button onClick={exportCSV} disabled={!data}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
-            <FaDownload /> Export
-          </button>
-          <button onClick={refresh} disabled={refreshing}
-            className="flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-[13px] font-semibold border border-line disabled:opacity-50">
-            <FaSync className={refreshing ? "animate-spin text-red-500" : ""} /> Refresh
-          </button>
         </div>
-      </div>
       )}
 
       {!showOptionsDialog && (
@@ -450,39 +524,96 @@ const AmountPayablePage: React.FC = () => {
               </div>
 
               <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left border-collapse table-fixed">
+                <table
+                  className="w-full text-left border-collapse table-fixed"
+                  style={{ minWidth: `${totalTableWidth}px` }}
+                >
+                  <colgroup>
+                    {activeColKeys.map((key) => (
+                      <col key={key} style={{ width: `${colWidths[key]}px` }} />
+                    ))}
+                    <col />
+                  </colgroup>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-head border-b-2 border-line">
                       <th
+                        style={{ width: `${colWidths.name}px` }}
                         onClick={() => toggleSort("name")}
                         title="Click to sort — A→Z / Z→A"
-                        className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[38%] cursor-pointer select-none hover:bg-line/60"
+                        className="relative px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head cursor-pointer select-none hover:bg-line/60"
                       >
                         {options.shownBy === "code" ? "Code / Supplier" : "Supplier"}
                         <span className="ml-1 text-[10px] text-ink-subtle">
                           {sort.key === "name" ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}
                         </span>
+                        <div
+                          onMouseDown={(e) => startResizing("name", e)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-red-500/50 z-20"
+                          title="Drag to resize column"
+                        />
                       </th>
-                      {options.showType && (
-                        <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[14%]">Type</th>
-                      )}
+
                       {options.showMobile && (
-                        <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[18%]">Mobile</th>
+                        <th
+                          style={{ width: `${colWidths.mobile}px` }}
+                          className="relative px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head select-none"
+                        >
+                          Mobile
+                          <div
+                            onMouseDown={(e) => startResizing("mobile", e)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-red-500/50 z-20"
+                            title="Drag to resize column"
+                          />
+                        </th>
                       )}
                       <th
+                        style={{ width: `${colWidths.balance}px` }}
                         onClick={() => toggleSort("balance")}
                         title="Click to sort — Highest / Lowest"
-                        className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[18%] cursor-pointer select-none hover:bg-line/60"
+                        className="relative px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head cursor-pointer select-none hover:bg-line/60"
                       >
                         Net Balance
                         <span className="ml-1 text-[10px] text-ink-subtle">
                           {sort.key === "balance" ? (sort.dir === "desc" ? "▼" : "▲") : "⇅"}
                         </span>
+                        <div
+                          onMouseDown={(e) => startResizing("balance", e)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-red-500/50 z-20"
+                          title="Drag to resize column"
+                        />
                       </th>
-                      {/* "Days" header preserved per spec — value below is the
-                          date of the LAST transaction with this supplier, not
-                          an overdue-days count. */}
-                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink bg-head w-[12%]">Days</th>
+                      {options.showTxnDate && (
+                        <th
+                          style={{ width: `${colWidths.txnDate}px` }}
+                          className="relative px-3 py-1 text-[13px] font-bold text-center text-ink border-r border-line bg-head select-none"
+                        >
+                          Transaction Date
+                          <div
+                            onMouseDown={(e) => startResizing("txnDate", e)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-red-500/50 z-20"
+                            title="Drag to resize column"
+                          />
+                        </th>
+                      )}
+                      {options.showDays && (
+                        <th
+                          style={{ width: `${colWidths.days}px` }}
+                          className="relative px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head select-none"
+                        >
+                          Days
+                          <div
+                            onMouseDown={(e) => startResizing("days", e)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-red-500/50 z-20"
+                            title="Drag to resize column"
+                          />
+                        </th>
+                      )}
+                      <th className="bg-head border-b-2 border-line">&nbsp;</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -508,37 +639,40 @@ const AmountPayablePage: React.FC = () => {
                               r.legalName
                             )}
                           </td>
-                          {options.showType && (
-                            <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase text-ink-muted ${cls}`}>
-                              {r.vendorType || ""}
-                            </td>
-                          )}
+
                           {options.showMobile && (
                             <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 font-mono ${cls}`}>
                               {r.phone || ""}
                             </td>
                           )}
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono font-semibold border-r border-line-soft/50 ${
-                            !isHl && r.balanceAsOnDate > 0 ? "text-red-600" :
-                            !isHl && r.balanceAsOnDate < 0 ? "text-emerald-600" :
-                            ""
-                          } ${cls}`}>
+                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono font-semibold border-r border-line-soft/50 ${!isHl && r.balanceAsOnDate > 0 ? "text-red-600" :
+                              !isHl && r.balanceAsOnDate < 0 ? "text-emerald-600" :
+                                ""
+                            } ${cls}`}>
                             {fmt(Math.abs(r.balanceAsOnDate))}
                           </td>
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono ${
-                            !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
-                          } ${cls}`}>
-                            {r.lastTransactionDate ? displayDate(r.lastTransactionDate) : ""}
-                          </td>
+                          {options.showTxnDate && (
+                            <td className={`px-3 py-0.5 text-[13px] text-center font-mono border-r border-line-soft/50 ${cls}`}>
+                              {r.lastTransactionDate ? displayDate(r.lastTransactionDate) : ""}
+                            </td>
+                          )}
+                          {options.showDays && (
+                            <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${!isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
+                              } ${cls}`}>
+                              {getDaysElapsed(r.lastTransactionDate, asOnDate)}
+                            </td>
+                          )}
+                          <td className={`px-3 py-0.5 text-[13px] ${cls}`}>&nbsp;</td>
                         </tr>
                       );
                     })}
                     {Array.from({ length: Math.max(0, 25 - rows.length) }).map((_, i) => (
                       <tr key={`ap-empty-${i}`} className="border-b border-line-soft/60">
                         <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
-                        {options.showType && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
                         {options.showMobile && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
                         <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>
+                        {options.showTxnDate && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
+                        {options.showDays && <td className="px-3 py-0.5 border-r border-line-soft/50">&nbsp;</td>}
                         <td className="px-3 py-0.5">&nbsp;</td>
                       </tr>
                     ))}
@@ -546,9 +680,10 @@ const AmountPayablePage: React.FC = () => {
                   <tfoot className="sticky bottom-0 z-10">
                     <tr className="bg-card-2 border-t-2 border-line">
                       <td className="px-3 py-1 text-[13px] font-bold uppercase text-ink border-r border-line bg-card-2">TOTAL</td>
-                      {options.showType && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
                       {options.showMobile && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
                       <td className="px-3 py-1 text-[13px] text-right font-mono font-bold text-ink border-r border-line bg-card-2">{fmt(Math.abs(totals.net))}</td>
+                      {options.showTxnDate && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
+                      {options.showDays && <td className="px-3 py-1 border-r border-line bg-card-2">&nbsp;</td>}
                       <td className="px-3 py-1 bg-card-2">&nbsp;</td>
                     </tr>
                   </tfoot>
@@ -599,12 +734,16 @@ const AmountPayablePage: React.FC = () => {
               </div>
 
               {(() => {
-                type Row = { key: "showZeroBalance" | "showOverdueOnly" | "showType" | "showMobile"; label: string };
+                type Row = {
+                  key: "showZeroBalance" | "showOverdueOnly" | "showMobile" | "showTxnDate" | "showDays";
+                  label: string;
+                };
                 const rows: Row[] = [
                   { key: "showZeroBalance", label: "Show Zero Balance Suppliers ?" },
                   { key: "showOverdueOnly", label: "Show Only Overdue ?" },
-                  { key: "showType", label: "Show Type Column ?" },
                   { key: "showMobile", label: "Show Mobile Number ?" },
+                  { key: "showTxnDate", label: "Show Transaction Date Column ?" },
+                  { key: "showDays", label: "Show Days Column ?" },
                 ];
                 return rows.map((r) => (
                   <React.Fragment key={r.key}>
