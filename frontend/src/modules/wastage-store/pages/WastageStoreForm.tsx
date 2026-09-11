@@ -102,14 +102,9 @@ const WastageStoreForm: React.FC = () => {
     useEffect(() => {
         categoryService.fetchAll({ type: "WASTAGE", isActive: true }).then((res) => {
             const list = res?.categories ?? res ?? [];
-            if (Array.isArray(list) && list.length > 0) {
+            if (Array.isArray(list) && list.length > 0) 
                 setCategoryOptions(list.map((c: any) => ({ label: c.name, value: c.id })));
-            } else {
-                categoryService.fetchAll({ isActive: true }).then((allRes) => {
-                    const allList = allRes?.categories ?? allRes ?? [];
-                    setCategoryOptions(Array.isArray(allList) ? allList.map((c: any) => ({ label: c.name, value: c.id })) : []);
-                });
-            }
+            
         }).catch(() => {});
     }, []);
 

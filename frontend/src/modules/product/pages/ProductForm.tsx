@@ -28,7 +28,7 @@ import { machineService } from "../../../services/machineService";
 import { customerGradeService, type CustomerGrade } from "../../../services/customerGradeService";
 import { categoryService } from "../../../services/categoryService";
 
-const MAX_IMAGES = 3;
+const MAX_IMAGES = 7;
 
 interface ExistingProductImage {
     id: string | number;
@@ -115,8 +115,8 @@ const ProductForm: React.FC = () => {
     const fetchRawMaterialsData = useCallback(() => {
         rawMaterialService.fetchAll({}).then((res: any) => {
             const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-            const rmOnly = data.filter((item: any) => item.itemType !== "WASTAGE");
-            setAllRawMaterials(rmOnly);
+         
+            setAllRawMaterials(data);
         }).catch(() => {});
     }, []);
     const fetchEmployeesData = useCallback(() => {
