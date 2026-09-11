@@ -47,19 +47,33 @@ apiClient.interceptors.response.use(
     async (error) => {
         // If 401 Unauthorized, it means the token is expired or invalid
         if (error.response?.status === 401 && !error.config.url?.includes("/auth/login")) {
-            // Clear the invalid token and redirect to login
-            if (storeRef) {
-                const { clearUser } = await import("../features/auth/authSlice");
-                storeRef.dispatch(clearUser());
-            }
-            
-            // Clear stored tokens
-            localStorage.removeItem('accessToken');
-            sessionStorage.removeItem('accessToken');
-            
-            // Optionally redirect to login page
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
+            // Special case — /auth/me called during initializeAuth is a TOKEN
+            // PROBE. A 401 there just means the stored JWT is stale (server was
+            // reset, session evicted, expired). initializeAuth's reducer already
+            // clears state cleanly. Forcing an extra clearUser + hard redirect
+            // here caused: (a) a redirect race with StrictMode's double-fire,
+            // and (b) users being kicked to /login before initializeAuth even
+            // resolved. Skip the aggressive path in that specific window.
+            const isInitProbe =
+                error.config.url?.includes("/auth/me") &&
+                storeRef &&
+                !storeRef.getState().auth.isInitialized;
+
+            if (!isInitProbe) {
+                // Clear the invalid token and redirect to login
+                if (storeRef) {
+                    const { clearUser } = await import("../features/auth/authSlice");
+                    storeRef.dispatch(clearUser());
+                }
+
+                // Clear stored tokens
+                localStorage.removeItem('accessToken');
+                sessionStorage.removeItem('accessToken');
+
+                // Optionally redirect to login page
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
             }
         }
         return Promise.reject(error);

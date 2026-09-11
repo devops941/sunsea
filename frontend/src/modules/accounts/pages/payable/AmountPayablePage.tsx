@@ -94,6 +94,36 @@ const AmountPayablePage: React.FC = () => {
   const [showColumnsMenu, setShowColumnsMenu] = useState<boolean>(false);
   const rowSearchRef = useRef<HTMLInputElement>(null);
   const columnsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click-to-sort on Supplier / Net Balance column headers.
+  // - name:  alphabetical A→Z (asc) or Z→A (desc)
+  // - balance: signed netBalance, ascending (lowest first) or desc (highest first)
+  // Sessionstorage persists so refresh keeps the order the operator picked.
+  const SORT_KEY = "sunsea:payable:sort:v1";
+  type SortKey = "name" | "balance";
+  type SortDir = "asc" | "desc";
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>(() => {
+    try {
+      const raw = sessionStorage.getItem(SORT_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if ((p.key === "name" || p.key === "balance") && (p.dir === "asc" || p.dir === "desc")) return p;
+      }
+    } catch { /* ignore */ }
+    return { key: "name" as SortKey, dir: "asc" as SortDir };
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(SORT_KEY, JSON.stringify(sort)); } catch { /* ignore */ }
+  }, [sort]);
+  const toggleSort = useCallback((key: SortKey) => {
+    setSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      // First click on a new column defaults to the intuitive direction:
+      //   name → A→Z, balance → highest first (desc)
+      return { key, dir: key === "balance" ? "desc" : "asc" };
+    });
+  }, []);
+
   useEffect(() => {
     if (!showColumnsMenu) return;
     const onClick = (e: MouseEvent) => {
@@ -139,12 +169,20 @@ const AmountPayablePage: React.FC = () => {
         (r.vendorType || "").toLowerCase().includes(q)
       );
     }
-    return [...list].sort((a, b) =>
-      options.shownBy === "code"
-        ? (a.supplierCode || "").localeCompare(b.supplierCode || "")
-        : (a.legalName || "").localeCompare(b.legalName || "")
-    );
-  }, [data, options.showZeroBalance, options.showOverdueOnly, options.shownBy, rowSearch]);
+    // Click-to-sort by column header (name or balance). Direction from `sort`.
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      if (sort.key === "balance") {
+        cmp = (a.balanceAsOnDate || 0) - (b.balanceAsOnDate || 0);
+      } else {
+        // name — respects the "Account shown by" (Name / Code) preference
+        const aStr = options.shownBy === "code" ? (a.supplierCode || "") : (a.legalName || "");
+        const bStr = options.shownBy === "code" ? (b.supplierCode || "") : (b.legalName || "");
+        cmp = aStr.localeCompare(bStr);
+      }
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [data, options.showZeroBalance, options.showOverdueOnly, options.shownBy, rowSearch, sort]);
 
   const totals = useMemo(() => {
     // Only the signed Net Balance total is shown in the footer now — Debit /
@@ -415,8 +453,15 @@ const AmountPayablePage: React.FC = () => {
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-head border-b-2 border-line">
-                      <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[38%]">
+                      <th
+                        onClick={() => toggleSort("name")}
+                        title="Click to sort — A→Z / Z→A"
+                        className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[38%] cursor-pointer select-none hover:bg-line/60"
+                      >
                         {options.shownBy === "code" ? "Code / Supplier" : "Supplier"}
+                        <span className="ml-1 text-[10px] text-ink-subtle">
+                          {sort.key === "name" ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}
+                        </span>
                       </th>
                       {options.showType && (
                         <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[14%]">Type</th>
@@ -424,7 +469,16 @@ const AmountPayablePage: React.FC = () => {
                       {options.showMobile && (
                         <th className="px-3 py-1 text-[13px] font-bold text-ink border-r border-line bg-head w-[18%]">Mobile</th>
                       )}
-                      <th className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[18%]">Net Balance</th>
+                      <th
+                        onClick={() => toggleSort("balance")}
+                        title="Click to sort — Highest / Lowest"
+                        className="px-3 py-1 text-[13px] font-bold text-right text-ink border-r border-line bg-head w-[18%] cursor-pointer select-none hover:bg-line/60"
+                      >
+                        Net Balance
+                        <span className="ml-1 text-[10px] text-ink-subtle">
+                          {sort.key === "balance" ? (sort.dir === "desc" ? "▼" : "▲") : "⇅"}
+                        </span>
+                      </th>
                       {/* "Days" header preserved per spec — value below is the
                           date of the LAST transaction with this supplier, not
                           an overdue-days count. */}

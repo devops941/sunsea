@@ -538,46 +538,10 @@ const HorizontalNav = () => {
   // State tracking expanded items within dropdown tree
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
 
-  // Auto-expand active route or first parent category when menu opens
+  // Keep all dropdown tree items collapsed by default when menu opens
   useEffect(() => {
-    if (!activeMenuId) {
-      setExpandedKeys({});
-      return;
-    }
-    const currentMenu = filteredSidebarItems.find((m) => m.title === activeMenuId);
-    if (currentMenu && currentMenu.children) {
-      const initial: Record<string, boolean> = {};
-      let hasActive = false;
-
-      const checkActive = (items: any[]) => {
-        items.forEach((child) => {
-          if (child.children?.length) {
-            const isChildActive = child.children.some((sc: any) => isItemOrDescendantActive(sc));
-            if (isChildActive) {
-              initial[child.title] = true;
-              hasActive = true;
-              checkActive(child.children);
-            }
-          }
-        });
-      };
-
-      checkActive(currentMenu.children);
-
-      // If nothing matches current route, expand the first parent with children and its first child
-      if (!hasActive) {
-        const firstWithChildren = currentMenu.children.find((c) => c.children?.length);
-        if (firstWithChildren) {
-          initial[firstWithChildren.title] = true;
-          const firstSubChild = firstWithChildren.children?.find((sc: any) => sc.children?.length);
-          if (firstSubChild) {
-            initial[firstSubChild.title] = true;
-          }
-        }
-      }
-      setExpandedKeys(initial);
-    }
-  }, [activeMenuId, filteredSidebarItems, isItemOrDescendantActive]);
+    setExpandedKeys({});
+  }, [activeMenuId]);
 
   // Helper to find ancestor path in tree for a given title
   const findAncestors = useCallback(
