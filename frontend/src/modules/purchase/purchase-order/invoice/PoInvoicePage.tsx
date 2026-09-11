@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo } from "react";
 import { FaPrint, FaDownload, FaArrowLeft, FaWhatsapp } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
@@ -15,10 +16,7 @@ const formatMoney = (val: string | number | null | undefined) => {
     return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const formatDate = (val: string | null | undefined) => {
-    if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-};
+
 
 const ROWS_PER_PAGE = 20;
 

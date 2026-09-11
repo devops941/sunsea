@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect } from "react";
 import { Modal } from "react-bootstrap";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -63,7 +64,7 @@ const ProductionShiftRecordsModal: React.FC<Props> = ({ show, onHide, productId,
                       Target: {Number(highest.targetQty).toLocaleString()} |
                       Machine: {highest.machine?.machineName || "N/A"} |
                       Shift: {highest.shift?.shiftName || "N/A"} |
-                      Date: {new Date(highest.recordedDate).toLocaleDateString()}
+                      Date: {formatDate(highest.recordedDate)}
                     </small>
                     {highest.operatorIds && (
                       <div className="mt-1">
@@ -100,7 +101,7 @@ const ProductionShiftRecordsModal: React.FC<Props> = ({ show, onHide, productId,
                   {records.map((r, idx) => (
                     <tr key={r.id} className={r.isHighest ? "table-success" : ""}>
                       <td className="text-muted">{idx + 1}</td>
-                      <td className="fw-semibold">{new Date(r.recordedDate).toLocaleDateString()}</td>
+                      <td className="fw-semibold">{formatDate(r.recordedDate)}</td>
                       <td>{r.shift?.shiftName || r.shiftId}</td>
                       <td>{r.machine?.machineName || r.machineId}</td>
                       <td className="fw-bold text-primary">{Number(r.achievedQty).toLocaleString()}</td>

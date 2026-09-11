@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -292,7 +293,7 @@ const HourlyWorkReportList: React.FC = () => {
         {
             header: "DATE",
             width: "90px",
-            render: (group) => <span className="font-medium text-ink-subtle">{new Date(group.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            render: (group) => <span className="font-medium text-ink-subtle">{formatDate(group.productionDate)}</span>
         },
         {
             header: "MACHINE",
@@ -608,7 +609,7 @@ const HourlyWorkReportList: React.FC = () => {
                         <div>
                             <div className="text-[10px] font-bold uppercase tracking-wider text-ink-subtle mb-0.5">Date</div>
                             <div className="text-sm font-semibold text-ink-muted">
-                                {new Date(selectedViewGroup.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                {formatDate(selectedViewGroup.productionDate)}
                             </div>
                         </div>
                         <div>

@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
@@ -174,11 +175,11 @@ const PurchaseReportsCenter: React.FC = () => {
     },
     {
       header: "PO DATE",
-      render: (item: any) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
+      render: (item: any) => item.poDate ? formatDate(item.poDate) : "-"
     },
     {
       header: "DELIVERY DATE",
-      render: (item: any) => item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
+      render: (item: any) => item.expectedDeliveryDate ? formatDate(item.expectedDeliveryDate) : "-"
     },
     {
       header: "SUPPLIER",

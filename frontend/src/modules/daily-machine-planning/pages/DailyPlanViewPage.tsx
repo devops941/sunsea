@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaArrowLeft, FaIndustry, FaChartBar, FaCheckCircle, FaBoxOpen, FaTruck, FaArrowRight, FaShare, FaClipboardList, FaCalendarAlt } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -171,7 +172,7 @@ const DailyPlanViewPage: React.FC = () => {
       header: "Date",
       render: (plan: any) => (
         <span className="text-xs text-ink-muted">
-          {plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+          {plan.productionDate ? formatDate(plan.productionDate) : "—"}
         </span>
       )
     },

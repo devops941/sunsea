@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -471,11 +472,7 @@ const AllSalesOrderList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     const handleOpenView = useCallback((id: number) => {
         navigate(`/sales-order/details/${id}`);
@@ -497,7 +494,7 @@ const AllSalesOrderList: React.FC = () => {
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
             { header: "Order No", accessor: (item: any) => item.orderNo || "" },
-            { header: "Order Date", accessor: (item: any) => item.orderDate ? new Date(item.orderDate).toLocaleDateString("en-IN") : "" },
+            { header: "Order Date", accessor: (item: any) => item.orderDate ? formatDate(item.orderDate) : "" },
             { header: "Customer", accessor: (item: any) => item.customer?.displayName || item.customer?.firmName || item.customerName || "" },
             { header: "Net Amount", accessor: (item: any) => item.netAmount != null ? Number(item.netAmount).toFixed(2) : "0.00" },
             { header: "Order Source", accessor: (item: any) => item.orderSource || "" },

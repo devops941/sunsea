@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -16,10 +17,7 @@ const formatMoney = (val: string | number | null | undefined) => {
     return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const formatDate = (val: string | null | undefined) => {
-    if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
+
 
 const formatDateTime = (val: string | null | undefined) => {
     if (!val) return "—";

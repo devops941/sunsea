@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -150,8 +151,8 @@ export const CustomerBreakdownPage: React.FC = () => {
         csvData: customerDetail.invoices || [],
         csvColumns: [
           { header: "Invoice No", accessor: (item: any) => item.invoiceNo },
-          { header: "Date", accessor: (item: any) => item.date },
-          { header: "Due Date", accessor: (item: any) => item.dueDate || "-" },
+          { header: "Date", accessor: (item: any) => formatDate(item.date) },
+          { header: "Due Date", accessor: (item: any) => formatDate(item.dueDate) },
           { header: "Invoice Amount", accessor: (item: any) => item.amount },
         ],
         csvFilename: `${firmName}_Invoices_${new Date().toISOString().split("T")[0]}.csv`,
@@ -161,7 +162,7 @@ export const CustomerBreakdownPage: React.FC = () => {
         csvData: customerDetail.collectionHistory || [],
         csvColumns: [
           { header: "Voucher No", accessor: (item: any) => item.voucherNo },
-          { header: "Date", accessor: (item: any) => item.date },
+          { header: "Date", accessor: (item: any) => formatDate(item.date) },
           { header: "Payment Mode", accessor: (item: any) => item.paymentMode || "General" },
           { header: "Amount Received", accessor: (item: any) => item.amount },
           { header: "Reference No", accessor: (item: any) => item.referenceNo || "-" },
@@ -173,7 +174,7 @@ export const CustomerBreakdownPage: React.FC = () => {
       return {
         csvData: customerDetail.statementEntries || [],
         csvColumns: [
-          { header: "Date", accessor: (item: any) => item.date },
+          { header: "Date", accessor: (item: any) => formatDate(item.date) },
           { header: "Voucher No", accessor: (item: any) => item.voucherNo },
           { header: "Particulars", accessor: (item: any) => item.particulars },
           { header: "Debit (Dr)", accessor: (item: any) => item.debit },
@@ -198,7 +199,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     },
     {
       header: "DATE",
-      render: (item: any) => <span className="text-ink-muted font-mono">{item.date}</span>,
+      render: (item: any) => <span className="text-ink-muted font-mono">{formatDate(item.date)}</span>,
     },
     {
       header: "DUE DATE",
@@ -236,7 +237,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     },
     {
       header: "DATE",
-      render: (item: any) => <span className="text-ink-muted font-mono">{item.date}</span>,
+      render: (item: any) => <span className="text-ink-muted font-mono">{formatDate(item.date)}</span>,
     },
     {
       header: "PAYMENT MODE",
@@ -269,7 +270,7 @@ export const CustomerBreakdownPage: React.FC = () => {
     },
     {
       header: "DATE",
-      render: (item: any) => <span className="text-ink-muted font-mono">{item.date}</span>,
+      render: (item: any) => <span className="text-ink-muted font-mono">{formatDate(item.date)}</span>,
     },
     {
       header: "VOUCHER NO",

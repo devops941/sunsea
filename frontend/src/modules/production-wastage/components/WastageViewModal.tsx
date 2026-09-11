@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React from "react";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -84,7 +85,7 @@ const WastageViewModal: React.FC<WastageViewModalProps> = ({
       modalTitle="Wastage Log Details"
       avatarText={wastage.wastageNo ? wastage.wastageNo.substring(0, 2) : "WA"}
       headerTitle={`Wastage No: ${wastage.wastageNo}`}
-      headerSubtitle={`Date: ${new Date(wastage.wastageDate).toLocaleDateString()}`}
+      headerSubtitle={`Date: ${formatDate(wastage.wastageDate)}`}
       statusNode={<StatusBadge status={wastage.status} />}
       sections={sections}
       footer={footerActions}

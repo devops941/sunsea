@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -55,7 +56,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const getWeekLabel = (s: string, e: string) => {
         try {
             const opt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
-            return `${new Date(s).toLocaleDateString("en-US", opt)} – ${new Date(e).toLocaleDateString("en-US", opt)}`;
+            return `${formatDate(s)} – ${formatDate(e)}`;
         } catch { return `${s} – ${e}`; }
     };
 

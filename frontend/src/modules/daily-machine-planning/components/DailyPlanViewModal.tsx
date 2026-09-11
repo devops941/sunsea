@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   FaIndustry, FaChartBar, FaCheckCircle, FaBoxOpen, FaTruck,
@@ -158,7 +159,7 @@ const DailyPlanViewModal: React.FC<DailyPlanViewModalProps> = ({ show, onHide, p
       render: (plan: any) => (
         <span className="text-xs text-ink-muted">
           {plan.productionDate
-            ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+            ? formatDate(plan.productionDate)
             : "—"}
         </span>
       )

@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React from "react";
 import { Card, Col, Row } from "react-bootstrap";
 import { FaPlay } from "react-icons/fa";
@@ -64,12 +65,7 @@ const DayScheduleCard: React.FC<DayScheduleCardProps> = ({
         <div>
           <h5 className="mb-1 fw-bold text-dark">{day.dayName}</h5>
           <span className="text-muted small fw-medium">
-            {new Date(day.date).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              timeZone: "UTC",
-            })}
+            {formatDate(day.date)}
           </span>
         </div>
         <StatusBadge

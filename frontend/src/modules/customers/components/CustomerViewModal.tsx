@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState } from "react";
 import type { Customer } from "../../../features/customer/types";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
@@ -164,8 +165,8 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                         },
                         { label: "Credit Limit", value: customer.creditLimit !== undefined && customer.creditLimit !== null ? `₹ ${Number(customer.creditLimit).toLocaleString('en-IN')}` : "N/A" },
                         { label: "Credit Days", value: customer.creditDays ? `${customer.creditDays} Days` : "N/A" },
-                        { label: "Last Purchase Date", value: customer.lastPurchaseDate ? new Date(customer.lastPurchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "N/A" },
-                        { label: "Last Payment Date", value: customer.lastPaymentDate ? new Date(customer.lastPaymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "N/A" },
+                        { label: "Last Purchase Date", value: customer.lastPurchaseDate ? formatDate(customer.lastPurchaseDate) : "N/A" },
+                        { label: "Last Payment Date", value: customer.lastPaymentDate ? formatDate(customer.lastPaymentDate) : "N/A" },
                         {
                             label: "Current Balance",
                             value: (() => {

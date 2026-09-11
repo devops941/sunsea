@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -879,7 +880,7 @@ const DashboardPage: React.FC = () => {
                       const dateText = dateObj && !isNaN(dateObj.getTime()) ? (
                         dateObj.toDateString() === new Date().toDateString()
                           ? "Today"
-                          : dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+                          : formatDate(new Date())
                       ) : "";
 
                       return (
@@ -1237,7 +1238,7 @@ const DashboardPage: React.FC = () => {
                             </td>
                             <td className="px-3 py-2 text-ink truncate max-w-[160px] text-[11px] font-medium">{party}</td>
                             <td className="px-2 py-2 font-mono text-[10px] text-ink-muted whitespace-nowrap">
-                              {new Date(t.date).toLocaleDateString("en-IN")}
+                              {formatDate(t.date)}
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
                               ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1554,7 +1555,7 @@ const DashboardPage: React.FC = () => {
                           </td>
                           <td className="px-2 py-2 text-center text-[11px] text-ink-muted font-mono">{item.creditDays}d</td>
                           <td className="px-2 py-2 text-[10px] font-mono text-ink-muted whitespace-nowrap">
-                            {new Date(item.lastDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            {formatDate(item.lastDate)}
                           </td>
                           <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
                             ₹{item.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1619,7 +1620,7 @@ const DashboardPage: React.FC = () => {
                           </td>
                           <td className="px-2 py-2 text-center text-[11px] text-ink-muted font-mono">{item.creditDays}d</td>
                           <td className="px-2 py-2 text-[10px] font-mono text-ink-muted whitespace-nowrap">
-                            {new Date(item.lastDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            {formatDate(item.lastDate)}
                           </td>
                           <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
                             ₹{item.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1829,7 +1830,7 @@ const DashboardPage: React.FC = () => {
                                       <>
                                         <span>Last ordered:</span>
                                         <span className="font-semibold text-ink-muted">
-                                          {item.lastOrderDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                          {formatDate(new Date())}
                                         </span>
                                         <span className="text-[9px]">({item.daysAgo}d ago)</span>
                                         {isInactive && (

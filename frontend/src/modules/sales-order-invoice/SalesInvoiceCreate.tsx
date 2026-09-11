@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../hooks/useFormKeyboardNav";
@@ -1093,7 +1094,7 @@ const SalesInvoiceForm: React.FC = () => {
     return filtered.map((so) => {
       const dateStr = so.orderDate || so.createdAt;
       const formattedDate = dateStr
-        ? new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+        ? formatDate(dateStr)
         : "";
       const formattedAmt = so.netAmount !== undefined
         ? `₹${Number(so.netAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`

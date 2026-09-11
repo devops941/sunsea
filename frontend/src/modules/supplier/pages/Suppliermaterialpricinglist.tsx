@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState } from "react";
 import { FaHistory, FaChevronDown, FaChevronUp, FaArrowLeft, FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -13,7 +14,7 @@ import type {
     SupplierMaterialPrice,
 } from "../../../features/supplier/types";
 
-const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-IN") : "—");
+const fmtDate = (d: string | null) => (d ? formatDate(d) : "—");
 const fmtMoney = (n: number) => (n > 0 ? `₹${Number(n).toFixed(2)}` : "—");
 const todayISO = () => new Date().toISOString().split("T")[0];
 

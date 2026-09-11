@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useCallback } from 'react';
 import { Wallet, Plus, Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
@@ -8,7 +9,7 @@ import { usePermission } from '../../../hooks/usePermission';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtRs = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
-const fmtDate = (s: string) => new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+const fmtDate = (s: string) => formatDate(s);
 
 const STATUS_STYLE: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-700',

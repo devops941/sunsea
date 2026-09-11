@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
@@ -108,11 +109,7 @@ const InvoiceList: React.FC = () => {
         }
     };
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     const formatCurrency = (amount: number) =>
         `₹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;

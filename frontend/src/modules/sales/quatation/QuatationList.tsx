@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAppSelector } from "../../../hooks/reduxHooks";
@@ -390,7 +391,7 @@ const QuotationList: React.FC = () => {
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
             { header: "Order / Quotation No", accessor: (item: any) => item.orderNo || "" },
-            { header: "Order Date", accessor: (item: any) => item.orderDate ? new Date(item.orderDate).toLocaleDateString("en-IN") : "" },
+            { header: "Order Date", accessor: (item: any) => item.orderDate ? formatDate(item.orderDate) : "" },
             { header: "Customer", accessor: (item: any) => item.customer?.displayName || item.customer?.firmName || "N/A" },
             { header: "Net Amount", accessor: (item: any) => item.netAmount != null ? Number(item.netAmount).toFixed(2) : "0.00" },
             { header: "Status", accessor: (item: any) => item.status || "" },
@@ -483,11 +484,7 @@ const QuotationList: React.FC = () => {
         }
     }, []);
 
-    const formatDate = useCallback((dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    }, []);
+    
 
     const generatePdf = async (action: "view" | "download") => {
         if (!estimateOrder) return;

@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useLocation, useParams } from "react-router-dom";
@@ -17,10 +18,7 @@ const PRODUCTION_STARTED_STATUSES = [
     "COMPLETED_WITH_SHORTFALL", "DISPATCHED", "CLOSED", "CANCELLED",
 ];
 
-const formatDate = (dateString?: string) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-};
+
 
 const formatDateTime = (dateString?: string) => {
     if (!dateString) return "-";
@@ -280,7 +278,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                 }
                 return {
                     id: plan.dailyPlanId,
-                    date: plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN") : "-",
+                    date: plan.productionDate ? formatDate(plan.productionDate) : "-",
                     shiftName: plan.shift?.shiftName || plan.shiftId || "-",
                     machineName: plan.machine?.machineName || plan.machineId || fullOrder?.Machine?.machineName || "-",
                     plannedQty,
@@ -410,7 +408,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                 : "none";
         return [{
             id: "fallback",
-            date: displayOrder?.orderDate ? new Date(displayOrder.orderDate).toLocaleDateString("en-IN") : "-",
+            date: displayOrder?.orderDate ? formatDate(displayOrder.orderDate) : "-",
             shiftName: "General Shift",
             machineName: fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || "-",
             plannedQty: Number(displayOrder?.targetQty || 0),
@@ -451,7 +449,7 @@ const ProductionOrderHistoryView: React.FC = () => {
             width: "110px",
             render: (item) => <span className="text-ink-muted">
                 {item.dispatch?.dispatchDate
-                    ? new Date(item.dispatch.dispatchDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                    ? formatDate(item.dispatch.dispatchDate)
                     : "-"}
             </span>,
         },

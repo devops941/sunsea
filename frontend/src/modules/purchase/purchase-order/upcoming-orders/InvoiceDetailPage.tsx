@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FaSave, FaUndo } from "react-icons/fa";
 import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
@@ -659,7 +660,7 @@ const InvoiceDetailPage: React.FC = () => {
             const supplierName = po.supplier?.supplierName || po.supplier?.displayName || po.supplier?.legalName || "";
             const dateStr = po.poDate || po.createdAt;
             const formattedDate = dateStr
-                ? new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                ? formatDate(dateStr)
                 : "";
             const formattedAmt = po.netAmount !== undefined
                 ? `₹${Number(po.netAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`

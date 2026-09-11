@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaBoxes, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
@@ -384,7 +385,7 @@ export const PurchaseReturnPage: React.FC = () => {
         header: "Return Date",
         accessor: (item: any) =>
           item.returnDate
-            ? new Date(item.returnDate).toLocaleDateString("en-IN")
+            ? formatDate(item.returnDate)
             : "",
       },
       {
@@ -431,7 +432,7 @@ export const PurchaseReturnPage: React.FC = () => {
       header: "DATE",
       render: (item) => (
         <span className="font-mono text-xs">
-          {item.returnDate ? new Date(item.returnDate).toLocaleDateString("en-IN") : "—"}
+          {item.returnDate ? formatDate(item.returnDate) : "—"}
         </span>
       ),
     },
@@ -747,7 +748,7 @@ export const PurchaseReturnPage: React.FC = () => {
               {
                 label: "Return Date",
                 value: selectedViewReturn
-                  ? new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")
+                  ? formatDate(selectedViewReturn.returnDate)
                   : "—",
               },
               {
