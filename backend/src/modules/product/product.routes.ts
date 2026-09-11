@@ -28,7 +28,7 @@ router.get(
 /**
  * Create Product
  *
- * uploadProductImage.array("images", 3) MUST run before validateMiddleware.
+ * uploadProductImage.array("images", 7) MUST run before validateMiddleware.
  * Multer is what parses the multipart/form-data body into req.body +
  * req.files — until it runs, req.body is empty and validation would fail
  * on every field.
@@ -37,7 +37,7 @@ router.post(
   "/",
   authMiddleware,
   requirePermission("products.create"),
-  uploadProductImage.array("images", 3),
+  uploadProductImage.array("images", 7),
   validateMiddleware(createProductSchema),
   productController.create
 );
@@ -66,19 +66,19 @@ router.get(
 /**
  * Update Product
  *
- * Same field name ("images") and cap (3) as create, since edit now supports
+ * Same field name ("images") and cap (7) as create, since edit now supports
  * adding/removing individual images rather than replacing a single one.
  * The cap is enforced here per-request only — it does NOT account for
  * images the product already has on disk, so a product with 2 existing
- * images plus 3 new uploads would still pass multer (5 total) and only get
+ * images plus 7 new uploads would still pass multer (9 total) and only get
  * capped at the DB layer if product.service enforces it. Enforce the
- * combined (existing + new) limit of 3 on the frontend before submit.
+ * combined (existing + new) limit of 7 on the frontend before submit.
  */
 router.put(
   "/:id",
   authMiddleware,
   requirePermission("products.edit"),
-  uploadProductImage.array("images", 3),
+  uploadProductImage.array("images", 7),
   validateMiddleware(updateProductSchema),
   productController.update
 );
