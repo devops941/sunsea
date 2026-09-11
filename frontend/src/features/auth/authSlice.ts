@@ -79,11 +79,11 @@ export const initializeAuth = createAsyncThunk(
         try {
             // Check if access token exists in localStorage or sessionStorage
             const storedToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
-            
+
             if (storedToken) {
                 // Set the token first
                 thunkAPI.dispatch(setAccessToken(storedToken));
-                
+
                 // Verify the token by fetching current user
                 try {
                     const userResponse = await authService.getCurrentUser();
@@ -95,11 +95,22 @@ export const initializeAuth = createAsyncThunk(
                     return null;
                 }
             }
-            
+
             return null;
         } catch {
             return null;
         }
+    },
+    {
+        // In dev, React.StrictMode double-invokes App's useEffect on mount,
+        // which used to trigger two back-to-back /api/auth/me calls (and two
+        // spurious "Session expired or invalid" server-side warnings if the
+        // stored JWT is orphaned). The condition callback tells RTK to skip
+        // the second dispatch when init is already running or already done.
+        condition: (_, { getState }) => {
+            const state = getState() as { auth: AuthState };
+            return !state.auth.isInitialized && !state.auth.isLoading;
+        },
     }
 );
 

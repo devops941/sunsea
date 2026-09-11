@@ -11,9 +11,18 @@ export const errorMiddleware = (
   _next: NextFunction
 ) => {
   if (err instanceof ApiError) {
+    // Routine 401 on /auth/me is the frontend probing whether its stored JWT
+    // is still valid at boot. That's expected and not noteworthy — suppress
+    // the log line so a normal fresh load with a stale token doesn't look
+    // like the server is on fire.
+    const isRoutineAuthProbe =
+      err.statusCode === 401 &&
+      typeof _req.originalUrl === "string" &&
+      _req.originalUrl.includes("/auth/me");
+
     if (err.statusCode >= 500) {
       console.error("API ERROR DETECTED:", err);
-    } else {
+    } else if (!isRoutineAuthProbe) {
       console.warn(`[API Warning] ${err.statusCode} - ${err.message}`);
     }
     res.status(err.statusCode).json({

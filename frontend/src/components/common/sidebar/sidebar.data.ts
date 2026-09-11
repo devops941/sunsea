@@ -374,7 +374,7 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "vouchers.view", path: "/accounts/payment-voucher" },
     ],
     children: [
-      // ── Sales Order ──
+      // ── 1. Sales Order ──
       {
         title: "Sales Order",
         permission: "sales-orders.view",
@@ -383,25 +383,7 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/sales-order", permission: "sales-orders.view" },
         ],
       },
-      // ── Purchase Order ──
-      {
-        title: "Purchase Order",
-        permission: "purchaseOrders.view",
-        children: [
-          { title: "Add", path: "/purchase-orders/create", permission: "purchaseOrders.create", badge: "Ctrl+X" },
-          { title: "List", path: "/purchase-orders", permission: "purchaseOrders.view", badge: "Ctrl+Shift+O" },
-        ],
-      },
-      // ── Quotations ──
-      {
-        title: "Quotations",
-        permission: "quotations.view",
-        children: [
-          { title: "Add", path: "/quatation-order/create", permission: "quotations.create" },
-          { title: "List", path: "/quatation-order", permission: "quotations.view", badge: "Ctrl+Q" },
-        ],
-      },
-      // ── Sales (Invoice) ──
+      // ── 2. Sales Invoice ──
       {
         title: "Sales Invoice",
         permission: "sales-invoices.view",
@@ -410,16 +392,7 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/sales-invoices", permission: "sales-invoices.view", badge: "Ctrl+I" },
         ],
       },
-      // ── Purchase (GRN) ──
-      {
-        title: "Purchase Invoice",
-        permission: "invoice.view",
-        children: [
-          { title: "Add", path: "/invoice/create", permission: "invoice.create", badge: "Ctrl+U" },
-          { title: "List", path: "/invoice", permission: "invoice.view", badge: "Ctrl+G" },
-        ],
-      },
-      // ── Sales Return (Cr. Note) ──
+      // ── 3. Sales Return (Cr. Note) ──
       {
         title: "Sales Return (Cr. Note)",
         permission: "sales-returns.view",
@@ -428,7 +401,25 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/sales-returns", permission: "sales-returns.view" },
         ],
       },
-      // ── Purchase Return (Dr. Note) ──
+      // ── 4. Purchase Order ──
+      {
+        title: "Purchase Order",
+        permission: "purchaseOrders.view",
+        children: [
+          { title: "Add", path: "/purchase-orders/create", permission: "purchaseOrders.create", badge: "Ctrl+X" },
+          { title: "List", path: "/purchase-orders", permission: "purchaseOrders.view", badge: "Ctrl+Shift+O" },
+        ],
+      },
+      // ── 5. Purchase Invoice ──
+      {
+        title: "Purchase Invoice",
+        permission: "invoice.view",
+        children: [
+          { title: "Add", path: "/invoice/create", permission: "invoice.create", badge: "Ctrl+U" },
+          { title: "List", path: "/invoice", permission: "invoice.view", badge: "Ctrl+G" },
+        ],
+      },
+      // ── 6. Purchase Return (Dr. Note) ──
       {
         title: "Purchase Return (Dr. Note)",
         permission: "purchase-returns.view",
@@ -437,16 +428,7 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/purchase-returns", permission: "purchase-returns.view" },
         ],
       },
-      // ── Payment Voucher ──
-      {
-        title: "Payment",
-        permission: "vouchers.view",
-        children: [
-          { title: "Add", path: "/accounts/payment-voucher/add", permission: "vouchers.create", badge: "Ctrl+Shift+P" },
-          { title: "List", path: "/accounts/payment-voucher", permission: "vouchers.view" },
-        ],
-      },
-      // ── Receipt Voucher ──
+      // ── 7. Receipt Voucher ──
       {
         title: "Receipt",
         permission: "vouchers.view",
@@ -455,7 +437,26 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/accounts/receipt-voucher", permission: "vouchers.view" },
         ],
       },
-      // ── Journal Entry ──
+      // ── 8. Payment Voucher ──
+      {
+        title: "Payment",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/accounts/payment-voucher/add", permission: "vouchers.create", badge: "Ctrl+Shift+P" },
+          { title: "List", path: "/accounts/payment-voucher", permission: "vouchers.view" },
+        ],
+      },
+      // ── 9. Expenses ──
+      {
+        title: "Expenses",
+        permission: "vouchers.view",
+        children: [
+          { title: "Add", path: "/expenses/add", permission: "vouchers.create" },
+          { title: "Modify", path: "/expenses/modify", permission: "vouchers.update" },
+          { title: "List", path: "/expenses", permission: "vouchers.view" },
+        ],
+      },
+      // ── 10. Journal Entry ──
       {
         title: "Journal",
         permission: "vouchers.view",
@@ -464,7 +465,7 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/accounts/journal-entry", permission: "vouchers.view" },
         ],
       },
-      // ── Contra Entry ──
+      // ── 11. Contra Entry ──
       {
         title: "Contra",
         permission: "vouchers.view",
@@ -473,14 +474,13 @@ export const sidebarItems: SidebarItem[] = [
           { title: "List", path: "/accounts/contra-entry", permission: "vouchers.view" },
         ],
       },
-      // ── Expenses (replaces Petty Cash — source is user's pick per row) ──
+      // ── 12. Quotations ──
       {
-        title: "Expenses",
-        permission: "vouchers.view",
+        title: "Quotations",
+        permission: "quotations.view",
         children: [
-          { title: "Add", path: "/expenses/add", permission: "vouchers.create" },
-          { title: "Modify", path: "/expenses/modify", permission: "vouchers.update" },
-          { title: "List", path: "/expenses", permission: "vouchers.view" },
+          { title: "Add", path: "/quatation-order/create", permission: "quotations.create" },
+          { title: "List", path: "/quatation-order", permission: "quotations.view", badge: "Ctrl+Q" },
         ],
       },
     ],
