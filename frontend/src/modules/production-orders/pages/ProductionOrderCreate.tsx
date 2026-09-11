@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
@@ -1210,9 +1211,9 @@ const ProductionOrderCreate: React.FC = () => {
                                                     </div>
                                                     <div className="font-bold text-ink">
                                                         {selectedSalesOrder.orderDate
-                                                            ? new Date(
+                                                            ? formatDate(
                                                                 selectedSalesOrder.orderDate
-                                                            ).toLocaleDateString("en-IN")
+                                                            )
                                                             : "-"}
                                                     </div>
                                                 </div>
@@ -1222,9 +1223,9 @@ const ProductionOrderCreate: React.FC = () => {
                                                     </div>
                                                     <div className="font-bold text-ink">
                                                         {selectedSalesOrder.expectedCompletionDate
-                                                            ? new Date(
+                                                            ? formatDate(
                                                                 selectedSalesOrder.expectedCompletionDate
-                                                            ).toLocaleDateString("en-IN")
+                                                            )
                                                             : "-"}
                                                     </div>
                                                 </div>

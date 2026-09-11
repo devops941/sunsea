@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaReceipt, FaPlus, FaSync, FaFilter } from "react-icons/fa";
@@ -385,7 +386,7 @@ const ReceiptVoucherPage: React.FC = () => {
                       }`}
                     >
                       <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
-                        {new Date(v.date).toLocaleDateString("en-GB")}
+                        {formatDate(v.date)}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-emerald-500 text-center">
                         {displayVoucherNo(v.voucherNo)}

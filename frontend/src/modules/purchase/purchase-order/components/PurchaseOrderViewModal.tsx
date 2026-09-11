@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useEffect, useMemo } from "react";
 import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
 import { useSelector, useDispatch } from "react-redux";
@@ -18,7 +19,7 @@ interface PurchaseOrderViewModalProps {
 const safeDate = (date?: string | null) => {
   if (!date) return "-";
   const d = new Date(date);
-  return isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
+  return isNaN(d.getTime()) ? "-" : formatDate(new Date());
 };
 
 const safeNumber = (val: any): number => {

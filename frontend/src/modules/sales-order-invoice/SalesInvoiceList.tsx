@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../hooks/useTableKeyboardNav";
@@ -216,11 +217,7 @@ const SalesInvoiceList: React.FC = () => {
         }
     };
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     const formatCurrency = (amount: any) =>
         `₹${Number(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;

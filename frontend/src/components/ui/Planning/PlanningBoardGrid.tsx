@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React from "react";
 import StatusBadge from "../StatusBadge/Badge";
 import "./PlanningBoardGrid.css";
@@ -37,7 +38,7 @@ const PlanningBoardGrid: React.FC<PlanningBoardGridProps> = ({
                                     const sd = new Date(weekStartDate);
                                     if (!isNaN(sd.getTime())) {
                                         sd.setDate(sd.getDate() + (d.value - 1));
-                                        displayDate = sd.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                                        displayDate = formatDate(new Date());
                                     }
                                 }
                                 return (

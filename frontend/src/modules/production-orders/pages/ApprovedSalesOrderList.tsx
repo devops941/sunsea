@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useCallback } from "react";
 import { Container, Row, Col, Alert, Modal } from "react-bootstrap";
 import { FaPlus, FaSearch } from "react-icons/fa";
@@ -97,11 +98,7 @@ const ApprovedSalesOrderList: React.FC = () => {
         }
     }, []);
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     return (
         <div className="inner-container">

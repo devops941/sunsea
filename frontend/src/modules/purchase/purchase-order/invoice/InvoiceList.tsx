@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -28,10 +29,7 @@ const formatMoney = (val: string | number | null | undefined) => {
     return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const formatDate = (val: string | null | undefined) => {
-    if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
+
 
 /** Compute display total: DB netAmount + sundry from remarks/billSundry */
 const getInvoiceDisplayTotal = (inv: any): number => {

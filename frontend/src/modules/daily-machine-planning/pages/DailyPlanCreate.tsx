@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
@@ -810,7 +811,7 @@ const DailyPlanCreate: React.FC = () => {
             <p className="font-bold text-amber-400 text-sm">Carry Forward from {carryForwardFromPlanId}</p>
             {carryForwardFromInfo && (
               <p className="text-amber-300 text-xs">
-                {carryForwardFromInfo.shiftName || carryForwardFromInfo.shiftId} — {carryForwardFromInfo.productionDate ? new Date(carryForwardFromInfo.productionDate).toLocaleDateString() : ""}
+                {carryForwardFromInfo.shiftName || carryForwardFromInfo.shiftId} — {carryForwardFromInfo.productionDate ? formatDate(carryForwardFromInfo.productionDate) : ""}
               </p>
             )}
             <p className="text-amber-300 text-xs mt-0.5">The remaining quantity from plan <strong>{carryForwardFromPlanId}</strong> has been pre-filled below.</p>

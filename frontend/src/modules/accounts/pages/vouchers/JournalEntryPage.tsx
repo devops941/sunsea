@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaBookOpen, FaPlus, FaSync, FaFilter } from "react-icons/fa";
@@ -385,7 +386,7 @@ const JournalEntryPage: React.FC = () => {
                     >
                       {/* Date + Vch No only appear on the first item of each voucher */}
                       <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
-                        {isFirst ? new Date(voucher.date).toLocaleDateString("en-GB") : ""}
+                        {isFirst ? formatDate(voucher.date) : ""}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-purple-500 text-center">
                         {isFirst ? displayVoucherNo(voucher.voucherNo) : ""}

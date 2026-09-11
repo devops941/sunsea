@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -743,7 +744,7 @@ const ProductList: React.FC = () => {
                                                                                 {isInitial ? "Initial" : isCurrent ? "Current" : "Previous"}
                                                                             </span>
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-ink">{new Date(r.productionDate).toLocaleDateString()}</td>
+                                                                        <td className="px-4 py-2.5 text-ink">{formatDate(r.productionDate)}</td>
                                                                         <td className="px-4 py-2.5 text-ink">{r.shiftId && r.shiftId !== "INITIAL" ? r.shiftId : "-"}</td>
                                                                         <td className="px-4 py-2.5 text-ink">{isInitial ? "-" : (machineObj?.machineName || machineId)}</td>
                                                                         <td className="px-4 py-2.5 text-ink">{r.operators || "-"}</td>

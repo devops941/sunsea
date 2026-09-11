@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -71,10 +72,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
 
     if (!order) return null;
 
-    const formatDate = (dateString?: string) => {
-        if (!dateString) return "-";
-        return new Date(dateString).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     const hasInsufficientStock = fullOrder?.products?.some((p: any) =>
         p.rawMaterials?.some((rm: any) => {
@@ -291,7 +289,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         const producedForPlan = hourlySum > 0 ? hourlySum : (plan.status === 'COMPLETED' ? Number(plan.plannedQty || 0) : 0);
                                         plans.push({
                                             id: plan.dailyPlanId,
-                                            date: plan.productionDate ? new Date(plan.productionDate).toLocaleDateString() : '-',
+                                            date: plan.productionDate ? formatDate(plan.productionDate) : '-',
                                             shiftName: plan.shift?.shiftName || plan.shiftId || '-',
                                             machineName: plan.machine?.machineName || plan.machineId || fullOrder?.Machine?.machineName || (order as any)?.machineName || '-',
                                             plannedQty: Number(plan.plannedQty || 0),
@@ -383,7 +381,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                             })
                                                         ) : (
                                                             <tr className="hover:bg-slate-50 transition-colors">
-                                                                <td className="px-4 py-3 font-medium text-slate-800">{new Date(fullOrder?.orderDate || order.orderDate).toLocaleDateString()}</td>
+                                                                <td className="px-4 py-3 font-medium text-slate-800">{formatDate(fullOrder?.orderDate || order.orderDate)}</td>
                                                                 <td className="px-4 py-3 text-slate-700">General Shift</td>
                                                                 <td className="px-4 py-3 text-slate-700">{fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || (order as any)?.machineName || (order as any)?.machineMachineId || '-'}</td>
                                                                 <td className="px-4 py-3 font-semibold text-slate-700">{Number(fullOrder?.targetQty || order.targetQty || 0).toFixed(2)}</td>
@@ -433,7 +431,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                                 const dispatch = item?.dispatch || {};
                                                                 const status = dispatch?.status || "PENDING_GATE_APPROVAL";
                                                                 const dispatchDate = dispatch.dispatchDate
-                                                                    ? new Date(dispatch.dispatchDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                                                                    ? formatDate(dispatch.dispatchDate)
                                                                     : "-";
                                                                 return (
                                                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">

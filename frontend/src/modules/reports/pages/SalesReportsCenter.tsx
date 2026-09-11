@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
@@ -189,7 +190,7 @@ const SalesReportsCenter: React.FC = () => {
     },
     {
       header: "ORDER DATE",
-      render: (item: any) => item.orderDate ? new Date(item.orderDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
+      render: (item: any) => item.orderDate ? formatDate(item.orderDate) : "-"
     },
     {
       header: "CUSTOMER",

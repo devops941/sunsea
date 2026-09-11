@@ -1,11 +1,10 @@
+import { formatDate } from "../../utils/dateUtils";
 import React from "react";
 import { Briefcase, Mail, Phone, CalendarDays, BadgeCheck, ShieldCheck, Shield } from "lucide-react";
 
 import { useProfile } from "../../hooks/useProfile";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
 
-const formatDate = (date?: string | null) =>
-    date ? new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A";
 
 const getInitials = (name?: string | null) => {
     if (!name) return "—";

@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
@@ -261,7 +262,7 @@ const ProductionReportsCenter: React.FC = () => {
     switch (selectedReportType) {
       case "daily": {
         const columns = [
-          { header: "Date", accessor: (item: any) => item.date },
+          { header: "Date", accessor: (item: any) => formatDate(item.date) },
           { header: "Machine", accessor: (item: any) => item.machineName },
           { header: "Prod. Order", accessor: (item: any) => item.productionOrder },
           { header: "Product", accessor: (item: any) => item.productName },
@@ -370,7 +371,7 @@ const ProductionReportsCenter: React.FC = () => {
   const getTableColumns = (): DataTableColumn<any>[] => {
     if (selectedReportType === "daily") {
       return [
-        { header: "DATE", render: (item: any) => <span className="font-semibold text-ink">{item.date}</span> },
+        { header: "DATE", render: (item: any) => <span className="font-semibold text-ink">{formatDate(item.date)}</span> },
         { header: "MACHINE", render: (item: any) => item.machineName },
         { header: "PROD. ORDER", render: (item: any) => item.productionOrder },
         { header: "PRODUCT", render: (item: any) => item.productName },

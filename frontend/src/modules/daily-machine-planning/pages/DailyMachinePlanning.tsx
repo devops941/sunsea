@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { Container, Row, Col, Card, Modal, Button, Form } from "react-bootstrap";
@@ -227,7 +228,7 @@ const DailyMachinePlanning: React.FC = () => {
     const end = new Date(currentWeekMonday);
     end.setDate(start.getDate() + 6);
     const options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" };
-    return `${start.toLocaleDateString("en-IN", options)} - ${end.toLocaleDateString("en-IN", options)}`;
+    return `${formatDate(new Date())} - ${formatDate(new Date())}`;
   }, [currentWeekMonday]);
 
   // Add Production Run handlers

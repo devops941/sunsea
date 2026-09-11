@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React from 'react';
 import type { ApiPayslipData } from '../../../services/payrollService';
 
@@ -152,7 +153,7 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
     const addr2 = [company?.city, company?.state, company?.zipcode ? `- ${company.zipcode}` : ''].filter(Boolean).join(', ');
 
     const doj = employee.dateOfJoining
-      ? new Date(employee.dateOfJoining).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      ? formatDate(employee.dateOfJoining)
       : '—';
 
     // Right-side info grid rows

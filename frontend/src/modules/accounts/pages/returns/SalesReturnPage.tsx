@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
@@ -206,7 +207,7 @@ export const SalesReturnPage: React.FC = () => {
   const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
       { header: "Return No", accessor: (item: any) => item.returnNo || "" },
-      { header: "Return Date", accessor: (item: any) => item.returnDate ? new Date(item.returnDate).toLocaleDateString("en-IN") : "" },
+      { header: "Return Date", accessor: (item: any) => item.returnDate ? formatDate(item.returnDate) : "" },
       { header: "Customer", accessor: (item: any) => item.customer?.firmName || item.customer?.displayName || "" },
       { header: "Invoice No", accessor: (item: any) => item.salesInvoice?.invoiceNo || (item.salesInvoiceId ? `INV #${item.salesInvoiceId}` : "") },
       { header: "Grand Total (₹)", accessor: (item: any) => item.grandTotal != null ? Number(item.grandTotal).toFixed(2) : "0.00" },
@@ -248,7 +249,7 @@ export const SalesReturnPage: React.FC = () => {
       header: "DATE",
       render: (item) => (
         <span className="text-ink-muted">
-          {new Date(item.returnDate).toLocaleDateString("en-IN")}
+          {formatDate(item.returnDate)}
         </span>
       ),
     },
@@ -478,7 +479,7 @@ export const SalesReturnPage: React.FC = () => {
               {
                 label: "Return Date",
                 value: selectedViewReturn
-                  ? new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")
+                  ? formatDate(selectedViewReturn.returnDate)
                   : "—",
               },
               {

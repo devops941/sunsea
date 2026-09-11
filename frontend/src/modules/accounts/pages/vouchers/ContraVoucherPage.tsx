@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaExchangeAlt, FaPlus, FaSync, FaFilter, FaTrash, FaCheckSquare, FaSquare } from "react-icons/fa";
@@ -447,7 +448,7 @@ const ContraVoucherPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
-                        {isFirst ? new Date(voucher.date).toLocaleDateString("en-GB") : ""}
+                        {isFirst ? formatDate(voucher.date) : ""}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-rose-500 text-center">
                         {isFirst ? displayVoucherNo(voucher.voucherNo) : ""}

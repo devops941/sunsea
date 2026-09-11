@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -138,7 +139,7 @@ const WastageList: React.FC = () => {
 
   const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
-      { header: "Date", accessor: (item: any) => item.wastageDate ? new Date(item.wastageDate).toLocaleDateString("en-IN") : "" },
+      { header: "Date", accessor: (item: any) => item.wastageDate ? formatDate(item.wastageDate) : "" },
       { header: "PO Reference", accessor: (item: any) => item.productionOrderId || "" },
       { header: "Product", accessor: (item: any) => item.product?.productName || item.productId || "" },
       { header: "Machine", accessor: (item: any) => item.machine?.machineName || item.machineId || "" },
@@ -199,7 +200,7 @@ const WastageList: React.FC = () => {
           columns={[
             {
               header: "DATE",
-              render: (item: any) => <span className="font-medium text-ink">{new Date(item.wastageDate).toLocaleDateString()}</span>,
+              render: (item: any) => <span className="font-medium text-ink">{formatDate(item.wastageDate)}</span>,
             },
             {
               header: "PO REFERENCE",

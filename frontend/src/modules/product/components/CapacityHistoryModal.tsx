@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect } from "react";
 import { Modal } from "react-bootstrap";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -91,7 +92,7 @@ const CapacityHistoryModal: React.FC<Props> = ({ show, onHide, productId, produc
                     <tr key={r.id}>
                       <td className="text-muted">{idx + 1}</td>
                       <td className="fw-semibold">
-                        {new Date(r.productionDate).toLocaleDateString()}
+                        {formatDate(r.productionDate)}
                       </td>
                       <td className="small text-muted">{r.productionOrderId}</td>
                       <td>{Number(r.previousCapacity).toLocaleString()}</td>

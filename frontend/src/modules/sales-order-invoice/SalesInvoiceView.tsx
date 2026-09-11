@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateUtils";
 // src/pages/sales/SalesInvoiceView.tsx
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaArrowLeft, FaPrint, FaDownload, FaCircleNotch } from "react-icons/fa";
@@ -17,10 +18,7 @@ const formatMoney = (val: string | number | null | undefined) => {
     return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const formatDate = (val: string | null | undefined) => {
-    if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-};
+
 
 const getMobileFromCustomer = (cust: any) => {
     if (!cust) return "";

@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
@@ -456,7 +457,7 @@ const QuotationForm: React.FC = () => {
     const prevOrderAutocompleteOptions = useMemo(() =>
         customerOrders.map((o: any) => {
             const dateStr = o.orderDate
-                ? new Date(o.orderDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                ? formatDate(o.orderDate)
                 : null;
             const itemCount = Array.isArray(o.items) ? o.items.length : null;
             const itemsStr = itemCount != null ? `(${itemCount} ${itemCount === 1 ? "Item" : "Items"})` : "";

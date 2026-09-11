@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -476,7 +477,7 @@ const CategoryList: React.FC = () => {
                   {
                     label: "Created At",
                     value: selectedItem.createdAt
-                      ? new Date(selectedItem.createdAt).toLocaleDateString()
+                      ? formatDate(selectedItem.createdAt)
                       : "—",
                   },
                 ],

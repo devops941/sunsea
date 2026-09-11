@@ -4,9 +4,9 @@ export const formatDate = (dateStr: string | Date | null | undefined): string =>
   if (isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
-  });
+  }).replace(/\//g, "-");
 };
 
 /**
@@ -31,9 +31,9 @@ export const formatDateTime = (dateStr: string | Date | null | undefined): strin
 
   const datePart = date.toLocaleDateString("en-GB", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
-  });
+  }).replace(/\//g, "-");
 
   const timePart = date.toLocaleTimeString("en-US", {
     hour: "2-digit",

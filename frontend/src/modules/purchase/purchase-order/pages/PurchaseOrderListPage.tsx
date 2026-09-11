@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../../hooks/useTableKeyboardNav";
@@ -306,7 +307,7 @@ const PurchaseOrderListPage: React.FC = () => {
   const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
       { header: "PO Number", accessor: (item: any) => item.poNumber || "" },
-      { header: "PO Date", accessor: (item: any) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "" },
+      { header: "PO Date", accessor: (item: any) => item.poDate ? formatDate(item.poDate) : "" },
       { header: "Supplier", accessor: (item: any) => item.supplier?.supplierName || "" },
       { header: "Net Amount", accessor: (item: any) => Number(item.netAmount ?? 0).toFixed(2) },
       { header: "Status", accessor: (item: any) => item.status || "" },
@@ -421,7 +422,7 @@ const PurchaseOrderListPage: React.FC = () => {
               },
               {
                 header: "PO DATE",
-                render: (item) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-",
+                render: (item) => item.poDate ? formatDate(item.poDate) : "-",
               },
               {
                 header: "SUPPLIER",

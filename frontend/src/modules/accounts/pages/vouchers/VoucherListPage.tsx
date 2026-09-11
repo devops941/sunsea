@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useCallback, useMemo, useState } from "react";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useNavigate } from "react-router-dom";
@@ -204,7 +205,7 @@ export const VoucherListPage: React.FC = () => {
     const columns = [
       { header: "Voucher No", accessor: (v: Voucher) => v.voucherNo },
       { header: "Type", accessor: (v: Voucher) => v.type },
-      { header: "Date", accessor: (v: Voucher) => new Date(v.date).toLocaleDateString("en-IN") },
+      { header: "Date", accessor: (v: Voucher) => formatDate(v.date) },
       { header: "Invoice No", accessor: (v: Voucher) => v.refDoc?.invoiceNo || "-" },
       { header: "GRN/PO Ref", accessor: (v: Voucher) => getGrnRef(v) },
       { header: "Supplier/Customer", accessor: (v: Voucher) => getPartyName(v) },
@@ -381,11 +382,7 @@ export const VoucherListPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-3 py-1.5 font-mono text-[13px]">
-                        {new Date(v.date).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {formatDate(v.date)}
                       </td>
                       <td className="px-3 py-1.5 font-semibold text-ink">{debitLedgerName}</td>
                       <td className="px-3 py-1.5 text-ink-muted">{creditLedgerName}</td>
@@ -462,7 +459,7 @@ export const VoucherListPage: React.FC = () => {
                   {renderStatusBadge(selectedVoucher.status)}
                 </div>
                 <p className="text-[13px] text-ink-subtle mt-0.5">
-                  Date: {new Date(selectedVoucher.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
+                  Date: {formatDate(selectedVoucher.date)}
                 </p>
               </div>
               <button

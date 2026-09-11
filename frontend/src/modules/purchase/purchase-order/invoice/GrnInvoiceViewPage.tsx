@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { FaPrint, FaEye, FaDownload, FaTrash, FaArrowLeft, FaFilePdf } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
@@ -19,10 +20,7 @@ const formatMoney = (val: string | number | null | undefined) => {
     return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const formatDate = (val: string | null | undefined) => {
-    if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-};
+
 
 // Basic number-to-words for Indian Rupees (integer part only)
 const numberToWords = (num: number): string => {

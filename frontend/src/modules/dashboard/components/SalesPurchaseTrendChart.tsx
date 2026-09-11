@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useMemo } from "react";
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
@@ -118,7 +119,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
         d.setDate(d.getDate() - i);
         const start = getStartOfDay(d);
         const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-        const label = start.toLocaleDateString('en-US', { weekday: 'short' });
+        const label = formatDate(new Date());
         buckets.push({ label, start, end, sales: 0, purchase: 0 });
       }
     } else if (period === "30d") {
@@ -134,7 +135,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const start = d;
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-        const label = d.toLocaleDateString('en-US', { month: 'short' });
+        const label = formatDate(new Date());
         buckets.push({ label, start, end, sales: 0, purchase: 0 });
       }
     } else if (period === "12m") {

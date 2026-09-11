@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { reportsService } from "../../../services/reportsService";
@@ -97,7 +98,7 @@ const InventoryReportsCenter: React.FC = () => {
       { header: "Item Name", accessor: (item: any) => item.itemName },
       { header: "Category", accessor: (item: any) => item.category },
       { header: "Store", accessor: (item: any) => stores.find(s => String(s.storeId) === String(item.storeId))?.storeName || item.storeId },
-      { header: "Date", accessor: (item: any) => item.snapshotDate ? new Date(item.snapshotDate).toLocaleDateString() : "-" },
+      { header: "Date", accessor: (item: any) => item.snapshotDate ? formatDate(item.snapshotDate) : "-" },
       { header: "Start Qty", accessor: (item: any) => (item.startQty !== null && item.startQty !== undefined && item.startQty !== '') ? `${item.startQty} ${item.uom ? item.uom.split(',')[0] : ''}`.trim() : "-" },
       { header: "EOD Qty", accessor: (item: any) => (item.eodQty !== null && item.eodQty !== undefined && item.eodQty !== '') ? `${item.eodQty} ${item.uom ? item.uom.split(',')[0] : ''}`.trim() : "-" }
     ];
@@ -135,7 +136,7 @@ const InventoryReportsCenter: React.FC = () => {
     },
     {
       header: "DATE",
-      render: (item: any) => <span className="text-ink-subtle font-medium">{item.snapshotDate ? new Date(item.snapshotDate).toLocaleDateString() : "-"}</span>
+      render: (item: any) => <span className="text-ink-subtle font-medium">{item.snapshotDate ? formatDate(item.snapshotDate) : "-"}</span>
     },
     {
       header: "ITEM CODE",
@@ -175,7 +176,7 @@ const InventoryReportsCenter: React.FC = () => {
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
             <h2 className="text-2xl font-bold text-ink">Inventory Reports</h2>
-            {asOfDate && <p className="text-sm text-ink-subtle mt-1">Data as of: {new Date(asOfDate).toLocaleDateString()}</p>}
+            {asOfDate && <p className="text-sm text-ink-subtle mt-1">Data as of: {formatDate(asOfDate)}</p>}
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">

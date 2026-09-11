@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
@@ -94,7 +95,7 @@ const ProductionOrderList: React.FC = () => {
             { header: "Target Qty", accessor: (item: any) => item.targetQty || item.quantity || 0 },
             { header: "Produced Qty", accessor: (item: any) => item.producedQty || 0 },
             { header: "UOM", accessor: (item: any) => item.uom || "Pcs." },
-            { header: "Due Date", accessor: (item: any) => item.dueDate ? new Date(item.dueDate).toLocaleDateString("en-IN") : "" },
+            { header: "Due Date", accessor: (item: any) => item.dueDate ? formatDate(item.dueDate) : "" },
             { header: "Status", accessor: (item: any) => item.status || "" },
         ];
         return {
@@ -431,11 +432,7 @@ const ProductionOrderList: React.FC = () => {
         setShowDeleteModal(true);
     }, []);
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 

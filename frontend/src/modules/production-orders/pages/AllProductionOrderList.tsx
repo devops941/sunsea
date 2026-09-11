@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "react-toastify";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
@@ -148,7 +149,7 @@ const AllProductionOrderList: React.FC = () => {
             { header: "Total Products", accessor: (item: any) => item.totalProducts ?? 1 },
             { header: "Total Qty", accessor: (item: any) => item.totalProductionQuantity ?? item.targetQty ?? 0 },
             { header: "Status", accessor: (item: any) => item.status === "DISPATCHED" ? "COMPLETED" : (item.status || "CREATED") },
-            { header: "Created Date", accessor: (item: any) => item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "" },
+            { header: "Created Date", accessor: (item: any) => item.createdAt ? formatDate(item.createdAt) : "" },
         ];
         return {
             csvColumns: columns,
@@ -198,11 +199,7 @@ const AllProductionOrderList: React.FC = () => {
         onExport: () => handleExportCSV(),
     });
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
+    
 
     const totalPages = Math.max(1, Math.ceil(groupedData.length / ITEMS_PER_PAGE));
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;

@@ -1,3 +1,4 @@
+import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaArrowLeft, FaPlus, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -598,7 +599,7 @@ const CustomerFormPage: React.FC = () => {
               <div>
                 <label className="block text-xs font-semibold text-ink-muted mb-1.5">Last Purchase Date</label>
                 <div className="px-3 py-2 rounded-lg border border-line bg-card-2 text-sm text-ink">
-                  {lastPurchaseDate ? new Date(lastPurchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "No purchase yet"}
+                  {lastPurchaseDate ? formatDate(lastPurchaseDate) : "No purchase yet"}
                 </div>
               </div>
             )}
@@ -606,7 +607,7 @@ const CustomerFormPage: React.FC = () => {
               <div>
                 <label className="block text-xs font-semibold text-ink-muted mb-1.5">Last Payment Date</label>
                 <div className="px-3 py-2 rounded-lg border border-line bg-card-2 text-sm text-ink">
-                  {lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "No payment yet"}
+                  {lastPaymentDate ? formatDate(lastPaymentDate) : "No payment yet"}
                 </div>
               </div>
             )}

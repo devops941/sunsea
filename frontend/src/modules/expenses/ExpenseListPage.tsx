@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateUtils";
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCoins, FaPlus, FaSync, FaFilter } from "react-icons/fa";
@@ -315,7 +316,7 @@ const ExpenseListPage: React.FC = () => {
                       }`}
                     >
                       <td className="px-2 py-1 border-r border-line-soft font-mono text-[11px]">
-                        {new Date(exp.date).toLocaleDateString("en-GB")}
+                        {formatDate(exp.date)}
                       </td>
                       <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-amber-500 text-center">
                         {displayExpenseNo(exp.expenseNumber)}

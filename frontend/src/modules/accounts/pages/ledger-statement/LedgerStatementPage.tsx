@@ -1,3 +1,4 @@
+import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -784,7 +785,7 @@ export const LedgerStatementPage: React.FC = () => {
       return { csvData: [], csvColumns: [], csvFilename: "Ledger_Statement.csv" };
     const isMulti = statement.mode === "multi";
     const columns = [
-      { header: "Date", accessor: (item: any) => item.date },
+      { header: "Date", accessor: (item: any) => formatDate(item.date) },
       { header: "DC No", accessor: (item: any) => item.dcNo || "-" },
       { header: "Voucher No", accessor: (item: any) => ledgerVoucherLabel(item.voucherNo) },
       { header: "Type", accessor: (item: any) => item.voucherType },
@@ -2438,7 +2439,7 @@ export const LedgerStatementPage: React.FC = () => {
                               key={row.id}
                               className={`border-b border-line-soft ${i % 2 === 1 ? "bg-card-2/20" : ""} hover:bg-card-2/70`}
                             >
-                              <td className={`${cell} font-mono text-[13px] whitespace-nowrap`}>{row.date}</td>
+                              <td className={`${cell} font-mono text-[13px] whitespace-nowrap`}>{formatDate(row.date)}</td>
                               <td className={`${cell} whitespace-nowrap`}>
                                 <span className="px-1 py-0.5 rounded text-[13px] font-semibold bg-card-2 text-ink-muted border border-line">
                                   {shortVoucherType(row.voucherType)}
@@ -2567,7 +2568,7 @@ export const LedgerStatementPage: React.FC = () => {
                               : "hover:bg-card-2/70"
                         }`}
                       >
-                        <td className={`${cellBase} font-mono text-[13px] whitespace-nowrap`}>{row.date}</td>
+                        <td className={`${cellBase} font-mono text-[13px] whitespace-nowrap`}>{formatDate(row.date)}</td>
                         
                         <td className={`${cellBase} whitespace-nowrap`}>
                           <span className="px-1.5 py-0.5 rounded text-[13px] font-semibold bg-card-2 text-ink-muted border border-line">
