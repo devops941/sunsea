@@ -30,22 +30,22 @@ model Employee {
 
   // Section 2: Contact Info
   personalMobile         String? @db.VarChar(20)
-  personalEmail          String? @db.VarChar(100)
   emergencyContactName   String?
   emergencyContactNumber String? @db.VarChar(20)
+  emergencyContactRelationship String?
+  emergencyContactName2   String?
+  emergencyContactNumber2 String? @db.VarChar(20)
+  emergencyContactRelationship2 String?
 
   // Section 3: Family Details
   fatherName           String?
   motherName           String?
   spouseName           String?
-  guardianName         String?
-  guardianRelationship String?
 
   // Section 4: Identity Documents
   aadhaarNumber  String? @unique
   panNumber      String? @unique
   drivingLicense String?
-  voterId        String?
 
   // Section 5: Address
   permanentAddressLine1 String?

@@ -166,7 +166,7 @@ class EmployeeService {
     }))!;
 
     // Send welcome email after transaction (non-blocking)
-    const recipientEmail = createdEmployee?.email || createdEmployee?.personalEmail || loginAccount?.email;
+    const recipientEmail = createdEmployee?.email || loginAccount?.email;
     if (
       createLoginAccount &&
       loginAccount?.loginEnabled !== false &&
@@ -457,7 +457,7 @@ class EmployeeService {
     }))!;
 
     // Send email notification after transaction if login account password was set/updated
-    const recipientEmail = updatedEmployee?.email || updatedEmployee?.personalEmail || loginAccount?.email;
+    const recipientEmail = updatedEmployee?.email || loginAccount?.email;
     if (
       createLoginAccount &&
       loginAccount?.loginEnabled !== false &&
