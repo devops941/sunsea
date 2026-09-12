@@ -953,7 +953,7 @@ const SalesInvoiceForm: React.FC = () => {
       if (isEditMode && id) {
         await salesInvoiceService.update(id, payload);
         toast.success("Sales invoice updated!");
-        navigate("/sales-invoices");
+        navigate(-1);
       } else {
         await salesInvoiceService.create(payload);
         toast.success("Sales invoice created successfully!");

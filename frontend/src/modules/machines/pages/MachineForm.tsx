@@ -224,7 +224,7 @@ const MachineForm: React.FC = () => {
             invalidateCacheByPrefix("machines:");
             setIsDirty(false);
             if (isEdit) {
-                navigate("/machines");
+                navigate(-1);
             } else {
                 setFormData(initialFormState);
                 setErrors({});
@@ -314,7 +314,7 @@ const MachineForm: React.FC = () => {
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
                         <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
-                        <BackButton text="Back to List" to="/machines" />
+                        <BackButton text="Back to List" onClick={() => navigate(-1)} />
                     </div>
 
                     <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="p-5 lg:p-6 space-y-4" noValidate>

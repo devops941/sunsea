@@ -401,7 +401,7 @@ const GoodsDispatchCreate: React.FC = () => {
 
         {/* Footer */}
         <div className="flex justify-end items-center gap-3 px-5 py-3">
-          <CustomButton text="Cancel" icon={FaArrowLeft} onClick={() => navigate("/production/goods-dispatch")} disabled={loading} variant="secondary" />
+          <CustomButton text="Cancel" icon={FaArrowLeft} onClick={() => navigate(-1)} disabled={loading} variant="secondary" />
           {can("goods-dispatch.create") && (
             <CustomButton text={loading ? "Creating..." : "Create Dispatch"} icon={FaSave} onClick={handleSubmit} disabled={loading} />
           )}

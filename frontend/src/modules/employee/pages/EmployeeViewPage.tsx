@@ -268,7 +268,7 @@ export default function EmployeeViewPage() {
       {/* Top nav */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate("/employees")}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-primary transition-colors font-medium"
         >
           <FaArrowLeft size={11} /> Back to Employees

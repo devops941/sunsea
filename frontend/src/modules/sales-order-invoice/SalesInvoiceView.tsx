@@ -152,7 +152,7 @@ const SalesInvoiceView: React.FC = () => {
 
             if (e.key === "Escape") {
                 e.preventDefault();
-                navigate("/sales-invoices");
+                navigate(-1);
                 return;
             }
 
@@ -353,7 +353,7 @@ const SalesInvoiceView: React.FC = () => {
                 <div className="p-4 border-b border-line flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                         <button
-                            onClick={() => navigate("/sales-invoices")}
+                            onClick={() => navigate(-1)}
                             className="flex items-center gap-2 text-ink hover:text-primary font-bold text-lg transition-colors"
                         >
                             <FaArrowLeft className="text-sm" /> Sales Invoices

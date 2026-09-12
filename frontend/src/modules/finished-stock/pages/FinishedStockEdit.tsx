@@ -194,7 +194,7 @@ const FinishedStockEdit: React.FC = () => {
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}
-                            onClick={() => navigate("/finished-stock")}
+                            onClick={() => navigate(-1)}
                         />
                         <div className="ms-2">
                             <CustomButton

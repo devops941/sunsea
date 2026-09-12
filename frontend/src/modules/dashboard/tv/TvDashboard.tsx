@@ -301,10 +301,10 @@ const TvDashboard: React.FC = () => {
 
             {/* Exit — a full-screen route needs a visible way back. */}
             <div
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate(-1)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && navigate("/dashboard")}
+              onKeyDown={(e) => e.key === "Enter" && navigate(-1)}
               title="Switch to the regular dashboard (Esc)"
               style={{
                 background: T.badgeBg,

@@ -210,11 +210,7 @@ const CompanySettings: React.FC = () => {
 
       await dispatch(updateCompany({ id: company.id, data: submitData as any })).unwrap();
       toast.success(company.isOnboarded ? "Company updated successfully!" : "Onboarding completed successfully!");
-      if (!company.isOnboarded) {
-        navigate('/dashboard');
-      } else {
-        navigate('/company/view');
-      }
+      navigate(-1);
     } catch (err: any) {
       toast.error(err?.message || err || "Failed to update company");
     }

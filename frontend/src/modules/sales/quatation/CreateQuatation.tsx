@@ -1379,7 +1379,15 @@ const QuotationForm: React.FC = () => {
 
                 <form
                     ref={formRef}
-                    onKeyDown={handleFormKeyDown}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(-1);
+                            return;
+                        }
+                        handleFormKeyDown(e);
+                    }}
                     data-escape-guarded
                     className="px-5 py-2 space-y-2"
                     onSubmit={handleSubmit((data) => onSubmit(data, false))}

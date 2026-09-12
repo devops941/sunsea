@@ -199,7 +199,7 @@ const WastageStockEdit: React.FC = () => {
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}
-                            onClick={() => navigate("/wastage-stock")}
+                            onClick={() => navigate(-1)}
                         />
                         <div className="ms-2">
                             <CustomButton

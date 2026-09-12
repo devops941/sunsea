@@ -924,7 +924,7 @@ const PurchaseOrderForm: React.FC = () => {
       }
       setIsDirty(false);
       if (isEdit) {
-        navigate("/purchase-orders");
+        navigate(-1);
       } else {
         setFormData({
           ...initialFormData,

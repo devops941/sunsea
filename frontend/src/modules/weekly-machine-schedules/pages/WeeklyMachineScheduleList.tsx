@@ -140,13 +140,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
             const isAlt   = e.altKey && !e.ctrlKey && !e.shiftKey;
 
             if (e.key === "Escape") {
-                if (inField) {
-                    e.preventDefault();
-                    if (searchTerm && active instanceof HTMLInputElement) setSearchTerm("");
-                    active?.blur();
-                    tableRef.current?.focus({ preventScroll: true });
-                    return;
-                }
+                if (document.querySelector("[data-select-portal]")) return;
                 if (showDeleteModal) return;
                 e.preventDefault();
                 navigate(-1);

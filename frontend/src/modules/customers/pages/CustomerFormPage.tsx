@@ -217,7 +217,7 @@ const CustomerFormPage: React.FC = () => {
     if (isDirty) {
       openDiscardModal();
     } else {
-      navigate("/customers");
+      navigate(-1);
     }
   }, [isDirty, openDiscardModal, navigate]);
 

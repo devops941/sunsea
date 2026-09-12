@@ -832,8 +832,7 @@ export const LedgerStatementPage: React.FC = () => {
     if (!tableVisible) return;
 
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (document.querySelector('[data-select-portal]')) return;
 
       const total = filteredEntries.length;
       if (total === 0) return;

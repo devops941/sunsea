@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaSearch,
   FaPlus,
@@ -20,6 +21,7 @@ import { usePermission } from "../../../../hooks/usePermission";
 
 export const ChartOfAccountsPage: React.FC = () => {
   const { can } = usePermission();
+  const navigate = useNavigate();
   // Applied filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("ALL");
@@ -57,7 +59,30 @@ export const ChartOfAccountsPage: React.FC = () => {
     socketModule: "accountLedger",
     fetcher,
   });
-// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
+  // F5 = refresh (centralised via usePageShortcuts).
+  usePageShortcuts({ onRefresh: refresh });
+
+  // Esc handler — page is data-escape-guarded so the global Esc→back is
+  // suppressed here. Install our own so Esc still leaves the page (and closes
+  // the New Ledger modal first when it's open).
+  const showModalRef = useRef(showModal);
+  useEffect(() => { showModalRef.current = showModal; }, [showModal]);
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // If a SelectInput dropdown portal is open, let it own the Esc first.
+      if (document.querySelector("[data-select-portal]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (showModalRef.current) {
+        setShowModal(false);
+      } else {
+        navigate(-1);
+      }
+    };
+    window.addEventListener("keydown", handleEsc, { capture: true });
+    return () => window.removeEventListener("keydown", handleEsc, { capture: true });
+  }, [navigate]);
 
   const handleApplyFilters = () => {
     setSearchTerm(draftSearchTerm);

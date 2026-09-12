@@ -321,7 +321,7 @@ export const SupplierBreakdownPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
           <div className="flex items-center gap-2 min-w-0">
             <button
-              onClick={() => navigate("/accounts/payable")}
+              onClick={() => navigate(-1)}
               className="inline-flex items-center gap-1 px-2 py-1 bg-card-2 hover:bg-line text-ink-muted font-semibold rounded text-[13px] transition-colors border border-line shrink-0"
             >
               <FaArrowLeft size={9} /> Back
