@@ -1,4 +1,5 @@
 import { formatDate } from "../../../utils/dateUtils";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
@@ -224,7 +225,7 @@ function reconstructQuotationItems(orderItems: any[], salesProds: any[], prods: 
         result.push({
             salesProductId: spIdStr,
             orderQuantity: String(calcOrderQty),
-            unitPrice: unitPricePerOrder > 0 ? String(Math.round(unitPricePerOrder * 100) / 100) : "",
+            unitPrice: unitPricePerOrder > 0 ? unitPricePerOrder.toFixed(2) : "",
             gstRate: gstRate > 0 ? String(gstRate) : "",
             components,
         });
@@ -433,7 +434,7 @@ const QuotationForm: React.FC = () => {
             const bal = Number(c.balanceAmount ?? c.netBalance ?? c.openingBalance ?? 0);
             const bType = (c.balanceType || c.openingBalanceType || "").toString().toUpperCase();
             const isDr = bType.startsWith("D");
-            const balLabel = `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
+            const balLabel = `₹${bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
 
             return {
                 value: String(c.id),
@@ -543,7 +544,11 @@ const QuotationForm: React.FC = () => {
 
         // Load bill sundry from order
         if (Array.isArray((order as any).billSundry) && (order as any).billSundry.length > 0) {
-            setSundryRows((order as any).billSundry);
+            setSundryRows((order as any).billSundry.map((r: any) => ({
+                ...r,
+                rate: r.rate ? Number(r.rate).toFixed(2) : r.rate,
+                amount: r.amount ? Number(r.amount).toFixed(2) : r.amount,
+            })));
         } else {
             setSundryRows([]);
         }
@@ -1095,7 +1100,7 @@ const QuotationForm: React.FC = () => {
                             setValue(`items.${index}.orderQuantity`, "1");
                             setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
                             const autoPrice = sp ? computeSalesProductUnitPrice(sp, products) : 0;
-                            setValue(`items.${index}.unitPrice`, autoPrice > 0 ? String(autoPrice) : "");
+                            setValue(`items.${index}.unitPrice`, autoPrice > 0 ? autoPrice.toFixed(2) : "");
                             setValue(`items.${index}.gstRate`, "");
                             // Auto-focus Qty cell so user can enter quantity immediately
                             setTimeout(() => {
@@ -1153,8 +1158,9 @@ const QuotationForm: React.FC = () => {
                         inputMode="decimal"
                         value={itemValue?.unitPrice ?? ""}
                         onChange={(e) => setValue(`items.${index}.unitPrice`, e.target.value)}
+                        onBlur={formatAmountOnBlur((v) => setValue(`items.${index}.unitPrice`, v))}
                         className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full"
-                        placeholder="0"
+                        placeholder="0.00"
                     />
                 );
             },
@@ -1180,8 +1186,8 @@ const QuotationForm: React.FC = () => {
                         onBlur={(e) => {
                             const newTotal = Number(e.target.value) || 0;
                             const qty = Number(watchedItems?.[index]?.orderQuantity) || 1;
-                            const newUnitPrice = qty > 0 ? Math.round((newTotal / qty) * 100) / 100 : 0;
-                            setValue(`items.${index}.unitPrice`, String(newUnitPrice));
+                            const newUnitPrice = qty > 0 ? newTotal / qty : 0;
+                            setValue(`items.${index}.unitPrice`, newUnitPrice.toFixed(2));
                         }}
                         onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -1507,7 +1513,7 @@ const QuotationForm: React.FC = () => {
                                         renderExpandedRow={renderExpandedComponents}
                                         showTotals={[
                                             { colKey: "orderQuantity", value: (watchedItems || []).reduce((s: number, it: any) => s + (Number(it?.orderQuantity) || 0), 0) },
-                                            { colKey: "total", value: `₹${totals.subtotal.toFixed(2)}` },
+                                            { colKey: "total", value: `₹${totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
                                         ]}
                                         visibleRows={10}
                                         getFieldBeforeTable={() => {
@@ -1561,7 +1567,7 @@ const QuotationForm: React.FC = () => {
                                                         const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
                                                         return s + (o?.sign === -1 ? -a : a);
                                                     }, 0);
-                                                    return t !== 0 ? `${t > 0 ? "+" : "-"} ₹${Math.abs(t).toFixed(2)}` : "0.00";
+                                                    return t !== 0 ? `${t > 0 ? "+" : "-"} ₹${Math.abs(t).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "0.00";
                                                 })(),
                                             },
                                         ]}
@@ -1594,7 +1600,7 @@ const QuotationForm: React.FC = () => {
                                                         const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
                                                         return s + (o?.sign === -1 ? -a : a);
                                                     }, 0);
-                                                    return (totals.subtotal + sundryTotal).toFixed(2);
+                                                    return (totals.subtotal + sundryTotal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                                 })()}
                                             </span>
                                         </div>

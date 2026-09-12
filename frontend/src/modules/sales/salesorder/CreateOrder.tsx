@@ -227,7 +227,7 @@ function reconstructFormItems(orderItems: any[], salesProducts: any[]): FormItem
             salesProductId: spIdStr,
             orderQuantity: String(calcOrderQty),
             unit: "Pcs.",
-            unitPrice: String(items[0]?.unitPrice ?? items[0]?.rate ?? ""),
+            unitPrice: (items[0]?.unitPrice ?? items[0]?.rate) != null ? Number(items[0]?.unitPrice ?? items[0]?.rate).toFixed(2) : "0.00",
             components,
         });
     });
@@ -552,7 +552,7 @@ const SalesOrderForm: React.FC = () => {
             const bal = Number(d.balanceAmount ?? d.netBalance ?? d.openingBalance ?? 0);
             const bType = (d.balanceType || d.openingBalanceType || "").toString().toUpperCase();
             const isDr = bType.startsWith("D");
-            const balLabel = `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
+            const balLabel = `₹${bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
 
             return {
                 value: String(d.id),
@@ -683,10 +683,10 @@ const SalesOrderForm: React.FC = () => {
 
     // ─── Helper: get product rate ──────────────────────────────────
     const getProductRate = useCallback((sp: any): string => {
-        if (!sp) return "";
-        if (sp.rate) return String(sp.rate);
+        if (!sp) return "0.00";
+        if (sp.rate) return Number(sp.rate).toFixed(2);
         const comp = (sp.components || []).find((c: any) => c.componentProduct?.rate);
-        return comp ? String(comp.componentProduct.rate) : "";
+        return comp ? Number(comp.componentProduct.rate).toFixed(2) : "0.00";
     }, []);
 
     // ─── Order item columns for BusyItemsTable ────────────────────

@@ -13,6 +13,7 @@ import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import DecimalCell from "../../../../components/form/DecimalCell/DecimalCell";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 
@@ -1079,15 +1080,13 @@ const PurchaseOrderForm: React.FC = () => {
         const item = formData.items[index];
         if (!item) return null;
         return (
-          <input
-            type="number"
-            value={item.unitPrice || ""}
-            onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
-            placeholder="0.00"
-            step="0.01"
-            min={0}
+          <DecimalCell
+            value={item.unitPrice || 0}
+            showEmpty={!item.rawMaterialId}
             disabled={isLocked}
-            className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            onChange={(v) => handleItemChange(index, "unitPrice", v)}
+            placeholder="0.00"
+            className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0"
           />
         );
       },

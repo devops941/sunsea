@@ -28,6 +28,7 @@ import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
 import { customerGradeService, type CustomerGrade } from "../../../services/customerGradeService";
 import { categoryService } from "../../../services/categoryService";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 
 const MAX_IMAGES = 7;
 
@@ -46,7 +47,7 @@ const initialFormState = {
     productType: "SALES_PRODUCTION",
     description: "",
     isActive: "true",
-    rate: "",
+    rate: "0.00",
     minimumQty: "",
     openingStockQty: "",
     openingStockStoreId: "",
@@ -188,7 +189,7 @@ const ProductForm: React.FC = () => {
             productType: productData.productType || "SALES_PRODUCTION",
             description: productData.description || "",
             isActive: productData.isActive ? "true" : "false",
-            rate: productData.rate != null ? String(productData.rate) : "",
+            rate: productData.rate != null ? Number(productData.rate).toFixed(2) : "0.00",
             minimumQty: productData.minimumQty != null ? String(productData.minimumQty) : "",
             openingStockQty: latestStock ? String(latestStock.onHandQty) : "",
             openingStockStoreId: latestStock ? String(latestStock.storeId) : "",
@@ -210,7 +211,7 @@ const ProductForm: React.FC = () => {
         if (productData.gradeRates && typeof productData.gradeRates === "object") {
             const loaded: Record<string, string> = {};
             for (const [key, val] of Object.entries(productData.gradeRates)) {
-                loaded[key] = String(val);
+                loaded[key] = val != null ? Number(val).toFixed(2) : "0.00";
             }
             setGradeRates(loaded);
         } else {
@@ -763,7 +764,7 @@ const ProductForm: React.FC = () => {
                             <SelectInput label="Category" name="categoryId" value={formData.categoryId} options={categoryOptions} defaultOptionLabel="-- Select Category --" required onChange={handleChange} error={errors.categoryId} disabled={isEditMode} />
                             <SelectInput label="Product Type" name="productType" value={formData.productType} options={[{ value: "PRODUCTION", label: "Production" }, { value: "SALES_PRODUCTION", label: "Sales Production" }]} required onChange={handleChange} error={errors.productType} />
                             <QuantityInput label="Weight per Piece" name="weightPerPiece" required value={formData.weightPerPiece} baseUoms="g,kg" uom={formData.weightUom} onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))} onChange={handleChange} error={errors.weightPerPiece} disabled={isEditMode} />
-                            <TextInput label="Rate (₹)" name="rate" type="number" step="0.01" value={formData.rate} placeholder="0.00" onChange={handleChange} error={errors.rate} />
+                            <TextInput label="Rate (₹)" name="rate" type="number" step="0.01" value={formData.rate} placeholder="0.00" onChange={handleChange} onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "rate", value: v } } as any))} error={errors.rate} />
                             <SelectInput label="Opening Stock Store" name="openingStockStoreId" required value={formData.openingStockStoreId} options={storeOptions} onChange={handleChange} error={errors.openingStockStoreId} disabled={isEditMode} />
                             <TextInput label="Opening Stock Qty" name="openingStockQty" type="number" placeholder="0" required value={formData.openingStockQty} onChange={handleChange} error={errors.openingStockQty} disabled={isEditMode} />
                             <TextInput label="Minimum Stock Qty" name="minimumQty" type="number" placeholder="0" value={String(formData.minimumQty)} onChange={handleChange} required error={errors.minimumQty} />
@@ -786,7 +787,7 @@ const ProductForm: React.FC = () => {
                                         name={`gradeRate_${grade.name}`}
                                         type="number"
                                         step="0.01"
-                                        value={gradeRates[grade.name] ?? ""}
+                                        value={gradeRates[grade.name] ?? "0.00"}
                                         placeholder="0.00"
                                         onChange={(e) => {
                                             const val = e.target.value;
@@ -795,6 +796,7 @@ const ProductForm: React.FC = () => {
                                                 setErrors(prev => ({ ...prev, [`gradeRate_${grade.name}`]: "", gradeRates: "" }));
                                             }
                                         }}
+                                        onBlur={formatAmountOnBlur((v) => setGradeRates(prev => ({ ...prev, [grade.name]: v })))}
                                         error={errors[`gradeRate_${grade.name}`]}
                                     />
                                 ))}

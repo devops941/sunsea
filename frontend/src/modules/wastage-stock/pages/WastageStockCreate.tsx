@@ -8,6 +8,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 
 const CATEGORY_OPTIONS = [
     { label: "Fabric Scraps", value: "Fabric Scraps" },
@@ -177,6 +178,7 @@ const WastageStockCreate: React.FC = () => {
                                 step="0.01"
                                 placeholder="e.g. 15.00"
                                 onChange={handleChange}
+                                onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "scrapUnitPrice", value: v } } as any))}
                             />
                         </Col>
                         <Col md={12}>

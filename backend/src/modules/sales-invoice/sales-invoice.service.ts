@@ -495,6 +495,7 @@ class SalesInvoiceService {
             id: true,
             orderNo: true,
             mobile: true,
+            billSundry: true,
           },
         },
         items: {

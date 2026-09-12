@@ -9,7 +9,7 @@ import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePicke
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { handleGridArrow } from "../../hooks/useFormGridNav";
 import { useListCache, prependToListCacheByPrefix } from "../../hooks/useListCache";
-import { formatAmount } from "../../utils/pricingUtils";
+import { formatAmount, formatAmountOnBlur } from "../../utils/pricingUtils";
 
 // Column order for grid arrow nav (matches focusCell field names below).
 // ↑↓ jump rows; ← / → hop columns when the cursor is at the value edge.
@@ -101,6 +101,10 @@ const ExpenseAddPage: React.FC = () => {
           next.sourceLedgerId = "";
           next.amount = "";
           next.description = "";
+        }
+        // Auto-set amount to 0.00 when both expense and source are selected
+        if (next.expenseLedgerId && next.sourceLedgerId && !next.amount) {
+          next.amount = "0.00";
         }
         return next;
       })
@@ -303,6 +307,7 @@ const ExpenseAddPage: React.FC = () => {
                           min="0"
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
+                          onBlur={formatAmountOnBlur((v) => updateRow(row.id, "amount", v))}
                           onKeyDown={(e) => {
                             handleGridArrow(e, {
                               rowIdx: idx,

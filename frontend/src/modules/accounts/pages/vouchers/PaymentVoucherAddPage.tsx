@@ -146,6 +146,10 @@ const PaymentVoucherAddPage: React.FC = () => {
           next.amount = "";
           next.narration = "";
         }
+        // Auto-set amount to 0.00 when both account and payment mode are selected
+        if (next.debitLedgerId && next.paymentModeId && !next.amount) {
+          next.amount = "0.00";
+        }
         return next;
       })
     );

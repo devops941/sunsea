@@ -13,6 +13,8 @@ import TextInput from "../../../../components/form/TextInput/TextInput";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import TextArea from "../../../../components/form/TextArea/TextArea";
+import DecimalCell from "../../../../components/form/DecimalCell/DecimalCell";
+import { formatAmountOnBlur } from "../../../../utils/pricingUtils";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { supplierService } from "../../../../services/supplierService";
@@ -286,8 +288,8 @@ const InvoiceDetailPage: React.FC = () => {
                         setSundryRows(savedSundry.map((r: any) => ({
                             id: r.id || `${Date.now()}-${Math.random()}`,
                             type: r.type || "",
-                            rate: r.rate || "",
-                            amount: String(r.amount || ""),
+                            rate: r.rate ? Number(r.rate).toFixed(2) : "",
+                            amount: r.amount ? Number(r.amount).toFixed(2) : "",
                         })));
                     }
                 })
@@ -696,7 +698,7 @@ const InvoiceDetailPage: React.FC = () => {
                 ? supplierLiveBalance.type.charAt(0).toUpperCase()
                 : (s.balanceType || s.openingBalanceType || "").toString().toUpperCase();
             const isDr = bType.startsWith("D");
-            const balLabel = bal ? `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : ""}` : "";
+            const balLabel = bal ? `₹${bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : ""}` : "";
             return {
                 value: String(s.id || ""),
                 label: name,
@@ -1140,15 +1142,13 @@ const InvoiceDetailPage: React.FC = () => {
                 const item = items[index];
                 if (!item) return null;
                 return (
-                    <input
-                        type="number"
-                        value={item.unitPrice || ""}
-                        onChange={(e) => updateItem(index, "unitPrice", Number(e.target.value))}
-                        placeholder="0.00"
-                        step="0.01"
-                        min={0}
+                    <DecimalCell
+                        value={item.unitPrice || 0}
+                        showEmpty={!item.productId}
                         disabled={isEditMode}
-                        className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        onChange={(v) => updateItem(index, "unitPrice", v)}
+                        placeholder="0.00"
+                        className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0"
                     />
                 );
             },
@@ -1172,6 +1172,9 @@ const InvoiceDetailPage: React.FC = () => {
     ], [items, productAutocompleteOptions, rawMaterials, activeUOMs, errors, isEditMode, isPOSelected, updateItem]);
 
     // ─── Bill Sundry columns ────────────────────────────────────────
+    const subtotalRef = useRef(0);
+    subtotalRef.current = subtotal;
+
     const sundryColumns: BusyColumn<SundryRow>[] = useMemo(() => [
         {
             key: "type",
@@ -1214,9 +1217,10 @@ const InvoiceDetailPage: React.FC = () => {
                             onChange={(e) => {
                                 const rate = e.target.value.replace(/[^0-9.]/g, "");
                                 const rateNum = Number(rate) || 0;
-                                const calcAmount = ((subtotal * rateNum) / 100).toFixed(2);
-                                update({ rate, amount: rateNum > 0 ? calcAmount : "" });
+                                const calcAmount = ((subtotalRef.current * rateNum) / 100).toFixed(2);
+                                update({ rate, amount: calcAmount });
                             }}
+                            onBlur={formatAmountOnBlur((v) => update({ rate: v }))}
                             placeholder="0.000"
                             disabled={isEditMode}
                             className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right"
@@ -1239,6 +1243,7 @@ const InvoiceDetailPage: React.FC = () => {
                         inputMode="decimal"
                         value={row.amount}
                         onChange={(e) => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
+                        onBlur={formatAmountOnBlur((v) => update({ amount: v }))}
                         placeholder="0.00"
                         disabled={isEditMode}
                         className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right font-semibold"
@@ -1247,10 +1252,10 @@ const InvoiceDetailPage: React.FC = () => {
                 );
             },
         },
-    ], [isEditMode, subtotal]);
+    ], [isEditMode]);
 
     const sundryEmptyRow: SundryRow = useMemo(() => ({
-        id: `${Date.now()}-${Math.random()}`, type: "", rate: "", amount: "",
+        id: `${Date.now()}-${Math.random()}`, type: "", rate: "0.00", amount: "0.00",
     }), []);
 
     const sundryTotal = useMemo(() => sundryRows.reduce((s, r) => {

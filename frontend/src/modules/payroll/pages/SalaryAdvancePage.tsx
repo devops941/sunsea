@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiSalaryAdvance, ApiEmployeePayroll } from '../../../services/payrollService';
 import { usePermission } from '../../../hooks/usePermission';
+import { formatAmountOnBlur } from '../../../utils/pricingUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtRs = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -99,6 +100,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
               step="0.01"
               value={amount}
               onChange={e => setAmount(e.target.value)}
+              onBlur={formatAmountOnBlur((v) => setAmount(v))}
               placeholder="0.00"
               className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
               required

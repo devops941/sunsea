@@ -20,6 +20,7 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   labelClassName?: string;
   horizontal?: boolean;
   onChange?: (event: any) => void;
+  onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
 }
 
 const TextInput: React.FC<TextInputProps> = ({
@@ -40,6 +41,7 @@ const TextInput: React.FC<TextInputProps> = ({
   labelClassName = "",
   horizontal = false,
   onChange,
+  onBlur,
   onKeyDown,
   onPaste,
   as = "input",
@@ -143,6 +145,7 @@ const TextInput: React.FC<TextInputProps> = ({
               value={value}
               placeholder={placeholder}
               onChange={handleChange}
+              onBlur={onBlur}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               min={isNumberType ? (rest.min ?? "0") : rest.min}

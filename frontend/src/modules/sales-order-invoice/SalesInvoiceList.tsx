@@ -396,16 +396,16 @@ const SalesInvoiceList: React.FC = () => {
             ),
             render: (item) => <span className="font-medium text-ink-muted">{item.customer?.displayName || item.customer?.firmName || "N/A"}</span>,
         },
-        {
-            header: "SUB TOTAL",
-            render: (item) => <span className="font-semibold text-ink-muted">{formatCurrency(item.subTotal)}</span>,
-            align: "right",
-        },
-        {
-            header: "TAX AMOUNT",
-            render: (item) => <span className="font-medium text-ink-subtle">{formatCurrency(item.taxTotal)}</span>,
-            align: "right",
-        },
+        // {
+        //     header: "SUB TOTAL",
+        //     render: (item) => <span className="font-semibold text-ink-muted">{formatCurrency(item.subTotal)}</span>,
+        //     align: "right",
+        // },
+        // {
+        //     header: "TAX AMOUNT",
+        //     render: (item) => <span className="font-medium text-ink-subtle">{formatCurrency(item.taxTotal)}</span>,
+        //     align: "right",
+        // },
         {
             header: "NET AMOUNT",
             render: (item) => <span className="font-bold text-emerald-600">{formatCurrency(item.grandTotal)}</span>,

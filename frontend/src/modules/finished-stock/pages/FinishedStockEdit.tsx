@@ -8,6 +8,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 
 const CATEGORY_OPTIONS = [
     { label: "T-Shirt", value: "T-Shirt" },
@@ -186,6 +187,7 @@ const FinishedStockEdit: React.FC = () => {
                                 step="0.01"
                                 placeholder="e.g. 599.00"
                                 onChange={handleChange}
+                                onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "unitPrice", value: v } } as any))}
                             />
                         </Col>
                     </Row>

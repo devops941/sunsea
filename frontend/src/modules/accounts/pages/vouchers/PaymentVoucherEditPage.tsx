@@ -85,7 +85,7 @@ const PaymentVoucherEditPage: React.FC = () => {
       id: rowCounter++,
       debitLedgerId: it.debitLedgerId != null ? String(it.debitLedgerId) : "",
       paymentModeId: it.creditLedgerId != null ? String(it.creditLedgerId) : "",
-      amount: String(Number(it.debitAmount || it.creditAmount || 0)),
+      amount: Number(it.debitAmount || it.creditAmount || 0).toFixed(2),
       narration: it.narration || "",
     }));
     while (populated.length < INITIAL_ROW_COUNT) populated.push(makeEmptyRow());

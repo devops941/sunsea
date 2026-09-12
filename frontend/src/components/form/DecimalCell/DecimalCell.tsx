@@ -17,12 +17,13 @@ const DecimalCell: React.FC<DecimalCellProps> = ({
   placeholder,
   showEmpty,
 }) => {
-  const [raw, setRaw] = useState(value === 0 && showEmpty ? "" : String(value));
+  const fmt = (v: number) => (v === 0 && showEmpty ? "" : v.toFixed(2));
+  const [raw, setRaw] = useState(fmt(value));
   const focused = useRef(false);
 
   useEffect(() => {
     if (!focused.current) {
-      setRaw(value === 0 && showEmpty ? "" : String(value));
+      setRaw(fmt(value));
     }
   }, [value, showEmpty]);
 
@@ -45,7 +46,7 @@ const DecimalCell: React.FC<DecimalCellProps> = ({
       onBlur={() => {
         focused.current = false;
         const num = parseFloat(raw);
-        setRaw(isNaN(num) || (num === 0 && showEmpty) ? "" : String(num));
+        setRaw(isNaN(num) || (num === 0 && showEmpty) ? "" : num.toFixed(2));
       }}
       className={className}
       placeholder={placeholder}

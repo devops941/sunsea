@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa';
 
 import TextInput from '../form/TextInput/TextInput';
+import { formatAmountOnBlur } from '../../utils/pricingUtils';
 import SelectInput from '../form/SelectInput/SelectInput';
 import { usePayrollConfig } from '../../hooks/usePayrollConfig';
 import {
@@ -322,20 +323,20 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
     if (isGrossField) {
       const gross = parseFloat(value) || 0;
       if (gross > 0) {
-        const basic = Math.round(gross * 0.50);
-        const da = Math.round(gross * 0.10);
-        const hra = Math.round(gross * 0.10);
+        const basic = (gross * 0.50);
+        const da = (gross * 0.10);
+        const hra = (gross * 0.10);
         const other = Math.max(0, gross - basic - da - hra);
 
-        onChange({ target: { name: 'basicSalary', value: String(basic) } });
-        onChange({ target: { name: 'da', value: String(da) } });
-        onChange({ target: { name: 'hra', value: String(hra) } });
-        onChange({ target: { name: 'otherAllowance', value: String(other) } });
+        onChange({ target: { name: 'basicSalary', value: basic.toFixed(2) } });
+        onChange({ target: { name: 'da', value: da.toFixed(2) } });
+        onChange({ target: { name: 'hra', value: hra.toFixed(2) } });
+        onChange({ target: { name: 'otherAllowance', value: other.toFixed(2) } });
       } else {
-        onChange({ target: { name: 'basicSalary', value: '' } });
-        onChange({ target: { name: 'da', value: '' } });
-        onChange({ target: { name: 'hra', value: '' } });
-        onChange({ target: { name: 'otherAllowance', value: '' } });
+        onChange({ target: { name: 'basicSalary', value: '0.00' } });
+        onChange({ target: { name: 'da', value: '0.00' } });
+        onChange({ target: { name: 'hra', value: '0.00' } });
+        onChange({ target: { name: 'otherAllowance', value: '0.00' } });
       }
     } else if (['basicSalary', 'hra', 'da'].includes(name)) {
       const gross = parseFloat(form.monthlySalary || form.weeklySalary || form.dailySalary || form.hourlySalary || '0') || 0;
@@ -344,20 +345,20 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
         const d = name === 'da' ? (parseFloat(value) || 0) : (parseFloat(form.da || '0') || 0);
         const h = name === 'hra' ? (parseFloat(value) || 0) : (parseFloat(form.hra || '0') || 0);
         const other = Math.max(0, gross - b - d - h);
-        onChange({ target: { name: 'otherAllowance', value: String(other) } });
+        onChange({ target: { name: 'otherAllowance', value: other.toFixed(2) } });
       }
     } else if (name === 'paymentMode' && value === 'BANK') {
       const gross = parseFloat(form.monthlySalary || form.weeklySalary || form.dailySalary || form.hourlySalary || '0') || 0;
       if (gross > 0 && (!form.basicSalary || parseFloat(form.basicSalary) === 0)) {
-        const basic = Math.round(gross * 0.50);
-        const da = Math.round(gross * 0.10);
-        const hra = Math.round(gross * 0.10);
+        const basic = (gross * 0.50);
+        const da = (gross * 0.10);
+        const hra = (gross * 0.10);
         const other = Math.max(0, gross - basic - da - hra);
 
-        onChange({ target: { name: 'basicSalary', value: String(basic) } });
-        onChange({ target: { name: 'da', value: String(da) } });
-        onChange({ target: { name: 'hra', value: String(hra) } });
-        onChange({ target: { name: 'otherAllowance', value: String(other) } });
+        onChange({ target: { name: 'basicSalary', value: basic.toFixed(2) } });
+        onChange({ target: { name: 'da', value: da.toFixed(2) } });
+        onChange({ target: { name: 'hra', value: hra.toFixed(2) } });
+        onChange({ target: { name: 'otherAllowance', value: other.toFixed(2) } });
       }
     }
   };
@@ -476,6 +477,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   type="number"
                   value={form.monthlySalary}
                   onChange={handleSalaryChange}
+                  onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "monthlySalary", value: v } }))}
                   required
                   error={errors.monthlySalary}
                   placeholder="Total monthly CTC"
@@ -490,6 +492,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   type="number"
                   value={form.weeklySalary}
                   onChange={handleSalaryChange}
+                  onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "weeklySalary", value: v } }))}
                   required
                   error={errors.weeklySalary}
                   placeholder="Total weekly salary"
@@ -504,6 +507,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   type="number"
                   value={form.dailySalary}
                   onChange={handleSalaryChange}
+                  onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "dailySalary", value: v } }))}
                   required
                   error={errors.dailySalary}
                   placeholder="Per-day rate"
@@ -519,6 +523,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     type="number"
                     value={form.hourlySalary}
                     onChange={handleSalaryChange}
+                    onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "hourlySalary", value: v } }))}
                     required
                     error={errors.hourlySalary}
                     placeholder="Per-hour rate"
@@ -551,6 +556,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     type="number"
                     value={form.basicSalary}
                     onChange={handleSalaryChange}
+                    onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "basicSalary", value: v } }))}
                     error={errors.basicSalary}
                     placeholder="Basic salary"
                   />
@@ -560,6 +566,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     type="number"
                     value={form.da}
                     onChange={handleSalaryChange}
+                    onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "da", value: v } }))}
                     error={errors.da}
                     placeholder="DA amount"
                   />
@@ -569,6 +576,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     type="number"
                     value={form.hra}
                     onChange={handleSalaryChange}
+                    onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "hra", value: v } }))}
                     error={errors.hra}
                     placeholder="HRA amount"
                   />
@@ -578,6 +586,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     type="number"
                     value={form.otherAllowance}
                     onChange={onChange}
+                    onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "otherAllowance", value: v } }))}
                     error={errors.otherAllowance}
                     placeholder="Other allowance"
                   />
@@ -587,6 +596,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                 type="number"
                 value={form.cashInHand}
                 onChange={onChange}
+                onBlur={formatAmountOnBlur((v) => onChange({ target: { name: "cashInHand", value: v } }))}
                 error={errors.cashInHand}
                 placeholder="Cash in hand amount"
               />

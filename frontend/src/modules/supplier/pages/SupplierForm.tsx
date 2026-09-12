@@ -21,6 +21,7 @@ import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useSocket } from "../../../providers/SocketProvider";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 
 const supplierFormSchema = z.object({
     companyId: z.string().optional(),
@@ -82,7 +83,7 @@ const INITIAL_FORM = {
     billingAddressPincode: "",
     billingAddressCountry: "India",
     stateCode: "TN",
-    openingBalance: 0,
+    openingBalance: "0.00",
     openingBalanceType: "CREDIT",
     status: "Active",
 };
@@ -228,7 +229,7 @@ const SupplierForm: React.FC = () => {
             billingAddressPincode: supplier.billingPincode || "",
             billingAddressCountry: supplier.billingCountry || "India",
             stateCode: supplier.stateCode || "TN",
-            openingBalance: Number(supplier.openingBalance) || 0,
+            openingBalance: supplier.openingBalance != null ? Number(supplier.openingBalance).toFixed(2) : "0.00",
             openingBalanceType: supplier.openingBalanceType || "CREDIT",
             status: supplier.status || "Active",
         });
@@ -637,7 +638,7 @@ const SupplierForm: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
                                 <div>
-                                    <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} disabled={isEdit && hasTransactions} />
+                                    <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "openingBalance", value: v } } as any))} disabled={isEdit && hasTransactions} />
                                     {isEdit && hasTransactions && <p className="mt-0.5 text-[10px] text-amber-600">Cannot edit — supplier has existing transactions.</p>}
                                 </div>
                                 <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} disabled={isEdit && hasTransactions} />

@@ -1,4 +1,5 @@
 import { formatDate } from "../../../utils/dateUtils";
+import { withDecimalFormat } from "../../../utils/pricingUtils";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaArrowLeft, FaPlus, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -68,9 +69,9 @@ const initialFormData: CustomerFormValues = {
   phones: [],
   email: "",
   gstin: "",
-  creditLimit: "",
+  creditLimit: "0.00",
   creditDays: "",
-  openingBalance: "",
+  openingBalance: "0.00",
   openingBalanceType: "DEBIT",
   transports: [],
   addresses: [{ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }]
@@ -98,9 +99,9 @@ const mapCustomerToFormData = (customer: any): CustomerFormValues => {
     phones: initialPhones,
     email: customer.email || "",
     gstin: customer.gstin || "",
-    creditLimit: customer.creditLimit != null ? String(customer.creditLimit) : "",
+    creditLimit: customer.creditLimit != null ? Number(customer.creditLimit).toFixed(2) : "0.00",
     creditDays: customer.creditDays != null ? String(customer.creditDays) : "",
-    openingBalance: customer.openingBalance != null ? String(customer.openingBalance) : "0",
+    openingBalance: customer.openingBalance != null ? Number(customer.openingBalance).toFixed(2) : "0.00",
     openingBalanceType: customer.openingBalanceType || "DEBIT",
     transports: Array.isArray(customer.transports) ? customer.transports : [],
     addresses: addrs.length > 0 ? addrs : initialFormData.addresses,
@@ -592,7 +593,7 @@ const CustomerFormPage: React.FC = () => {
               <CtrlText field={field} label="GSTIN (15 CHAR)" placeholder="33AABC1234D1Z5" error={errors.gstin?.message} />
             )} />
             <Controller name="openingBalance" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative  required error={errors.openingBalance?.message} disabled={isEditMode && hasTransactions} />
+              <CtrlText field={withDecimalFormat(field)} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative  required error={errors.openingBalance?.message} disabled={isEditMode && hasTransactions} />
             )} />
             <Controller name="openingBalanceType" control={control} render={({ field }) => (
               <SelectInput
@@ -610,7 +611,7 @@ const CustomerFormPage: React.FC = () => {
               />
             )} />
             <Controller name="creditLimit" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Credit Limit ₹" type="number" placeholder="30000" preventNegative required error={errors.creditLimit?.message} />
+              <CtrlText field={withDecimalFormat(field)} label="Credit Limit ₹" type="number" placeholder="0.00" preventNegative required error={errors.creditLimit?.message} />
             )} />
             <Controller name="creditDays" control={control} render={({ field }) => (
               <SelectInput

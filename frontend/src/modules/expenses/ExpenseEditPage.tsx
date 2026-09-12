@@ -9,6 +9,7 @@ import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePicke
 import { useListCache, upsertInListCacheByPrefix } from "../../hooks/useListCache";
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../hooks/useDetailCache";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
+import { formatAmountOnBlur } from "../../utils/pricingUtils";
 
 const ACTIVE_CELL = "focus:bg-slate-900 focus:text-white focus:font-semibold";
 
@@ -60,7 +61,7 @@ const ExpenseEditPage: React.FC = () => {
   const [sourceLedgerId, setSourceLedgerId] = useState<string>(
     effective?.creditLedgerId != null ? String(effective.creditLedgerId) : ""
   );
-  const [amount, setAmount] = useState<string>(effective ? String(effective.amount) : "");
+  const [amount, setAmount] = useState<string>(effective ? Number(effective.amount).toFixed(2) : "");
   const [description, setDescription] = useState<string>(effective?.description || "");
 
   const lastAppliedIdRef = useRef<string | null>(effective?.id ?? null);
@@ -71,7 +72,7 @@ const ExpenseEditPage: React.FC = () => {
     setDate(cachedExpense.date ? String(cachedExpense.date).split("T")[0] : new Date().toISOString().split("T")[0]);
     setExpenseLedgerId(cachedExpense.debitLedgerId != null ? String(cachedExpense.debitLedgerId) : "");
     setSourceLedgerId(cachedExpense.creditLedgerId != null ? String(cachedExpense.creditLedgerId) : "");
-    setAmount(String(cachedExpense.amount));
+    setAmount(Number(cachedExpense.amount).toFixed(2));
     setDescription(cachedExpense.description || "");
     lastAppliedIdRef.current = cachedExpense.id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,6 +203,7 @@ const ExpenseEditPage: React.FC = () => {
                 min="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                onBlur={formatAmountOnBlur((v) => setAmount(v))}
                 onFocus={(e) => e.currentTarget.select()}
                 required
                 className={`w-full px-2 py-1 border border-line bg-card rounded text-[11px] text-ink text-right font-mono focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500 focus:outline-none ${ACTIVE_CELL}`}
