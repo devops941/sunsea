@@ -179,11 +179,6 @@ const PaymentVoucherEditPage: React.FC = () => {
       prev.map((r) => {
         if (r.id !== id) return r;
         const next = { ...r, [field]: value };
-        if (field === "debitLedgerId" && !value) {
-          next.paymentModeId = "";
-          next.amount = "";
-          next.narration = "";
-        }
         return next;
       })
     );

@@ -20,6 +20,7 @@ import CreatableSelectInput from "../../../components/form/CreatableSelectInput/
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
 const addressSchema = z.object({
   addressLine1: z.string(),
@@ -194,8 +195,19 @@ const CustomerFormPage: React.FC = () => {
     setSaveConfirmOpen(true);
   }, []);
 
+  // Ref to remember blocker's proceed()/reset() from the current block-attempt
+  // so the existing discard modal can drive them from its buttons.
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+
   const handleResume = useCallback(() => {
     setSaveConfirmOpen(false);
+    if (resetRef.current) {
+      const r = resetRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      r();
+    }
     setTimeout(() => {
       if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
         lastFocusedElementRef.current.focus();
@@ -210,8 +222,21 @@ const CustomerFormPage: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
+    if (proceedRef.current) {
+      const p = proceedRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      p();
+      return;
+    }
     navigate(-1);
   }, [navigate]);
+
+  useDirtyNavGuard(isDirty, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setSaveConfirmOpen(true);
+  });
 
   const handleBack = useCallback(() => {
     if (isDirty) {

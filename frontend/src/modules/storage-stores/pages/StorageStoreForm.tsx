@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { FaSave, FaArrowLeft, FaCheck } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -99,6 +100,16 @@ const StorageStoreForm: React.FC = () => {
     const handleFormKeyDown = useFormKeyboardNav(formRef);
 
     useFormShortcuts({ onSave: () => handleSubmitRef.current() });
+
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+      proceedRef.current = proceed;
+      resetRef.current = reset;
+      setSaveConfirmOpen(true);
+    });
 
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
     const { roles, loadRoles } = useRoles();
@@ -306,6 +317,7 @@ const StorageStoreForm: React.FC = () => {
                 await dispatch(updateStore({ id: formData.storeId, data: payload as any })).unwrap();
                 toast.success("Store updated successfully!");
                 setIsDirty(false);
+                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
                 navigate(-1);
             } else {
                 await dispatch(createStore(payload as any)).unwrap();
@@ -502,7 +514,11 @@ const StorageStoreForm: React.FC = () => {
 
             <CommonConfirmModal
                 show={saveConfirmOpen}
-                onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+                onHide={() => {
+                    setSaveConfirmOpen(false);
+                    if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
+                    setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+                }}
                 onConfirm={() => {
                     setSaveConfirmOpen(false);
                     setTimeout(() => {
@@ -516,7 +532,12 @@ const StorageStoreForm: React.FC = () => {
                 cancelText="Discard"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
+                onCancel={() => {
+                    setSaveConfirmOpen(false);
+                    if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
+                    setIsDirty(false);
+                    navigate(-1);
+                }}
             />
         </div>
     );

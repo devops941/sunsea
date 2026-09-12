@@ -29,6 +29,7 @@ import { billOfMaterialService } from "../../../services/billOfMaterialService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
 
 
@@ -515,6 +516,16 @@ const ProductionOrderCreate: React.FC = () => {
     } = useForm<ProductionOrderFormValues>({
         resolver: zodResolver(productionOrderSchema) as any,
         defaultValues,
+    });
+
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(rhfIsDirty, (proceed, reset) => {
+        proceedRef.current = proceed;
+        resetRef.current = reset;
+        setSaveConfirmOpen(true);
     });
 
     const { fields: productFields, append: appendProduct, remove: removeProduct } = useFieldArray({
@@ -1139,8 +1150,10 @@ const ProductionOrderCreate: React.FC = () => {
             }
 
             if (isEditMode) {
+                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
                 navigate(-1);
             } else {
+                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
                 reset(defaultValues);
                 setRowRmStates({});
                 productionOrderService
@@ -1475,7 +1488,11 @@ const ProductionOrderCreate: React.FC = () => {
         </div>
         <CommonConfirmModal
             show={saveConfirmOpen}
-            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+            onHide={() => {
+                setSaveConfirmOpen(false);
+                if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            }}
             onConfirm={() => { setSaveConfirmOpen(false); setTimeout(() => handleSubmitRef.current(), 150); }}
             title="Unsaved Changes"
             message="You have unsaved changes. Do you want to save before leaving?"
@@ -1483,7 +1500,11 @@ const ProductionOrderCreate: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
+            onCancel={() => {
+                setSaveConfirmOpen(false);
+                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
+                navigate(-1);
+            }}
         />
     </>
     );
