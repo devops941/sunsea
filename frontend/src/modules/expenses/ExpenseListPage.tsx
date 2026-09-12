@@ -29,14 +29,14 @@ const ExpenseListPage: React.FC = () => {
 
   const [applied, setApplied] = useState<FilterOptions>(() => defaultFilters());
   const [pending, setPending] = useState<FilterOptions>(() => defaultFilters());
-  // Modal-as-page persistence.
-  const VIEW_KEY = "sunsea:expenses:view";
-  const [panelOpen, setPanelOpen] = useState<boolean>(() => {
-    try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
-  });
-  useEffect(() => {
-    try { sessionStorage.setItem(VIEW_KEY, panelOpen ? "panel" : "table"); } catch { /* ignore */ }
-  }, [panelOpen]);
+  // Filter panel is a proper "screen step" like the Ledger Statement flow.
+  // Every fresh visit (Dashboard → Expenses, or Edit → back → Expenses) lands
+  // on the panel, then Enter/OK moves to the table. Previous versions cached
+  // this in sessionStorage, but that broke the Esc-walk-back chain when the
+  // operator came back from an Edit page — they'd land on the table view and
+  // Esc would loop back to the same Edit page. Panel-as-first-screen means
+  // Esc always has a distinct step to unwind to before leaving the page.
+  const [panelOpen, setPanelOpen] = useState<boolean>(true);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
 
   // Modal nav stack — Esc walks: table → panel → navigate away.
@@ -54,20 +54,44 @@ const ExpenseListPage: React.FC = () => {
         return;
       }
       if (e.key !== "Escape") return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Esc chain (matches Ledger Statement's reverse-nav):
+      //   Table view  → open the filter panel with current filters pre-loaded
+      //                 (the panel is the previous "step" in the flow).
+      //   Panel view  → navigate(-1) back to whichever page came before
+      //                 Expenses (usually the Dashboard).
+      //
+      // Runs regardless of which control has focus. Earlier revisions
+      // returned early when the target was INPUT/TEXTAREA/SELECT, but the
+      // panel auto-focuses the Starting Date input on open, so that guard
+      // trapped Esc and left the operator stranded on the panel.
       e.preventDefault();
       e.stopPropagation();
-      if (!panelOpenRef.current) {
+      if (panelOpenRef.current) {
+        navigate(-1);
+      } else {
         setPending(applied);
         setPanelOpen(true);
-      } else {
-        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [applied, navigate]);
+
+  // Auto-focus + select the first field when the filter panel opens so the
+  // operator can immediately type a new starting date without reaching for
+  // the mouse. Runs on every panel-open (not just mount) — reopening from
+  // the "Change Filters" button also re-focuses the date input.
+  useEffect(() => {
+    if (!panelOpen) return;
+    const t = setTimeout(() => {
+      const el = document.querySelector<HTMLInputElement>('input[name="startDate"]');
+      if (el) {
+        el.focus();
+        el.select?.();
+      }
+    }, 30);
+    return () => clearTimeout(t);
+  }, [panelOpen]);
 
   const cacheKey = `expenses:${applied.startDate}:${applied.endDate}`;
 
@@ -174,9 +198,100 @@ const ExpenseListPage: React.FC = () => {
 
   // ────── Busy-style pre-list filter dialog ──────
   // `data-escape-guarded` opts out of the global Esc→back shortcut.
+  //
+  // Panel-scoped keyboard nav:
+  //   ↑ / ↓         → jump between filter fields (startDate → endDate → Y/N → OK)
+  //   Y / N         → set Show Description toggle regardless of focused field
+  //   Enter         → advance to next field; on OK button submit the panel
+  // The DatePickerCalendar owns its own arrow keys while the calendar
+  // popover is open, so we only handle arrows when the popover is closed
+  // (checked via aria-expanded on the trigger).
+  // Ordered focus stops in the filter panel. Two are inputs (found via name);
+  // the rest are buttons (found via data-filter-field).
+  const filterFieldOrder: Array<{ selector: string; kind: "input" | "button" }> = [
+    { selector: 'input[name="startDate"]', kind: "input" },
+    { selector: 'input[name="endDate"]', kind: "input" },
+    { selector: '[data-filter-field="showDescription-y"]', kind: "button" },
+    { selector: '[data-filter-field="showDescription-n"]', kind: "button" },
+    { selector: '[data-filter-field="ok-btn"]', kind: "button" },
+  ];
+  const currentFieldIdx = (): number => {
+    const active = document.activeElement as HTMLElement | null;
+    if (!active) return -1;
+    return filterFieldOrder.findIndex((f) => active.matches(f.selector));
+  };
+  const onFilterKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const key = e.key;
+    // Skip nav while the DatePickerCalendar popover is open — it owns arrows.
+    if (document.querySelector('[data-calendar-popover="true"]')) return;
+
+    // Y / N always toggle Show Description — but ONLY when focus is on the
+    // toggle itself or the OK button, so typing digits in a date input isn't
+    // hijacked (native date input allows letters in DD-MM-YYYY editing).
+    const activeEl = document.activeElement as HTMLElement | null;
+    const onToggleRow =
+      !!activeEl && !!activeEl.closest('[data-filter-row="showDescription"], [data-filter-field="ok-btn"]');
+    if ((key === "y" || key === "Y") && onToggleRow) {
+      e.preventDefault();
+      setPending((p) => ({ ...p, showDescription: true }));
+      return;
+    }
+    if ((key === "n" || key === "N") && onToggleRow) {
+      e.preventDefault();
+      setPending((p) => ({ ...p, showDescription: false }));
+      return;
+    }
+
+    // Enter = advance to next field. On the LAST field (or when the
+    // OK button already has focus) Enter submits the panel — matches the
+    // "OK (F2)" hint and Tally-style forms where Enter walks the row and
+    // fires the primary action at the end.
+    //
+    // Skip when DatePickerCalendar already handled Enter itself (it calls
+    // preventDefault + focusNextTabbable), otherwise the child's advance
+    // + our advance would DOUBLE-hop past one field. defaultPrevented is
+    // the reliable signal since React bubbles the same event object.
+    if (key === "Enter" && !e.defaultPrevented) {
+      const idx = currentFieldIdx();
+      if (idx < 0) return;
+      e.preventDefault();
+      // OK button → submit the panel.
+      if (idx === filterFieldOrder.length - 1) {
+        setApplied(pending);
+        setPanelOpen(false);
+        return;
+      }
+      // Y or N button → jump straight to OK, skipping the sibling toggle
+      // button (otherwise Enter would land on the other Y/N first and the
+      // operator has to press Enter 3× to reach OK).
+      const activeEl2 = document.activeElement as HTMLElement | null;
+      const onToggle = !!activeEl2?.closest('[data-filter-row="showDescription"]');
+      const targetIdx = onToggle ? filterFieldOrder.length - 1 : idx + 1;
+      const nextEl = document.querySelector<HTMLElement>(filterFieldOrder[targetIdx].selector);
+      if (nextEl) {
+        nextEl.focus();
+        if (nextEl instanceof HTMLInputElement) nextEl.select?.();
+      }
+      return;
+    }
+
+    if (key !== "ArrowUp" && key !== "ArrowDown") return;
+    const idx = currentFieldIdx();
+    if (idx < 0) return;
+    const nextIdx =
+      key === "ArrowDown" ? Math.min(idx + 1, filterFieldOrder.length - 1) : Math.max(idx - 1, 0);
+    if (nextIdx === idx) return;
+    e.preventDefault();
+    const nextEl = document.querySelector<HTMLElement>(filterFieldOrder[nextIdx].selector);
+    if (nextEl) {
+      nextEl.focus();
+      if (nextEl instanceof HTMLInputElement) nextEl.select?.();
+    }
+  };
+
   if (panelOpen) {
     return (
-      <div data-escape-guarded className="p-3">
+      <div data-escape-guarded className="p-3" onKeyDown={onFilterKey}>
         <div className="w-full lg:w-[420px]">
           <div className="bg-card border border-line rounded-md overflow-hidden shadow-sm">
             <div className="bg-amber-500/90 text-white text-[11px] font-bold uppercase tracking-wide text-center py-1 border-b border-line">
@@ -203,11 +318,13 @@ const ExpenseListPage: React.FC = () => {
                 label="Show Description?"
                 value={pending.showDescription}
                 onChange={(v) => setPending({ ...pending, showDescription: v })}
+                dataFilterRow="showDescription"
               />
 
               <div className="pt-2 flex justify-center">
                 <button
                   type="button"
+                  data-filter-field="ok-btn"
                   onClick={() => {
                     setApplied(pending);
                     setPanelOpen(false);
@@ -397,16 +514,21 @@ const FilterRow: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
   </div>
 );
 
-const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean) => void }> = ({
-  label,
-  value,
-  onChange,
-}) => (
-  <div className="grid grid-cols-12 gap-3 items-center">
+const ToggleRow: React.FC<{
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  dataFilterRow?: string;
+}> = ({ label, value, onChange, dataFilterRow }) => (
+  <div
+    className="grid grid-cols-12 gap-3 items-center"
+    {...(dataFilterRow ? { "data-filter-row": dataFilterRow } : {})}
+  >
     <label className="col-span-5 text-ink-subtle font-semibold">{label}</label>
     <div className="col-span-7 flex gap-2">
       <button
         type="button"
+        data-filter-field={dataFilterRow ? `${dataFilterRow}-y` : undefined}
         onClick={() => onChange(true)}
         className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
           value
@@ -418,6 +540,7 @@ const ToggleRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean
       </button>
       <button
         type="button"
+        data-filter-field={dataFilterRow ? `${dataFilterRow}-n` : undefined}
         onClick={() => onChange(false)}
         className={`px-3 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer ${
           !value

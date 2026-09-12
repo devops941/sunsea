@@ -10,6 +10,10 @@ import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useLi
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
+import { handleGridArrow } from "../../../../hooks/useFormGridNav";
+
+// Field order for arrow-nav (← / →). ↑ / ↓ stay in the same column.
+const CELL_FIELDS = ["dc", "account", "amount", "narration"] as const;
 
 interface JournalRow {
   id: number;
@@ -307,6 +311,15 @@ const JournalEntryEditPage: React.FC = () => {
                           data-cell={`${idx}-dc`}
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
+                          onKeyDown={(e) =>
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "dc",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            })
+                          }
                           disabled={!unlocked}
                           className={`w-full px-1 py-1 bg-transparent border-0 text-[13px] font-bold font-mono text-center text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         >
@@ -315,7 +328,23 @@ const JournalEntryEditPage: React.FC = () => {
                         </select>
                       </td>
                       <td className="px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-account`}>
+                        {/* Wrapper div catches bubbled key events from the
+                           inner <input> owned by LedgerSearchInput. When the
+                           search dropdown is open, it consumes arrow keys via
+                           preventDefault/stopPropagation, so grid-nav only
+                           fires when there's no active suggestion list. */}
+                        <div
+                          data-cell={`${idx}-account`}
+                          onKeyDown={(e) =>
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "account",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            })
+                          }
+                        >
                           <LedgerSearchInput
                             value={row.ledgerId}
                             ledgers={ledgers}
@@ -339,7 +368,10 @@ const JournalEntryEditPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onKeyDown={(e) => {
+                              handleGridArrow(e, { rowIdx: idx, field: "amount", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                              if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                            }}
                             onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -359,7 +391,10 @@ const JournalEntryEditPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onKeyDown={(e) => {
+                              handleGridArrow(e, { rowIdx: idx, field: "amount", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                              if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                            }}
                             onFocus={(e) => e.currentTarget.select()}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -375,7 +410,10 @@ const JournalEntryEditPage: React.FC = () => {
                           placeholder=""
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
-                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, { rowIdx: idx, field: "narration", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                            if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                          }}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

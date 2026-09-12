@@ -8,6 +8,12 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
+import { handleGridArrow } from "../../../../hooks/useFormGridNav";
+
+// Excel-style arrow-key nav uses this field order for ← / → within a row.
+// ↑ / ↓ jump between rows in the same column. Enter continues to move forward
+// (dc → account → amount → narration → next row's dc).
+const CELL_FIELDS = ["dc", "account", "amount", "narration"] as const;
 
 // Each row: D = money LEAVES (Out → credited in journal), C = money ARRIVES (In → debited in journal)
 interface ContraRow {
@@ -249,6 +255,7 @@ const ContraVoucherAddPage: React.FC = () => {
                           data-cell={`${idx}-dc`}
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
+                          onKeyDown={(e) => handleGridArrow(e, { rowIdx: idx, field: "dc", fields: CELL_FIELDS, rowsLength: rows.length, focusCell })}
                           disabled={!unlocked}
                           className={`w-full px-1 py-1 bg-transparent border-0 text-[13px] font-bold font-mono text-center focus:outline-none focus:bg-card-2/60 ${
                             row.dc === "D" ? "text-red-400" : "text-emerald-500"
@@ -259,7 +266,13 @@ const ContraVoucherAddPage: React.FC = () => {
                         </select>
                       </td>
                       <td className="px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-account`}>
+                        {/* Wrap LedgerSearchInput div with a bubbling keydown so
+                            arrow keys nav out of the search cell even though the
+                            inner input is inside a child component. */}
+                        <div
+                          data-cell={`${idx}-account`}
+                          onKeyDown={(e) => handleGridArrow(e, { rowIdx: idx, field: "account", fields: CELL_FIELDS, rowsLength: rows.length, focusCell })}
+                        >
                           <LedgerSearchInput
                             value={row.ledgerId}
                             ledgers={ledgers}
@@ -284,7 +297,10 @@ const ContraVoucherAddPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onKeyDown={(e) => {
+                              handleGridArrow(e, { rowIdx: idx, field: "amount", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                              if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                            }}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-red-400 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
@@ -303,7 +319,10 @@ const ContraVoucherAddPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onKeyDown={(e) => {
+                              handleGridArrow(e, { rowIdx: idx, field: "amount", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                              if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                            }}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-emerald-500 text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
@@ -318,7 +337,10 @@ const ContraVoucherAddPage: React.FC = () => {
                           placeholder=""
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
-                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, { rowIdx: idx, field: "narration", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                            if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                          }}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />

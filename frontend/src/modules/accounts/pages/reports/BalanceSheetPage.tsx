@@ -221,11 +221,11 @@ const BalanceSheetPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!showOptionsDialogRef.current) {
-        // From table → re-open the options dialog.
-        setShowOptionsDialog(true);
+      // Table view Esc → walk back one page in history.
+      // Options dialog open → close it (returns to table view; next Esc walks back).
+      if (showOptionsDialogRef.current) {
+        setShowOptionsDialog(false);
       } else {
-        // From options dialog → leave the page (Esc twice = go back).
         navigate(-1);
       }
     };

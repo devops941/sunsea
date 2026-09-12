@@ -438,13 +438,19 @@ export const LedgerStatementPage: React.FC = () => {
         );
         btn?.click();
       } else if (e.key === "Escape") {
+        // Format is the ENTRY dialog for the std/t-format flow. Once closed
+        // there is nothing behind it on this page — walk back one page in
+        // history so the operator returns to wherever they came from
+        // (usually the Dashboard) instead of being stranded on a blank
+        // ledger page.
         e.preventDefault();
         setShowFormatDialog(false);
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showFormatDialog]);
+  }, [showFormatDialog, navigate]);
 
   // Mode dialog — 2x2 grid: One / Group / All / Selected.
   useEffect(() => {
@@ -532,13 +538,17 @@ export const LedgerStatementPage: React.FC = () => {
         );
         btn?.click();
       } else if (e.key === "Escape") {
+        // Merged is the ENTRY dialog for the merged-ledger flow. Same as
+        // Format above: once closed, walk back a page so the operator
+        // exits the ledger page instead of staring at a blank screen.
         e.preventDefault();
         setShowMergedDialog(false);
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showMergedDialog]);
+  }, [showMergedDialog, navigate]);
 
   // Refs mirror the latest highlight index so the keydown closures (which
   // capture state at effect-attach time) always click the CURRENT selection,
@@ -857,10 +867,11 @@ export const LedgerStatementPage: React.FC = () => {
           navigate(route);
         }
       } else if (e.key === "Escape") {
-        // Busy reverse-nav: Esc on the table view re-opens the Options
-        // config dialog with the CURRENT filters pre-loaded, so the
-        // operator can tweak dates/toggles and click OK again without
-        // starting over.
+        // Reverse-nav chain: Table Esc re-opens the Options dialog with
+        // current filters pre-loaded. From there Esc walks back further:
+        // Options → Mode → Format → navigate(-1) exits the page. Each
+        // Esc unwinds one step; the FINAL entry dialog (Format/Merged)
+        // is what actually leaves the page.
         e.preventDefault();
         setDraftLedgerId(selectedLedgerId);
         setDraftGroup(selectedGroup);

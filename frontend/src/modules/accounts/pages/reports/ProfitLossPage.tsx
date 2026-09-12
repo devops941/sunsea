@@ -229,8 +229,10 @@ const ProfitLossPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!showOptionsDialogRef.current) {
-        setShowOptionsDialog(true);
+      // Table view Esc → walk back one page in history.
+      // Options dialog open → close it (returns to table view; next Esc walks back).
+      if (showOptionsDialogRef.current) {
+        setShowOptionsDialog(false);
       } else {
         navigate(-1);
       }

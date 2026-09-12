@@ -9,6 +9,12 @@ import LedgerSearchInput, { isBankOrCashLedger } from "../../../../components/fo
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
+import { handleGridArrow } from "../../../../hooks/useFormGridNav";
+
+// Excel-style arrow-key nav column order (↑/↓ = same column across rows,
+// ←/→ = adjacent cell in the same row when the cursor is at the value edge).
+// Enter continues to move forward via the existing per-cell handlers.
+const CELL_FIELDS = ["account", "paymentMode", "amount", "narration"] as const;
 
 interface PaymentRow {
   id: number;
@@ -281,7 +287,23 @@ const PaymentVoucherAddPage: React.FC = () => {
                       {idx + 1}
                     </td>
                     <td className="px-0 py-0 border-r border-line">
-                      <div data-cell={`${idx}-account`}>
+                      {/* LedgerSearchInput wraps its own <input>; the wrapper
+                         div catches bubbled key events for arrow-nav. The
+                         search dropdown's own arrow handling still runs first
+                         and preventDefaults arrow keys when the dropdown is
+                         open, so this only fires when the dropdown is closed. */}
+                      <div
+                        data-cell={`${idx}-account`}
+                        onKeyDown={(e) =>
+                          handleGridArrow(e, {
+                            rowIdx: idx,
+                            field: "account",
+                            fields: CELL_FIELDS,
+                            rowsLength: rows.length,
+                            focusCell,
+                          })
+                        }
+                      >
                         <LedgerSearchInput
                           value={row.debitLedgerId}
                           ledgers={ledgers}
@@ -296,7 +318,18 @@ const PaymentVoucherAddPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="w-48 px-0 py-0 border-r border-line">
-                      <div data-cell={`${idx}-paymentMode`}>
+                      <div
+                        data-cell={`${idx}-paymentMode`}
+                        onKeyDown={(e) =>
+                          handleGridArrow(e, {
+                            rowIdx: idx,
+                            field: "paymentMode",
+                            fields: CELL_FIELDS,
+                            rowsLength: rows.length,
+                            focusCell,
+                          })
+                        }
+                      >
                         <LedgerSearchInput
                           value={row.paymentModeId}
                           ledgers={ledgers}
@@ -319,7 +352,16 @@ const PaymentVoucherAddPage: React.FC = () => {
                         placeholder=""
                         value={row.amount}
                         onChange={(e) => updateRow(row.id, "amount", e.target.value)}
-                        onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                        onKeyDown={(e) => {
+                          handleGridArrow(e, {
+                            rowIdx: idx,
+                            field: "amount",
+                            fields: CELL_FIELDS,
+                            rowsLength: rows.length,
+                            focusCell,
+                          });
+                          if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                        }}
                         // Select existing value on focus so typing replaces
                         // it (Busy behaviour). Native spinner arrows hidden.
                         onFocus={(e) => e.currentTarget.select()}
@@ -335,7 +377,16 @@ const PaymentVoucherAddPage: React.FC = () => {
                         placeholder=""
                         value={row.narration}
                         onChange={(e) => updateRow(row.id, "narration", e.target.value)}
-                        onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                        onKeyDown={(e) => {
+                          handleGridArrow(e, {
+                            rowIdx: idx,
+                            field: "narration",
+                            fields: CELL_FIELDS,
+                            rowsLength: rows.length,
+                            focusCell,
+                          });
+                          if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                        }}
                         onFocus={(e) => e.currentTarget.select()}
                         disabled={!unlocked}
                         className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

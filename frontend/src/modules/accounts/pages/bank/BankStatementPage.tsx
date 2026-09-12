@@ -7,6 +7,7 @@ import { displayVoucherNo } from "../../../../services/voucherService";
 import { useListCache, invalidateCache } from "../../../../hooks/useListCache";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+import { useTableCellNav } from "../../../../hooks/useTableCellNav";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { formatDateDMY } from "../../../../utils/dateUtils";
@@ -72,9 +73,10 @@ const BankStatementPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!panelOpenRef.current) {
-        setPending(applied);
-        setPanelOpen(true);
+      // Table view Esc → walk back one page in history.
+      // Filter panel open → close it (returns to table view; next Esc walks back).
+      if (panelOpenRef.current) {
+        setPanelOpen(false);
       } else {
         navigate(-1);
       }
@@ -175,6 +177,19 @@ const BankStatementPage: React.FC = () => {
       entries: filteredEntries,
     };
   }, [rawData, applied.startDate, applied.endDate]);
+
+  // Cell-level nav for the statement table. Columns are:
+  //   0=Date, 1=Vch No, [Type if showType], Particulars, [Narration if showNarration],
+  //   Debit, Credit, [Balance if showBalance]. Compute count from active flags.
+  const stmtColCount = 5 // Date, Vch, Particulars, Debit, Credit (always)
+    + (applied.showType ? 1 : 0)
+    + (applied.showNarration ? 1 : 0)
+    + (applied.showBalance ? 1 : 0);
+  const { rowIdx: stmtRowIdx, colIdx: stmtColIdx, setCell: setStmtCell } = useTableCellNav({
+    rowCount: data?.entries?.length ?? 0,
+    colCount: stmtColCount,
+    disabled: panelOpen,
+  });
 
   // CSV export dataset — uses the FILTERED entries so the download always
   // matches what's on screen. Filename encodes ledger + date range.
@@ -516,68 +531,92 @@ const BankStatementPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft">
-                {data.entries.map((entry, idx) => (
-                  <tr key={entry.id || idx} className="hover:bg-card-2 transition-colors">
-                    <td className="px-3 py-1.5 text-xs whitespace-nowrap font-mono">
-                      {formatDateDMY(entry.date)}
-                    </td>
-                    <td className="px-3 py-1.5 text-xs font-mono font-medium text-blue-500">
-                      {displayVoucherNo(entry.voucherNo)}
-                    </td>
-                    {applied.showType && (
-                      <td className="px-3 py-1.5 text-xs">
-                        <span className={`px-1.5 py-0.5 rounded text-[13px] font-bold uppercase ${
-                          entry.voucherType === "RECEIPT" ? "bg-emerald-500/10 text-emerald-500" :
-                          entry.voucherType === "PAYMENT" ? "bg-red-500/10 text-red-500" :
-                          entry.voucherType === "CONTRA" ? "bg-purple-500/10 text-purple-500" :
-                          entry.voucherType === "OPENING" ? "bg-amber-500/10 text-amber-500" :
-                          "bg-blue-500/10 text-blue-500"
-                        }`}>
-                          {entry.voucherType}
-                        </span>
+                {data.entries.map((entry, idx) => {
+                  // Column indices are dynamic based on which optional cols are shown.
+                  let cursor = 0;
+                  const dateCol = cursor++;
+                  const vchCol = cursor++;
+                  const typeCol = applied.showType ? cursor++ : -1;
+                  const partCol = cursor++;
+                  const narCol = applied.showNarration ? cursor++ : -1;
+                  const drCol = cursor++;
+                  const crCol = cursor++;
+                  const balCol = applied.showBalance ? cursor++ : -1;
+                  const isActiveRow = stmtRowIdx === idx;
+                  const ringFor = (col: number) =>
+                    isActiveRow && col >= 0 && stmtColIdx === col
+                      ? " ring-2 ring-yellow-400 ring-inset"
+                      : "";
+                  const clickFor = (col: number) => (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (col >= 0) setStmtCell(idx, col);
+                  };
+                  return (
+                    <tr
+                      key={entry.id || idx}
+                      className={`hover:bg-card-2 transition-colors ${isActiveRow ? "bg-card-2/60" : ""}`}
+                    >
+                      <td onClick={clickFor(dateCol)} className={`px-3 py-1.5 text-xs whitespace-nowrap font-mono${ringFor(dateCol)}`}>
+                        {formatDateDMY(entry.date)}
                       </td>
-                    )}
-                    <td className="px-3 py-1.5 text-xs text-ink max-w-xs truncate">
-                      {entry.particulars || entry.narration || "-"}
-                    </td>
-                    {applied.showNarration && (
-                      <td className="px-3 py-1.5 text-xs text-ink-subtle max-w-xs truncate">
-                        {entry.narration || "-"}
+                      <td onClick={clickFor(vchCol)} className={`px-3 py-1.5 text-xs font-mono font-medium text-blue-500${ringFor(vchCol)}`}>
+                        {displayVoucherNo(entry.voucherNo)}
                       </td>
-                    )}
-                    {/* Standard accounting convention: Debit column shows
-                        money IN (receipts, contra in) and Credit shows money
-                        OUT (payments, contra out) — same as every other
-                        ledger page. Keeps display consistent with double-entry
-                        so the same transaction appears on OPPOSITE sides in
-                        the two ledgers involved (e.g. Receipt shows Dr in
-                        Bank Statement AND Cr in Customer Ledger). */}
-                    <td className="px-3 py-1.5 text-xs text-right font-mono">
-                      {entry.debit > 0 ? (
-                        <span className="text-emerald-500 font-semibold">
-                          {formatAmount(entry.debit)}
-                        </span>
-                      ) : "-"}
-                    </td>
-                    <td className="px-3 py-1.5 text-xs text-right font-mono">
-                      {entry.credit > 0 ? (
-                        <span className="text-red-500 font-semibold">
-                          {formatAmount(entry.credit)}
-                        </span>
-                      ) : "-"}
-                    </td>
-                    {applied.showBalance && (
-                      <td className="px-3 py-1.5 text-xs text-right font-mono font-bold text-ink">
-                        ₹{formatAmount(Math.abs(entry.runningBalance))}
-                        {/* Bank/Cash is an ASSET — natural side is Dr. Negative
-                            running balance means the ledger sits on Cr (overdraft /
-                            cash shortage). Show "Cr" so the sign matches accounting
-                            convention. */}
-                        {entry.runningBalance < 0 && <span className="text-[13px] text-red-500 ml-1">Cr</span>}
+                      {applied.showType && (
+                        <td onClick={clickFor(typeCol)} className={`px-3 py-1.5 text-xs${ringFor(typeCol)}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[13px] font-bold uppercase ${
+                            entry.voucherType === "RECEIPT" ? "bg-emerald-500/10 text-emerald-500" :
+                            entry.voucherType === "PAYMENT" ? "bg-red-500/10 text-red-500" :
+                            entry.voucherType === "CONTRA" ? "bg-purple-500/10 text-purple-500" :
+                            entry.voucherType === "OPENING" ? "bg-amber-500/10 text-amber-500" :
+                            "bg-blue-500/10 text-blue-500"
+                          }`}>
+                            {entry.voucherType}
+                          </span>
+                        </td>
+                      )}
+                      <td onClick={clickFor(partCol)} className={`px-3 py-1.5 text-xs text-ink max-w-xs truncate${ringFor(partCol)}`}>
+                        {entry.particulars || entry.narration || "-"}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      {applied.showNarration && (
+                        <td onClick={clickFor(narCol)} className={`px-3 py-1.5 text-xs text-ink-subtle max-w-xs truncate${ringFor(narCol)}`}>
+                          {entry.narration || "-"}
+                        </td>
+                      )}
+                      {/* Standard accounting convention: Debit column shows
+                          money IN (receipts, contra in) and Credit shows money
+                          OUT (payments, contra out) — same as every other
+                          ledger page. Keeps display consistent with double-entry
+                          so the same transaction appears on OPPOSITE sides in
+                          the two ledgers involved (e.g. Receipt shows Dr in
+                          Bank Statement AND Cr in Customer Ledger). */}
+                      <td onClick={clickFor(drCol)} className={`px-3 py-1.5 text-xs text-right font-mono${ringFor(drCol)}`}>
+                        {entry.debit > 0 ? (
+                          <span className="text-emerald-500 font-semibold">
+                            {formatAmount(entry.debit)}
+                          </span>
+                        ) : "-"}
+                      </td>
+                      <td onClick={clickFor(crCol)} className={`px-3 py-1.5 text-xs text-right font-mono${ringFor(crCol)}`}>
+                        {entry.credit > 0 ? (
+                          <span className="text-red-500 font-semibold">
+                            {formatAmount(entry.credit)}
+                          </span>
+                        ) : "-"}
+                      </td>
+                      {applied.showBalance && (
+                        <td onClick={clickFor(balCol)} className={`px-3 py-1.5 text-xs text-right font-mono font-bold text-ink${ringFor(balCol)}`}>
+                          ₹{formatAmount(Math.abs(entry.runningBalance))}
+                          {/* Bank/Cash is an ASSET — natural side is Dr. Negative
+                              running balance means the ledger sits on Cr (overdraft /
+                              cash shortage). Show "Cr" so the sign matches accounting
+                              convention. */}
+                          {entry.runningBalance < 0 && <span className="text-[13px] text-red-500 ml-1">Cr</span>}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

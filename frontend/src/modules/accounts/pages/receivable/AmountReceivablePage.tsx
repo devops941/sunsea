@@ -13,6 +13,7 @@ import {
 import apiClient from "../../../../api/apiClient";
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDetailCache } from "../../../../hooks/useDetailCache";
+import { useTableCellNav } from "../../../../hooks/useTableCellNav";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import type { CustomerReceivableSummary } from "../../../../services/receivableService";
 import { formatAmount } from "../../../../utils/pricingUtils";
@@ -285,7 +286,7 @@ const AmountReceivablePage: React.FC = () => {
         return;
       }
       if (e.key !== "Escape") return;
-      // Esc inside the search input just clears + blurs.
+      // Search input inside the table: first Esc clears, second Esc blurs.
       if (e.target === rowSearchRef.current) {
         e.preventDefault();
         e.stopPropagation();
@@ -293,12 +294,16 @@ const AmountReceivablePage: React.FC = () => {
         else rowSearchRef.current?.blur();
         return;
       }
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Was previously returning early for ANY form-input focus, which meant
+      // the Options modal's auto-focused Report Date input swallowed Esc and
+      // the operator couldn't close the modal or walk back. Now:
+      //   - From table view   → navigate back (browser -1)
+      //   - From options view → close modal → table view (one more Esc walks back)
+      // Both handled regardless of which form control has focus.
       e.preventDefault();
       e.stopPropagation();
-      if (!showOptionsDialogRef.current) {
-        setShowOptionsDialog(true);
+      if (showOptionsDialogRef.current) {
+        setShowOptionsDialog(false);
       } else {
         navigate(-1);
       }
@@ -307,39 +312,23 @@ const AmountReceivablePage: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [commitOptions, navigate]);
 
-  // ─── Row keyboard nav ──────────────────────────────────────────
-  const [rowIdx, setRowIdx] = useState<number>(-1);
-  const rowIdxRef = useRef(rowIdx);
-  useEffect(() => { rowIdxRef.current = rowIdx; }, [rowIdx]);
-  useEffect(() => {
-    if (showOptionsDialog) return;
-    if (rowIdx < 0 && rows.length > 0) setRowIdx(0);
-  }, [showOptionsDialog, rows.length, rowIdx]);
+  // ─── Cell-level keyboard nav ────────────────────────────────────
+  // ↑↓←→ move the active cell across rows / columns. Enter drills into the
+  // customer breakdown. Disabled while the Options dialog is open so the
+  // modal's own key handlers win.
+  const { rowIdx, colIdx, setCell, setRowIdx } = useTableCellNav({
+    rowCount: rows.length,
+    colCount: activeColKeys.length,
+    onEnter: (r) => {
+      if (rows[r]) navigate(`/accounts/receivable/${rows[r].customerId}`);
+    },
+    disabled: showOptionsDialog,
+  });
+  // Scroll the highlighted row into view when it changes.
   useEffect(() => {
     if (rowIdx < 0) return;
     document.querySelector<HTMLElement>(`[data-ar-row="${rowIdx}"]`)?.scrollIntoView({ block: "nearest" });
   }, [rowIdx]);
-  useEffect(() => {
-    if (showOptionsDialog) return;
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      const max = rows.length - 1;
-      const cur = rowIdxRef.current;
-      if (e.key === "ArrowDown") { e.preventDefault(); setRowIdx(Math.min(cur + 1, max)); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); setRowIdx(Math.max(cur - 1, 0)); }
-      else if (e.key === "Home") { e.preventDefault(); setRowIdx(0); }
-      else if (e.key === "End") { e.preventDefault(); setRowIdx(max); }
-      else if (e.key === "PageDown") { e.preventDefault(); setRowIdx(Math.min(cur + 10, max)); }
-      else if (e.key === "PageUp") { e.preventDefault(); setRowIdx(Math.max(cur - 10, 0)); }
-      else if (e.key === "Enter" && cur >= 0 && rows[cur]) {
-        e.preventDefault();
-        navigate(`/accounts/receivable/${rows[cur].customerId}`);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, rows, navigate]);
 
   // ─── Print / Export ────────────────────────────────────────────
   const handlePrint = () => window.print();
@@ -618,6 +607,14 @@ const AmountReceivablePage: React.FC = () => {
                     {rows.map((r, i) => {
                       const isHl = rowIdx === i;
                       const cls = isHl ? "bg-black text-white" : "";
+                      const ringFor = (colKey: typeof activeColKeys[number]) =>
+                        isHl && colIdx === activeColKeys.indexOf(colKey)
+                          ? " ring-2 ring-yellow-400 ring-inset"
+                          : "";
+                      const clickFor = (colKey: typeof activeColKeys[number]) => (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        setCell(i, activeColKeys.indexOf(colKey));
+                      };
                       return (
                         <tr
                           key={r.customerId}
@@ -627,7 +624,10 @@ const AmountReceivablePage: React.FC = () => {
                           className="border-b border-line-soft/60 hover:bg-card-2/40 cursor-pointer"
                           title="Double-click (or Enter) to drill into customer breakdown"
                         >
-                          <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase ${cls}`}>
+                          <td
+                            onClick={clickFor("name")}
+                            className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase ${cls}${ringFor("name")}`}
+                          >
                             {options.shownBy === "code" ? (
                               <>
                                 <span className="font-mono text-[13px] text-ink-subtle mr-2">{r.customerCode}</span>
@@ -638,29 +638,42 @@ const AmountReceivablePage: React.FC = () => {
                             )}
                           </td>
                           {options.showMobile && (
-                            <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 font-mono ${cls}`}>
+                            <td
+                              onClick={clickFor("mobile")}
+                              className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 font-mono ${cls}${ringFor("mobile")}`}
+                            >
                               {r.phone || ""}
                             </td>
                           )}
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono font-semibold border-r border-line-soft/50 ${
-                            !isHl && r.netBalance > 0 ? "text-emerald-600" :
-                            !isHl && r.netBalance < 0 ? "text-red-600" :
-                            ""
-                          } ${cls}`}>
+                          <td
+                            onClick={clickFor("balance")}
+                            className={`px-3 py-0.5 text-[13px] text-right font-mono font-semibold border-r border-line-soft/50 ${
+                              !isHl && r.netBalance > 0 ? "text-emerald-600" :
+                              !isHl && r.netBalance < 0 ? "text-red-600" :
+                              ""
+                            } ${cls}${ringFor("balance")}`}
+                          >
                             {fmt(Math.abs(r.netBalance))}
                           </td>
                           {options.showTxnDate && (
-                            <td className={`px-3 py-0.5 text-[13px] text-center font-mono border-r border-line-soft/50 ${cls}`}>
+                            <td
+                              onClick={clickFor("txnDate")}
+                              className={`px-3 py-0.5 text-[13px] text-center font-mono border-r border-line-soft/50 ${cls}${ringFor("txnDate")}`}
+                            >
                               {r.lastTransactionDate ? displayDate(r.lastTransactionDate) : ""}
                             </td>
                           )}
                           {options.showDays && (
-                            <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${
-                              !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
-                            } ${cls}`}>
+                            <td
+                              onClick={clickFor("days")}
+                              className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${
+                                !isHl && r.isOverdue ? "text-red-600 font-semibold" : "text-ink-subtle"
+                              } ${cls}${ringFor("days")}`}
+                            >
                               {getDaysElapsed(r.lastTransactionDate, asOnDate)}
                             </td>
                           )}
+                          {/* Trailing spacer column — not navigable, no ring, no click handler */}
                           <td className={`px-3 py-0.5 text-[13px] ${cls}`}>&nbsp;</td>
                         </tr>
                       );
@@ -690,7 +703,7 @@ const AmountReceivablePage: React.FC = () => {
               </div>
 
               <div className="px-3 py-1 text-[13px] border-t border-line bg-card-2/40 flex items-center gap-3 shrink-0 italic text-ink-subtle">
-                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓</kbd> nav</span>
+                <span><kbd className="px-1 border border-line rounded bg-card">↑ ↓ ← →</kbd> cell</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Enter</kbd> drill</span>
                 <span><kbd className="px-1 border border-line rounded bg-card">Esc</kbd> filters</span>
                 <span className="ml-auto not-italic text-red-600 font-semibold">

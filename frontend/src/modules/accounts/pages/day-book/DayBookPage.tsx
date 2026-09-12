@@ -86,9 +86,10 @@ const DayBookPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!panelOpenRef.current) {
-        setPending(applied);
-        setPanelOpen(true);
+      // Table view Esc → walk back one page in history.
+      // Filter panel open → close it (returns to table view; next Esc walks back).
+      if (panelOpenRef.current) {
+        setPanelOpen(false);
       } else {
         navigate(-1);
       }

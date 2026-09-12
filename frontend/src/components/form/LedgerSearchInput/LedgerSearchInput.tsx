@@ -50,6 +50,17 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  // Blur-close guard: onBlur schedules a close, but a click on a dropdown
+  // item must be able to run BEFORE the close fires so it can call handleSelect.
+  // A short timeout gives the item's onClick time to land. Cancelled if the
+  // input regains focus or the user interacts inside the dropdown.
+  const blurCloseTimer = useRef<number | null>(null);
+  const cancelBlurClose = useCallback(() => {
+    if (blurCloseTimer.current != null) {
+      clearTimeout(blurCloseTimer.current);
+      blurCloseTimer.current = null;
+    }
+  }, []);
 
   // Find selected ledger name for display
   const selectedLedger = ledgers.find((l) => String(l.id) === value);
@@ -100,6 +111,17 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
       };
     }
   }, [isOpen, updatePosition]);
+
+  // Cancel any pending blur-close timer on unmount so we don't call
+  // setState on an unmounted component (avoids the React warning).
+  useEffect(() => {
+    return () => {
+      if (blurCloseTimer.current != null) {
+        clearTimeout(blurCloseTimer.current);
+        blurCloseTimer.current = null;
+      }
+    };
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -233,6 +255,7 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
         }}
         onFocus={() => {
           if (disabled) return;
+          cancelBlurClose();
           setIsOpen(true);
           // If a value is already selected, pre-fill searchText with its
           // display label AND select-all — so the operator SEES what's
@@ -247,6 +270,26 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
             setSearchText("");
           }
           updatePosition();
+        }}
+        onBlur={(e) => {
+          // Close the dropdown when focus moves away — otherwise navigating to
+          // the next cell (Tab / Enter / focusCell) leaves this dropdown
+          // hanging open. If the blur target is a child of the dropdown (user
+          // clicking an item), the item's onClick will fire the select on the
+          // next tick — hold the close briefly so that click completes.
+          const nextFocus = e.relatedTarget as HTMLElement | null;
+          if (nextFocus && dropdownRef.current?.contains(nextFocus)) {
+            // Focus went INTO the dropdown (rare — items aren't focusable) —
+            // don't close.
+            return;
+          }
+          cancelBlurClose();
+          blurCloseTimer.current = window.setTimeout(() => {
+            setIsOpen(false);
+            setSearchText("");
+            setHighlightIndex(-1);
+            blurCloseTimer.current = null;
+          }, 150);
         }}
         onKeyDown={handleKeyDown}
         className={`${inputClass} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -275,6 +318,17 @@ const LedgerSearchInput: React.FC<LedgerSearchInputProps> = ({
         createPortal(
           <div
             ref={dropdownRef}
+            // data-select-portal marks this as an open dropdown so other
+            // window-level keydown handlers (useTableCellNav, page Esc walkers)
+            // yield to the dropdown's own key handling.
+            data-select-portal
+            // Prevent focus loss when the user mousedowns on the dropdown — the
+            // input's onBlur would otherwise fire before the item's onClick,
+            // eating the click.
+            onMouseDown={(e) => {
+              e.preventDefault();
+              cancelBlurClose();
+            }}
             className="fixed z-[9999] bg-card border border-line rounded-xl shadow-2xl overflow-hidden"
             style={{
               top: dropdownPos.top,
