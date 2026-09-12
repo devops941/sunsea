@@ -55,7 +55,11 @@ export interface GridArrowCtx<F extends string = string> {
 }
 
 export function handleGridArrow<F extends string>(
-  e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+  // Accept HTMLElement broadly because voucher grids wrap LedgerSearchInput
+  // in a <div> that catches bubbled keydowns — the event's currentTarget is
+  // the wrapper div, not the inner input. We still narrow to input-like
+  // below when reading selectionStart.
+  e: React.KeyboardEvent<HTMLElement>,
   ctx: GridArrowCtx<F>
 ): boolean {
   const key = e.key;
@@ -63,18 +67,20 @@ export function handleGridArrow<F extends string>(
     return false;
   }
 
-  // ArrowLeft/Right cursor-edge detection. Select elements report null
-  // selectionStart — treat them as at both edges so arrows always nav.
-  const target = e.currentTarget as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-  const isInputLike = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+  // ArrowLeft/Right cursor-edge detection. Read cursor state from the
+  // ACTUAL focused input so we correctly narrow when currentTarget is a
+  // wrapper <div> (voucher account cells wrap LedgerSearchInput in a div
+  // to catch bubbled keydowns; the real input is document.activeElement).
+  // SELECT reports null selectionStart — leave pos=0, len=0 so ← / → jump.
+  const active = (document.activeElement as HTMLElement | null) ?? e.currentTarget;
+  const tag = active.tagName;
   let pos = 0;
   let len = 0;
-  if (isInputLike) {
-    const el = target as HTMLInputElement | HTMLTextAreaElement;
+  if (tag === "INPUT" || tag === "TEXTAREA") {
+    const el = active as HTMLInputElement | HTMLTextAreaElement;
     pos = el.selectionStart ?? 0;
     len = (el.value ?? "").length;
   }
-  // For select, pos=0 and len=0, so ← / → will always jump — good.
 
   const fieldIdx = ctx.fields.indexOf(ctx.field);
   if (fieldIdx < 0) return false;
