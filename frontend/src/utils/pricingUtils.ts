@@ -31,8 +31,21 @@ export const getUnitPrice = (item: PriceableItem): string | number => {
 export const formatAmountOnBlur = (onUpdate: (formatted: string) => void) =>
   (e: React.FocusEvent<HTMLInputElement>) => {
     const v = parseFloat(e.target.value);
-    if (!isNaN(v) && v > 0) onUpdate(v.toFixed(2));
+    if (!isNaN(v)) onUpdate(v.toFixed(2));
   };
+
+/**
+ * Wraps a react-hook-form field to format its value to 2 decimal places on blur.
+ * Usage with Controller: <CtrlText field={withDecimalFormat(field)} ... />
+ */
+export const withDecimalFormat = (field: { value: any; onChange: (v: any) => void; onBlur: () => void; [key: string]: any }) => ({
+  ...field,
+  onBlur: () => {
+    field.onBlur();
+    const num = parseFloat(field.value || "0");
+    field.onChange(isNaN(num) ? "0.00" : num.toFixed(2));
+  },
+});
 
 export const formatAmount = (value: number) => {
   return value % 1 === 0

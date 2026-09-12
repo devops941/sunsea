@@ -79,7 +79,7 @@ const ContraVoucherEditPage: React.FC = () => {
         id: rowCounter++,
         dc: isDebit ? "C" : "D",
         ledgerId: String(isDebit ? it.debitLedgerId : it.creditLedgerId),
-        amount: String(Number(isDebit ? it.debitAmount : it.creditAmount) || 0),
+        amount: (Number(isDebit ? it.debitAmount : it.creditAmount) || 0).toFixed(2),
         narration: it.narration || "",
       };
     });

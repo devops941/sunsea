@@ -14,6 +14,7 @@ import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/Com
 import CustomButton from "../../../../components/ui/Button/Button";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import BusyItemsTable, { type BusyColumn } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
+import DecimalCell from "../../../../components/form/DecimalCell/DecimalCell";
 import { formatAmount } from "../../../../utils/pricingUtils";
 import apiClient from "../../../../api/apiClient";
 
@@ -375,18 +376,10 @@ export const PurchaseReturnCreatePage: React.FC = () => {
         width: "110px",
         align: "right" as const,
         render: (row: PurchaseReturnLineItem) => (
-          <input
-            type="text"
-            inputMode="decimal"
-            value={row.unitPrice === 0 && !row.rawMaterialId ? "" : row.unitPrice}
-            onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9.]/g, "");
-              const p = val === "" ? 0 : Number(val);
-              updateLine(row.id, {
-                unitPrice: p,
-                amount: row.quantity * p,
-              });
-            }}
+          <DecimalCell
+            value={row.unitPrice}
+            showEmpty={!row.rawMaterialId}
+            onChange={(p) => updateLine(row.id, { unitPrice: p, amount: row.quantity * p })}
             className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 h-full"
             placeholder="0.00"
           />

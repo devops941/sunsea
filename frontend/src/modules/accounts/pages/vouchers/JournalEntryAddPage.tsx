@@ -109,7 +109,15 @@ const JournalEntryAddPage: React.FC = () => {
   };
 
   const updateRow = (id: number, field: keyof JournalRow, value: string) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    setRows((prev) => prev.map((r) => {
+      if (r.id !== id) return r;
+      const next = { ...r, [field]: value };
+      // Auto-set amount to 0.00 when ledger is selected
+      if (next.ledgerId && !next.amount) {
+        next.amount = "0.00";
+      }
+      return next;
+    }));
   };
 
   const totalDebit = rows.reduce(

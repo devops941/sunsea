@@ -6,6 +6,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supplierService } from "../../../services/supplierService";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 import Button from "../../../components/ui/Button/Button";
 import CustomButton from "../../../components/ui/Button/Button";
 import { supplierMaterialPriceService } from "../../../services/Suppliermaterialpriceservice";
@@ -371,6 +372,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                                         type="number"
                                         value={revisePrice}
                                         onChange={(e) => setRevisePrice(e.target.value)}
+                                        onBlur={formatAmountOnBlur((v) => setRevisePrice(v))}
                                         min={0}
                                         step={0.01}
                                         required

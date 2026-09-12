@@ -1,4 +1,5 @@
 import { formatDate } from "../../utils/dateUtils";
+import { formatAmountOnBlur } from "../../utils/pricingUtils";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../hooks/useFormKeyboardNav";
@@ -61,6 +62,13 @@ interface ItemOption {
   gstRate: number;
   gradeRates: Record<string, number> | null;
 }
+
+const fmtSundry = (rows: any[]): SundryRow[] =>
+  rows.map((r: any) => ({
+    ...r,
+    rate: r.rate ? Number(r.rate).toFixed(2) : r.rate,
+    amount: r.amount ? Number(r.amount).toFixed(2) : r.amount,
+  }));
 
 const emptyLine = (): InvoiceLineItem => ({
   id: crypto.randomUUID(),
@@ -174,7 +182,7 @@ const SalesInvoiceForm: React.FC = () => {
   const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
   const [excludedComponents, setExcludedComponents] = useState<Record<string, Set<string>>>({});
   const [discountType, setDiscountType] = useState<string>("PERCENT");
-  const [discountValue, setDiscountValue] = useState<string>("");
+  const [discountValue, setDiscountValue] = useState<string>("0.00");
   const [billingAddress, setBillingAddress] = useState({ line1: "", city: "", state: "", pincode: "" });
   const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
   const [selectedShippingIdx, setSelectedShippingIdx] = useState<number>(0);
@@ -347,56 +355,18 @@ const SalesInvoiceForm: React.FC = () => {
               pincode: fullOrder.billingPincode || cust?.billingPincode || defaultAddr.pincode || "",
             });
             setSelectedShippingIdx(0);
-            // Build lines from invoice items grouped by salesProductId
-            const invoiceItems: any[] = invoice.items || [];
-            const orderItems: any[] = fullOrder.items || [];
-            if (invoiceItems.length > 0) {
-              const grouped = new Map<string, any[]>();
-              invoiceItems.forEach((ii: any) => {
-                const spId = ii.salesProductId ? String(ii.salesProductId) : String(ii.productId);
-                if (!grouped.has(spId)) grouped.set(spId, []);
-                grouped.get(spId)!.push(ii);
-              });
-              const rebuilt: any[] = [];
-              grouped.forEach((items, spId) => {
-                // Find sales product name from order items or product relation
-                const orderItem = orderItems.find((oi: any) => String(oi.salesProductId) === spId);
-                const spFromOrder = orderItem?.salesProduct;
-                const spName = spFromOrder?.salesProductName || spFromOrder?.salesProductCode
-                  || items[0]?.product?.productName || items[0]?.description || `Product #${spId}`;
-                const totalQty = items.reduce((s: number, ii: any) => s + Number(ii.quantity || 0), 0);
-                const totalAmount = items.reduce((s: number, ii: any) => s + (Number(ii.unitPrice || 0) * Number(ii.quantity || 0)), 0);
-                const totalWeight = items.reduce((s: number, ii: any) => s + Number(ii.weight || 0), 0);
-                // Calculate order qty from component perUnit
-                const compDef = orderItems.find((oi: any) => String(oi.salesProductId) === spId);
-                const perUnit = compDef ? Number(compDef.quantity || totalQty) / Math.max(1, totalQty) : 1;
-                const orderQty = perUnit > 0 ? Math.max(1, Math.round(totalQty / (items.length > 1 ? Number(items[0]?.quantity || totalQty) / Math.max(1, totalQty) : 1))) : totalQty;
-                const unitPrice = orderQty > 0 ? Math.round((totalAmount / orderQty) * 100) / 100 : 0;
-                const taxPercent = Number(items[0]?.igstRate) > 0
-                  ? Number(items[0]?.igstRate)
-                  : (Number(items[0]?.cgstRate || 0) + Number(items[0]?.sgstRate || 0));
-                const amount = orderQty * unitPrice;
-                const taxAmount = (amount * taxPercent) / 100;
-                rebuilt.push({
-                  id: crypto.randomUUID(),
-                  itemId: spId,
-                  itemName: spName,
-                  qty: orderQty,
-                  rate: unitPrice,
-                  weight: totalWeight,
-                  discountAmount: 0,
-                  taxPercent,
-                  amount,
-                  taxAmount,
-                  total: amount + taxAmount,
-                });
-              });
-              if (rebuilt.length > 0) setLines(rebuilt);
-            }
-            // Load bill sundry from full order if not already loaded from invoice
-            if (sundryRows.length === 0 && Array.isArray(fullOrder.billSundry) && fullOrder.billSundry.length > 0) {
-              setSundryRows(fullOrder.billSundry);
-            }
+            // In edit mode, invoice items are already loaded from invoice.items (lines 404-417)
+            // with the correct unitPrice. Do NOT rebuild/overwrite from order items here,
+            // as the recalculation can produce incorrect unit prices.
+            // Bill sundry is already loaded from invoice.billSundry or invoice.salesOrder.billSundry
+            // at lines 379-383. Only fall back to fullOrder if invoice had no sundry at all.
+            setSundryRows(prev => {
+              if (prev.length > 0) return prev;
+              if (Array.isArray(fullOrder.billSundry) && fullOrder.billSundry.length > 0) {
+                return fmtSundry(fullOrder.billSundry);
+              }
+              return prev;
+            });
           }).catch(() => {});
         }
         if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate.split("T")[0]);
@@ -423,9 +393,9 @@ const SalesInvoiceForm: React.FC = () => {
 
         // Load bill sundry from invoice or its sales order
         if (Array.isArray((invoice as any).billSundry) && (invoice as any).billSundry.length > 0) {
-          setSundryRows((invoice as any).billSundry);
+          setSundryRows(fmtSundry((invoice as any).billSundry));
         } else if (invoice.salesOrder && Array.isArray((invoice.salesOrder as any).billSundry)) {
-          setSundryRows((invoice.salesOrder as any).billSundry);
+          setSundryRows(fmtSundry((invoice.salesOrder as any).billSundry));
         }
       })
       .catch(() => {
@@ -676,7 +646,7 @@ const SalesInvoiceForm: React.FC = () => {
 
       // Load bill sundry from sales order
       if (Array.isArray((fullOrder as any).billSundry) && (fullOrder as any).billSundry.length > 0) {
-        setSundryRows((fullOrder as any).billSundry);
+        setSundryRows(fmtSundry((fullOrder as any).billSundry));
       } else {
         setSundryRows([]);
       }
@@ -1087,7 +1057,7 @@ const SalesInvoiceForm: React.FC = () => {
       const bal = Number(c.balanceAmount ?? c.netBalance ?? c.openingBalance ?? 0);
       const bType = (c.balanceType || c.openingBalanceType || "").toString().toUpperCase();
       const isDr = bType.startsWith("D");
-      const balLabel = `₹${bal.toLocaleString("en-IN")} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
+      const balLabel = `₹${bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "—"}`;
 
       return {
         value: String(c.id),
@@ -1354,6 +1324,9 @@ const SalesInvoiceForm: React.FC = () => {
   }, [selectedSalesOrderId, salesProducts, excludedComponents]);
 
   // ── Bill Sundry columns for BusyItemsTable ──
+  const subTotalRef = useRef(0);
+  subTotalRef.current = totals.subTotal;
+
   const sundryColumns: BusyColumn<SundryRow>[] = useMemo(() => {
     return [
       {
@@ -1407,9 +1380,10 @@ const SalesInvoiceForm: React.FC = () => {
                 onChange={(e) => {
                   const rate = e.target.value.replace(/[^0-9.]/g, "");
                   const rateNum = Number(rate) || 0;
-                  const calcAmount = ((totals.subTotal * rateNum) / 100).toFixed(2);
-                  update({ rate, amount: rateNum > 0 ? calcAmount : "" });
+                  const calcAmount = ((subTotalRef.current * rateNum) / 100).toFixed(2);
+                  update({ rate, amount: calcAmount });
                 }}
+                onBlur={formatAmountOnBlur((v) => update({ rate: v }))}
                 placeholder="0.000"
                 className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right"
               />
@@ -1431,6 +1405,7 @@ const SalesInvoiceForm: React.FC = () => {
               inputMode="decimal"
               value={row.amount}
               onChange={(e) => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
+              onBlur={formatAmountOnBlur((v) => update({ amount: v }))}
               placeholder="0.00"
               className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right font-semibold"
               style={{ color: isNeg ? "#ef4444" : "var(--color-ink)" }}
@@ -1439,10 +1414,10 @@ const SalesInvoiceForm: React.FC = () => {
         },
       },
     ];
-  }, [totals.subTotal]);
+  }, []);
 
   const sundryEmptyRow: SundryRow = useMemo(() => {
-    return { id: `${Date.now()}-${Math.random()}`, type: "", rate: "", amount: "" };
+    return { id: `${Date.now()}-${Math.random()}`, type: "", rate: "0.00", amount: "0.00" };
   }, []);
 
   // ── Find expanded line index for BusyItemsTable ──

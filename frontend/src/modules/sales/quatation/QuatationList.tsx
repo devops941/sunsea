@@ -880,15 +880,7 @@ const QuotationList: React.FC = () => {
                             {
                                 header: "NET AMOUNT",
                                 render: (item) => {
-                                    // Recompute netAmount: GST must apply on taxable (post-discount) amount
-                                    const subtotal     = Number(item.subtotal     ?? 0);
-                                    const discount     = Number(item.totalDiscount ?? 0);
-                                    const totalTax     = Number(item.totalTax     ?? 0);
-                                    const taxable      = Math.max(0, subtotal - discount);
-                                    const discRatio    = subtotal > 0 ? taxable / subtotal : 1;
-                                    const adjustedTax  = totalTax * discRatio;
-                                    const correctNet   = taxable + adjustedTax;
-                                    return formatCurrency(correctNet > 0 ? correctNet : item.netAmount);
+                                    return formatCurrency(Number(item.netAmount ?? 0));
                                 },
                             },
                             { header: "STATUS",     render: (item) => <StatusBadge status={item.status || "PENDING"} /> },

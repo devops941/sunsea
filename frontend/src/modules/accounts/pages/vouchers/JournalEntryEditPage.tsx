@@ -80,7 +80,7 @@ const JournalEntryEditPage: React.FC = () => {
         id: rowCounter++,
         dc: isDebit ? "D" : "C",
         ledgerId: String(isDebit ? it.debitLedgerId : it.creditLedgerId),
-        amount: String(Number(isDebit ? it.debitAmount : it.creditAmount) || 0),
+        amount: (Number(isDebit ? it.debitAmount : it.creditAmount) || 0).toFixed(2),
         narration: it.narration || "",
       };
     });

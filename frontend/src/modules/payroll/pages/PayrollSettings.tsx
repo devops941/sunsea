@@ -12,6 +12,7 @@ import RadioInput from '../../../components/form/RadioInput/RadioInput';
 import Tabs from '../../../components/ui/tab/Tabs';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollConfig } from '../../../services/payrollService';
+import { formatAmountOnBlur } from '../../../utils/pricingUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const uid = () => `id-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -135,6 +136,7 @@ const SlabConfigurator: React.FC<{
           type="number"
           value={draft.amount !== undefined && draft.amount !== null ? String(draft.amount) : ''}
           onChange={e => setDraft(d => ({ ...d, amount: e.target.value ? Number(e.target.value) : '' as any }))}
+          onBlur={formatAmountOnBlur((v) => setDraft(d => ({ ...d, amount: Number(v) })))}
           bottom
         />
         <div className="flex gap-2 pt-1">
@@ -641,6 +643,7 @@ const PayrollSettings: React.FC = () => {
                   name="otRatePerHour" type="number"
                   value={String(config.otRatePerHour ?? 0)}
                   onChange={e => set({ otRatePerHour: Number(e.target.value) })}
+                  onBlur={formatAmountOnBlur((v) => set({ otRatePerHour: Number(v) }))}
                 />
               </div>
             )}
@@ -662,6 +665,7 @@ const PayrollSettings: React.FC = () => {
                 <TextInput label="Max PF Wage (₹)" name="maxPfWage" type="number"
                   value={String(config.maxPfWage ?? 15000)}
                   onChange={e => set({ maxPfWage: Number(e.target.value) })}
+                  onBlur={formatAmountOnBlur((v) => set({ maxPfWage: Number(v) }))}
                 />
                 <TextInput label="Employee PF %" name="employeePfPercent" type="number"
                   value={String(config.employeePfPercent ?? 12)}
@@ -686,6 +690,7 @@ const PayrollSettings: React.FC = () => {
                 <TextInput label="Max ESI Salary (₹)" name="maxEsiSalary" type="number"
                   value={String(config.maxEsiSalary ?? 21000)}
                   onChange={e => set({ maxEsiSalary: Number(e.target.value) })}
+                  onBlur={formatAmountOnBlur((v) => set({ maxEsiSalary: Number(v) }))}
                 />
                 <TextInput label="Employee ESI %" name="employeeEsiPercent" type="number"
                   value={String(config.employeeEsiPercent ?? 0.75)}
@@ -710,6 +715,7 @@ const PayrollSettings: React.FC = () => {
                 <TextInput label="Professional Tax Amount (₹/month)" name="professionalTaxAmount" type="number"
                   value={String(config.professionalTaxAmount ?? 200)}
                   onChange={e => set({ professionalTaxAmount: Number(e.target.value) })}
+                  onBlur={formatAmountOnBlur((v) => set({ professionalTaxAmount: Number(v) }))}
                 />
               </div>
             )}

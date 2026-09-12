@@ -131,6 +131,10 @@ const ReceiptVoucherAddPage: React.FC = () => {
           next.amount = "";
           next.narration = "";
         }
+        // Auto-set amount to 0.00 when both account and receipt mode are selected
+        if (next.creditLedgerId && next.receiptModeId && !next.amount) {
+          next.amount = "0.00";
+        }
         return next;
       })
     );

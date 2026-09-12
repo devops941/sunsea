@@ -5,6 +5,7 @@ import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import { formatAmountOnBlur } from "../../../utils/pricingUtils";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
@@ -29,7 +30,7 @@ const initialFormState = {
     storeId: "",
     baseUom: "",
     reorderLevel: "",
-    rate: "",
+    rate: "0.00",
     batchNo: "",
     onHandQty: "",
     reservedQty: "",
@@ -195,7 +196,7 @@ const RawMaterialForm: React.FC = () => {
             storeId: data.storeId || data.store?.storeId || "",
             baseUom: data.baseUom || "",
             reorderLevel: data.reorderLevel !== null && data.reorderLevel !== undefined ? String(data.reorderLevel) : "",
-            rate: data.rate !== null && data.rate !== undefined ? String(data.rate) : (data.unitPrice !== null && data.unitPrice !== undefined ? String(data.unitPrice) : ""),
+            rate: data.rate != null ? Number(data.rate).toFixed(2) : (data.unitPrice != null ? Number(data.unitPrice).toFixed(2) : "0.00"),
             batchNo: data.batchNo || "",
             onHandQty: data.onHandQty !== null && data.onHandQty !== undefined ? String(data.onHandQty) : "",
             reservedQty: data.reservedQty !== null && data.reservedQty !== undefined ? String(data.reservedQty) : "",
@@ -519,6 +520,7 @@ const RawMaterialForm: React.FC = () => {
                                 required
                                 error={errors.rate}
                                 onChange={handleChange}
+                                onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "rate", value: v } } as any))}
                             />
                             <SelectInput
                                 label="Status"
