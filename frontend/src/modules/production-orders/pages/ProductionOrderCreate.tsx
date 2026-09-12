@@ -1060,7 +1060,7 @@ const ProductionOrderCreate: React.FC = () => {
             e.preventDefault(); e.stopPropagation();
             if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
             if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
-            else { navigate("/production-orders"); }
+            else { navigate(-1); }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
@@ -1138,7 +1138,19 @@ const ProductionOrderCreate: React.FC = () => {
                 toast.success(data.status === "DRAFT" ? "Production Order saved as draft successfully!" : "Production Order(s) created successfully!");
             }
 
-            navigate("/production-orders");
+            if (isEditMode) {
+                navigate("/production-orders");
+            } else {
+                reset(defaultValues);
+                setRowRmStates({});
+                productionOrderService
+                    .fetchNextId()
+                    .then((orderNo) => setValue("productionOrderId", orderNo))
+                    .catch(() => {});
+                setTimeout(() => {
+                    formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+                }, 100);
+            }
         } catch (error: any) {
             toast.error(
                 error?.response?.data?.message ||
@@ -1471,7 +1483,7 @@ const ProductionOrderCreate: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); navigate("/production-orders"); }}
+            onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
         />
     </>
     );

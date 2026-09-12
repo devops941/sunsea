@@ -145,7 +145,11 @@ const WeeklyMachineScheduleList: React.FC = () => {
                     if (searchTerm && active instanceof HTMLInputElement) setSearchTerm("");
                     active?.blur();
                     tableRef.current?.focus({ preventScroll: true });
+                    return;
                 }
+                if (showDeleteModal) return;
+                e.preventDefault();
+                navigate(-1);
                 return;
             }
             if ((e.key === "/" && !inField) || (isAlt && e.key.toLowerCase() === "s")) {
@@ -166,7 +170,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [searchTerm, currentPage, totalPages]);
+    }, [searchTerm, currentPage, totalPages, showDeleteModal, navigate]);
 
     // ── Export ─────────────────────────────────────────────────────────────────
     const fetchForExport = useCallback(async () => {

@@ -159,6 +159,8 @@ const StockAdjustmentForm: React.FC = () => {
   const handleSubmitRef = useRef<() => void>(() => {});
   const isDirtyRef = useRef(false);
   const saveConfirmOpenRef = useRef(false);
+  // Set when user chose "Save" from the unsaved-changes modal, so the create success path exits instead of clearing.
+  const exitAfterSaveRef = useRef(false);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
 
   const handleFormKeyDown = useFormKeyboardNav(formRef);
@@ -814,7 +816,7 @@ const StockAdjustmentForm: React.FC = () => {
       lastFocusedRef.current = document.activeElement as HTMLElement;
       setSaveConfirmOpen(true);
     } else {
-      navigate("/inventory/stock-adjustments");
+      navigate(-1);
     }
   };
 
@@ -836,7 +838,7 @@ const StockAdjustmentForm: React.FC = () => {
         lastFocusedRef.current = document.activeElement as HTMLElement;
         setSaveConfirmOpen(true);
       } else {
-        navigate("/inventory/stock-adjustments");
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEscape, { capture: true });
@@ -847,6 +849,9 @@ const StockAdjustmentForm: React.FC = () => {
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    // Capture-and-clear so a later validation error / retry doesn't inherit a stale exit intent.
+    const shouldExitAfterSave = exitAfterSaveRef.current;
+    exitAfterSaveRef.current = false;
     setIsSubmitting(true);
     setErrors({});
 
@@ -918,12 +923,40 @@ const StockAdjustmentForm: React.FC = () => {
         if (isEditMode && id) {
           await dispatch(updateStockAdjustment({ id, data: payload })).unwrap();
           toast.success("Material Issue updated successfully");
+          setIsDirty(false);
+          navigate(-1);
         } else {
           await dispatch(createStockAdjustment(payload)).unwrap();
           toast.success("Material Issue saved successfully");
+          setIsDirty(false);
+          if (shouldExitAfterSave) {
+            setSaveConfirmOpen(false);
+            setIsSubmitting(false);
+            navigate(-1);
+            return;
+          }
+          setFormData({
+            adjustmentNumber: "",
+            adjustmentDate: new Date().toISOString().split("T")[0],
+            adjustmentType: "STOCK_INCREASE",
+            reason: "",
+            status: "APPROVED",
+            productionOrderId: "",
+            items: [{ ...emptyAdjustmentRow }],
+          });
+          setPmiItems([]);
+          setSelectedPO(null);
+          setErrors({});
+          dispatch(fetchNextAdjustmentNumber()).then((action: any) => {
+            if (action.payload) {
+              setFormData((prev: any) => ({ ...prev, adjustmentNumber: action.payload }));
+            }
+          });
+          setIsSubmitting(false);
+          setTimeout(() => {
+            formRef.current?.querySelector<HTMLElement>('input[name="adjustmentDate"], [data-nav]:not([disabled])')?.focus();
+          }, 100);
         }
-        setIsDirty(false);
-        navigate("/inventory/stock-adjustments");
       } catch (err: any) {
         toast.error(err || "An error occurred");
         setIsSubmitting(false);
@@ -1003,12 +1036,40 @@ const StockAdjustmentForm: React.FC = () => {
       if (isEditMode && id) {
         await dispatch(updateStockAdjustment({ id, data: finalPayload })).unwrap();
         toast.success("Stock Adjustment updated successfully");
+        setIsDirty(false);
+        navigate(-1);
       } else {
         await dispatch(createStockAdjustment(finalPayload)).unwrap();
         toast.success("Stock Adjustment created successfully");
+        setIsDirty(false);
+        if (shouldExitAfterSave) {
+          setSaveConfirmOpen(false);
+          setIsSubmitting(false);
+          navigate(-1);
+          return;
+        }
+        setFormData({
+          adjustmentNumber: "",
+          adjustmentDate: new Date().toISOString().split("T")[0],
+          adjustmentType: "STOCK_INCREASE",
+          reason: "",
+          status: "APPROVED",
+          productionOrderId: "",
+          items: [{ ...emptyAdjustmentRow }],
+        });
+        setPmiItems([]);
+        setSelectedPO(null);
+        setErrors({});
+        dispatch(fetchNextAdjustmentNumber()).then((action: any) => {
+          if (action.payload) {
+            setFormData((prev: any) => ({ ...prev, adjustmentNumber: action.payload }));
+          }
+        });
+        setIsSubmitting(false);
+        setTimeout(() => {
+          formRef.current?.querySelector<HTMLElement>('input[name="adjustmentDate"], [data-nav]:not([disabled])')?.focus();
+        }, 100);
       }
-      setIsDirty(false);
-      navigate("/inventory/stock-adjustments");
     } catch (err: any) {
       toast.error(err || "An error occurred");
       setIsSubmitting(false);
@@ -1220,6 +1281,7 @@ const StockAdjustmentForm: React.FC = () => {
         show={saveConfirmOpen}
         onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
         onConfirm={() => {
+          exitAfterSaveRef.current = true;
           setSaveConfirmOpen(false);
           setTimeout(() => {
             handleSubmitRef.current();
@@ -1231,7 +1293,7 @@ const StockAdjustmentForm: React.FC = () => {
         cancelText="Discard"
         confirmVariant="primary"
         confirmIcon={FaCheck}
-        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/inventory/stock-adjustments"); }}
+        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
       />
     </div>
   );

@@ -69,16 +69,15 @@ const BankStatementPage: React.FC = () => {
         return;
       }
       if (e.key !== "Escape") return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      // Table view Esc → walk back one page in history.
-      // Filter panel open → close it (returns to table view; next Esc walks back).
+      // Filter panel open Esc → leave the page (one Esc past the modal exits history).
+      // Table view Esc → OPEN the filter panel with current filters pre-loaded.
       if (panelOpenRef.current) {
-        setPanelOpen(false);
-      } else {
         navigate(-1);
+      } else {
+        setPending(applied);
+        setPanelOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);

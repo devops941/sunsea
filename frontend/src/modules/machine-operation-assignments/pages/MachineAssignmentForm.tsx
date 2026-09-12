@@ -297,7 +297,15 @@ export const MachineAssignmentForm: React.FC = () => {
         toast.success("Machine Operation Assignment created successfully!");
       }
       setIsDirty(false);
-      navigate("/machines/assignments");
+      if (isEdit) {
+        navigate(-1);
+      } else {
+        setFormData(initialFormState);
+        setErrors({});
+        setTimeout(() => {
+          formRef.current?.querySelector<HTMLElement>('[data-nav]:not([disabled]), select, input')?.focus();
+        }, 50);
+      }
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || "Failed to save assignment";
       toast.error(msg);
@@ -327,7 +335,7 @@ export const MachineAssignmentForm: React.FC = () => {
         lastFocusedRef.current = document.activeElement as HTMLElement;
         setSaveConfirmOpen(true);
       } else {
-        navigate("/machines/assignments");
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEscape, { capture: true });
@@ -577,7 +585,7 @@ export const MachineAssignmentForm: React.FC = () => {
         cancelText="Discard"
         confirmVariant="primary"
         confirmIcon={FaCheck}
-        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/machines/assignments"); }}
+        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
       />
     </div>
   );

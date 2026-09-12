@@ -275,7 +275,7 @@ const RawMaterialForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/raw-materials");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -344,12 +344,25 @@ const RawMaterialForm: React.FC = () => {
             if (isEditMode && id) {
                 await dispatch(updateRawMaterial({ id, data: payload })).unwrap();
                 toast.success("Raw material updated successfully!");
+                setIsDirty(false);
+                navigate(-1);
             } else {
                 await dispatch(createRawMaterial(payload)).unwrap();
                 toast.success("Raw material created successfully!");
+                setFormData({ ...initialFormState });
+                setErrors({});
+                setOpeningStockUom("");
+                setMinimumStockUom("");
+                setReorderLevelUom("");
+                setIsDirty(false);
+                setIsSubmitting(false);
+                rawMaterialService.fetchNextId()
+                    .then(nextId => {
+                        setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
+                    })
+                    .catch(() => {});
+                setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 50);
             }
-            setIsDirty(false);
-            navigate("/raw-materials");
         } catch (err: any) {
             toast.error(typeof err === 'string' ? err : err?.message || (isEditMode ? "Failed to update raw material" : "Failed to create raw material"));
             setIsSubmitting(false);
@@ -371,7 +384,7 @@ const RawMaterialForm: React.FC = () => {
                     <h2 className="text-xl font-bold text-ink">
                         {isEditMode ? "Edit Raw Material" : "Create Raw Material"}
                     </h2>
-                    <BackButton text="Back to List" to="/raw-materials" />
+                    <BackButton text="Back to List" />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex flex-col flex-1" noValidate>
@@ -548,7 +561,7 @@ const RawMaterialForm: React.FC = () => {
                 cancelText="Discard"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/raw-materials"); }}
+                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
             />
         </div>
     );

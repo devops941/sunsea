@@ -417,7 +417,7 @@ export const SalesReturnCreatePage: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
-    navigate("/sales-returns");
+    navigate(-1);
   }, [navigate]);
 
   const handleSaveFromModal = useCallback(() => {
@@ -762,12 +762,12 @@ export const SalesReturnCreatePage: React.FC = () => {
       if (isEditMode && id) {
         await returnService.updateSalesReturn(id, payload);
         toast.success("Sales Return updated successfully!");
+        navigate(-1);
       } else {
         await returnService.createSalesReturn(payload);
         toast.success("Sales Return confirmed & auto-posted to inventory and accounts!");
+        handleReset();
       }
-
-      navigate("/sales-returns");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to save Sales Return");
     } finally {

@@ -131,7 +131,7 @@ const ExpenseEditPage: React.FC = () => {
         updateDetailCache<Expense>(`expense-${updated.id}`, updated);
       }
       toast.success("Expense updated");
-      navigate("/expenses");
+      navigate(-1);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     } finally {
@@ -228,7 +228,7 @@ const ExpenseEditPage: React.FC = () => {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => navigate("/expenses")}
+                onClick={() => navigate(-1)}
                 className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
               >
                 Quit

@@ -2,7 +2,6 @@ import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -12,9 +11,7 @@ import { z } from "zod";
 import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn, SundryRow } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import TextInput from "../../../components/form/TextInput/TextInput";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DateInput from "../../../components/form/DateInput/DateInput";
-import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useCustomers } from "../../../hooks/useCustomers";
@@ -1002,11 +999,29 @@ const QuotationForm: React.FC = () => {
             markStaleByPrefix("salesOrders:");
 
             if (confirm) {
-                toast.success("Quotation confirmed successfully!");
-                navigate("/quatation-order");
+                if (currentIsEditMode) {
+                    toast.success("Quotation confirmed successfully!");
+                    navigate(-1);
+                } else {
+                    reset(defaultValues);
+                    toast.success("Saved");
+                    setTimeout(() => {
+                        const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+                        first?.focus();
+                    }, 200);
+                }
             } else {
-                toast.success(currentIsEditMode ? "Quotation updated as draft!" : "Quotation saved as draft!");
-                navigate("/quatation-order");
+                if (currentIsEditMode) {
+                    toast.success("Quotation updated as draft!");
+                    navigate(-1);
+                } else {
+                    reset(defaultValues);
+                    toast.success("Saved");
+                    setTimeout(() => {
+                        const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])");
+                        first?.focus();
+                    }, 200);
+                }
             }
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to save quotation");

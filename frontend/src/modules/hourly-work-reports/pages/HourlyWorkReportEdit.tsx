@@ -70,7 +70,7 @@ const HourlyWorkReportEdit: React.FC = () => {
             e.preventDefault(); e.stopPropagation();
             if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
             if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
-            else { navigate("/hourly-work-reports"); }
+            else { navigate(-1); }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
@@ -136,7 +136,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                 setNewHighDetails(dataObj.newHighDetails);
                 setShowNewHighModal(true);
             } else {
-                navigate("/hourly-work-reports");
+                navigate(-1);
             }
         } catch (err: any) {
             toast.error(err || "Failed to update report");
@@ -357,7 +357,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                 show={showNewHighModal}
                 onHide={() => {
                     setShowNewHighModal(false);
-                    navigate("/hourly-work-reports");
+                    navigate(-1);
                 }}
                 title={
                     <div className="flex items-center gap-2 text-indigo-400 font-bold">
@@ -370,7 +370,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                         text="Awesome!"
                         onClick={() => {
                             setShowNewHighModal(false);
-                            navigate("/hourly-work-reports");
+                            navigate(-1);
                         }}
                     />
                 }
@@ -448,7 +448,7 @@ const HourlyWorkReportEdit: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/hourly-work-reports"); }}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
         />
         </>
     );

@@ -185,7 +185,7 @@ const WastageStoreForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/wastage-store");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -246,7 +246,23 @@ const WastageStoreForm: React.FC = () => {
             }
 
             setIsDirty(false);
-            navigate("/wastage-store");
+            if (isEditMode) {
+                navigate(-1);
+            } else {
+                setFormData(initialFormState);
+                setOpeningStockUom("");
+                setErrors({});
+                setIsSubmitting(false);
+                try {
+                    const nextId = await rawMaterialService.fetchNextId();
+                    setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
+                } catch {
+                    // silent — next ID is non-critical
+                }
+                setTimeout(() => {
+                    formRef.current?.querySelector<HTMLElement>('input[name="materialName"]')?.focus();
+                }, 50);
+            }
         } catch (err: any) {
             toast.error(typeof err === 'string' ? err : err?.message || (isEditMode ? "Failed to update wastage product" : "Failed to create wastage product"));
             setIsSubmitting(false);
@@ -397,7 +413,7 @@ const WastageStoreForm: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/wastage-store"); }}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
         />
         </div>
     );

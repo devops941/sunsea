@@ -209,7 +209,7 @@ const UpComingOrderDetailPage: React.FC = () => {
             });
 
             toast.success("Purchase Order updated successfully!");
-            navigate("/purchase-orders");
+            navigate(-1);
         } catch (err: any) {
             toast.error(err?.message || "Failed to update purchase order");
         } finally {

@@ -273,7 +273,7 @@ export const PurchaseReturnCreatePage: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
-    navigate("/purchase-returns");
+    navigate(-1);
   }, [navigate]);
 
   const handleSaveFromModal = useCallback(() => {
@@ -461,11 +461,12 @@ export const PurchaseReturnCreatePage: React.FC = () => {
       if (isEditMode && id) {
         await returnService.updatePurchaseReturn(id, payload);
         toast.success("Purchase Return updated successfully!");
+        navigate(-1);
       } else {
         await returnService.createPurchaseReturn(payload);
-        toast.success("Purchase Return confirmed & posted to inventory and accounts!");
+        toast.success("Saved");
+        handleReset();
       }
-      navigate("/purchase-returns");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to save Purchase Return");
     } finally {

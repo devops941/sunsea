@@ -170,7 +170,7 @@ const SupplierForm: React.FC = () => {
 
     const handleDiscard = useCallback(() => {
         setSaveConfirmOpen(false);
-        navigate("/suppliers");
+        navigate(-1);
     }, [navigate]);
 
     useEffect(() => {
@@ -185,7 +185,7 @@ const SupplierForm: React.FC = () => {
             } else if (isDirtyRef.current) {
                 openDiscardModal();
             } else {
-                navigate("/suppliers");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEsc, { capture: true });
@@ -428,12 +428,16 @@ const SupplierForm: React.FC = () => {
             if (isEdit) {
                 await editSupplier(id, payload);
                 toast.success("Supplier updated successfully!");
+                setIsDirty(false);
+                navigate(-1);
             } else {
                 await addSupplier(payload);
                 toast.success("Supplier created successfully!");
+                handleClear();
+                setTimeout(() => {
+                    formRef.current?.querySelector<HTMLElement>("input:not([disabled]), select:not([disabled])")?.focus();
+                }, 50);
             }
-            setIsDirty(false);
-            navigate("/suppliers");
         } catch (err: any) {
             const apiErrors = err?.errors || err?.response?.data?.errors;
             if (Array.isArray(apiErrors) && apiErrors.length > 0) {

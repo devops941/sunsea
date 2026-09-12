@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Container, Row, Col } from "react-bootstrap";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -42,10 +41,9 @@ const initialFormState = {
 };
 
 const FinishedStockCreate: React.FC = () => {
-    const navigate = useNavigate();
     const [formData, setFormData] = useState(initialFormState);
 
-    useFormShortcuts({});
+    useFormShortcuts({ autoFocusField: "productCode" });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -58,8 +56,11 @@ const FinishedStockCreate: React.FC = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        toast.success("Finished stock created successfully!");
-        navigate("/finished-stock");
+        setFormData(initialFormState);
+        toast.success("Saved");
+        setTimeout(() => {
+            document.querySelector<HTMLInputElement>('input[name="productCode"]')?.focus();
+        }, 0);
     };
 
     return (

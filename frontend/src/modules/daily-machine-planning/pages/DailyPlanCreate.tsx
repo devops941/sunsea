@@ -7,7 +7,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   FaSave, FaArrowLeft, FaInfoCircle, FaExclamationTriangle,
-  FaIndustry, FaCalendarAlt, FaClock, FaBoxes, FaCheckCircle
+  FaClock
 } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -29,7 +29,6 @@ import TextArea from "../../../components/form/TextArea/TextArea";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import CustomButton from "../../../components/ui/Button/Button";
-import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { usePermission } from "../../../hooks/usePermission";
@@ -132,7 +131,7 @@ const DailyPlanCreate: React.FC = () => {
   useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
   useEffect(() => { showDiscardRef.current = showDiscardModal; }, [showDiscardModal]);
 
-  const goBack = useCallback(() => navigate("/daily-machine-planning"), [navigate]);
+  const goBack = useCallback(() => navigate(-1), [navigate]);
 
   const openDiscardModal = useCallback(() => {
     lastFocusedRef.current = document.activeElement as HTMLElement;
@@ -699,13 +698,6 @@ const DailyPlanCreate: React.FC = () => {
       return;
     }
 
-    // The selectedOperators validation is now handled by Zod above
-    if (selectedOperators.length === 0 && assignmentError) {
-      setSubmitError(assignmentError);
-      toast.error(assignmentError);
-      return;
-    }
-
     // Allow overproduction, so we removed the overCapacity block
 
     setFormErrors({});
@@ -749,7 +741,22 @@ const DailyPlanCreate: React.FC = () => {
         }, 1200);
       }
       setIsDirty(false);
-      navigate("/daily-machine-planning");
+      if (isEdit) {
+        navigate(-1);
+      } else {
+        setWeeklyProgramId("");
+        setMachineId("");
+        setShiftId("");
+        setPlannedQty("");
+        setPlannedHours("");
+        setRemarks("");
+        setSelectedOperators([]);
+        setFormErrors({});
+        setSubmitError(null);
+        setTimeout(() => {
+          document.querySelector<HTMLElement>('[data-nav]:not([disabled])')?.focus();
+        }, 50);
+      }
     } catch (err: any) {
       let errMsg = "Failed to save daily plan";
       if (err?.data?.message) {

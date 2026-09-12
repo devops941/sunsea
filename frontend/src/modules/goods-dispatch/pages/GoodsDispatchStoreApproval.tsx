@@ -80,7 +80,7 @@ const GoodsDispatchStoreApproval: React.FC = () => {
         data: { action: "APPROVE", remarks, receivedItems }
       })).unwrap();
       toast.success("Store receipt approved successfully. Stock updated.");
-      navigate(`/production/goods-dispatch/view/${id}`, { replace: true });
+      navigate(-1);
     } catch (err: any) {
       toast.error(err);
     }
@@ -97,7 +97,7 @@ const GoodsDispatchStoreApproval: React.FC = () => {
         data: { action: "REJECT", remarks }
       })).unwrap();
       toast.success("Store receipt rejected");
-      navigate(`/production/goods-dispatch/view/${id}`, { replace: true });
+      navigate(-1);
     } catch (err: any) {
       toast.error(err);
     }

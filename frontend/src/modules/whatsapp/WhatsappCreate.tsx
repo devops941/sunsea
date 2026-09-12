@@ -234,7 +234,7 @@ const WhatsappCreatePage: React.FC = () => {
 
     const handleDiscard = useCallback(() => {
         setSaveConfirmOpen(false);
-        navigate('/dashboard');
+        navigate(-1);
     }, [navigate]);
 
     const handleSaveFromModal = useCallback(() => {
@@ -286,7 +286,7 @@ const WhatsappCreatePage: React.FC = () => {
                 lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
                 setSaveConfirmOpen(true);
             } else {
-                navigate('/dashboard');
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEsc, { capture: true });
