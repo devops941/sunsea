@@ -1082,7 +1082,7 @@ const PurchaseOrderForm: React.FC = () => {
         return (
           <DecimalCell
             value={item.unitPrice || 0}
-            showEmpty={!item.rawMaterialId}
+            showEmpty={!item.productId}
             disabled={isLocked}
             onChange={(v) => handleItemChange(index, "unitPrice", v)}
             placeholder="0.00"
