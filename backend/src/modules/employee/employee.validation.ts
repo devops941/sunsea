@@ -50,22 +50,22 @@ const employeeBodySchema = z.object({
   // BUG-EMP-002 fix: email is now optional on backend
   email: z.string().email("Invalid email format").optional().nullable(),
   personalMobile: z.string().optional().nullable(),
-  personalEmail: z.string().email("Invalid personal email").optional().nullable(),
   emergencyContactName: z.string().optional().nullable(),
   emergencyContactNumber: z.string().optional().nullable(),
+  emergencyContactRelationship: z.string().optional().nullable(),
+  emergencyContactName2: z.string().optional().nullable(),
+  emergencyContactNumber2: z.string().optional().nullable(),
+  emergencyContactRelationship2: z.string().optional().nullable(),
 
   // ── Section 3: Family Details ─────────────────────────────────────────────
   fatherName: z.string().optional().nullable(),
   motherName: z.string().optional().nullable(),
   spouseName: z.string().optional().nullable(),
-  guardianName: z.string().optional().nullable(),
-  guardianRelationship: z.string().optional().nullable(),
 
   // ── Section 4: Identity Documents ────────────────────────────────────────
   aadhaarNumber: z.string().optional().nullable(),
   panNumber: z.string().optional().nullable(),
   drivingLicense: z.string().optional().nullable(),
-  voterId: z.string().optional().nullable(),
 
   // ── Section 5: Address ───────────────────────────────────────────────────
   permanentAddressLine1: z.string().optional().nullable(),

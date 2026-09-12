@@ -334,9 +334,12 @@ export default function EmployeeViewPage() {
           <InfoRow label="Work Mobile" value={employee.mobile} />
           <InfoRow label="Work Email" value={employee.email} />
           <InfoRow label="Personal Mobile" value={employee.personalMobile} />
-          <InfoRow label="Personal Email" value={employee.personalEmail} />
           <InfoRow label="Emergency Contact" value={employee.emergencyContactName} />
           <InfoRow label="Emergency Number" value={employee.emergencyContactNumber} />
+          <InfoRow label="Relationship" value={employee.emergencyContactRelationship} />
+          <InfoRow label="Emergency Contact 2" value={employee.emergencyContactName2} />
+          <InfoRow label="Emergency Number 2" value={employee.emergencyContactNumber2} />
+          <InfoRow label="Relationship 2" value={employee.emergencyContactRelationship2} />
         </FieldGrid>
 
         {/* 3. Family Details */}
@@ -345,8 +348,6 @@ export default function EmployeeViewPage() {
           <InfoRow label="Father's Name" value={employee.fatherName} />
           <InfoRow label="Mother's Name" value={employee.motherName} />
           <InfoRow label="Spouse's Name" value={employee.spouseName} />
-          <InfoRow label="Guardian's Name" value={employee.guardianName} />
-          <InfoRow label="Guardian Relationship" value={employee.guardianRelationship} />
         </FieldGrid>
 
         {/* 4. Identity Documents */}
@@ -355,7 +356,6 @@ export default function EmployeeViewPage() {
           <InfoRow label="Aadhaar Number" value={employee.aadhaarNumber} />
           <InfoRow label="PAN Number" value={employee.panNumber} />
           <InfoRow label="Driving License" value={employee.drivingLicense} />
-          <InfoRow label="Voter ID" value={employee.voterId} />
         </FieldGrid>
 
         {/* 5. Address */}

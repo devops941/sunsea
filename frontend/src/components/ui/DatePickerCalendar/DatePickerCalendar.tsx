@@ -700,6 +700,7 @@ export default function DatePickerCalendar({
             ${disabled ? "bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70" : ""}
           `}
           autoComplete="off"
+          data-nav
         />
         <button
           type="button"

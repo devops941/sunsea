@@ -89,12 +89,11 @@ interface Props {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const SectionHeader: React.FC<{
-  icon: React.ElementType;
+  icon?: React.ElementType;
   title: string;
   color?: string;
-}> = ({ icon: Icon, title, color = 'text-primary' }) => (
-  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-line-soft">
-    <Icon className={`${color} text-base`} />
+}> = ({ title }) => (
+  <div className="flex items-center gap-2 mb-2 pb-1 border-b border-line-soft">
     <h3 className="text-sm font-extrabold text-ink uppercase tracking-wide">{title}</h3>
   </div>
 );
@@ -368,7 +367,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
 
       {/* Config error banner */}
       {configError && (
@@ -382,12 +381,12 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
       <div className="flex flex-col xl:flex-row gap-6">
 
         {/* ───────── LEFT: dynamic salary fields ───────── */}
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-3">
 
           {/* ── Bank & Payment Details ── */}
           <div>
             <SectionHeader icon={FaUniversity} title="Bank & Payment Details" color="text-emerald-600" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-3">
               <SelectInput
                 label="Payment Mode"
                 name="paymentMode"
@@ -453,7 +452,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
           {/* Salary Type selector — always visible */}
           <div>
             <SectionHeader icon={FaMoneyBillWave} title="Salary Structure" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-3">
               <SelectInput
                 label="Salary Type"
                 name="salaryType"
@@ -582,11 +581,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     error={errors.otherAllowance}
                     placeholder="Other allowance"
                   />
-                </>
-              )}
-
-              {/* Cash in Hand — shown for all payment modes */}
-              <TextInput
+                    <TextInput
                 label="Cash in Hand (₹)"
                 name="cashInHand"
                 type="number"
@@ -595,6 +590,11 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                 error={errors.cashInHand}
                 placeholder="Cash in hand amount"
               />
+                </>
+              )}
+
+              {/* Cash in Hand — shown for all payment modes */}
+            
             </div>
 
             {/* Live component balance calculator for Bank Transfer */}
@@ -667,15 +667,16 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
           {/* ── Statutory Section ── */}
           {form.paymentMode === 'BANK' && (
             <div>
-              <SectionHeader icon={FaCheckCircle} title="Statutory Deductions" color="text-violet-500" />
+            
               <div className="flex flex-wrap gap-8">
                 <Toggle label="PF Applicable" value={form.pfApplicable} onChange={onToggle('pfApplicable')} />
                 <Toggle label="ESI Applicable" value={form.esiApplicable} onChange={onToggle('esiApplicable')} />
                 <Toggle label="Professional Tax" value={form.professionalTax} onChange={onToggle('professionalTax')} />
               </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 rounded-xl pt-4">
 
               {form.pfApplicable && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-card-2 rounded-xl border border-line-soft">
+              
                   <TextInput
                     label="UAN Number"
                     name="uanNumber"
@@ -685,11 +686,10 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     error={errors.uanNumber}
                     placeholder="Universal Account Number"
                   />
-                </div>
+               
               )}
-
-              {form.esiApplicable && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-card-2 rounded-xl border border-line-soft">
+               {form.esiApplicable && (
+             
                   <TextInput
                     label="ESIC Number"
                     name="esiNumber"
@@ -699,8 +699,12 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     error={errors.esiNumber}
                     placeholder="ESIC number"
                   />
-                </div>
+             
               )}
+
+               </div>
+
+             
             </div>
           )}
         </div>
