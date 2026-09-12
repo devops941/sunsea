@@ -187,11 +187,6 @@ const ReceiptVoucherEditPage: React.FC = () => {
       prev.map((r) => {
         if (r.id !== id) return r;
         const next = { ...r, [field]: value };
-        if (field === "creditLedgerId" && !value) {
-          next.receiptModeId = "";
-          next.amount = "";
-          next.narration = "";
-        }
         return next;
       })
     );

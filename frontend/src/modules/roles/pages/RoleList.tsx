@@ -5,6 +5,7 @@ import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -229,8 +230,19 @@ const RoleList: React.FC = () => {
         setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
     }, []);
 
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+        proceedRef.current = proceed;
+        resetRef.current = reset;
+        setSaveConfirmOpen(true);
+    });
+
     const handleResume = useCallback(() => {
         setSaveConfirmOpen(false);
+        if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
         setTimeout(() => {
             if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
                 lastFocusedElementRef.current.focus();
@@ -245,6 +257,7 @@ const RoleList: React.FC = () => {
 
     const handleDiscard = useCallback(() => {
         handleForceCloseFormModal();
+        if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
     }, [handleForceCloseFormModal]);
 
     const handleRequestCloseFormModal = useCallback(() => {

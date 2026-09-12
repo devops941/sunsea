@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { Form } from 'react-bootstrap';
 
 import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaCheck } from "react-icons/fa";
@@ -133,6 +134,16 @@ const HourlyWorkReportCreate: React.FC = () => {
     handleSubmitRef.current = () => {
         formRef.current?.requestSubmit();
     };
+
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+      proceedRef.current = proceed;
+      resetRef.current = reset;
+      setSaveConfirmOpen(true);
+    });
 
     const handleFormKeyDown = useFormKeyboardNav(formRef);
 
@@ -1488,7 +1499,11 @@ const HourlyWorkReportCreate: React.FC = () => {
         </div>
         <CommonConfirmModal
             show={saveConfirmOpen}
-            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onHide={() => {
+                setSaveConfirmOpen(false);
+                if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
+                setTimeout(() => lastFocusedRef.current?.focus(), 50);
+            }}
             onConfirm={() => { setSaveConfirmOpen(false); setTimeout(() => handleSubmitRef.current(), 150); }}
             title="Unsaved Changes"
             message="You have unsaved changes. Do you want to save before leaving?"
@@ -1496,7 +1511,12 @@ const HourlyWorkReportCreate: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
+            onCancel={() => {
+                setSaveConfirmOpen(false);
+                setIsDirty(false);
+                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
+                navigate(-1);
+            }}
         />
         <CommonConfirmModal
             show={backConfirmOpen}

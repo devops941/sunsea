@@ -339,6 +339,23 @@ export function useGlobalShortcuts({
         }
       }
 
+      // ── ESC smart back — MUST run before the inField guard so Esc works
+      // even when focus is on an <input>/<textarea>/<select> (e.g. on the
+      // voucher Modify pages where the account cell is auto-focused; the
+      // old ordering swallowed Esc there because inField=true returned first
+      // and Esc handling at the bottom of this handler was never reached).
+      if (key === "Escape") {
+        if (e.defaultPrevented) return;
+        if (document.querySelector("[data-escape-guarded]")) return;
+        const openDialog = document.querySelector<HTMLElement>(
+          "[role='dialog']:not([aria-hidden='true']), [data-radix-popper-content-wrapper]"
+        );
+        if (openDialog) return;
+        flash("Esc");
+        navigate(-1);
+        return;
+      }
+
       // Guard: skip plain/ctrl shortcuts when inside form fields
       if (inField) return;
 
@@ -365,19 +382,7 @@ export function useGlobalShortcuts({
 
       if (e.altKey || e.metaKey) return;
 
-      // ── ESC  smart back ────────────────────────────────────────────────
-      if (key === "Escape") {
-        if (e.defaultPrevented) return;
-        // If a form has registered its own Escape handler, let it take over
-        if (document.querySelector("[data-escape-guarded]")) return;
-        const openDialog = document.querySelector<HTMLElement>(
-          "[role='dialog']:not([aria-hidden='true']), [data-radix-popper-content-wrapper]"
-        );
-        if (openDialog) return;
-        flash("Esc");
-        navigate(-1);
-        return;
-      }
+      // Esc already handled above (before the inField guard).
 
       // ── Plain letter  reports shortcuts (truly no-modifier shortcuts only) ──
       // Must check !s.alt and !s.shift too — otherwise Alt+Shift+T entries

@@ -2,6 +2,7 @@ import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { z } from "zod";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -140,11 +141,13 @@ const DailyPlanCreate: React.FC = () => {
 
   const handleResume = useCallback(() => {
     setShowDiscardModal(false);
+    if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
     setTimeout(() => lastFocusedRef.current?.focus(), 50);
   }, []);
 
   const handleDiscard = useCallback(() => {
     setShowDiscardModal(false);
+    if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
     goBack();
   }, [goBack]);
 
@@ -152,6 +155,16 @@ const DailyPlanCreate: React.FC = () => {
     setShowDiscardModal(false);
     if (!isSubmitting) handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED");
   }, [isSubmitting, isEdit, status]);
+
+  // Ref to remember blocker's proceed()/reset() from the current block-attempt
+  // so the existing discard modal can drive them from its buttons.
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+  useDirtyNavGuard(isDirty, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setShowDiscardModal(true);
+  });
 
   const handleBackClick = useCallback(() => {
     if (isDirtyRef.current) openDiscardModal();
@@ -741,6 +754,7 @@ const DailyPlanCreate: React.FC = () => {
         }, 1200);
       }
       setIsDirty(false);
+      if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
       if (isEdit) {
         navigate(-1);
       } else {

@@ -15,6 +15,7 @@ import { machineOperationAssignmentService } from "../../../services/machineOper
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
 import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
@@ -64,6 +65,16 @@ const MachineForm: React.FC = () => {
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+        proceedRef.current = proceed;
+        resetRef.current = reset;
+        setSaveConfirmOpen(true);
+    });
 
     useFormShortcuts({
         onSave: () => handleSubmit(new Event("submit") as any),
@@ -453,8 +464,16 @@ const MachineForm: React.FC = () => {
             {/* Discard Changes Modal */}
             <CommonConfirmModal
                 isOpen={saveConfirmOpen}
-                onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-                onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
+                onClose={() => {
+                    setSaveConfirmOpen(false);
+                    if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
+                    setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+                }}
+                onCancel={() => {
+                    setSaveConfirmOpen(false);
+                    if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
+                    navigate(-1);
+                }}
                 onConfirm={() => {
                     setSaveConfirmOpen(false);
                     setTimeout(() => {

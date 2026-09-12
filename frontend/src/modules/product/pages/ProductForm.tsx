@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaSave, FaEraser, FaTimes, FaPlus, FaImage, FaCheck } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -488,6 +489,16 @@ const ProductForm: React.FC = () => {
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
 
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+      proceedRef.current = proceed;
+      resetRef.current = reset;
+      setSaveConfirmOpen(true);
+    });
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
@@ -936,7 +947,11 @@ const ProductForm: React.FC = () => {
         </div>
         <CommonConfirmModal
             show={saveConfirmOpen}
-            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+            onHide={() => {
+                if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
+                setSaveConfirmOpen(false);
+                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+            }}
             onConfirm={() => {
                 setSaveConfirmOpen(false);
                 setTimeout(() => {
@@ -950,7 +965,12 @@ const ProductForm: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
+            onCancel={() => {
+                setSaveConfirmOpen(false);
+                setIsDirty(false);
+                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
+                navigate(-1);
+            }}
         />
         </>
     );

@@ -22,6 +22,7 @@ import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import { useDepartments } from "../../../hooks/useDepartments";
 import { useRoles } from "../../../hooks/useRoles";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
 import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
@@ -277,6 +278,16 @@ const EmployeeForm: React.FC = () => {
   const isDirtyRef = useRef(isDirty);
   const saveConfirmOpenRef = useRef(saveConfirmOpen);
   const isOriginallyDraftRef = useRef(false);
+
+  // Ref to remember blocker's proceed()/reset() from the current block-attempt
+  // so the existing discard modal can drive them from its buttons.
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+  useDirtyNavGuard(isDirty, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setSaveConfirmOpen(true);
+  });
 
   useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
@@ -1521,8 +1532,8 @@ const EmployeeForm: React.FC = () => {
       {/* Discard Changes Modal */}
       <CommonConfirmModal
         isOpen={saveConfirmOpen}
-        onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-        onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
+        onClose={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+        onCancel={() => { setSaveConfirmOpen(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } navigate(-1); }}
         onConfirm={
           (!isEdit || isOriginallyDraft)
             ? async () => { setSaveConfirmOpen(false); await handleSaveDraft(); }

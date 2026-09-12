@@ -14,6 +14,7 @@ import { fetchStores } from "../../../features/stores/storeSlice";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { z } from "zod";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -261,6 +262,16 @@ const RawMaterialForm: React.FC = () => {
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+      proceedRef.current = proceed;
+      resetRef.current = reset;
+      setSaveConfirmOpen(true);
+    });
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -547,7 +558,7 @@ const RawMaterialForm: React.FC = () => {
 
             <CommonConfirmModal
                 show={saveConfirmOpen}
-                onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+                onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
                 onConfirm={() => {
                     setSaveConfirmOpen(false);
                     setTimeout(() => {
@@ -561,7 +572,7 @@ const RawMaterialForm: React.FC = () => {
                 cancelText="Discard"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
+                onCancel={() => { setSaveConfirmOpen(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } setIsDirty(false); navigate(-1); }}
             />
         </div>
     );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { FaSave, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -43,6 +44,16 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     const isDirtyRef = useRef(false);
     const saveConfirmOpenRef = useRef(false);
     const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+    // Ref to remember blocker's proceed()/reset() from the current block-attempt
+    // so the existing discard modal can drive them from its buttons.
+    const proceedRef = useRef<(() => void) | null>(null);
+    const resetRef = useRef<(() => void) | null>(null);
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
+        proceedRef.current = proceed;
+        resetRef.current = reset;
+        setSaveConfirmOpen(true);
+    });
 
     // Auto-focus Week Start Date input on mount
     useEffect(() => {
@@ -398,13 +409,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         </div>
         <CommonConfirmModal
             show={saveConfirmOpen}
-            onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
-            onConfirm={() => { setSaveConfirmOpen(false); navigate(-1); }}
+            onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onConfirm={() => { setSaveConfirmOpen(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } navigate(-1); }}
             title="Discard Changes?"
             message="You have unsaved changes. Are you sure you want to leave without saving?"
             confirmText="Discard"
             confirmVariant="danger"
-            onCancel={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
+            onCancel={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
         />
         </>
     );

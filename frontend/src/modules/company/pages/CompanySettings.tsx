@@ -17,6 +17,7 @@ import type { UpdateCompanyDto } from '../../../features/company/types';
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
 const CompanySettings: React.FC = () => {
   const location = useLocation();
@@ -115,6 +116,11 @@ const CompanySettings: React.FC = () => {
 
   const saveConfirmOpenRef = useRef(saveConfirmOpen);
   useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  // Ref to remember blocker's proceed()/reset() from the current block-attempt
+  // so the existing discard modal can drive them from its buttons.
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -223,6 +229,7 @@ const CompanySettings: React.FC = () => {
 
   const handleResume = useCallback(() => {
     setSaveConfirmOpen(false);
+    if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
     setTimeout(() => {
       if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
         lastFocusedElementRef.current.focus();
@@ -237,6 +244,7 @@ const CompanySettings: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
+    if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
     navigate(-1);
   }, [navigate]);
 
@@ -250,6 +258,12 @@ const CompanySettings: React.FC = () => {
       submitForm();
     }, 150);
   }, [validate, submitForm]);
+
+  useDirtyNavGuard(isDirty, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setSaveConfirmOpen(true);
+  });
 
   // Global F2/F9 save shortcut
   useFormShortcuts({

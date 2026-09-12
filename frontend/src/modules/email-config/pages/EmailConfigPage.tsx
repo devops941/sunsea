@@ -12,6 +12,7 @@ import { usePermission } from "../../../hooks/usePermission";
 import { useDetailCache, invalidateDetailCache } from "../../../hooks/useDetailCache";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
 interface EmailConfigForm {
   smtpHost: string;
@@ -209,8 +210,24 @@ const EmailConfigPage: React.FC = () => {
     }
   }, [canEditEmail, validateConfig, configData]);
 
+  // Ref to remember blocker's proceed()/reset() from the current block-attempt
+  // so the existing discard modal can drive them from its buttons.
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+  useDirtyNavGuard(isDirty, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setSaveConfirmOpen(true);
+  });
+
   const handleResume = useCallback(() => {
     setSaveConfirmOpen(false);
+    if (resetRef.current) {
+      const r = resetRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      r();
+    }
     setTimeout(() => {
       if (lastFocusedElementRef.current && typeof lastFocusedElementRef.current.focus === "function") {
         lastFocusedElementRef.current.focus();
@@ -225,6 +242,13 @@ const EmailConfigPage: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
+    if (proceedRef.current) {
+      const p = proceedRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      p();
+      return;
+    }
     navigate(-1);
   }, [navigate]);
 

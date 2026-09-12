@@ -14,6 +14,7 @@ import { shiftService } from "../../../services/shiftService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
 export const MachineAssignmentForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -77,6 +78,16 @@ export const MachineAssignmentForm: React.FC = () => {
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  // Ref to remember blocker's proceed()/reset() from the current block-attempt
+  // so the existing discard modal can drive them from its buttons.
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+  useDirtyNavGuard(isDirty, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setSaveConfirmOpen(true);
+  });
 
   const handleFormKeyDown = useFormKeyboardNav(formRef);
 
@@ -571,7 +582,7 @@ export const MachineAssignmentForm: React.FC = () => {
 
       <CommonConfirmModal
         show={saveConfirmOpen}
-        onHide={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+        onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
         onConfirm={() => {
           setSaveConfirmOpen(false);
           setTimeout(() => {
@@ -585,7 +596,7 @@ export const MachineAssignmentForm: React.FC = () => {
         cancelText="Discard"
         confirmVariant="primary"
         confirmIcon={FaCheck}
-        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
+        onCancel={() => { setSaveConfirmOpen(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } setIsDirty(false); navigate(-1); }}
       />
     </div>
   );
