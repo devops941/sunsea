@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Modal } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -18,6 +19,7 @@ import { userService } from "../../../services/userService";
 const ITEMS_PER_PAGE = 15;
 
 const UserList: React.FC = () => {
+    const navigate = useNavigate();
     const { users, loading, error, loadUsers, changeUserStatus } = useUsers();
     const { can } = usePermission();
     const canEdit = can("users.edit");
@@ -46,6 +48,19 @@ const UserList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (showFormModal || showViewModal) return;
+            if (document.querySelector("[data-select-portal]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            navigate(-1);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [navigate, showFormModal, showViewModal]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

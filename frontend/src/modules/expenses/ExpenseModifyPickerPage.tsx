@@ -107,7 +107,7 @@ const ExpenseModifyPickerPage: React.FC = () => {
         e.preventDefault();
         (document.getElementById("modify-picker-form") as HTMLFormElement | null)?.requestSubmit();
       } else if (e.key === "Escape") {
-        navigate("/expenses");
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);

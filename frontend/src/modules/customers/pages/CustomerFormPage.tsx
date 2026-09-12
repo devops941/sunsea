@@ -12,7 +12,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { customerService } from "../../../services/customerService";
-import IndiaPhoneInput, { validatePhoneNumber, SinglePhoneField } from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { SinglePhoneField } from "../../../components/ui/PhoneInput/PhoneInput";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
@@ -210,7 +210,7 @@ const CustomerFormPage: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
-    navigate("/customers");
+    navigate(-1);
   }, [navigate]);
 
   const handleBack = useCallback(() => {
@@ -246,7 +246,7 @@ const CustomerFormPage: React.FC = () => {
       } else if (isDirtyRef.current) {
         openDiscardModal();
       } else {
-        navigate("/customers");
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEsc, { capture: true });
@@ -355,12 +355,21 @@ const CustomerFormPage: React.FC = () => {
           await editCustomer(id, payload as any);
         }
         toast.success("Customer updated successfully");
+        navigate(-1);
       } else {
         await addCustomer(payload as any);
         toast.success("Customer created successfully");
+        reset(initialFormData);
+        try {
+          const nextCode = await customerService.fetchNextCode();
+          if (nextCode) {
+            setValue("customerId", nextCode, { shouldValidate: true });
+          }
+        } catch {
+          // next-code fetch is non-critical; form remains editable
+        }
+        setTimeout(() => focusFirstField(), 100);
       }
-
-      navigate('/customers');
     } catch (error: any) {
       const msg = typeof error === "string" ? error : error?.message || error?.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} customer`;
       toast.error(msg);

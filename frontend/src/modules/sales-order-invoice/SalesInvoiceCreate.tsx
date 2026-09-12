@@ -8,10 +8,8 @@ import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 
 import TextInput from "../../components/form/TextInput/TextInput";
-import SelectInput from "../../components/form/SelectInput/SelectInput";
 import AutocompleteInput, { type AutocompleteOption } from "../../components/form/AutocompleteInput/AutocompleteInput";
 import CustomButton from "../../components/ui/Button/Button";
-import BackButton from "../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../components/form/OrderItemsTable/BusyItemsTable";
@@ -259,14 +257,14 @@ const SalesInvoiceForm: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
-    navigate("/sales-invoices");
+    navigate(-1);
   }, [navigate]);
 
   const handleBack = useCallback(() => {
     if (isDirty) {
       openDiscardModal();
     } else {
-      navigate("/sales-invoices");
+      navigate(-1);
     }
   }, [isDirty, openDiscardModal, navigate]);
 
@@ -288,7 +286,7 @@ const SalesInvoiceForm: React.FC = () => {
       } else if (isDirtyRef.current) {
         openDiscardModal();
       } else {
-        navigate("/sales-invoices");
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEsc, { capture: true });
@@ -955,11 +953,12 @@ const SalesInvoiceForm: React.FC = () => {
       if (isEditMode && id) {
         await salesInvoiceService.update(id, payload);
         toast.success("Sales invoice updated!");
+        navigate("/sales-invoices");
       } else {
         await salesInvoiceService.create(payload);
         toast.success("Sales invoice created successfully!");
+        handleClear();
       }
-      navigate("/sales-invoices");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save sales invoice");
     } finally {
@@ -984,6 +983,16 @@ const SalesInvoiceForm: React.FC = () => {
     setLines([emptyLine()]);
     setSundryRows([]);
     setChargeRows([]);
+    setDcNo("");
+    setDiscountType("PERCENT");
+    setDiscountValue("");
+    setBillingAddress({ line1: "", city: "", state: "", pincode: "" });
+    setCustomerAddresses([]);
+    setSelectedShippingIdx(0);
+    setAddingNewAddress(false);
+    setCustomerTransports([]);
+    setExcludedComponents({});
+    setExpandedLineId(null);
     setErrors({});
     if (invoiceSettings) {
       const todayStr = new Date().toISOString().split("T")[0];

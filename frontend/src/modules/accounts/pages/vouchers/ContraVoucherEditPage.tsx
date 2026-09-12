@@ -236,7 +236,7 @@ const ContraVoucherEditPage: React.FC = () => {
         updateDetailCache<Voucher>(`voucher-${updated.id}`, updated);
       }
       toast.success("Contra voucher updated");
-      navigate("/accounts/contra-entry");
+      navigate(-1);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     } finally {
@@ -455,7 +455,7 @@ const ContraVoucherEditPage: React.FC = () => {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => navigate("/accounts/contra-entry")}
+                onClick={() => navigate(-1)}
                 className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[13px] transition cursor-pointer"
               >
                 Quit

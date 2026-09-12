@@ -247,7 +247,7 @@ const StorageStoreForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/storage-stores");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -305,12 +305,23 @@ const StorageStoreForm: React.FC = () => {
             if (isEditMode) {
                 await dispatch(updateStore({ id: formData.storeId, data: payload as any })).unwrap();
                 toast.success("Store updated successfully!");
+                setIsDirty(false);
+                navigate(-1);
             } else {
                 await dispatch(createStore(payload as any)).unwrap();
                 toast.success("Store created successfully!");
+                setIsDirty(false);
+                let nextId = "";
+                try {
+                    nextId = await storeService.fetchNextId();
+                } catch {
+                    nextId = `STR${Math.floor(100 + Math.random() * 900)}`;
+                }
+                setFormData({ ...initialFormState, storeId: nextId });
+                setSelectedRoleId("");
+                setErrors({});
+                setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 50);
             }
-            setIsDirty(false);
-            navigate("/storage-stores");
         } catch (err: any) {
             const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to save store";
             toast.error(errorMessage);
@@ -505,7 +516,7 @@ const StorageStoreForm: React.FC = () => {
                 cancelText="Discard"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/storage-stores"); }}
+                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
             />
         </div>
     );

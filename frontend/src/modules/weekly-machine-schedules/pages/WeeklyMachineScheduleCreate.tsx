@@ -72,7 +72,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/weekly-machine-schedules");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -193,7 +193,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 })).unwrap();
             }
             toast.success("Orders successfully allocated to the week!");
-            navigate("/weekly-machine-schedules");
+            setSelectedOrders({});
+            setWeekStartDate("");
+            setWeekEndDate("");
+            setIsDirty(false);
+            setTimeout(() => {
+                datePickerRef.current?.querySelector<HTMLInputElement>("input:not([disabled])")?.focus();
+            }, 100);
         } catch (err: any) {
             let errMsg = "Failed to save schedule.";
             if (typeof err === "string") errMsg = err;
@@ -393,7 +399,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         <CommonConfirmModal
             show={saveConfirmOpen}
             onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
-            onConfirm={() => { setSaveConfirmOpen(false); navigate("/weekly-machine-schedules"); }}
+            onConfirm={() => { setSaveConfirmOpen(false); navigate(-1); }}
             title="Discard Changes?"
             message="You have unsaved changes. Are you sure you want to leave without saving?"
             confirmText="Discard"

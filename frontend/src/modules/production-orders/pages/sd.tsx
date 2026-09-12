@@ -190,8 +190,39 @@ const ProductionOrderCreate: React.FC = () => {
             };
 
             await productionOrderService.create(payload);
-            toast.success("Production Order created successfully");
-            navigate("/production-orders");
+            toast.success("Saved");
+            setFormData({
+                productionOrderId: "",
+                orderDate: new Date().toISOString().split("T")[0],
+                dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split("T")[0],
+                productItemId: "",
+                targetQty: 0,
+                uom: "PCS",
+                priority: "MEDIUM",
+                orderType: "STANDARD",
+                batchNo: "",
+                lotNo: "",
+                sourceSalesOrderId: "",
+                sourceSalesOrderLineId: "",
+                sourceStoreId: "",
+                destinationStoreId: "",
+                billOfMaterialId: "",
+                routingId: "",
+                status: "PLANNED",
+                remarks: ""
+            });
+            setErrors({});
+            setCalculatedBom(null);
+            try {
+                const nextId = await productionOrderService.fetchNextId();
+                if (nextId) setFormData(prev => ({ ...prev, productionOrderId: nextId }));
+            } catch {
+                // ignore
+            }
+            setTimeout(() => {
+                const first = document.querySelector<HTMLInputElement>('input[name="productionOrderId"]');
+                first?.focus();
+            }, 0);
         } catch (err: any) {
             toast.error(err?.response?.data?.message || err?.message || "Failed to create order");
         } finally {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { Container, Row, Col, Card } from "react-bootstrap";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
+import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -74,7 +74,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/weekly-machine-schedules");
+                navigate(-1);
             }
         };
         document.addEventListener("keydown", handleEscape, true);
@@ -130,7 +130,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
             }
         } else {
             toast.error("No schedule context provided for edit.");
-            navigate("/weekly-machine-schedules");
+            navigate(-1);
         }
     }, [dispatch, location.state, navigate]);
 
@@ -306,7 +306,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
             }
 
             toast.success("Weekly assignment updated successfully!");
-            navigate("/weekly-machine-schedules");
+            navigate(-1);
         } catch (err: any) {
             console.error("EDIT SAVE ERROR =>", err);
             toast.error(err?.response?.data?.message || err?.message || "Failed to update weekly assignment");
@@ -432,7 +432,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                                     <CustomButton
                                         text="Cancel"
                                         icon={FaEraser}
-                                        onClick={() => navigate("/weekly-machine-schedules")}
+                                        onClick={() => navigate(-1)}
                                         disabled={isSubmitting}
                                     />
                                     {can("weekly_programs.edit") && (
@@ -453,7 +453,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
         <CommonConfirmModal
             show={saveConfirmOpen}
             onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
-            onConfirm={() => { setSaveConfirmOpen(false); navigate("/weekly-machine-schedules"); }}
+            onConfirm={() => { setSaveConfirmOpen(false); navigate(-1); }}
             title="Discard Changes?"
             message="You have unsaved changes. Are you sure you want to leave without saving?"
             confirmText="Discard"

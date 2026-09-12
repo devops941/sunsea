@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Container, Row, Col } from "react-bootstrap";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
+import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -70,7 +70,7 @@ const WastageStockEdit: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         toast.success("Wastage Stock updated successfully!");
-        navigate("/wastage-stock");
+        navigate(-1);
     };
 
     return (

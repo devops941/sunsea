@@ -501,7 +501,7 @@ const ProductForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/products");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -584,12 +584,21 @@ const ProductForm: React.FC = () => {
             if (isEditMode && id) {
                 await editProduct(id, payload as any);
                 toast.success("Product updated successfully!");
+                setIsDirty(false);
+                navigate(-1);
             } else {
                 await addProduct(payload as any);
-                toast.success("Product created successfully!");
+                toast.success("Saved");
+                setIsDirty(false);
+                handleClear();
+                try {
+                    const nextCode = await productService.fetchNextId();
+                    setFormData(prev => ({ ...prev, productCode: nextCode }));
+                } catch (err) {
+                    console.error("Failed to fetch next product code", err);
+                }
+                setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 50);
             }
-            setIsDirty(false);
-            navigate("/products");
         } catch (err: any) {
             toast.error(err.message || (isEditMode ? "Failed to update product" : "Failed to create product"));
         } finally {
@@ -941,7 +950,7 @@ const ProductForm: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/products"); }}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
         />
         </>
     );

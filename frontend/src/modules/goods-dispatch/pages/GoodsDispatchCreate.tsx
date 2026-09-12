@@ -85,7 +85,7 @@ const GoodsDispatchCreate: React.FC = () => {
         lastFocusedRef.current = document.activeElement as HTMLElement;
         setSaveConfirmOpen(true);
       } else {
-        navigate("/production/goods-dispatch");
+        navigate(-1);
       }
     };
     document.addEventListener("keydown", handleEscape, true);
@@ -226,7 +226,24 @@ const GoodsDispatchCreate: React.FC = () => {
 
       await dispatch(createGoodsDispatch(payload)).unwrap();
       toast.success("Goods Dispatch created successfully");
-      navigate("/production/goods-dispatch");
+      setFormData({
+        dispatchDate: new Date().toISOString().split("T")[0],
+        vehicleNumber: "",
+        driverName: "",
+        driverMobile: "",
+        transportName: "",
+        loadingTime: "",
+        remarks: "",
+        destinationStoreId: "",
+      });
+      setSelectedPOs([]);
+      setFormErrors({ vehicleNumber: "", driverName: "", driverMobile: "", destinationStoreId: "" });
+      setIsDirty(false);
+      dispatch(fetchEligibleOrders({}));
+      setTimeout(() => {
+        const firstInput = formRef.current?.querySelector<HTMLElement>('input:not([disabled]), [tabindex="0"]');
+        firstInput?.focus();
+      }, 50);
     } catch (error: any) {
       toast.error(error || "Failed to create goods dispatch");
     }
@@ -394,7 +411,7 @@ const GoodsDispatchCreate: React.FC = () => {
     <CommonConfirmModal
       show={saveConfirmOpen}
       onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
-      onConfirm={() => { setSaveConfirmOpen(false); navigate("/production/goods-dispatch"); }}
+      onConfirm={() => { setSaveConfirmOpen(false); navigate(-1); }}
       title="Discard Changes?"
       message="You have unsaved changes. Are you sure you want to leave without saving?"
       confirmText="Discard"

@@ -217,16 +217,15 @@ const BalanceSheetPage: React.FC = () => {
         return;
       }
       if (e.key !== "Escape") return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      // Table view Esc → walk back one page in history.
-      // Options dialog open → close it (returns to table view; next Esc walks back).
+      // Options dialog open → Esc leaves the page (walk history back).
+      // Table view Esc → re-open the options dialog with current filters pre-loaded
+      // (draft state is synced from committed state in the dialog-open effect).
       if (showOptionsDialogRef.current) {
-        setShowOptionsDialog(false);
-      } else {
         navigate(-1);
+      } else {
+        setShowOptionsDialog(true);
       }
     };
     window.addEventListener("keydown", onKey);

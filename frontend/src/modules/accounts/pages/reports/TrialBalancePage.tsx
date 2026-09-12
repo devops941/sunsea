@@ -275,19 +275,18 @@ const TrialBalancePage: React.FC = () => {
         return;
       }
       if (e.key !== "Escape") return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       // Mode dialog owns its own Esc handler (registered inside that
       // effect) so we don't touch it here — it navigates away.
       if (showModeDialogRef.current) return;
       e.preventDefault();
       e.stopPropagation();
-      // Options dialog open → close it (returns to table view; next Esc walks back).
-      // Table view Esc → walk back one page in history.
+      // Options dialog open → leave the page (one Esc past the modal
+      // exits to previous history entry).
+      // Table view Esc → OPEN filter modal so operator can adjust.
       if (showOptionsDialogRef.current) {
-        setShowOptionsDialog(false);
-      } else {
         navigate(-1);
+      } else {
+        setShowOptionsDialog(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -646,6 +645,7 @@ const TrialBalancePage: React.FC = () => {
                             }, 0);
                           } else if (e.key === "Escape") {
                             e.preventDefault();
+                            e.stopPropagation();
                             setGroupPickerOpen(false);
                             (e.target as HTMLInputElement).blur();
                           }

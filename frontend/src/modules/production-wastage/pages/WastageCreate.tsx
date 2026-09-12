@@ -69,8 +69,8 @@ const WastageForm: React.FC = () => {
   const { data: rawMaterials } = useAppSelector((state) => state.rawMaterials);
   const { activeData: activeUOMs = [] } = useAppSelector((state: any) => state.uoms || {});
 
-  // Form local state
-  const [formData, setFormData] = useState({
+  // Initial form state — extracted so create-mode save can reset back to it.
+  const initialFormState = {
     wastageDate: new Date().toISOString().split("T")[0],
     productionOrderId: "",
     hourlyProductionId: null as number | null,
@@ -89,7 +89,8 @@ const WastageForm: React.FC = () => {
     isRecyclable: false,
     sentForRework: false,
     categoryId: "" as string | number,
-  });
+  };
+  const [formData, setFormData] = useState(initialFormState);
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -118,7 +119,7 @@ const WastageForm: React.FC = () => {
       e.preventDefault(); e.stopPropagation();
       if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
       if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
-      else { navigate("/production-wastages"); }
+      else { navigate(-1); }
     };
     window.addEventListener("keydown", handleEscape, { capture: true });
     return () => window.removeEventListener("keydown", handleEscape, { capture: true });
@@ -243,7 +244,15 @@ const WastageForm: React.FC = () => {
         await dispatch(createProductionWastage(payload)).unwrap();
         toast.success("Production wastage log logged successfully");
       }
-      navigate("/production-wastages");
+      if (isEdit) {
+        navigate(-1);
+      } else {
+        setFormData(initialFormState);
+        setErrors({});
+        setTimeout(() => {
+          formRef.current?.querySelector<HTMLElement>('input, select, [data-nav]:not([disabled])')?.focus();
+        }, 50);
+      }
     } catch (err: any) {
       toast.error(err || "Failed to save wastage record");
     } finally {
@@ -548,7 +557,7 @@ const WastageForm: React.FC = () => {
       cancelText="Discard"
       confirmVariant="primary"
       confirmIcon={FaCheck}
-      onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/production-wastages"); }}
+      onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
     />
     </>
   );

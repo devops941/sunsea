@@ -210,7 +210,12 @@ const CategoryForm: React.FC = () => {
         lastFocusedRef.current = document.activeElement as HTMLElement;
         setSaveConfirmOpen(true);
       } else {
-        navigate("/categories");
+        // Walk back to whichever page opened this form (Dashboard when the
+        // operator hit the sidebar's "Add Category" link directly; the List
+        // page when they clicked Edit on a row). Hardcoding "/categories"
+        // forced everyone onto the list — which is wrong for the sidebar-
+        // menu case and produced an Esc loop.
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEscape, { capture: true });
@@ -250,7 +255,23 @@ const CategoryForm: React.FC = () => {
         toast.success("Category created successfully!");
       }
       setIsDirty(false);
-      navigate("/categories");
+      // Add mode: reset the form and stay on this page so the operator can
+      // punch in the next category without leaving. Edit mode goes back to
+      // where they came from (usually the list they clicked Edit from).
+      // Previously both modes navigated to /categories, which pushed an
+      // extra history entry and broke Esc-back to Dashboard from the
+      // sidebar's "Add Category" link.
+      if (isEditMode) {
+        navigate(-1);
+      } else {
+        setFormData(initialFormState);
+        setErrors({});
+        // Refocus the first field (Type dropdown drives auto-code) so the
+        // next entry starts without a click.
+        setTimeout(() => {
+          formRef.current?.querySelector<HTMLElement>("select[name='type'], input[name='name']")?.focus();
+        }, 0);
+      }
     } catch (err: any) {
       toast.error(err || "Failed to save category");
     } finally {
@@ -381,7 +402,7 @@ const CategoryForm: React.FC = () => {
         cancelText="Discard"
         confirmVariant="primary"
         confirmIcon={FaCheck}
-        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/categories"); }}
+        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
       />
     </div>
   );

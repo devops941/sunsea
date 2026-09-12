@@ -183,7 +183,7 @@ const SalesProductForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/sales-products");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -218,7 +218,14 @@ const SalesProductForm: React.FC = () => {
                 toast.success("Sales Product created successfully!");
             }
             setIsDirty(false);
-            navigate("/sales-products");
+            if (isEditMode) {
+                navigate(-1);
+            } else {
+                handleClear();
+                setTimeout(() => {
+                    formRef.current?.querySelector<HTMLInputElement>("input[name='salesProductName']")?.focus();
+                }, 50);
+            }
         } catch (err: any) {
             toast.error(err?.response?.data?.message || (isEditMode ? "Failed to update Sales Product" : "Failed to create Sales Product"));
         } finally {
@@ -408,7 +415,7 @@ const SalesProductForm: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/sales-products"); }}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
         />
         </>
     );

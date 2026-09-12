@@ -496,14 +496,13 @@ export const LedgerStatementPage: React.FC = () => {
     if (!showOptionsDialog) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      // Ignore Esc typed inside a text input's search dropdown, etc.
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
-        // Let child components handle Esc first (clear their own state).
-        // If focus is still on that element next tick, we do nothing —
-        // caller's onKeyDown already handled it.
-        return;
-      }
+      // If a search/select dropdown portal is currently OPEN, let it own
+      // the Esc (dropdown closes first). Once it's closed, subsequent Esc
+      // presses fall through to us even if focus is still on the input —
+      // that's the fix for the trap where the Account combobox auto-opens,
+      // Esc closes it, but the operator then can't leave the modal because
+      // the old handler kept early-returning on any INPUT focus.
+      if (document.querySelector('[data-select-portal]')) return;
       // Selected → config → Esc → back to Selected panel.
       if (viewMode === "selected" && selectedStep === "config") {
         e.preventDefault();

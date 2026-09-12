@@ -297,15 +297,15 @@ const AmountReceivablePage: React.FC = () => {
       // Was previously returning early for ANY form-input focus, which meant
       // the Options modal's auto-focused Report Date input swallowed Esc and
       // the operator couldn't close the modal or walk back. Now:
-      //   - From table view   → navigate back (browser -1)
-      //   - From options view → close modal → table view (one more Esc walks back)
+      //   - From table view   → open Options modal (current filters pre-loaded)
+      //   - From options view → navigate back (browser -1)
       // Both handled regardless of which form control has focus.
       e.preventDefault();
       e.stopPropagation();
       if (showOptionsDialogRef.current) {
-        setShowOptionsDialog(false);
-      } else {
         navigate(-1);
+      } else {
+        setShowOptionsDialog(true);
       }
     };
     window.addEventListener("keydown", onKey);

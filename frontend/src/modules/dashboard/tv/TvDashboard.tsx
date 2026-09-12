@@ -115,7 +115,7 @@ const TvDashboard: React.FC = () => {
           else document.documentElement.requestFullscreen?.().catch(() => {});
           break;
         case "Escape":
-          if (!document.fullscreenElement) navigate("/dashboard");
+          if (!document.fullscreenElement) navigate(-1);
           break;
         default:
           break;

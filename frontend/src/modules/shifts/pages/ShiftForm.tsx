@@ -122,13 +122,21 @@ const ShiftForm: React.FC = () => {
             if (isEdit) {
                 await dispatch(updateShift({ id: formData.id, data: payload })).unwrap();
                 toast.success("Shift updated successfully!");
+                invalidateCacheByPrefix("shifts:");
+                setIsDirty(false);
+                navigate(-1);
             } else {
                 await dispatch(createShift(payload)).unwrap();
                 toast.success("Shift created successfully!");
+                invalidateCacheByPrefix("shifts:");
+                setIsDirty(false);
+                setFormData(initialFormState);
+                setErrors({});
+                shiftService.fetchNextId()
+                    .then((nextId) => { if (nextId) setFormData(prev => ({ ...prev, shiftCode: nextId })); })
+                    .catch(() => {});
+                setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 50);
             }
-            invalidateCacheByPrefix("shifts:");
-            setIsDirty(false);
-            navigate("/shifts");
         } catch (err: any) {
             toast.error(err || `Failed to ${isEdit ? "update" : "create"} shift`);
         } finally {
@@ -157,7 +165,7 @@ const ShiftForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/shifts");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
@@ -303,7 +311,7 @@ const ShiftForm: React.FC = () => {
                 cancelText="Discard"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/shifts"); }}
+                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
             />
         </div>
     );

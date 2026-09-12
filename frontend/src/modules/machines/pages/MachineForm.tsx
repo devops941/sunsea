@@ -223,7 +223,18 @@ const MachineForm: React.FC = () => {
             }
             invalidateCacheByPrefix("machines:");
             setIsDirty(false);
-            navigate("/machines");
+            if (isEdit) {
+                navigate("/machines");
+            } else {
+                setFormData(initialFormState);
+                setErrors({});
+                setInchargeRoleId("");
+                setEmployees([]);
+                machineService.fetchNextId()
+                    .then((nextId) => setFormData(prev => ({ ...prev, machineId: nextId })))
+                    .catch(() => { });
+                setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 50);
+            }
         } catch (err: any) {
             toast.error(err || `Failed to ${isEdit ? "update" : "create"} machine`);
         } finally {
@@ -246,7 +257,7 @@ const MachineForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement | null;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/machines");
+                navigate(-1);
             }
         };
         window.addEventListener("keydown", handleEsc, { capture: true });
@@ -443,7 +454,7 @@ const MachineForm: React.FC = () => {
             <CommonConfirmModal
                 isOpen={saveConfirmOpen}
                 onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-                onCancel={() => { setSaveConfirmOpen(false); navigate("/machines"); }}
+                onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
                 onConfirm={() => {
                     setSaveConfirmOpen(false);
                     setTimeout(() => {

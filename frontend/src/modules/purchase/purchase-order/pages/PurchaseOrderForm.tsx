@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { FaSave, FaPaperPlane, FaCheck } from "react-icons/fa";
+import { FaCheck } from "react-icons/fa";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import BusyItemsTable from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 import AutocompleteInput from "../../../../components/form/AutocompleteInput/AutocompleteInput";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import CustomButton from "../../../../components/ui/Button/Button";
@@ -128,7 +128,6 @@ const PurchaseOrderForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const location = useLocation();
   const dispatch = useAppDispatch();
 
   const { addPurchaseOrder, editPurchaseOrder } = usePurchaseOrders();
@@ -198,7 +197,7 @@ const PurchaseOrderForm: React.FC = () => {
         lastFocusedRef.current = document.activeElement as HTMLElement;
         setSaveConfirmOpen(true);
       } else {
-        navigate("/purchase-orders");
+        navigate(-1);
       }
     };
     document.addEventListener("keydown", handleEscape, true);
@@ -924,7 +923,23 @@ const PurchaseOrderForm: React.FC = () => {
         );
       }
       setIsDirty(false);
-      navigate("/purchase-orders");
+      if (isEdit) {
+        navigate("/purchase-orders");
+      } else {
+        setFormData({
+          ...initialFormData,
+          createdByOn: formData.createdByOn,
+          billingAddressLine1: company?.addressLine1 || "",
+          billingCity: company?.city || "",
+          billingState: company?.state || "",
+          billingPincode: company?.zipcode || "",
+          billingCountry: company?.country || "India",
+        });
+        setErrors({});
+        setShippingResetKey((k) => k + 1);
+        await fetchNextCode();
+        setTimeout(() => focusFirstField(), 100);
+      }
     } catch (error: any) {
       toast.error(error?.message || `Failed to ${isEdit ? "update" : "create"} purchase order`);
     } finally {
@@ -1200,7 +1215,7 @@ const PurchaseOrderForm: React.FC = () => {
         show={saveConfirmOpen}
         onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
         onConfirm={() => { setSaveConfirmOpen(false); handleSaveRef.current(); }}
-        onCancel={() => { setSaveConfirmOpen(false); navigate("/purchase-orders"); }}
+        onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
         title="Discard Changes?"
         message="Are you sure you want to leave? Any unsaved purchase order details will be lost."
         warningText="Save to keep your changes, or Discard to leave."

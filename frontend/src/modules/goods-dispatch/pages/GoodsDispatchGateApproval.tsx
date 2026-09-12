@@ -60,7 +60,7 @@ const GoodsDispatchGateApproval: React.FC = () => {
     try {
       await dispatch(gateApproveDispatch({ id: dispatchData.id, data: { action: "APPROVE", remarks } })).unwrap();
       toast.success("Gate approval approved successfully");
-      navigate(`/production/goods-dispatch/view/${id}`, { replace: true });
+      navigate(-1);
     } catch (err: any) {
       toast.error(err);
     }
@@ -74,7 +74,7 @@ const GoodsDispatchGateApproval: React.FC = () => {
     try {
       await dispatch(gateApproveDispatch({ id: dispatchData.id, data: { action: "REJECT", remarks } })).unwrap();
       toast.success("Gate approval rejected");
-      navigate(`/production/goods-dispatch/view/${id}`, { replace: true });
+      navigate(-1);
     } catch (err: any) {
       toast.error(err);
     }

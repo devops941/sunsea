@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { Container, Row, Col } from "react-bootstrap";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -46,10 +45,9 @@ const initialFormState = {
 };
 
 const WastageStockCreate: React.FC = () => {
-    const navigate = useNavigate();
     const [formData, setFormData] = useState(initialFormState);
 
-    useFormShortcuts({});
+    useFormShortcuts({ autoFocusField: "wastageCode" });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -63,7 +61,12 @@ const WastageStockCreate: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         toast.success("Wastage Stock record created successfully!");
-        navigate("/wastage-stock");
+        setFormData(initialFormState);
+        // Return caret to first field so the next entry can start immediately
+        setTimeout(() => {
+            const el = document.querySelector<HTMLElement>('[data-nav], input[name="wastageCode"]');
+            el?.focus();
+        }, 0);
     };
 
     return (

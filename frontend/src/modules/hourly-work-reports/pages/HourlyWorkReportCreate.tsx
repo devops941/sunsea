@@ -3,7 +3,7 @@ import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { Form } from 'react-bootstrap';
 
-import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaPlus, FaCheck } from "react-icons/fa";
+import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaCheck } from "react-icons/fa";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -696,7 +696,13 @@ const HourlyWorkReportCreate: React.FC = () => {
                 setNewHighDetails(dataObj.newHighDetails);
                 setShowNewHighModal(true);
             } else {
-                navigate("/daily-machine-planning");
+                handleClear();
+                setIsDirty(false);
+                await fetchExistingLogs();
+                setTimeout(() => {
+                    const first = formRef.current?.querySelector<HTMLElement>('select:not([disabled]), input:not([disabled]):not([type="hidden"])');
+                    first?.focus();
+                }, 50);
             }
         } catch (err: any) {
             toast.error(err || "Failed to log hourly production");
@@ -1385,7 +1391,13 @@ const HourlyWorkReportCreate: React.FC = () => {
                 show={showNewHighModal}
                 onHide={() => {
                     setShowNewHighModal(false);
-                    navigate("/daily-machine-planning");
+                    handleClear();
+                    setIsDirty(false);
+                    fetchExistingLogs();
+                    setTimeout(() => {
+                        const first = formRef.current?.querySelector<HTMLElement>('select:not([disabled]), input:not([disabled]):not([type="hidden"])');
+                        first?.focus();
+                    }, 50);
                 }}
                 title={
                     <div className="flex items-center gap-2 text-indigo-400 font-bold">
@@ -1398,7 +1410,13 @@ const HourlyWorkReportCreate: React.FC = () => {
                         text="Awesome!"
                         onClick={() => {
                             setShowNewHighModal(false);
-                            navigate("/daily-machine-planning");
+                            handleClear();
+                            setIsDirty(false);
+                            fetchExistingLogs();
+                            setTimeout(() => {
+                                const first = formRef.current?.querySelector<HTMLElement>('select:not([disabled]), input:not([disabled]):not([type="hidden"])');
+                                first?.focus();
+                            }, 50);
                         }}
                     />
                 }
@@ -1478,7 +1496,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate("/hourly-work-reports"); }}
+            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); navigate(-1); }}
         />
         <CommonConfirmModal
             show={backConfirmOpen}
@@ -1493,7 +1511,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setBackConfirmOpen(false); setIsDirty(false); navigate("/daily-machine-planning"); }}
+            onCancel={() => { setBackConfirmOpen(false); setIsDirty(false); navigate(-1); }}
         />
         </>
     );

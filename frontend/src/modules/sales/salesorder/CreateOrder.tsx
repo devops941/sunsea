@@ -3,8 +3,6 @@ import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { FaCheck } from "react-icons/fa";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BusyItemsTable from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -19,7 +17,6 @@ import type { AutocompleteOption } from "../../../components/form/AutocompleteIn
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import TextArea from "../../../components/form/TextArea/TextArea";
-import DateInput from "../../../components/form/DateInput/DateInput";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { useEmployees } from "../../../hooks/useEmployees";
@@ -425,7 +422,7 @@ const SalesOrderForm: React.FC = () => {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate("/sales-order");
+                navigate(-1);
             }
         };
         document.addEventListener("keydown", handleEscape, true);
@@ -816,12 +813,23 @@ const SalesOrderForm: React.FC = () => {
             if (targetId) {
                 await salesOrderService.update(targetId, payload);
                 toast.success("Sales Order updated successfully!");
+                navigate(-1);
             } else {
                 await salesOrderService.create(payload);
                 toast.success(payload.status === "DRAFT" ? "Sales Order Draft created successfully!" : "Sales Order created successfully!");
+                reset(defaultValues);
+                setExpandedItemIndex(null);
+                try {
+                    const nextCode = await salesOrderService.getNextOrderNo();
+                    if (nextCode) setValue("orderNo", nextCode);
+                } catch {
+                    // next order number fetch failed
+                }
+                setTimeout(() => {
+                    const firstInput = formRef.current?.querySelector<HTMLElement>('input:not([disabled]), [tabindex="0"]');
+                    firstInput?.focus();
+                }, 50);
             }
-
-            navigate(-1);
         } catch (error: any) {
             const backendMsg = error?.response?.data?.message
                 || (Array.isArray(error?.response?.data?.errors) ? error.response.data.errors.map((e: any) => e.message).join(", ") : null)
@@ -986,7 +994,7 @@ const SalesOrderForm: React.FC = () => {
             show={saveConfirmOpen}
             onHide={() => { setSaveConfirmOpen(false); setTimeout(() => lastFocusedRef.current?.focus(), 50); }}
             onConfirm={() => { setSaveConfirmOpen(false); handleSaveRef.current(); }}
-            onCancel={() => { setSaveConfirmOpen(false); navigate("/sales-order"); }}
+            onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
             title="Discard Changes?"
             message="Are you sure you want to leave? Any unsaved order details will be lost."
             warningText="Save to keep your changes, or Discard to leave."

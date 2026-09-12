@@ -5,9 +5,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import {
-  FaUser, FaPhone, FaUsers, FaIdCard, FaMapMarkerAlt,
-  FaBriefcase, FaCalendarAlt, FaClock, FaMoneyBillWave, FaKey,
-  FaClipboardList, FaSave, FaChevronLeft, FaChevronRight, FaCamera,
+  FaUser, FaUsers, FaMapMarkerAlt,
+  FaBriefcase, FaMoneyBillWave,
+  FaSave, FaChevronLeft, FaChevronRight, FaCamera,
   FaRandom, FaEye, FaEyeSlash, FaCheck, FaTimes, FaSpinner, FaRegSave,
 } from "react-icons/fa";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -789,7 +789,21 @@ const EmployeeForm: React.FC = () => {
         toast.success("Employee created successfully!");
       }
       setIsDirty(false);
-      navigate("/employees");
+      if (isEdit) {
+        navigate(-1);
+      } else {
+        setForm(INITIAL_STATE);
+        setErrors({});
+        setActiveTab(0);
+        setTimeout(() => {
+          const first = tabContentRef.current?.querySelector<HTMLElement>(
+            "[data-nav-default]:not([disabled]):not([tabindex='-1'])"
+          ) ?? tabContentRef.current?.querySelector<HTMLElement>(
+            "[data-nav]:not([disabled]):not([tabindex='-1'])"
+          );
+          first?.focus();
+        }, 80);
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || `Failed to ${isEdit ? "update" : "create"} employee`);
     } finally {
@@ -901,7 +915,21 @@ const EmployeeForm: React.FC = () => {
         toast.success("Draft saved successfully!");
       }
       setIsDirty(false);
-      navigate("/employees");
+      if (isEdit) {
+        navigate(-1);
+      } else {
+        setForm(INITIAL_STATE);
+        setErrors({});
+        setActiveTab(0);
+        setTimeout(() => {
+          const first = tabContentRef.current?.querySelector<HTMLElement>(
+            "[data-nav-default]:not([disabled]):not([tabindex='-1'])"
+          ) ?? tabContentRef.current?.querySelector<HTMLElement>(
+            "[data-nav]:not([disabled]):not([tabindex='-1'])"
+          );
+          first?.focus();
+        }, 80);
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to save draft");
     } finally {
@@ -933,7 +961,7 @@ const EmployeeForm: React.FC = () => {
         lastFocusedRef.current = document.activeElement as HTMLElement | null;
         setSaveConfirmOpen(true);
       } else {
-        navigate("/employees");
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEsc, { capture: true });
@@ -1004,7 +1032,6 @@ const EmployeeForm: React.FC = () => {
       if (isEdit && id) {
         try {
           setIsLoading(true);
-          const emp = await employeeService.fetchById(id);
           // Re-trigger the existing load effect by resetting loading state
           setForm(INITIAL_STATE); // brief reset
           employeeService.fetchById(id).then((fresh: any) => {
@@ -1495,7 +1522,7 @@ const EmployeeForm: React.FC = () => {
       <CommonConfirmModal
         isOpen={saveConfirmOpen}
         onClose={() => { setSaveConfirmOpen(false); setTimeout(() => { lastFocusedRef.current?.focus() ?? tabContentRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-        onCancel={() => { setSaveConfirmOpen(false); navigate("/employees"); }}
+        onCancel={() => { setSaveConfirmOpen(false); navigate(-1); }}
         onConfirm={
           (!isEdit || isOriginallyDraft)
             ? async () => { setSaveConfirmOpen(false); await handleSaveDraft(); }

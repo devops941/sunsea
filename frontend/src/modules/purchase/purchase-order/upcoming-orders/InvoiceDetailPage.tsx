@@ -929,11 +929,17 @@ const InvoiceDetailPage: React.FC = () => {
             if (isEditMode && id) {
                 await grnInvoiceService.update(id, payload);
                 toast.success("GRN / Invoice updated successfully!");
+                navigate(-1);
             } else {
                 await grnInvoiceService.create(payload);
+                handleF8();
+                await grnInvoiceService.fetchNextCode()
+                    .then((code) => {
+                        if (code) setForm((prev) => ({ ...prev, grnNumber: code }));
+                    })
+                    .catch(() => {});
                 toast.success("GRN / Invoice created successfully!");
             }
-            navigate("/invoice");
         } catch (error: any) {
             const errorMsg = error.response?.data?.message || "Failed to create GRN / Invoice";
             toast.error(errorMsg);
@@ -1446,7 +1452,7 @@ const InvoiceDetailPage: React.FC = () => {
                         {!isEditMode && (
                             <CustomButton text="Clear Form" type="button" variant="secondary" icon={FaUndo} onClick={handleF8} />
                         )}
-                        <CustomButton text="Cancel" type="button" variant="secondary" onClick={() => navigate("/invoice")} />
+                        <CustomButton text="Cancel" type="button" variant="secondary" onClick={() => navigate(-1)} />
                         <CustomButton text={saving ? "Saving..." : (isEditMode ? "Update Invoice" : "Confirm Invoice")} icon={FaSave} type="submit" disabled={saving} variant="primary" />
                     </div>
                 </form>
