@@ -486,7 +486,7 @@ const StorageStoreForm: React.FC = () => {
                             text="Cancel"
                             icon={FaArrowLeft}
                             variant="secondary"
-                            onClick={() => navigate("/storage-stores")}
+                            onClick={() => navigate(-1)}
                             disabled={isSubmitting}
                         />
                         <Button

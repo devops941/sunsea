@@ -191,7 +191,7 @@ const PoInvoicePage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6 no-print">
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => navigate("/purchase-orders")}
+                            onClick={() => navigate(-1)}
                             className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 font-semibold bg-transparent border-none outline-none cursor-pointer"
                         >
                             <FaArrowLeft className="text-xs" /> Back

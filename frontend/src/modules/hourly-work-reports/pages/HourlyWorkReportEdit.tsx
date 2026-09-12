@@ -336,7 +336,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}
-                            onClick={() => navigate("/hourly-work-reports")}
+                            onClick={() => navigate(-1)}
                             disabled={isSubmitting}
                             variant="secondary"
                         />

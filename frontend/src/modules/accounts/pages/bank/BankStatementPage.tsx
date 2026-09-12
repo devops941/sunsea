@@ -391,7 +391,7 @@ const BankStatementPage: React.FC = () => {
               <div className="text-center pt-1">
                 <button
                   type="button"
-                  onClick={() => navigate("/accounts/bank-accounts")}
+                  onClick={() => navigate(-1)}
                   className="text-[13px] text-ink-subtle hover:text-blue-600 underline"
                 >
                   ← Back to Bank & Cash Accounts
@@ -461,7 +461,7 @@ const BankStatementPage: React.FC = () => {
             text="Export"
           />
           <button
-            onClick={() => navigate("/accounts/bank-accounts")}
+            onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-card-2 hover:bg-line text-ink-muted rounded text-xs font-semibold transition-all border border-line cursor-pointer"
           >
             <FaArrowLeft className="text-[13px]" /> Back

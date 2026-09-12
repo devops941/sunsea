@@ -411,9 +411,21 @@ export const SalesReturnCreatePage: React.FC = () => {
     if (isFormDirty) {
       setSaveConfirmOpen(true);
     } else {
-      navigate("/sales-returns");
+      navigate(-1);
     }
   }, [isFormDirty, navigate]);
+
+  // Local Esc handler (form has data-escape-guarded so global handler bails out)
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector("[data-select-portal]")) return;
+      e.preventDefault();
+      handleBack();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [handleBack]);
 
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
 import { FaExchangeAlt, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -39,6 +40,7 @@ const buildEmptyRows = () =>
   Array.from({ length: INITIAL_ROW_COUNT }, (_, i) => makeEmptyRow(i));
 
 const ContraVoucherAddPage: React.FC = () => {
+  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -397,7 +399,7 @@ const ContraVoucherAddPage: React.FC = () => {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={resetForm}
+                onClick={() => navigate(-1)}
                 className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[13px] transition cursor-pointer"
               >
                 Quit

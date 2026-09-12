@@ -533,7 +533,7 @@ const WastageForm: React.FC = () => {
                 type="button"
                 text="Cancel"
                 variant="secondary"
-                onClick={() => navigate("/production-wastages")}
+                onClick={() => navigate(-1)}
                 disabled={loading}
               />
               <CustomButton

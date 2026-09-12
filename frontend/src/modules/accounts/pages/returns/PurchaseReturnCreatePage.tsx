@@ -267,7 +267,7 @@ export const PurchaseReturnCreatePage: React.FC = () => {
     if (isFormDirty) {
       setSaveConfirmOpen(true);
     } else {
-      navigate("/purchase-returns");
+      navigate(-1);
     }
   }, [isFormDirty, navigate]);
 

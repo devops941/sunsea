@@ -618,7 +618,7 @@ const AttendancePage: React.FC = () => {
       <div className="bg-card border-b border-line-soft px-6 py-4 sticky top-0 z-30">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/payroll')}
+            <button onClick={() => navigate(-1)}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink transition-colors">
               <ArrowLeft size={16} /> Back
             </button>

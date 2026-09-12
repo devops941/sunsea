@@ -1139,7 +1139,7 @@ const ProductionOrderCreate: React.FC = () => {
             }
 
             if (isEditMode) {
-                navigate("/production-orders");
+                navigate(-1);
             } else {
                 reset(defaultValues);
                 setRowRmStates({});
@@ -1173,7 +1173,7 @@ const ProductionOrderCreate: React.FC = () => {
                         {isEditMode && !isDraftEdit ? "Edit Production Order" : "Create Production Order"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("productionOrderId")}</span>
                     </h2>
-                    <BackButton text="Back to List" to="/production-orders" />
+                    <BackButton text="Back to List" />
                 </div>
 
                 <form

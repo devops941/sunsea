@@ -449,7 +449,7 @@ const ProductionOrderCreate: React.FC = () => {
                 </Row>
 
                 <div className="d-flex justify-content-end mb-5">
-                    <CustomButton variant="secondary" onClick={() => navigate("/production-orders")} className="me-2" text="Cancel" />
+                    <CustomButton variant="secondary" onClick={() => navigate(-1)} className="me-2" text="Cancel" />
                     <CustomButton variant="primary" type="submit" disabled={loading} text={loading ? "Saving..." : "Create Order"} />
                 </div>
             </form>

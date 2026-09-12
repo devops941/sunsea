@@ -374,7 +374,7 @@ const ExpenseAddPage: React.FC = () => {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => navigate("/expenses")}
+                onClick={() => navigate(-1)}
                 className="px-4 py-1 text-ink bg-card-2 hover:bg-card border border-line rounded font-semibold text-[11px] transition cursor-pointer"
               >
                 Quit

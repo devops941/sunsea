@@ -344,7 +344,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                 {/* Header */}
                 <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
                     <button
-                        onClick={() => navigate("/invoice")}
+                        onClick={() => navigate(-1)}
                         className="flex items-center gap-2 text-gray-700 hover:text-gray-900 font-bold text-lg bg-transparent border-none outline-none cursor-pointer text-left"
                     >
                         <FaArrowLeft className="text-sm" /> Bill & Invoice
@@ -404,7 +404,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                         <div className="flex items-center justify-between gap-4 mb-6 no-print">
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => navigate("/invoice")}
+                                    onClick={() => navigate(-1)}
                                     className="md:hidden flex items-center gap-1.5 text-gray-600 hover:text-gray-900 font-semibold bg-transparent border-none outline-none cursor-pointer"
                                 >
                                     <FaArrowLeft className="text-xs" /> Back

@@ -1132,7 +1132,7 @@ const DailyPlanCreate: React.FC = () => {
         <CustomButton
           text="Cancel"
           variant="secondary"
-          onClick={() => navigate("/daily-machine-planning")}
+          onClick={() => navigate(-1)}
           disabled={isSubmitting}
         />
         {(isEdit ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) && (

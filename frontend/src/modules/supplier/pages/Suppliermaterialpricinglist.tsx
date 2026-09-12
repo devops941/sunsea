@@ -181,7 +181,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                     <button
                         type="button"
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 shadow-sm hover:shadow active:scale-95"
-                        onClick={() => navigate("/suppliers")}
+                        onClick={() => navigate(-1)}
                     >
                         <FaArrowLeft className="text-slate-400" />
                         Back to Suppliers

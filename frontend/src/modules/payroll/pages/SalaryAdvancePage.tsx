@@ -1,5 +1,6 @@
 import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Wallet, Plus, Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { toast } from 'react-toastify';
@@ -154,6 +155,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 const SalaryAdvancePage: React.FC = () => {
+  const navigate = useNavigate();
   const { can } = usePermission();
   const canCreateAdvance = can("payroll-advance.create");
   const canDeleteAdvance = can("payroll-advance.delete");
@@ -165,6 +167,26 @@ const SalaryAdvancePage: React.FC = () => {
   const [showPanel, setShowPanel] = useState(false);
   const [deleteId,  setDeleteId]  = useState<number | null>(null);
   const [deleting,  setDeleting]  = useState(false);
+
+  // Esc key handler
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('[data-select-portal]')) return;
+      if (showPanel) {
+        setShowPanel(false);
+        return;
+      }
+      if (deleteId != null) {
+        setDeleteId(null);
+        return;
+      }
+      navigate(-1);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showPanel, deleteId, navigate]);
 
   const load = useCallback(async () => {
     try {
