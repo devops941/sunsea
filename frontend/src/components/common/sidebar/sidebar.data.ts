@@ -51,7 +51,7 @@ export const sidebarItems: SidebarItem[] = [
             permission: "customers.view",
             children: [
               { title: "Add", path: "/customers/create", permission: "customers.create" },
-              { title: "List", path: "/customers", permission: "customers.view", badge: "Ctrl+Shift+C" },
+              { title: "List", path: "/customers", permission: "customers.view", badge: "Alt+K" },
             ],
           },
           {
@@ -59,7 +59,7 @@ export const sidebarItems: SidebarItem[] = [
             permission: "suppliers.view",
             children: [
               { title: "Add", path: "/suppliers/create", permission: "suppliers.create" },
-              { title: "List", path: "/suppliers", permission: "suppliers.view", badge: "Ctrl+Shift+S" },
+              { title: "List", path: "/suppliers", permission: "suppliers.view", badge: "Alt+W" },
             ],
           },
           {
@@ -407,7 +407,7 @@ export const sidebarItems: SidebarItem[] = [
         permission: "purchaseOrders.view",
         children: [
           { title: "Add", path: "/purchase-orders/create", permission: "purchaseOrders.create", badge: "Ctrl+X" },
-          { title: "List", path: "/purchase-orders", permission: "purchaseOrders.view", badge: "Ctrl+Shift+O" },
+          { title: "List", path: "/purchase-orders", permission: "purchaseOrders.view", badge: "Alt+O" },
         ],
       },
       // ── 5. Purchase Invoice ──
@@ -434,6 +434,7 @@ export const sidebarItems: SidebarItem[] = [
         permission: "vouchers.view",
         children: [
           { title: "Add", path: "/accounts/receipt-voucher/add", permission: "vouchers.create", badge: "Ctrl+R" },
+          { title: "Modify", path: "/accounts/receipt-voucher/modify", permission: "vouchers.update" },
           { title: "List", path: "/accounts/receipt-voucher", permission: "vouchers.view" },
         ],
       },
@@ -442,7 +443,8 @@ export const sidebarItems: SidebarItem[] = [
         title: "Payment",
         permission: "vouchers.view",
         children: [
-          { title: "Add", path: "/accounts/payment-voucher/add", permission: "vouchers.create", badge: "Ctrl+Shift+P" },
+          { title: "Add", path: "/accounts/payment-voucher/add", permission: "vouchers.create", badge: "Ctrl+P" },
+          { title: "Modify", path: "/accounts/payment-voucher/modify", permission: "vouchers.update" },
           { title: "List", path: "/accounts/payment-voucher", permission: "vouchers.view" },
         ],
       },
@@ -462,6 +464,7 @@ export const sidebarItems: SidebarItem[] = [
         permission: "vouchers.view",
         children: [
           { title: "Add", path: "/accounts/journal-entry/add", permission: "vouchers.create", badge: "Ctrl+J" },
+          { title: "Modify", path: "/accounts/journal-entry/modify", permission: "vouchers.update" },
           { title: "List", path: "/accounts/journal-entry", permission: "vouchers.view" },
         ],
       },
@@ -471,6 +474,7 @@ export const sidebarItems: SidebarItem[] = [
         permission: "vouchers.view",
         children: [
           { title: "Add", path: "/accounts/contra-entry/add", permission: "vouchers.create" },
+          { title: "Modify", path: "/accounts/contra-entry/modify", permission: "vouchers.update" },
           { title: "List", path: "/accounts/contra-entry", permission: "vouchers.view" },
         ],
       },
@@ -529,7 +533,7 @@ export const sidebarItems: SidebarItem[] = [
         permission: "production_orders.view",
         children: [
           { title: "Add", path: "/production-orders/create", permission: "production_orders.create" },
-          { title: "List", path: "/production-orders", permission: "production_orders.view", badge: "Alt+Shift+P" },
+          { title: "List", path: "/production-orders", permission: "production_orders.view", badge: "Alt+U" },
           { title: "Order History", path: "/allproduction-orders", permission: "production_orders.view" },
         ],
       },
@@ -973,9 +977,9 @@ export const sidebarItems: SidebarItem[] = [
         title: "Final Results",
         permission: "accounts.view",
         children: [
-          { title: "Balance Sheet", path: "/accounts/balance-sheet", permission: "accounts.view", badge: "Alt+Shift+B" },
+          { title: "Balance Sheet", path: "/accounts/balance-sheet", permission: "accounts.view", badge: "Alt+B" },
           { title: "Profit & Loss", path: "/accounts/profit-loss", permission: "accounts.view" },
-          { title: "Trial Balance", path: "/accounts/trial-balance", permission: "accounts.view", badge: "Alt+Shift+T" },
+          { title: "Trial Balance", path: "/accounts/trial-balance", permission: "accounts.view", badge: "Alt+Z" },
         ],
       },
       // ── Account Books & Ledgers ──
@@ -998,7 +1002,7 @@ export const sidebarItems: SidebarItem[] = [
             badge: "Alt+N",
           },
           { title: "Day Book", path: "/accounts/day-book", permission: "accounts.view" },
-          { title: "Account-Wise Ledger", path: "/accounts/ledger-statement", permission: "accounts.view", badge: "Alt+Shift+L" },
+          { title: "Account-Wise Ledger", path: "/accounts/ledger-statement", permission: "accounts.view", badge: "Ctrl+L" },
           { title: "Merged Accounts Ledger", path: "/accounts/ledger-statement/merged", permission: "accounts.view" },
         ],
       },
@@ -1008,7 +1012,7 @@ export const sidebarItems: SidebarItem[] = [
         permission: "payable.view",
         children: [
           { title: "Amount Payable (Outstanding)", path: "/accounts/payable", permission: "payable.view" },
-          { title: "Amount Receivable (Outstanding)", path: "/accounts/receivable", permission: "receivable.view", badge: "Alt+Shift+A" },
+          { title: "Amount Receivable (Outstanding)", path: "/accounts/receivable", permission: "receivable.view", badge: "Alt+M" },
         ],
       },
       // ── MIS Reports & Analysis ──
@@ -1016,7 +1020,7 @@ export const sidebarItems: SidebarItem[] = [
         title: "MIS Reports",
         permission: "sales-reports.view",
         children: [
-          { title: "Sales Reports", path: "/reports/sales", permission: "sales-reports.view", badge: "Alt+Shift+S" },
+          { title: "Sales Reports", path: "/reports/sales", permission: "sales-reports.view", badge: "Alt+S" },
           { title: "Purchase Reports", path: "/reports/purchase", permission: "purchase-reports.view" },
           { title: "Inventory Reports", path: "/reports/inventory", permission: "inventory-reports.view" },
           { title: "Production Reports", path: "/reports/production", permission: "production-reports.view" },

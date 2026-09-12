@@ -7,8 +7,13 @@ import { accountService, type AccountLedger } from "../../services/accountServic
 import LedgerSearchInput, { isBankOrCashLedger } from "../../components/form/LedgerSearchInput/LedgerSearchInput";
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useFormShortcuts } from "../../hooks/useFormShortcuts";
+import { handleGridArrow } from "../../hooks/useFormGridNav";
 import { useListCache, prependToListCacheByPrefix } from "../../hooks/useListCache";
 import { formatAmount } from "../../utils/pricingUtils";
+
+// Column order for grid arrow nav (matches focusCell field names below).
+// ↑↓ jump rows; ← / → hop columns when the cursor is at the value edge.
+const CELL_FIELDS = ["expense", "source", "amount", "narration"] as const;
 
 // One editable row = one Expense to be saved. Save iterates and POSTs each
 // row so a single "session" can capture multiple expenses in one flow.
@@ -239,7 +244,18 @@ const ExpenseAddPage: React.FC = () => {
                         {idx + 1}
                       </td>
                       <td className="px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-expense`}>
+                        <div
+                          data-cell={`${idx}-expense`}
+                          onKeyDown={(e) =>
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "expense",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            })
+                          }
+                        >
                           <LedgerSearchInput
                             value={row.expenseLedgerId}
                             ledgers={ledgers}
@@ -254,7 +270,18 @@ const ExpenseAddPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="w-48 px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-source`}>
+                        <div
+                          data-cell={`${idx}-source`}
+                          onKeyDown={(e) =>
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "source",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            })
+                          }
+                        >
                           <LedgerSearchInput
                             value={row.sourceLedgerId}
                             ledgers={ledgers}
@@ -276,7 +303,16 @@ const ExpenseAddPage: React.FC = () => {
                           min="0"
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
-                          onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "amount",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            });
+                            if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                          }}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -288,7 +324,16 @@ const ExpenseAddPage: React.FC = () => {
                           type="text"
                           value={row.description}
                           onChange={(e) => updateRow(row.id, "description", e.target.value)}
-                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "narration",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            });
+                            if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                          }}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[11px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

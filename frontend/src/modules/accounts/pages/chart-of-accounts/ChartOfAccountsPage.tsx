@@ -15,6 +15,7 @@ import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSV
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
+import { useTableCellNav } from "../../../../hooks/useTableCellNav";
 import { usePermission } from "../../../../hooks/usePermission";
 
 export const ChartOfAccountsPage: React.FC = () => {
@@ -28,7 +29,6 @@ export const ChartOfAccountsPage: React.FC = () => {
   const [draftSelectedType, setDraftSelectedType] = useState<string>(selectedType);
 
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [selectedRow, setSelectedRow] = useState<number | null>(null);
 
   // New Ledger Form State
   const [formData, setFormData] = useState({
@@ -82,6 +82,15 @@ export const ChartOfAccountsPage: React.FC = () => {
       return matchesSearch && matchesType;
     });
   }, [ledgers, searchTerm, selectedType]);
+
+  // Cell-level nav — 7 fixed columns (#, Code, Name, Type, Group, Linked, Status).
+  // Disabled while the New Ledger modal is open so its own key handling wins.
+  const CHART_COL_COUNT = 7;
+  const { rowIdx, colIdx, setCell } = useTableCellNav({
+    rowCount: filteredLedgers.length,
+    colCount: CHART_COL_COUNT,
+    disabled: showModal,
+  });
 
   const handleCreateLedger = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -301,40 +310,47 @@ export const ChartOfAccountsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLedgers.map((item, rowIdx) => {
-                    const isSelected = selectedRow === item.id;
+                  {filteredLedgers.map((item, i) => {
+                    const isSelected = rowIdx === i;
+                    // Ring only on active cell within active row
+                    const ringFor = (col: number) =>
+                      isSelected && colIdx === col ? " ring-2 ring-yellow-400 ring-inset" : "";
+                    const clickFor = (col: number) => (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      setCell(i, col);
+                    };
                     return (
                       <tr
                         key={item.id}
-                        onClick={() => setSelectedRow(item.id)}
+                        onClick={() => setCell(i, 0)}
                         className={`border-b border-line-soft cursor-pointer ${
                           isSelected
                             ? "bg-slate-500/20 text-ink"
-                            : rowIdx % 2 === 0
+                            : i % 2 === 0
                               ? "hover:bg-card-2/70"
                               : "bg-card-2/20 hover:bg-card-2/70"
                         }`}
                       >
-                        <td className="px-2 py-1 border-r border-line-soft text-center font-mono text-[13px] text-ink-subtle">
-                          {rowIdx + 1}
+                        <td onClick={clickFor(0)} className={`px-2 py-1 border-r border-line-soft text-center font-mono text-[13px] text-ink-subtle${ringFor(0)}`}>
+                          {i + 1}
                         </td>
-                        <td className="px-2 py-1 border-r border-line-soft font-mono font-bold text-ink whitespace-nowrap">
+                        <td onClick={clickFor(1)} className={`px-2 py-1 border-r border-line-soft font-mono font-bold text-ink whitespace-nowrap${ringFor(1)}`}>
                           {item.code}
                         </td>
-                        <td className="px-2 py-1 border-r border-line-soft font-semibold text-ink">
+                        <td onClick={clickFor(2)} className={`px-2 py-1 border-r border-line-soft font-semibold text-ink${ringFor(2)}`}>
                           {item.name}
                         </td>
-                        <td className="px-2 py-1 border-r border-line-soft text-center">
+                        <td onClick={clickFor(3)} className={`px-2 py-1 border-r border-line-soft text-center${ringFor(3)}`}>
                           <span className={`inline-block px-1.5 py-0.5 rounded text-[13px] font-bold border ${getTypeBadgeClass(item.type)}`}>
                             {item.type}
                           </span>
                         </td>
-                        <td className="px-2 py-1 border-r border-line-soft">
+                        <td onClick={clickFor(4)} className={`px-2 py-1 border-r border-line-soft${ringFor(4)}`}>
                           <span className="flex items-center gap-1 text-ink-muted text-[13px]">
                             <FaFolder className="text-slate-500 text-[9px] shrink-0" /> {item.group}
                           </span>
                         </td>
-                        <td className="px-2 py-1 border-r border-line-soft">
+                        <td onClick={clickFor(5)} className={`px-2 py-1 border-r border-line-soft${ringFor(5)}`}>
                           {item.customer ? (
                             <span className="px-1.5 py-0.5 rounded text-[13px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                               Customer: {item.customer.firmName} ({item.customer.customerCode})
@@ -347,7 +363,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                             <span className="text-[13px] text-ink-subtle italic">General System Ledger</span>
                           )}
                         </td>
-                        <td className="px-2 py-1 text-center">
+                        <td onClick={clickFor(6)} className={`px-2 py-1 text-center${ringFor(6)}`}>
                           {item.isActive ? (
                             <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                               <FaCheckCircle className="text-[9px]" /> Active
@@ -386,9 +402,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               </span>
               <span>
                 Row No: <b className="text-ink">
-                  {selectedRow
-                    ? filteredLedgers.findIndex((v) => v.id === selectedRow) + 1
-                    : (filteredLedgers.length > 0 ? 1 : 0)}
+                  {filteredLedgers.length > 0 ? rowIdx + 1 : 0}
                   {" / "}{filteredLedgers.length}
                 </b>
               </span>

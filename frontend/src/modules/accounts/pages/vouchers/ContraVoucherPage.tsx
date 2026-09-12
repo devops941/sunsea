@@ -46,6 +46,16 @@ const ContraVoucherPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
+  // Active column index for cell-level nav via ArrowLeft/Right.
+  // Columns: 0=checkbox, 1=Date, 2=Vch/Bill No, 3=Account, 4=Debit, 5=Credit,
+  //          6=Narration (only when applied.showNarration is true).
+  const [colIdx, setColIdx] = useState<number>(1); // start at Date, not checkbox
+  const colCount = 6 + (applied.showNarration ? 1 : 0);
+  // Clamp column when the Narration column toggles off
+  useEffect(() => {
+    if (colIdx > colCount - 1) setColIdx(colCount - 1);
+  }, [colCount, colIdx]);
+
   // Modal nav stack — Esc walks: table → panel → navigate away.
   const panelOpenRef = useRef(panelOpen);
   const pendingRef = useRef(pending);
@@ -65,9 +75,10 @@ const ContraVoucherPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!panelOpenRef.current) {
-        setPending(applied);
-        setPanelOpen(true);
+      // Table view Esc → walk back one page in history.
+      // Filter panel open → close it (returns to table view; next Esc walks back).
+      if (panelOpenRef.current) {
+        setPanelOpen(false);
       } else {
         navigate(-1);
       }
@@ -150,12 +161,20 @@ const ContraVoucherPage: React.FC = () => {
         e.preventDefault();
         const prev = vouchers[Math.max(idx - 1, 0)];
         if (prev) setSelectedRow(prev.id);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setColIdx((c) => Math.min(c + 1, colCount - 1));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setColIdx((c) => Math.max(c - 1, 0));
       } else if (e.key === "Home") {
         e.preventDefault();
-        setSelectedRow(vouchers[0].id);
+        if (e.ctrlKey) setSelectedRow(vouchers[0].id);
+        setColIdx(0);
       } else if (e.key === "End") {
         e.preventDefault();
-        setSelectedRow(vouchers[vouchers.length - 1].id);
+        if (e.ctrlKey) setSelectedRow(vouchers[vouchers.length - 1].id);
+        setColIdx(colCount - 1);
       } else if (e.key === "PageDown") {
         e.preventDefault();
         const start = idx < 0 ? 0 : idx;
@@ -168,7 +187,7 @@ const ContraVoucherPage: React.FC = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelOpen, selectedRow, vouchers, openVoucherEdit]);
+  }, [panelOpen, selectedRow, vouchers, openVoucherEdit, colCount]);
 
   // Keep the highlighted row in view — minimal scroll (no smooth animation).
   useEffect(() => {
@@ -420,6 +439,19 @@ const ContraVoucherPage: React.FC = () => {
                   const dr = Number(item.debitAmount || 0);
                   const cr = Number(item.creditAmount || 0);
                   const isChecked = selectedIds.has(voucher.id);
+                  // Cell ring — only shown on the isFirst row of the currently
+                  // selected voucher, on the active column. Applies across all
+                  // item rows would look wrong when a voucher spans multiple items.
+                  const isActiveVoucher = selectedRow === voucher.id;
+                  const ringFor = (col: number) =>
+                    isActiveVoucher && isFirst && colIdx === col
+                      ? " ring-2 ring-yellow-400 ring-inset"
+                      : "";
+                  const clickFor = (col: number) => (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setSelectedRow(voucher.id);
+                    setColIdx(col);
+                  };
                   return (
                     <tr
                       key={`${voucher.id}-${itemIdx}`}
@@ -440,34 +472,34 @@ const ContraVoucherPage: React.FC = () => {
                               : "bg-card-2/20 hover:bg-card-2/70"
                       }`}
                     >
-                      <td className="px-2 py-1 border-r border-line-soft text-center" onClick={(e) => e.stopPropagation()}>
+                      <td onClick={(e) => e.stopPropagation()} className={`px-2 py-1 border-r border-line-soft text-center${ringFor(0)}`}>
                         {isFirst && (
                           <button type="button" onClick={() => toggleVoucher(voucher.id)} className="text-ink-subtle hover:text-rose-500">
                             {isChecked ? <FaCheckSquare className="text-rose-500" /> : <FaSquare />}
                           </button>
                         )}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
+                      <td onClick={clickFor(1)} className={`px-2 py-1 border-r border-line-soft font-mono text-[13px]${ringFor(1)}`}>
                         {isFirst ? formatDate(voucher.date) : ""}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-rose-500 text-center">
+                      <td onClick={clickFor(2)} className={`px-2 py-1 border-r border-line-soft font-mono font-semibold text-rose-500 text-center${ringFor(2)}`}>
                         {isFirst ? displayVoucherNo(voucher.voucherNo) : ""}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase">
+                      <td onClick={clickFor(3)} className={`px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase${ringFor(3)}`}>
                         {accountLabel || "-"}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
+                      <td onClick={clickFor(4)} className={`px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink${ringFor(4)}`}>
                         {dr > 0
                           ? formatAmount(dr)
                           : ""}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
+                      <td onClick={clickFor(5)} className={`px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink${ringFor(5)}`}>
                         {cr > 0
                           ? formatAmount(cr)
                           : ""}
                       </td>
                       {applied.showNarration && (
-                        <td className="px-2 py-1 text-ink-subtle max-w-xs truncate">
+                        <td onClick={clickFor(6)} className={`px-2 py-1 text-ink-subtle max-w-xs truncate${ringFor(6)}`}>
                           {item.narration || "-"}
                         </td>
                       )}

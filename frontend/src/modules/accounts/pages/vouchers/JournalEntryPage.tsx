@@ -45,6 +45,11 @@ const JournalEntryPage: React.FC = () => {
   }, [panelOpen]);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
 
+  // Active column for cell-level nav via ← / →.
+  // Columns: 0=Date, 1=Vch/Bill No, 2=Account, 3=Debit, 4=Credit,
+  //          5=Narration (only when applied.showNarration is true).
+  const [colIdx, setColIdx] = useState<number>(0);
+
   // Modal nav stack — Esc walks: table → panel → navigate away.
   const panelOpenRef = useRef(panelOpen);
   const pendingRef = useRef(pending);
@@ -64,9 +69,10 @@ const JournalEntryPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!panelOpenRef.current) {
-        setPending(applied);
-        setPanelOpen(true);
+      // Table view Esc → walk back one page in history.
+      // Filter panel open → close it (returns to table view; next Esc walks back).
+      if (panelOpenRef.current) {
+        setPanelOpen(false);
       } else {
         navigate(-1);
       }
@@ -149,12 +155,21 @@ const JournalEntryPage: React.FC = () => {
         e.preventDefault();
         const prev = vouchers[Math.max(idx - 1, 0)];
         if (prev) setSelectedRow(prev.id);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const colMax = 4 + (applied.showNarration ? 1 : 0);
+        setColIdx((c) => Math.min(c + 1, colMax));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setColIdx((c) => Math.max(c - 1, 0));
       } else if (e.key === "Home") {
         e.preventDefault();
-        setSelectedRow(vouchers[0].id);
+        if (e.ctrlKey) setSelectedRow(vouchers[0].id);
+        setColIdx(0);
       } else if (e.key === "End") {
         e.preventDefault();
-        setSelectedRow(vouchers[vouchers.length - 1].id);
+        if (e.ctrlKey) setSelectedRow(vouchers[vouchers.length - 1].id);
+        setColIdx(4 + (applied.showNarration ? 1 : 0));
       } else if (e.key === "PageDown") {
         e.preventDefault();
         const start = idx < 0 ? 0 : idx;
@@ -167,7 +182,7 @@ const JournalEntryPage: React.FC = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelOpen, selectedRow, vouchers, openVoucherEdit]);
+  }, [panelOpen, selectedRow, vouchers, openVoucherEdit, applied.showNarration]);
 
   // Keep the highlighted row in view — minimal scroll (no smooth animation).
   useEffect(() => {
@@ -369,6 +384,16 @@ const JournalEntryPage: React.FC = () => {
                   const dr = Number(item.debitAmount || 0);
                   const cr = Number(item.creditAmount || 0);
                   const isSelected = selectedRow === voucher.id;
+                  // Ring only on active voucher's first row + active column
+                  const ringFor = (col: number) =>
+                    isSelected && isFirst && colIdx === col
+                      ? " ring-2 ring-yellow-400 ring-inset"
+                      : "";
+                  const clickFor = (col: number) => (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setSelectedRow(voucher.id);
+                    setColIdx(col);
+                  };
                   return (
                     <tr
                       key={`${voucher.id}-${itemIdx}`}
@@ -385,27 +410,27 @@ const JournalEntryPage: React.FC = () => {
                       }`}
                     >
                       {/* Date + Vch No only appear on the first item of each voucher */}
-                      <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
+                      <td onClick={clickFor(0)} className={`px-2 py-1 border-r border-line-soft font-mono text-[13px]${ringFor(0)}`}>
                         {isFirst ? formatDate(voucher.date) : ""}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-purple-500 text-center">
+                      <td onClick={clickFor(1)} className={`px-2 py-1 border-r border-line-soft font-mono font-semibold text-purple-500 text-center${ringFor(1)}`}>
                         {isFirst ? displayVoucherNo(voucher.voucherNo) : ""}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase">
+                      <td onClick={clickFor(2)} className={`px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase${ringFor(2)}`}>
                         {accountLabel || "-"}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-emerald-600">
+                      <td onClick={clickFor(3)} className={`px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-emerald-600${ringFor(3)}`}>
                         {dr > 0
                           ? formatAmount(dr)
                           : ""}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-red-500">
+                      <td onClick={clickFor(4)} className={`px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-red-500${ringFor(4)}`}>
                         {cr > 0
                           ? formatAmount(cr)
                           : ""}
                       </td>
                       {applied.showNarration && (
-                        <td className="px-2 py-1 text-ink-subtle max-w-xs truncate">
+                        <td onClick={clickFor(5)} className={`px-2 py-1 text-ink-subtle max-w-xs truncate${ringFor(5)}`}>
                           {item.narration || "-"}
                         </td>
                       )}

@@ -65,7 +65,13 @@ export function useGlobalShortcuts({
     const lockKeys = async () => {
       try {
         if ("keyboard" in navigator && (navigator as any).keyboard?.lock) {
-          await (navigator as any).keyboard.lock(["KeyT", "KeyW", "KeyN", "KeyA", "KeyD"]);
+          // KeyP / KeyL added so Ctrl+P (Add Payment) and Ctrl+L (Ledger)
+          // reliably override Chrome's Print / address-bar shortcuts when
+          // the app runs full-screen / as a PWA. Outside those modes we
+          // rely on preventDefault() alone (see keydown handler below).
+          await (navigator as any).keyboard.lock([
+            "KeyT", "KeyW", "KeyN", "KeyA", "KeyD", "KeyP", "KeyL",
+          ]);
         }
       } catch (_) {}
     };
@@ -110,12 +116,37 @@ export function useGlobalShortcuts({
         return;
       }
 
-      // ── Ctrl+Shift+E Export (works even inside form fields) ─────────────────
-      if (isCtrlShift && (lowerKey === "e" || e.code === "KeyE")) {
+      // ── Alt+E Export (works even inside form fields) ────────────────
+      // Was Ctrl+Shift+E — converted to a single-modifier combo per the
+      // operator's request that all shortcuts stay 2-key.
+      if (isAlt && (lowerKey === "e" || e.code === "KeyE")) {
         e.preventDefault();
         e.stopPropagation();
-        flash("Ctrl+Shift+E");
+        flash("Alt+E");
         dispatchFKey(FKEY_EVENTS.EXPORT);
+        return;
+      }
+
+      // ── Ctrl+P Add Payment (blocks Chrome print; works in form fields) ──
+      // Chrome would open the print dialog on Ctrl+P; preventDefault +
+      // stopPropagation on capture:true (see effect deps below) suppresses
+      // it before the browser reacts.
+      if (isCtrl && (lowerKey === "p" || e.code === "KeyP")) {
+        e.preventDefault();
+        e.stopPropagation();
+        flash("Ctrl+P");
+        navigate("/accounts/payment-voucher/add");
+        return;
+      }
+
+      // ── Ctrl+L Account Ledger (blocks Chrome address-bar focus) ─────
+      // Ctrl+L normally focuses the omnibox in Chrome. Same
+      // preventDefault-on-capture trick as Ctrl+P above.
+      if (isCtrl && (lowerKey === "l" || e.code === "KeyL")) {
+        e.preventDefault();
+        e.stopPropagation();
+        flash("Ctrl+L");
+        navigate("/accounts/ledger-statement");
         return;
       }
 

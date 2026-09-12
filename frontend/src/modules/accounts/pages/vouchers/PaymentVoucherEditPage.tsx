@@ -10,6 +10,9 @@ import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useLi
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
+import { handleGridArrow } from "../../../../hooks/useFormGridNav";
+
+const CELL_FIELDS = ["account", "paymentMode", "amount", "narration"] as const;
 
 // Same shape as the Add page — one row per party being paid, with a
 // per-row Payment Mode (bank/cash) column.
@@ -317,7 +320,10 @@ const PaymentVoucherEditPage: React.FC = () => {
                         {idx + 1}
                       </td>
                       <td className="px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-account`}>
+                        <div
+                          data-cell={`${idx}-account`}
+                          onKeyDown={(e) => handleGridArrow(e, { rowIdx: idx, field: "account", fields: CELL_FIELDS, rowsLength: rows.length, focusCell })}
+                        >
                           <LedgerSearchInput
                             value={row.debitLedgerId}
                             ledgers={ledgers}
@@ -332,7 +338,10 @@ const PaymentVoucherEditPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="w-48 px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-paymentMode`}>
+                        <div
+                          data-cell={`${idx}-paymentMode`}
+                          onKeyDown={(e) => handleGridArrow(e, { rowIdx: idx, field: "paymentMode", fields: CELL_FIELDS, rowsLength: rows.length, focusCell })}
+                        >
                           <LedgerSearchInput
                             value={row.paymentModeId}
                             ledgers={ledgers}
@@ -355,7 +364,10 @@ const PaymentVoucherEditPage: React.FC = () => {
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                           onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                          onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, { rowIdx: idx, field: "amount", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                            if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                          }}
                           // Select existing value on focus so typing replaces it
                           // (matches Busy — click any pre-filled amount and the
                           // first digit you type overwrites the old value).
@@ -370,7 +382,10 @@ const PaymentVoucherEditPage: React.FC = () => {
                           type="text"
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
-                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, { rowIdx: idx, field: "narration", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                            if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                          }}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

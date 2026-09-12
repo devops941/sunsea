@@ -55,6 +55,21 @@ const PaymentVoucherPage: React.FC = () => {
   }, [panelOpen]);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
 
+  // Active column for cell-level nav via ← / →.
+  // Columns are dynamic: 0=Date, 1=Vch/Bill No, [Mode if showPaidFrom],
+  //                      then Account, [Amount if showAmount], [Narration if showNarration]
+  const [colIdx, setColIdx] = useState<number>(0);
+  const colCount = useMemo(() => {
+    return 3 // Date + Vch + Account (always shown)
+      + (applied.showPaidFrom ? 1 : 0)
+      + (applied.showAmount ? 1 : 0)
+      + (applied.showNarration ? 1 : 0);
+  }, [applied.showPaidFrom, applied.showAmount, applied.showNarration]);
+  // Clamp column when toggles change
+  useEffect(() => {
+    if (colIdx > colCount - 1) setColIdx(colCount - 1);
+  }, [colCount, colIdx]);
+
   // Modal nav stack — Esc walks: table → panel → navigate away.
   // Uses refs so the listener registers once (no stale-closure race).
   const panelOpenRef = useRef(panelOpen);
@@ -75,12 +90,11 @@ const PaymentVoucherPage: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
       e.stopPropagation();
-      if (!panelOpenRef.current) {
-        // Table → open filter panel.
-        setPending(applied);
-        setPanelOpen(true);
+      // Table view Esc → walk back one page in history.
+      // Filter panel open → close it (returns to table view; next Esc walks back).
+      if (panelOpenRef.current) {
+        setPanelOpen(false);
       } else {
-        // Panel → leave the page.
         navigate(-1);
       }
     };
@@ -161,12 +175,20 @@ const PaymentVoucherPage: React.FC = () => {
         e.preventDefault();
         const prev = vouchers[Math.max(idx - 1, 0)];
         if (prev) setSelectedRow(prev.id);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setColIdx((c) => Math.min(c + 1, colCount - 1));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setColIdx((c) => Math.max(c - 1, 0));
       } else if (e.key === "Home") {
         e.preventDefault();
-        setSelectedRow(vouchers[0].id);
+        if (e.ctrlKey) setSelectedRow(vouchers[0].id);
+        setColIdx(0);
       } else if (e.key === "End") {
         e.preventDefault();
-        setSelectedRow(vouchers[vouchers.length - 1].id);
+        if (e.ctrlKey) setSelectedRow(vouchers[vouchers.length - 1].id);
+        setColIdx(colCount - 1);
       } else if (e.key === "PageDown") {
         e.preventDefault();
         const start = idx < 0 ? 0 : idx;
@@ -179,7 +201,7 @@ const PaymentVoucherPage: React.FC = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelOpen, selectedRow, vouchers, navigate]);
+  }, [panelOpen, selectedRow, vouchers, navigate, colCount]);
 
   // Sum of all voucher totals — memoised to avoid re-summing on unrelated
   // renders. MUST live above the early return below so hook order is stable
@@ -376,6 +398,24 @@ const PaymentVoucherPage: React.FC = () => {
                       ? v.items[0]?.creditLedger?.code
                       : v.items[0]?.creditLedger?.name;
                   const isSelected = selectedRow === v.id;
+                  // Cell ring — active voucher + active column. Column indices
+                  // depend on which optional columns are visible.
+                  let cursor = 0;
+                  const dateCol = cursor++;
+                  const vchCol = cursor++;
+                  const modeCol = applied.showPaidFrom ? cursor++ : -1;
+                  const accCol = cursor++;
+                  const amtCol = applied.showAmount ? cursor++ : -1;
+                  const narCol = applied.showNarration ? cursor++ : -1;
+                  const ringFor = (col: number) =>
+                    isSelected && col >= 0 && colIdx === col
+                      ? " ring-2 ring-yellow-400 ring-inset"
+                      : "";
+                  const clickFor = (col: number) => (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setSelectedRow(v.id);
+                    if (col >= 0) setColIdx(col);
+                  };
                   return (
                     <tr
                       key={v.id}
@@ -395,27 +435,27 @@ const PaymentVoucherPage: React.FC = () => {
                             : "bg-card-2/20 hover:bg-card-2/70"
                       }`}
                     >
-                      <td className="px-2 py-1 border-r border-line-soft font-mono text-[13px]">
+                      <td onClick={clickFor(dateCol)} className={`px-2 py-1 border-r border-line-soft font-mono text-[13px]${ringFor(dateCol)}`}>
                         {formatDate(v.date)}
                       </td>
-                      <td className="px-2 py-1 border-r border-line-soft font-mono font-semibold text-red-500 text-center">
+                      <td onClick={clickFor(vchCol)} className={`px-2 py-1 border-r border-line-soft font-mono font-semibold text-red-500 text-center${ringFor(vchCol)}`}>
                         {displayVoucherNo(v.voucherNo)}
                       </td>
                       {applied.showPaidFrom && (
-                        <td className="px-2 py-1 border-r border-line-soft text-ink-muted uppercase">
+                        <td onClick={clickFor(modeCol)} className={`px-2 py-1 border-r border-line-soft text-ink-muted uppercase${ringFor(modeCol)}`}>
                           {creditLabel || "-"}
                         </td>
                       )}
-                      <td className="px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase">
+                      <td onClick={clickFor(accCol)} className={`px-2 py-1 border-r border-line-soft font-semibold text-ink uppercase${ringFor(accCol)}`}>
                         {debitLabel || "-"}
                       </td>
                       {applied.showAmount && (
-                        <td className="px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink">
+                        <td onClick={clickFor(amtCol)} className={`px-2 py-1 border-r border-line-soft text-right font-mono font-semibold text-ink${ringFor(amtCol)}`}>
                           {formatAmount(voucherTotal)}
                         </td>
                       )}
                       {applied.showNarration && (
-                        <td className="px-2 py-1 text-ink-subtle max-w-xs truncate">
+                        <td onClick={clickFor(narCol)} className={`px-2 py-1 text-ink-subtle max-w-xs truncate${ringFor(narCol)}`}>
                           {/* "Short Narration" = per-item narration (Busy
                               convention). Join across items so a multi-row
                               payment shows all short narrations, not the

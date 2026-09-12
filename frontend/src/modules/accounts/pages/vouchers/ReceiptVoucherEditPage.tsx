@@ -10,6 +10,10 @@ import { useListCache, upsertInListCacheByPrefix } from "../../../../hooks/useLi
 import { useDetailCache, updateDetailCache, getDetailFromCache } from "../../../../hooks/useDetailCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
+import { handleGridArrow } from "../../../../hooks/useFormGridNav";
+
+// Excel-style arrow-key nav uses this field order for ← / → within a row.
+const CELL_FIELDS = ["account", "receiptMode", "amount", "narration"] as const;
 
 // Same shape as the Add page — one row per payer, with a per-row Receipt
 // Mode (bank/cash) column.
@@ -326,7 +330,10 @@ const ReceiptVoucherEditPage: React.FC = () => {
                         {idx + 1}
                       </td>
                       <td className="px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-account`}>
+                        <div
+                          data-cell={`${idx}-account`}
+                          onKeyDown={(e) => handleGridArrow(e, { rowIdx: idx, field: "account", fields: CELL_FIELDS, rowsLength: rows.length, focusCell })}
+                        >
                           <LedgerSearchInput
                             value={row.creditLedgerId}
                             ledgers={ledgers}
@@ -341,7 +348,10 @@ const ReceiptVoucherEditPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="w-48 px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-receiptMode`}>
+                        <div
+                          data-cell={`${idx}-receiptMode`}
+                          onKeyDown={(e) => handleGridArrow(e, { rowIdx: idx, field: "receiptMode", fields: CELL_FIELDS, rowsLength: rows.length, focusCell })}
+                        >
                           <LedgerSearchInput
                             value={row.receiptModeId}
                             ledgers={ledgers}
@@ -364,7 +374,10 @@ const ReceiptVoucherEditPage: React.FC = () => {
                           value={row.amount}
                           onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                           onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                          onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, { rowIdx: idx, field: "amount", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                            if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                          }}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -376,7 +389,10 @@ const ReceiptVoucherEditPage: React.FC = () => {
                           type="text"
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
-                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, { rowIdx: idx, field: "narration", fields: CELL_FIELDS, rowsLength: rows.length, focusCell });
+                            if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                          }}
                           onFocus={(e) => e.currentTarget.select()}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none ${ACTIVE_CELL} ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}

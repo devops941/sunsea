@@ -9,6 +9,12 @@ import LedgerSearchInput from "../../../../components/form/LedgerSearchInput/Led
 import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useListCache, prependToListCacheByPrefix } from "../../../../hooks/useListCache";
 import { formatAmount, formatAmountOnBlur } from "../../../../utils/pricingUtils";
+import { handleGridArrow } from "../../../../hooks/useFormGridNav";
+
+// Excel-style arrow-key nav uses this field order for ← / → within a row.
+// ↑ / ↓ jump between rows in the same column. Enter continues to move forward
+// (dc → account → amount → narration → next row's dc).
+const CELL_FIELDS = ["dc", "account", "amount", "narration"] as const;
 
 // Journal = free-form debit/credit entries. Unlike Payment/Receipt there is
 // no fixed "Mode" account; every row picks its own ledger AND its own side
@@ -254,6 +260,15 @@ const JournalEntryAddPage: React.FC = () => {
                           data-cell={`${idx}-dc`}
                           value={row.dc}
                           onChange={(e) => updateRow(row.id, "dc", e.target.value)}
+                          onKeyDown={(e) =>
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "dc",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            })
+                          }
                           disabled={!unlocked}
                           className={`w-full px-1 py-1 bg-transparent border-0 text-[13px] font-bold font-mono text-center text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         >
@@ -262,7 +277,24 @@ const JournalEntryAddPage: React.FC = () => {
                         </select>
                       </td>
                       <td className="px-0 py-0 border-r border-line">
-                        <div data-cell={`${idx}-account`}>
+                        {/* LedgerSearchInput wraps its own <input>; the wrapper
+                           div catches bubbled key events for arrow-nav. The
+                           search dropdown's own arrow handling still runs
+                           first and stops propagation when a suggestion is
+                           highlighted, so this only fires when the dropdown
+                           is closed. */}
+                        <div
+                          data-cell={`${idx}-account`}
+                          onKeyDown={(e) =>
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "account",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            })
+                          }
+                        >
                           <LedgerSearchInput
                             value={row.ledgerId}
                             ledgers={ledgers}
@@ -287,7 +319,16 @@ const JournalEntryAddPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onKeyDown={(e) => {
+                              handleGridArrow(e, {
+                                rowIdx: idx,
+                                field: "amount",
+                                fields: CELL_FIELDS,
+                                rowsLength: rows.length,
+                                focusCell,
+                              });
+                              if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                            }}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
@@ -307,7 +348,16 @@ const JournalEntryAddPage: React.FC = () => {
                             value={row.amount}
                             onChange={(e) => updateRow(row.id, "amount", e.target.value)}
                             onBlur={formatAmountOnBlur((val) => updateRow(row.id, "amount", val))}
-                            onKeyDown={(e) => handleAmountKeyDown(e, idx)}
+                            onKeyDown={(e) => {
+                              handleGridArrow(e, {
+                                rowIdx: idx,
+                                field: "amount",
+                                fields: CELL_FIELDS,
+                                rowsLength: rows.length,
+                                focusCell,
+                              });
+                              if (!e.defaultPrevented) handleAmountKeyDown(e, idx);
+                            }}
                             disabled={!unlocked}
                             className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink text-right font-mono focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                           />
@@ -322,7 +372,16 @@ const JournalEntryAddPage: React.FC = () => {
                           placeholder=""
                           value={row.narration}
                           onChange={(e) => updateRow(row.id, "narration", e.target.value)}
-                          onKeyDown={(e) => handleNarrationKeyDown(e, idx)}
+                          onKeyDown={(e) => {
+                            handleGridArrow(e, {
+                              rowIdx: idx,
+                              field: "narration",
+                              fields: CELL_FIELDS,
+                              rowsLength: rows.length,
+                              focusCell,
+                            });
+                            if (!e.defaultPrevented) handleNarrationKeyDown(e, idx);
+                          }}
                           disabled={!unlocked}
                           className={`w-full px-2 py-1 bg-transparent border-0 text-[13px] text-ink focus:outline-none focus:bg-card-2/60 ${!unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                         />

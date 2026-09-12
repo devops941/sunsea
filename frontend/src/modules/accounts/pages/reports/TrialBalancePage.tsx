@@ -15,6 +15,7 @@ import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/Dat
 import { useDetailCache } from "../../../../hooks/useDetailCache";
 import { usePageShortcuts } from "../../../../hooks/usePageShortcuts";
 import { useListCache } from "../../../../hooks/useListCache";
+import { useTableCellNav } from "../../../../hooks/useTableCellNav";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 import { formatAmount } from "../../../../utils/pricingUtils";
 
@@ -281,54 +282,37 @@ const TrialBalancePage: React.FC = () => {
       if (showModeDialogRef.current) return;
       e.preventDefault();
       e.stopPropagation();
+      // Options dialog open → close it (returns to table view; next Esc walks back).
+      // Table view Esc → walk back one page in history.
       if (showOptionsDialogRef.current) {
-        // Options dialog → back to Mode picker.
         setShowOptionsDialog(false);
-        setShowModeDialog(true);
       } else {
-        // Table → open Options dialog.
-        setShowOptionsDialog(true);
+        navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [commitOptions]);
+  }, [commitOptions, navigate]);
 
-  // ─── Row keyboard nav ───────────────────────────────────────────
-  const [rowIdx, setRowIdx] = useState<number>(-1);
-  const rowIdxRef = useRef(rowIdx);
-  useEffect(() => { rowIdxRef.current = rowIdx; }, [rowIdx]);
-  useEffect(() => {
-    if (showOptionsDialog || showModeDialog) return;
-    if (rowIdx < 0 && filteredRows.length > 0) setRowIdx(0);
-  }, [showOptionsDialog, showModeDialog, filteredRows.length, rowIdx]);
+  // ─── Cell-level keyboard nav (↑↓←→) ─────────────────────────────
+  // Columns: 0=Account, [Parent Group if showParentGroup], Debit, Credit, Notes.
+  const tbColCount = 4 + (options.showParentGroup ? 1 : 0);
+  const { rowIdx, colIdx, setCell, setRowIdx } = useTableCellNav({
+    rowCount: filteredRows.length,
+    colCount: tbColCount,
+    onEnter: (r) => {
+      if (filteredRows[r]) {
+        const row = filteredRows[r];
+        navigate(`/accounts/ledger-statement?fmt=std&mode=one&acc=${row.ledgerId}&from=${asOnDate}&to=${asOnDate}`);
+      }
+    },
+    disabled: showOptionsDialog || showModeDialog,
+  });
+  // Scroll active row into view.
   useEffect(() => {
     if (rowIdx < 0) return;
     document.querySelector<HTMLElement>(`[data-tb-row="${rowIdx}"]`)?.scrollIntoView({ block: "nearest" });
   }, [rowIdx]);
-  useEffect(() => {
-    if (showOptionsDialog || showModeDialog) return;
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      const max = filteredRows.length - 1;
-      const cur = rowIdxRef.current;
-      if (e.key === "ArrowDown") { e.preventDefault(); setRowIdx(Math.min(cur + 1, max)); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); setRowIdx(Math.max(cur - 1, 0)); }
-      else if (e.key === "Home") { e.preventDefault(); setRowIdx(0); }
-      else if (e.key === "End") { e.preventDefault(); setRowIdx(max); }
-      else if (e.key === "PageDown") { e.preventDefault(); setRowIdx(Math.min(cur + 10, max)); }
-      else if (e.key === "PageUp") { e.preventDefault(); setRowIdx(Math.max(cur - 10, 0)); }
-      else if (e.key === "Enter" && cur >= 0 && filteredRows[cur]) {
-        // Drill into the ledger statement for the highlighted row.
-        e.preventDefault();
-        const r = filteredRows[cur];
-        navigate(`/accounts/ledger-statement?fmt=std&mode=one&acc=${r.ledgerId}&from=${asOnDate}&to=${asOnDate}`);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showOptionsDialog, showModeDialog, filteredRows, navigate, asOnDate]);
 
   // ─── Print / Export ─────────────────────────────────────────────
   const handlePrint = () => window.print();
@@ -448,6 +432,21 @@ const TrialBalancePage: React.FC = () => {
                     {filteredRows.map((r, i) => {
                       const isHl = rowIdx === i;
                       const rowCls = isHl ? "bg-black text-white" : "";
+                      // Column indices with conditional Parent Group:
+                      let cursor = 0;
+                      const accCol = cursor++;
+                      const grpCol = options.showParentGroup ? cursor++ : -1;
+                      const drCol = cursor++;
+                      const crCol = cursor++;
+                      const notesCol = cursor++;
+                      const ringFor = (col: number) =>
+                        isHl && col >= 0 && colIdx === col
+                          ? " ring-2 ring-yellow-400 ring-inset"
+                          : "";
+                      const clickFor = (col: number) => (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        if (col >= 0) setCell(i, col);
+                      };
                       return (
                         <tr
                           key={r.ledgerId}
@@ -459,21 +458,21 @@ const TrialBalancePage: React.FC = () => {
                           className="border-b border-line-soft/60 hover:bg-card-2/40 cursor-pointer"
                           title="Double-click (or Enter) to drill into ledger statement"
                         >
-                          <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase ${rowCls}`}>
+                          <td onClick={clickFor(accCol)} className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase ${rowCls}${ringFor(accCol)}`}>
                             {options.accountBy === "code" ? r.code : r.name}
                           </td>
                           {options.showParentGroup && (
-                            <td className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase text-ink-muted ${rowCls}`}>
+                            <td onClick={clickFor(grpCol)} className={`px-3 py-0.5 text-[13px] border-r border-line-soft/50 uppercase text-ink-muted ${rowCls}${ringFor(grpCol)}`}>
                               {r.group}
                             </td>
                           )}
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${rowCls}`}>
+                          <td onClick={clickFor(drCol)} className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${rowCls}${ringFor(drCol)}`}>
                             {fmt(r.debitBalance)}
                           </td>
-                          <td className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${rowCls}`}>
+                          <td onClick={clickFor(crCol)} className={`px-3 py-0.5 text-[13px] text-right font-mono border-r border-line-soft/50 ${rowCls}${ringFor(crCol)}`}>
                             {fmt(r.creditBalance)}
                           </td>
-                          <td className={`px-3 py-0.5 text-[13px] text-ink-subtle ${rowCls}`}>
+                          <td onClick={clickFor(notesCol)} className={`px-3 py-0.5 text-[13px] text-ink-subtle ${rowCls}${ringFor(notesCol)}`}>
                             &nbsp;
                           </td>
                         </tr>
