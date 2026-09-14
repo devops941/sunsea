@@ -271,14 +271,22 @@ export function computeEmployeePayroll(
   let grossSalary: number;
   let earnedSalary: number;
 
+  const initialCashInHand = Number(employee.cashInHand) || 0;
+  const dailyCashRate = (initialCashInHand > 0 && totalDays > 0)
+    ? initialCashInHand / totalDays
+    : 0;
+  let earnedCashInHand = initialCashInHand;
+
   if (isWeekly) {
     // WEEKLY: monthlySalary field stores the weekly gross salary (e.g. ₹5,000/week).
-    // Earned = dailyRate × paidDays (present + 0.5×halfDay + weeklyOff + holiday + paidLeave).
-    // Weekly off and holidays are paid as part of the weekly gross.
-    // Absent/LOP days are deducted at dailyRate each.
     grossSalary = employee.monthlySalary;
     earnedSalary = applyRounding(
       dailyRate * paidDays,
+      settings.roundingRule,
+      settings.decimalPrecision
+    );
+    earnedCashInHand = applyRounding(
+      dailyCashRate * paidDays,
       settings.roundingRule,
       settings.decimalPrecision
     );
@@ -291,14 +299,18 @@ export function computeEmployeePayroll(
       settings.roundingRule,
       settings.decimalPrecision
     );
+    earnedCashInHand = applyRounding(
+      totalDays > 0 ? (initialCashInHand * paidDays) / totalDays : 0,
+      settings.roundingRule,
+      settings.decimalPrecision
+    );
   }
 
-  // 5. OT + permission + late entry
+  // 5. OT + permission + late entry (Office Staff vs. Labour Rules)
   let totalOtHours = 0;
   let totalOtPay = 0;
   let totalPermMin = 0;
   let totalLateMin = 0;
-  let totalLateDeduction = 0;
 
   for (const day of days) {
     const isHoliday = day.status === 'HOLIDAY';
@@ -307,52 +319,106 @@ export function computeEmployeePayroll(
     totalOtPay += computeOtPay(day.otHours, dailyRate, settings, isHoliday, isWeeklyOff);
     totalPermMin += day.permissionMinutes;
     totalLateMin += day.lateMinutes;
-    // Late deduction: calculated per day so each day's minutes are checked against slabs independently
-    totalLateDeduction += computeLateEntryDeduction(day.lateMinutes, settings);
   }
 
   totalOtHours = Math.min(totalOtHours, settings.maxOtHoursPerWeek);
   totalOtPay = applyRounding(totalOtPay, settings.roundingRule, settings.decimalPrecision);
-  const lateEntryDeduction = applyRounding(
-    totalLateDeduction,
-    settings.roundingRule,
-    settings.decimalPrecision
-  );
-  const permissionDeduction = applyRounding(
-    computePermissionDeduction(totalPermMin, settings),
-    settings.roundingRule,
-    settings.decimalPrecision
-  );
 
-  // 6. PF — only for PF-eligible salary types
+  let lateEntryDeduction = 0;
+  let permissionDeduction = 0;
+
+  const empCat = String(employee.employeeCategory || (employee as any).category || '').toLowerCase();
+  const isDailyWeeklyType = ['DAILY_WEEKLY', 'WEEKLY'].includes(employee.salaryType || '');
+  const isOfficeStaff = !isDailyWeeklyType && (empCat === 'office_staff' || !empCat);
+
+  if (isOfficeStaff) {
+    // ── OFFICE STAFF RULE ──
+    // 1. Late minutes pool with permission minutes.
+    // 2. Free permission pool per period (configurable, default 240 minutes = 4 hrs).
+    // 3. Excess time beyond free pool deducted in 1-hour chunks at configurable rate (default ₹50/hr).
+    // 4. Late entry slab deduction is bypassed (₹0).
+    const freeMins = Number(settings.staffPermissionFreeMinutes ?? 240);
+    const hourlyRate = Number(settings.staffExcessHourlyRate ?? 50);
+    const totalPooledMinutes = totalPermMin + totalLateMin;
+    const excessMinutes = Math.max(0, totalPooledMinutes - freeMins);
+    const excessHours = Math.ceil(excessMinutes / 60);
+    permissionDeduction = excessHours * hourlyRate;
+    lateEntryDeduction = 0;
+  } else {
+    // ── LABOUR RULE ──
+    // 1. Daily grace time (configurable, default 10 min).
+    // 2. Late arrivals > grace time deducted via slabs.
+    // 3. Permission deduction follows standard permission slabs.
+    const graceMins = Number(settings.lateEntryGraceMinutes ?? 10);
+    const hasSlabs = settings.lateEntrySlabs?.length > 0;
+    let totalLateDeduction = 0;
+    for (const day of days) {
+      if (day.lateMinutes > graceMins) {
+        const slabAmount = hasSlabs ? lookupSlab(day.lateMinutes, settings.lateEntrySlabs) : 0;
+        if (slabAmount > 0) {
+          totalLateDeduction += slabAmount;
+        } else {
+          // No matching slab or no slabs configured — use per-minute rate
+          const lateRate = dailyRate / ((settings.standardWorkingHours || 8) * 60);
+          totalLateDeduction += (day.lateMinutes - graceMins) * lateRate;
+        }
+      }
+    }
+    lateEntryDeduction = applyRounding(
+      totalLateDeduction,
+      settings.roundingRule,
+      settings.decimalPrecision
+    );
+    permissionDeduction = applyRounding(
+      computePermissionDeduction(totalPermMin, settings),
+      settings.roundingRule,
+      settings.decimalPrecision
+    );
+  }
+
+  // 6. PF — only for PF-eligible salary types (60% of gross bank salary)
   const pfEligible = employee.salaryType === 'PF_MONTHLY' || employee.salaryType === 'FIXED_MONTHLY';
-  const pfWageRaw = settings.pfWageFormula === 'BASIC'
+  const grossForPf = earnedSalary + totalOtPay;
+  const pfWageBase = settings.pfWageFormula === 'BASIC' && employee.basicSalary > 0
     ? (employee.basicSalary * paidDays) / (totalDays || 1)
-    : earnedSalary;
+    : Math.round(grossForPf * 0.60);
+  const pfWageRaw = Math.min(pfWageBase, settings.maxPfWage);
   const pfWage = applyRounding(pfWageRaw, settings.pfRoundingRule);
   const { employeePf, employerPf } = pfEligible && settings.pfEnabled
     ? computePf(pfWage, settings)
     : { employeePf: 0, employerPf: 0 };
   const pfApplicable = pfEligible && settings.pfEnabled;
 
-  // 7. ESI
+  // 7. ESI (0.75% of gross bank salary)
   const grossForEsi = earnedSalary + totalOtPay;
   const { employeeEsi, employerEsi, applicable: esiApplicable } = computeEsi(grossForEsi, settings);
 
   // 8. Professional tax
   const professionalTax = settings.professionalTaxEnabled ? settings.professionalTaxAmount : 0;
 
-  // 9. Net
-  const totalDeductions = applyRounding(
-    employeePf + employeeEsi + professionalTax + lateEntryDeduction + permissionDeduction + salaryAdvanceAmount,
-    settings.roundingRule,
-    settings.decimalPrecision
-  );
+  // 9. Deduction Separation & Net
+  let bankNet = 0;
+  let finalCashInHand = 0;
+  let totalDeductions = 0;
 
-  // For WEEKLY: allow negative net salary when advance exceeds earned salary.
-  // The payslip displays the negative balance — employee owes the difference.
-  // For MONTHLY: clamp at 0 (excess advance carries forward to the next period).
-  const rawNet = earnedSalary + totalOtPay - totalDeductions;
+  if (initialCashInHand > 0 && pfApplicable) {
+    // PF Applicable employee with Cash in Hand:
+    const bankDeductions = employeePf + employeeEsi + professionalTax;
+    const cashDeductions = salaryAdvanceAmount + lateEntryDeduction + permissionDeduction;
+
+    bankNet = Math.max(0, earnedSalary + totalOtPay - bankDeductions);
+    finalCashInHand = Math.max(0, earnedCashInHand - cashDeductions);
+    totalDeductions = bankDeductions + cashDeductions;
+  } else {
+    // Standard employee: all deductions apply against gross
+    const standardDeductions = employeePf + employeeEsi + professionalTax + lateEntryDeduction + permissionDeduction + salaryAdvanceAmount;
+    totalDeductions = standardDeductions;
+    const rawBankNet = earnedSalary + totalOtPay - standardDeductions;
+    bankNet = isWeekly ? rawBankNet : Math.max(0, rawBankNet);
+    finalCashInHand = earnedCashInHand;
+  }
+
+  const rawNet = bankNet + finalCashInHand;
   const netSalary = applyRounding(
     isWeekly ? rawNet : Math.max(0, rawNet),
     settings.roundingRule,
@@ -402,6 +468,7 @@ export function computeEmployeePayroll(
     otherDeductions: 0,
     totalDeductions,
     netSalary,
+    cashInHand: finalCashInHand,
     paymentMode: (employee.salaryType === 'CASH_MONTHLY' || employee.salaryType === 'DAILY_WEEKLY') ? 'CASH' : 'BANK',
     hasVariance,
     varianceNote: hasVariance ? `Net ₹${netSalary} deviates >20% from monthly salary ₹${employee.monthlySalary}` : undefined,

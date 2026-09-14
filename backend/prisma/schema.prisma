@@ -556,6 +556,7 @@ model Shift {
   startTime            String
   endTime              String
   breakDuration        Int?
+  gracePeriod          Int?                         @default(15)
   isActive             Boolean                      @default(true)
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
@@ -2245,7 +2246,11 @@ model AttendanceRecord {
   period            String
   status            String
   shiftId           Int?
+  inTime            String?
+  outTime           String?
   otHours           Decimal  @default(0) @db.Decimal(10, 2)
+  otDays            Decimal  @default(0) @db.Decimal(10, 2)
+  teaOtCount        Int      @default(0)
   lateMinutes       Int      @default(0)
   permissionMinutes Int      @default(0)
   salaryAdvance     Decimal  @default(0) @db.Decimal(14, 2)
@@ -2299,6 +2304,7 @@ model PayrollConfig {
   maxOtHoursPerDay          Decimal  @default(4) @db.Decimal(5, 2)
   maxOtHoursPerWeek         Decimal  @default(20) @db.Decimal(5, 2)
   otSlabs                   Json     @default("[]")
+  teaOtRate                 Decimal  @default(0) @db.Decimal(10, 2)
   pfEnabled                 Boolean  @default(true)
   pfWageFormula             String   @default("BASIC")
   employeePfPercent         Decimal  @default(12) @db.Decimal(5, 2)
@@ -2311,7 +2317,9 @@ model PayrollConfig {
   maxEsiSalary              Decimal  @default(21000) @db.Decimal(10, 2)
   esiRoundingRule           String   @default("ROUND")
   paidLeavePerYear          Int      @default(12)
-  lateEntryGraceMinutes     Int      @default(5)
+  lateEntryGraceMinutes     Int      @default(10)
+  staffPermissionFreeMinutes Int     @default(240)
+  staffExcessHourlyRate     Decimal  @default(50) @db.Decimal(10, 2)
   permissionSlabs           Json     @default("[]")
   lateEntrySlabs            Json     @default("[]")
   professionalTaxEnabled    Boolean  @default(false)
@@ -2382,12 +2390,17 @@ model PayrollResult {
   loanRecovery        Decimal    @default(0) @db.Decimal(14, 2)
   otherDeductions     Decimal    @default(0) @db.Decimal(14, 2)
   totalDeductions     Decimal    @default(0) @db.Decimal(14, 2)
+  bankTransfer        Decimal    @default(0) @db.Decimal(14, 2)
+  cashPayment         Decimal    @default(0) @db.Decimal(14, 2)
+  cashPaid            Decimal    @default(0) @db.Decimal(14, 2)
+  actualSalary        Decimal    @default(0) @db.Decimal(14, 2)
   netSalary           Decimal    @default(0) @db.Decimal(14, 2)
   paymentMode         String     @default("CASH")
   hasVariance         Boolean    @default(false)
   varianceNote        String?
   lateEntryDeduction  Decimal    @default(0) @db.Decimal(14, 2)
   cashInHand          Decimal    @default(0) @db.Decimal(14, 2)
+  initialCashInHand   Decimal    @default(0) @db.Decimal(14, 2)
   payrollRun          PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee            Employee   @relation(fields: [employeeId], references: [id])
 

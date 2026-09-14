@@ -11,6 +11,7 @@ import {
   runActionSchema,
   listRunsSchema,
   createAdvanceSchema,
+  getBonusCalculationSchema,
 } from './payroll.validation';
 
 const router = Router();
@@ -31,6 +32,9 @@ router.put  ('/employees/:employeeId/config', validateMiddleware(upsertEmployeeP
 router.get  ('/attendance',     validateMiddleware(getAttendanceSchema),          payrollController.getAttendance);
 router.post ('/attendance',     validateMiddleware(bulkUpsertAttendanceSchema),   payrollController.bulkUpsertAttendance);
 
+// ─── Bonus Calculation ────────────────────────────────────────────────────────
+router.get  ('/bonus',          validateMiddleware(getBonusCalculationSchema),    payrollController.getBonusCalculation);
+
 // ─── Payroll Runs ─────────────────────────────────────────────────────────────
 router.get  ('/runs',           validateMiddleware(listRunsSchema),               payrollController.listRuns);
 router.post ('/runs',           validateMiddleware(createPayrollRunSchema),       payrollController.computeRun);
@@ -46,3 +50,4 @@ router.post  ('/advances',       validateMiddleware(createAdvanceSchema), payrol
 router.delete('/advances/:id',   payrollController.deleteAdvance);
 
 export default router;
+

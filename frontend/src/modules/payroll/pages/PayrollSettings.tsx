@@ -639,12 +639,28 @@ const PayrollSettings: React.FC = () => {
             {config.otEnabled && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
                 <TextInput
-                  label="Rate per Hour (₹)"
+                  label="OT Rate per Hour (₹)"
                   name="otRatePerHour" type="number"
                   value={String(config.otRatePerHour ?? 0)}
                   onChange={e => set({ otRatePerHour: Number(e.target.value) })}
                   onBlur={formatAmountOnBlur((v) => set({ otRatePerHour: Number(v) }))}
                 />
+                <TextInput
+                  label="Tea OT Rate (₹)"
+                  name="teaOtRate" type="number"
+                  value={String(config.teaOtRate ?? 0)}
+                  onChange={e => set({ teaOtRate: Number(e.target.value) })}
+                />
+              </div>
+            )}
+            {config.otEnabled && (
+              <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3.5 text-xs text-blue-400 font-medium mt-3">
+                <Info size={14} className="mt-0.5 shrink-0 text-blue-400" />
+                <div>
+                  <p className="font-bold mb-1">OT Pay Calculation</p>
+                  <p>OT Pay = (OT Hours × OT Rate/Hr) + (OT Days × Employee Daily Rate) + (Tea OT × Tea OT Rate)</p>
+                  <p className="mt-0.5 text-blue-400/80">OT Days uses the employee's daily salary rate, not the hourly rate.</p>
+                </div>
               </div>
             )}
           </div>
@@ -727,48 +743,87 @@ const PayrollSettings: React.FC = () => {
       key: 'deductions',
       label: 'Deductions',
       content: (
-        <Section title="Deductions">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TextInput label="Late Entry Grace Period (minutes)" name="lateEntryGraceMinutes" type="number"
-              value={String(config.lateEntryGraceMinutes ?? 5)}
-              onChange={e => set({ lateEntryGraceMinutes: Number(e.target.value) })}
-            />
-          </div>
-
-          <SlabConfigurator
-            title="Late Entry Deduction Slabs"
-            slabs={slabs.lateEntry}
-            onChange={s => handleSlabChange('lateEntry', s)}
-            canEdit={canEditSettings}
-            warningNote={
-              slabs.lateEntry.length === 0
-                ? 'No slabs configured — per-minute fallback will be used. Add slabs below to apply fixed deduction amounts.'
-                : undefined
-            }
-          />
-
-          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium">
-            <Info size={14} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-bold mb-1">How Late Entry Deduction works</p>
-              <p>If an employee is late by ≤ <strong>{config.lateEntryGraceMinutes ?? 5} min</strong> (grace period), <strong>no deduction</strong> is applied.</p>
-              <p className="mt-1">If late by more than the grace period, the <strong>total late minutes</strong> are looked up in the slab table above and that fixed amount is deducted.</p>
-              <p className="mt-1 text-primary">Example: Late 30 min → matches slab "21–60 min → ₹50" → ₹50 deducted.</p>
-              <p className="mt-1 text-primary">If no slabs are configured, a per-minute rate (Daily Rate ÷ Working Minutes) is used as fallback.</p>
+        <div className="space-y-6">
+          {/* Office Staff Policy */}
+          <Section title="Office Staff — Permission & Late Entry Policy">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <TextInput
+                  label="Free Permission Pool (Minutes)"
+                  name="staffPermissionFreeMinutes"
+                  type="number"
+                  value={String(config.staffPermissionFreeMinutes ?? 240)}
+                  onChange={e => set({ staffPermissionFreeMinutes: Number(e.target.value) })}
+                />
+                <p className="text-[11px] text-ink-subtle mt-1 font-medium">
+                  Default: 240 mins ({((config.staffPermissionFreeMinutes ?? 240) / 60).toFixed(1)} hours) per period.
+                </p>
+              </div>
+              <div>
+                <TextInput
+                  label="Excess Hourly Deduction Rate (₹/hour)"
+                  name="staffExcessHourlyRate"
+                  type="number"
+                  value={String(config.staffExcessHourlyRate ?? 50)}
+                  onChange={e => set({ staffExcessHourlyRate: Number(e.target.value) })}
+                />
+                <p className="text-[11px] text-ink-subtle mt-1 font-medium">
+                  Charged per 1-hour block (e.g. 1–60 mins excess = 1 hr = ₹{config.staffExcessHourlyRate ?? 50}).
+                </p>
+              </div>
             </div>
-          </div>
-          <SlabConfigurator
-            title="Permission Deduction Slabs"
-            slabs={slabs.perm}
-            onChange={s => handleSlabChange('perm', s)}
-            canEdit={canEditSettings}
-            warningNote={
-              slabs.perm.length === 0
-                ? 'No slabs configured — add slabs to apply deduction rules when employees take permission.'
-                : undefined
-            }
-          />
-        </Section>
+
+            <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3.5 text-xs text-blue-400 font-medium">
+              <Info size={14} className="mt-0.5 shrink-0 text-blue-400" />
+              <div>
+                <p className="font-bold mb-1">How Office Staff Policy Works</p>
+                <p>Office staff receive a monthly free pool of <strong>{config.staffPermissionFreeMinutes ?? 240} minutes ({((config.staffPermissionFreeMinutes ?? 240) / 60).toFixed(1)} hrs)</strong>.</p>
+                <p className="mt-0.5">Late arrival minutes automatically pool with permission minutes.</p>
+                <p className="mt-0.5">Any excess beyond the free pool is deducted at <strong>₹{config.staffExcessHourlyRate ?? 50} per hour</strong> in 1-hour chunks.</p>
+              </div>
+            </div>
+          </Section>
+
+          {/* Labour Policy */}
+          <Section title="Labour — Grace Time & Slab Deductions">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <TextInput
+                  label="Late Entry Grace Period (Minutes)"
+                  name="lateEntryGraceMinutes"
+                  type="number"
+                  value={String(config.lateEntryGraceMinutes ?? 10)}
+                  onChange={e => set({ lateEntryGraceMinutes: Number(e.target.value) })}
+                />
+                <p className="text-[11px] text-ink-subtle mt-1 font-medium">
+                  Daily grace time before late deductions start (Default: 10 mins).
+                </p>
+              </div>
+            </div>
+
+            <SlabConfigurator
+              title="Late Entry Deduction Slabs"
+              slabs={slabs.lateEntry}
+              onChange={s => handleSlabChange('lateEntry', s)}
+              canEdit={canEditSettings}
+              warningNote={
+                slabs.lateEntry.length === 0
+                  ? 'No slabs configured — per-minute fallback will be used. Add slabs below to apply fixed deduction amounts.'
+                  : undefined
+              }
+            />
+
+            <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium">
+              <Info size={14} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold mb-1">How Labour Late Entry Deduction works</p>
+                <p>If an employee is late by ≤ <strong>{config.lateEntryGraceMinutes ?? 10} min</strong> (grace period), <strong>no deduction</strong> is applied.</p>
+                <p className="mt-1">If late by more than the grace period on any day, the <strong>daily late minutes</strong> are looked up in the slab table above and that fixed amount is deducted.</p>
+                <p className="mt-1 text-primary">If no slabs are configured, a per-minute rate (Daily Rate ÷ Working Minutes) is used as fallback.</p>
+              </div>
+            </div>
+          </Section>
+        </div>
       ),
     },
   ];

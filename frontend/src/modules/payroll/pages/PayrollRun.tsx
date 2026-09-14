@@ -156,7 +156,7 @@ const Step1: React.FC<Step1Props> = ({
 }) => {
   // Filter employees strictly by selected Payroll Type (MONTHLY vs WEEKLY)
   const isWeeklyEmployee = (e: any) =>
-    e.payrollConfig?.salaryType === 'DAILY_WEEKLY' || e.salaryType === 'daily' || e.salaryType === 'weekly';
+    e.payrollConfig?.salaryType === 'DAILY_WEEKLY' || e.payrollConfig?.salaryType === 'WEEKLY' || e.salaryType === 'daily' || e.salaryType === 'weekly';
 
   const typeFiltered = employees.filter(e =>
     runType === 'WEEKLY' ? isWeeklyEmployee(e) : !isWeeklyEmployee(e)
@@ -583,9 +583,11 @@ const Step2: React.FC<{
       absent: acc.absent + Number(r.absentDays || 0),
       half: acc.half + Number(r.halfDays || 0),
       ot: acc.ot + Number(r.otHours || 0),
+      otDays: acc.otDays + Number(r.otDays || 0),
+      teaOt: acc.teaOt + Number(r.teaOtCount || 0),
       adv: acc.adv + Number(r.advance || 0),
     }),
-    { present: 0, absent: 0, half: 0, ot: 0, adv: 0 }
+    { present: 0, absent: 0, half: 0, ot: 0, otDays: 0, teaOt: 0, adv: 0 }
   );
   const totals = {
     ...totalsRaw,
@@ -700,6 +702,36 @@ const Step2: React.FC<{
       ),
     },
     {
+      header: "OT DAYS",
+      headerNode: (
+        <span>
+          OT <br />
+          <span className="font-normal normal-case text-ink-subtle">Days</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span className={`font-mono text-sm ${row.otDays > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
+          {row.otDays > 0 ? row.otDays.toFixed(1) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "TEA OT",
+      headerNode: (
+        <span>
+          Tea <br />
+          <span className="font-normal normal-case text-ink-subtle">OT</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span className={`font-mono text-sm ${row.teaOtCount > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
+          {row.teaOtCount > 0 ? row.teaOtCount : '—'}
+        </span>
+      ),
+    },
+    {
       header: "LATE MIN",
       headerNode: (
         <span>
@@ -784,22 +816,6 @@ const Step2: React.FC<{
         >
           <ClipboardList size={13} /> Edit Attendance
         </button>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {[
-          { label: 'Total Present', value: totals.present, cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-          { label: 'Total Absent', value: totals.absent, cls: 'text-red-600 bg-red-50 border-red-200' },
-          { label: 'Total Half Days', value: totals.half, cls: 'text-amber-600 bg-amber-50 border-amber-200' },
-          { label: 'Total OT Hours', value: totals.ot.toFixed(1), cls: 'text-blue-600 bg-blue-50 border-blue-200' },
-          { label: 'Total Advance', value: `₹${totals.adv.toLocaleString('en-IN')}`, cls: 'text-violet-600 bg-violet-50 border-violet-200' },
-        ].map(c => (
-          <div key={c.label} className={`rounded-xl border p-3.5 ${c.cls}`}>
-            <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{c.label}</p>
-            <p className="text-xl font-bold mt-0.5">{c.value}</p>
-          </div>
-        ))}
       </div>
 
       {/* Per-employee attendance breakdown using reusable DataTable component */}
@@ -954,33 +970,45 @@ const Step3: React.FC<{
 
   const handleExportCSV = () => {
     const headers = [
-      'Employee Code', 'Employee Name', 'Department', 'Pres Days', 'LOP Days',
-      'Daily Rate', 'Earned Salary', 'OT Pay', 'Gross Salary', 'Emp PF', 'Emp ESI',
-      'PT', 'Late Ded', 'Perm Ded', 'Advance', 'On-Record Net'
+      'S.No', 'Emp No', 'Employee Name', 'Actual Salary Per Month', '(PF) Gross Salary',
+      'Balance Cash Salary', 'PF Salary', 'Working Days', 'PF Salary (Earned)', 'ESI Salary',
+      'OT & Incentive', 'Salary Advance', 'Permission Deduction', 'Late Deduction',
+      'PF Deduction', 'ESI Deduction', 'Bank Transfer', 'Cash Payment', 'Cash Paid'
     ];
-    headers.push('Cash in Hand');
 
-    const rows = results.map(r => {
-      const row = [
+    const rows = results.map((r, idx) => {
+      const grossSal = Number(r.monthlySalary || 0);
+      const configuredCash = Number((r as any).initialCashInHand ?? r.cashInHand ?? 0);
+      const isCashEmp = r.paymentMode === 'CASH' && !r.pfApplicable;
+      const balanceCash = configuredCash > 0 ? configuredCash : (isCashEmp ? grossSal : 0);
+      const actualSalPerMonth = r.pfApplicable ? grossSal + configuredCash : grossSal;
+      const pfSalaryBase = r.pfApplicable ? grossSal * 0.60 : 0;
+      const pfSalaryEarned = Number(r.pfWage || 0);
+      const esiSalary = r.esiApplicable ? Number(r.grossSalary || 0) : 0;
+      const bankTransfer = Number(r.bankTransfer ?? 0);
+      const cashPayment = Number(r.cashPayment ?? r.actualSalary ?? r.netSalary);
+      const cashPaid = Number(r.cashPaid ?? r.netSalary);
+      return [
+        idx + 1,
         r.employeeCode,
         `"${r.employeeName.replace(/"/g, '""')}"`,
-        `"${(r.department || '').replace(/"/g, '""')}"`,
+        actualSalPerMonth.toFixed(2),
+        r.pfApplicable ? grossSal.toFixed(2) : '',
+        balanceCash > 0 ? balanceCash.toFixed(2) : '',
+        pfSalaryBase > 0 ? pfSalaryBase.toFixed(2) : '',
         Number(r.presentDays).toFixed(1),
-        Number(r.lopDays).toFixed(1),
-        Number(r.dailyRate).toFixed(2),
-        Number(r.earnedSalary).toFixed(2),
+        pfSalaryEarned > 0 ? pfSalaryEarned.toFixed(2) : '',
+        esiSalary > 0 ? esiSalary.toFixed(2) : '',
         Number(r.otPay).toFixed(2),
-        Number(r.grossSalary).toFixed(2),
+        Number(r.salaryAdvance).toFixed(2),
+        Number(r.permissionDeduction).toFixed(2),
+        Number(r.lateEntryDeduction).toFixed(2),
         Number(r.employeePf).toFixed(2),
         Number(r.employeeEsi).toFixed(2),
-        Number(r.professionalTax).toFixed(2),
-        Number(r.lateEntryDeduction).toFixed(2),
-        Number(r.permissionDeduction).toFixed(2),
-        Number(r.salaryAdvance).toFixed(2),
-        Number(r.netSalary).toFixed(2),
-      ];
-      row.push(Number(r.cashInHand || 0).toFixed(2));
-      return row.join(',');
+        bankTransfer > 0 ? bankTransfer.toFixed(2) : '',
+        cashPayment.toFixed(2),
+        cashPaid.toFixed(2),
+      ].join(',');
     });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
@@ -993,195 +1021,12 @@ const Step3: React.FC<{
     document.body.removeChild(link);
   };
 
-  const columns: DataTableColumn<ApiPayrollResult>[] = [
-    {
-      header: "Employee",
-      align: "left",
-      render: (r) => (
-        <div className="flex items-center gap-2">
-          {r.hasVariance && <AlertTriangle size={11} className="text-amber-500 shrink-0" />}
-          <div>
-            <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
-            <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Pres / LOP",
-      align: "center",
-      render: (r) => (
-        <div className="text-xs">
-          <span className="text-emerald-600 font-semibold">{Number(r.presentDays).toFixed(1)}</span>
-          <span className="text-text-muted"> / </span>
-          <span className={Number(r.lopDays) > 0 ? 'text-red-500 font-semibold' : 'text-text-muted'}>
-            {Number(r.lopDays).toFixed(1)}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "Daily Rate",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs cursor-help"
-          title={r.monthlySalary !== undefined
-            ? `Daily Rate = ₹${r.monthlySalary.toLocaleString('en-IN')} ÷ ${r.formulaDivisor || 1} days\n= ${fmtDec(Number(r.dailyRate))}/day`
-            : `Daily Rate\n= ${fmtDec(Number(r.dailyRate))}/day`}
-        >
-          {fmtDec(Number(r.dailyRate))}
-        </span>
-      ),
-    },
-    {
-      header: "Earned",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs cursor-help"
-          title={`Earned = Daily Rate × Payable Days\n= ${fmtDec(Number(r.dailyRate))} × ${Number(r.presentDays).toFixed(1)}d\n= ${fmtDec(Number(r.earnedSalary))}`}
-        >
-          {fmtRs(Number(r.earnedSalary))}
-        </span>
-      ),
-    },
-    {
-      header: "OT Pay",
-      align: "right",
-      render: (r) => (
-        <OtTooltip
-          otHours={Number(r.otHours)}
-          otPay={Number(r.otPay)}
-          dailyRate={Number(r.dailyRate)}
-        />
-      ),
-    },
-    {
-      header: "Gross",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs font-semibold cursor-help"
-          title={`Gross = Earned + OT\n= ${fmtDec(Number(r.earnedSalary))} + ${fmtDec(Number(r.otPay))}\n= ${fmtDec(Number(r.grossSalary))}`}
-        >
-          {fmtRs(Number(r.grossSalary))}
-        </span>
-      ),
-    },
-    {
-      header: "Emp PF",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs text-red-500 cursor-help"
-          title={r.pfApplicable
-            ? `PF Wage: ₹${Number(r.pfWage).toLocaleString('en-IN')}\nEmployee PF @ 12%\n= ${fmtRs(Number(r.employeePf))}`
-            : 'PF not applicable'}
-        >
-          {r.pfApplicable ? fmtRs(Number(r.employeePf)) : '—'}
-        </span>
-      ),
-    },
-    {
-      header: "Emp ESI",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs text-red-500 cursor-help"
-          title={r.esiApplicable
-            ? `ESI on Gross ₹${fmtRs(Number(r.grossSalary))}\nEmployee ESI @ 0.75%\n= ${fmtRs(Number(r.employeeEsi))}`
-            : 'ESI not applicable (gross > limit)'}
-        >
-          {r.esiApplicable ? fmtRs(Number(r.employeeEsi)) : '—'}
-        </span>
-      ),
-    },
-    {
-      header: "PT",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs text-red-500 cursor-help"
-          title={Number(r.professionalTax) > 0
-            ? `Professional Tax (monthly slab)\n= ${fmtRs(Number(r.professionalTax))}`
-            : 'PT: ₹0 (weekly run — applied in monthly payroll)'}
-        >
-          {Number(r.professionalTax) > 0 ? fmtRs(Number(r.professionalTax)) : '—'}
-        </span>
-      ),
-    },
-    {
-      header: "Late Ded",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs text-red-500 cursor-help"
-          title={Number(r.lateEntryDeduction) > 0
-            ? `Late Entry Deduction\n= ${r.lateMinutes ? r.lateMinutes + ' mins late' : 'Calculated by Slab'}\n= ${fmtRs(Number(r.lateEntryDeduction))}`
-            : 'No late entry deduction'}
-        >
-          {Number(r.lateEntryDeduction) > 0 ? fmtRs(Number(r.lateEntryDeduction)) : '—'}
-        </span>
-      ),
-    },
-    {
-      header: "Perm Ded",
-      align: "right",
-      render: (r) => (
-        <span
-          className="font-mono text-xs text-red-500 cursor-help"
-          title={Number(r.permissionDeduction) > 0
-            ? `Permission Deduction\n= ${r.permissionMinutes ? r.permissionMinutes + ' mins permission' : 'Calculated by Slab'}\n= ${fmtRs(Number(r.permissionDeduction))}`
-            : 'No permission deduction'}
-        >
-          {Number(r.permissionDeduction) > 0 ? fmtRs(Number(r.permissionDeduction)) : '—'}
-        </span>
-      ),
-    },
-    {
-      header: "Advance",
-      align: "right",
-      render: (r) => (
-        <EditableAdvanceInput
-          initialValue={Number(r.salaryAdvance)}
-          employeeId={Number(r.employeeId)}
-          textColorClass="text-red-600"
-          onSave={(empId, amount) => onAdvanceChange?.(empId, amount)}
-        />
-      ),
-    },
-    {
-      header: "Cash in Hand",
-      align: "right" as const,
-      render: (r: ApiPayrollResult) => (
-        <span className="font-mono text-xs text-indigo-600 font-semibold">
-          {Number(r.cashInHand || 0) > 0
-            ? fmtRs(Number(r.cashInHand || 0))
-            : '—'}
-        </span>
-      ),
-    },
-    {
-      header: "Net Salary",
-      align: "right",
-      render: (r) => (
-        <div className="text-right">
-          <span
-            className="font-mono font-bold text-xs text-text-primary cursor-help block"
-            title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
-          >
-            {fmtRs(Number(r.netSalary))}
-          </span>
-          {Number(r.cashInHand || 0) > 0 && (
-            <span className="text-[10px] font-mono text-indigo-600 block">
-              (incl. Cash: {fmtRs(Number(r.cashInHand || 0))})
-            </span>
-          )}
-        </div>
-      ),
-    },
-  ];
+  // Table cell helpers
+  const th = "px-3 py-2.5 text-center border-r border-line-soft whitespace-nowrap align-middle";
+  const thR = "px-3 py-2.5 text-right border-r border-line-soft whitespace-nowrap align-middle";
+  const td = "px-3 py-2 text-center border-r border-line-soft font-mono whitespace-nowrap";
+  const tdR = "px-3 py-2 text-right border-r border-line-soft font-mono whitespace-nowrap";
+  const tdDed = "px-3 py-2 text-right border-r border-line-soft font-mono text-red-500 whitespace-nowrap";
 
   return (
     <div className="space-y-5">
@@ -1226,24 +1071,6 @@ const Step3: React.FC<{
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Gross Payroll', value: fmtRs(Number(run.totalGross || 0)), icon: TrendingUp, cls: 'text-blue-600 bg-blue-50' },
-          { label: 'Net Payroll', value: fmtRs(Number(run.totalNetSalary || 0)), icon: IndianRupee, cls: 'text-emerald-600 bg-emerald-50' },
-          { label: 'PF Liability', value: fmtRs(Number(run.totalPfEmployee || 0) + Number(run.totalPfEmployer || 0)), icon: Building2, cls: 'text-violet-600 bg-violet-50' },
-          { label: 'ESI Liability', value: fmtRs(Number(run.totalEsiEmployee || 0) + Number(run.totalEsiEmployer || 0)), icon: FileText, cls: 'text-amber-600 bg-amber-50' },
-        ].map(c => (
-          <div key={c.label} className="bg-card rounded-xl border border-line-soft p-4 shadow-xs">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">{c.label}</p>
-              <div className={`p-1.5 rounded-lg ${c.cls}`}><c.icon size={13} /></div>
-            </div>
-            <p className="text-lg font-bold text-text-primary">{c.value}</p>
-          </div>
-        ))}
-      </div>
-
       {/* Variance alert */}
       {variances.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1.5">
@@ -1258,72 +1085,132 @@ const Step3: React.FC<{
         </div>
       )}
 
-      {/* Results table using reusable DataTable component */}
+      {/* Results table — Excel-style matching factory salary sheet */}
       <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
-        <DataTable
-          columns={columns}
-          data={results}
-          rowKey={(r) => r.id}
-          emptyMessage="No payroll results found."
-          rowClassName={(r) => (r.hasVariance ? 'border-l-2 border-l-amber-400' : '')}
-          density="compact"
-        />
-        {/* Total Summary Footer */}
-        <div className="bg-card border-t border-line-soft">
-          <div className="flex flex-col xl:flex-row items-center justify-between">
-            {/* Left side: Total count */}
-            <div className="px-6 py-4 flex items-center xl:border-r border-line-soft xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card-2 text-ink-muted font-bold">
-                  <Users size={18} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest">Total Employees</p>
-                  <p className="text-sm font-bold text-ink">{results.length}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Middle: Breakdowns */}
-            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-line-soft">
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Earned</span>
-                <span className="font-mono font-semibold text-ink">{fmtRs(results.reduce((s, r) => s + Number(r.earnedSalary), 0))}</span>
-              </div>
-              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">OT</span>
-                <span className="font-mono font-semibold text-emerald-600">{fmtRs(results.reduce((s, r) => s + Number(r.otPay), 0))}</span>
-              </div>
-              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-1">Gross</span>
-                <span className="font-mono font-bold text-ink">{fmtRs(run.totalGross)}</span>
-              </div>
-              <div className="h-8 w-px bg-line-soft hidden sm:block"></div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Deductions</span>
-                <span className="font-mono font-semibold text-rose-600">
-                  PF {fmtRs(results.reduce((s, r) => s + Number(r.employeePf), 0))} · ESI {fmtRs(results.reduce((s, r) => s + Number(r.employeeEsi), 0))}
-                </span>
-              </div>
-            </div>
-
-            {/* Right side: Final numbers */}
-            <div className="flex items-stretch xl:border-l border-line-soft bg-card-2 w-full xl:w-auto">
-              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-line-soft flex-1 xl:flex-none">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Net Pay</span>
-                <span className="font-mono text-xl font-black text-emerald-700">{fmtRs(run.totalNetSalary)}</span>
-              </div>
-
-              {totalCashInHand > 0 && (
-                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50 flex-1 xl:flex-none">
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Cash in Hand</span>
-                  <span className="font-mono text-xl font-black text-indigo-700">{fmtRs(totalCashInHand)}</span>
-                </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-max w-full text-xs border-collapse text-ink">
+            <thead>
+              <tr className="bg-card-2 text-ink font-extrabold uppercase text-[11px] tracking-wider border-b border-line-soft">
+                <th className={`${th} min-w-[40px]`}>S.No</th>
+                <th className={`${th} min-w-[60px]`}>Emp No</th>
+                <th className={`${th} min-w-[140px] text-left`}>Employee Name</th>
+                <th className={`${thR} min-w-[110px]`}>Actual Salary<br /><span className="font-normal normal-case text-ink-subtle">Per Month</span></th>
+                <th className={`${thR} min-w-[100px]`}>(PF) Gross<br /><span className="font-normal normal-case text-ink-subtle">Salary</span></th>
+                <th className={`${thR} min-w-[100px]`}>Balance<br /><span className="font-normal normal-case text-ink-subtle">Cash Salary</span></th>
+                <th className={`${thR} min-w-[80px]`}>PF<br /><span className="font-normal normal-case text-ink-subtle">Salary</span></th>
+                <th className={`${th} min-w-[70px]`}>Working<br /><span className="font-normal normal-case text-ink-subtle">Days</span></th>
+                <th className={`${thR} min-w-[90px]`}>PF<br /><span className="font-normal normal-case text-ink-subtle">Salary</span></th>
+                <th className={`${thR} min-w-[90px]`}>ESI<br /><span className="font-normal normal-case text-ink-subtle">Salary</span></th>
+                <th className={`${thR} min-w-[90px] bg-blue-500/10 text-blue-600`}>OT &<br /><span className="font-normal normal-case">Incentive</span></th>
+                <th className={`${thR} min-w-[80px] text-red-500`}>Salary<br /><span className="font-normal normal-case">Advance</span></th>
+                <th className={`${thR} min-w-[90px] text-red-500`}>Permission<br /><span className="font-normal normal-case">Deduction</span></th>
+                <th className={`${thR} min-w-[80px] text-red-500`}>Late<br /><span className="font-normal normal-case">Deduction</span></th>
+                <th className={`${thR} min-w-[80px] text-red-500`}>PF<br /><span className="font-normal normal-case">Deduction</span></th>
+                <th className={`${thR} min-w-[80px] text-red-500`}>ESI<br /><span className="font-normal normal-case">Deduction</span></th>
+                <th className={`${thR} min-w-[100px]`}>Bank<br /><span className="font-normal normal-case text-ink-subtle">Transfer</span></th>
+                <th className={`${thR} min-w-[100px]`}>Cash<br /><span className="font-normal normal-case text-ink-subtle">Payment</span></th>
+                <th className="px-3 py-2.5 text-right min-w-[100px] whitespace-nowrap align-middle bg-emerald-500/10 text-emerald-700 font-black">Cash<br /><span className="font-normal normal-case">Paid</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line-soft bg-card">
+              {results.length === 0 && (
+                <tr><td colSpan={19} className="h-24 text-center text-ink-muted font-medium">No payroll results found.</td></tr>
               )}
-            </div>
-          </div>
+              {results.map((r, idx) => {
+                const grossSal = Number(r.monthlySalary || 0);
+                const configuredCash = Number((r as any).initialCashInHand ?? r.cashInHand ?? 0);
+                const isCashEmployee = r.paymentMode === 'CASH' && !r.pfApplicable;
+                const balanceCashSalary = configuredCash > 0 ? configuredCash : (isCashEmployee ? grossSal : 0);
+                const actualSalPerMonth = r.pfApplicable ? grossSal + configuredCash : grossSal;
+                const pfSalaryBase = r.pfApplicable ? grossSal * 0.60 : 0;
+                const pfSalaryEarned = Number(r.pfWage || 0);
+                const esiSalary = r.pfApplicable ? Number(r.grossSalary || 0) : 0;
+                const bankTransfer = Number(r.bankTransfer ?? 0);
+                const cashPayment = Number(r.cashPayment ?? r.actualSalary ?? r.netSalary);
+                const cashPaid = Number(r.cashPaid ?? r.netSalary);
+                return (
+                <tr key={r.id} className={`hover:bg-primary/5 transition-colors ${r.hasVariance ? 'border-l-2 border-l-amber-400' : ''}`}>
+                  <td className={`${td} text-ink-muted`}>{idx + 1}</td>
+                  <td className={`${td} font-semibold`}>{r.employeeCode}</td>
+                  <td className="px-3 py-2 border-r border-line-soft min-w-[140px]">
+                    <p className="font-semibold text-ink text-xs">{r.employeeName}</p>
+                  </td>
+                  <td className={`${tdR} font-bold`}>{fmtRs(actualSalPerMonth)}</td>
+                  <td className={tdR}>{r.pfApplicable ? fmtRs(grossSal) : '—'}</td>
+                  <td className={tdR}>{balanceCashSalary > 0 ? fmtRs(balanceCashSalary) : '—'}</td>
+                  <td className={tdR}>{pfSalaryBase > 0 ? fmtRs(pfSalaryBase) : '—'}</td>
+                  <td className={td}>{Number(r.presentDays).toFixed(1)}</td>
+                  <td className={tdR}>{pfSalaryEarned > 0 ? fmtDec(pfSalaryEarned) : '—'}</td>
+                  <td className={tdR}>{esiSalary > 0 ? fmtDec(esiSalary) : '—'}</td>
+                  <td className={`${tdR} bg-blue-500/5 font-semibold text-blue-600`}>
+                    {Number(r.otPay) > 0 ? fmtRs(Number(r.otPay)) : '—'}
+                  </td>
+                  <td className={tdDed}>
+                    <EditableAdvanceInput
+                      initialValue={Number(r.salaryAdvance)}
+                      employeeId={Number(r.employeeId)}
+                      textColorClass="text-red-600"
+                      onSave={(empId, amount) => onAdvanceChange?.(empId, amount)}
+                    />
+                  </td>
+                  <td className={tdDed}>{Number(r.permissionDeduction) > 0 ? fmtRs(Number(r.permissionDeduction)) : '—'}</td>
+                  <td className={tdDed}>{Number(r.lateEntryDeduction) > 0 ? fmtRs(Number(r.lateEntryDeduction)) : '—'}</td>
+                  <td className={tdDed}>{r.pfApplicable ? fmtRs(Number(r.employeePf)) : '—'}</td>
+                  <td className={tdDed}>{r.esiApplicable ? fmtRs(Number(r.employeeEsi)) : '—'}</td>
+                  <td className={`${tdR} font-semibold`}>{bankTransfer > 0 ? fmtRs(bankTransfer) : '—'}</td>
+                  <td className={`${tdR} font-semibold`}>{fmtRs(cashPayment)}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap font-mono font-black text-emerald-700 bg-emerald-500/5">{fmtRs(cashPaid)}</td>
+                </tr>
+                );
+              })}
+              {/* Totals row */}
+              {results.length > 0 && (() => {
+                const totActualSalPerMonth = results.reduce((s, r) => {
+                  const g = Number(r.monthlySalary || 0);
+                  const c = Number((r as any).initialCashInHand ?? r.cashInHand ?? 0);
+                  return s + (r.pfApplicable ? g + c : g);
+                }, 0);
+                const totBalanceCash = results.reduce((s, r) => {
+                  const c = Number((r as any).initialCashInHand ?? r.cashInHand ?? 0);
+                  const isCash = r.paymentMode === 'CASH' && !r.pfApplicable;
+                  return s + (c > 0 ? c : (isCash ? Number(r.monthlySalary || 0) : 0));
+                }, 0);
+                const totGrossPf = results.reduce((s, r) => {
+                  return s + (r.pfApplicable ? Number(r.monthlySalary || 0) : 0);
+                }, 0);
+                const totOt = results.reduce((s, r) => s + Number(r.otPay || 0), 0);
+                const totAdv = results.reduce((s, r) => s + Number(r.salaryAdvance || 0), 0);
+                const totPerm = results.reduce((s, r) => s + Number(r.permissionDeduction || 0), 0);
+                const totLate = results.reduce((s, r) => s + Number(r.lateEntryDeduction || 0), 0);
+                const totPf = results.reduce((s, r) => s + Number(r.employeePf || 0), 0);
+                const totEsi = results.reduce((s, r) => s + Number(r.employeeEsi || 0), 0);
+                const totBank = results.reduce((s, r) => s + Number(r.bankTransfer ?? 0), 0);
+                const totCashPay = results.reduce((s, r) => s + Number(r.cashPayment ?? r.actualSalary ?? r.netSalary), 0);
+                const totCashPaid = results.reduce((s, r) => s + Number(r.cashPaid ?? r.netSalary), 0);
+                return (
+                  <tr className="bg-card-2 font-bold border-t-2 border-line-soft text-ink">
+                    <td className={`${td} font-black`} colSpan={3}>TOTAL ({results.length} employees)</td>
+                    <td className={`${tdR} font-black`}>{fmtRs(totActualSalPerMonth)}</td>
+                    <td className={tdR}>{totGrossPf > 0 ? fmtRs(totGrossPf) : '—'}</td>
+                    <td className={tdR}>{totBalanceCash > 0 ? fmtRs(totBalanceCash) : '—'}</td>
+                    <td className={tdR}></td>
+                    <td className={td}></td>
+                    <td className={tdR}></td>
+                    <td className={tdR}></td>
+                    <td className={`${tdR} text-blue-600`}>{totOt > 0 ? fmtRs(totOt) : '—'}</td>
+                    <td className={tdDed}>{totAdv > 0 ? fmtRs(totAdv) : '—'}</td>
+                    <td className={tdDed}>{totPerm > 0 ? fmtRs(totPerm) : '—'}</td>
+                    <td className={tdDed}>{totLate > 0 ? fmtRs(totLate) : '—'}</td>
+                    <td className={tdDed}>{totPf > 0 ? fmtRs(totPf) : '—'}</td>
+                    <td className={tdDed}>{totEsi > 0 ? fmtRs(totEsi) : '—'}</td>
+                    <td className={`${tdR} font-black`}>{totBank > 0 ? fmtRs(totBank) : '—'}</td>
+                    <td className={`${tdR} font-black`}>{fmtRs(totCashPay)}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap font-mono font-black text-emerald-700 bg-emerald-500/5">{fmtRs(totCashPaid)}</td>
+                  </tr>
+                );
+              })()}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1911,6 +1798,8 @@ const PayrollRun: React.FC = () => {
           absentDays: 0,
           halfDays: 0,
           otHours: 0,
+          otDays: 0,
+          teaOtCount: 0,
           lateMinutes: 0,
           dailyLateMinutes: [],
           permissionMinutes: 0,
@@ -1925,16 +1814,18 @@ const PayrollRun: React.FC = () => {
           });
           const uniqueRecs = Array.from(uniqueMap.values());
 
-          type Agg = { present: number; absent: number; half: number; ot: number; late: number; dailyLate: number[]; perm: number; adv: number };
+          type Agg = { present: number; absent: number; half: number; ot: number; otDays: number; teaOt: number; late: number; dailyLate: number[]; perm: number; adv: number };
           const agg: Record<number, Agg> = {};
           uniqueRecs.forEach((r: any) => {
             const empId = Number(r.employeeId);
-            if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
+            if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, otDays: 0, teaOt: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
             if (r.status === 'PRESENT') agg[empId].present++;
             if (runType === 'MONTHLY' && (r.status === 'WEEKLY_OFF' || r.status === 'HOLIDAY' || r.status === 'LEAVE_PAID')) agg[empId].present++;
             if (r.status === 'ABSENT' || r.status === 'LEAVE_UNPAID') agg[empId].absent++;
             if (r.status === 'HALF_DAY') agg[empId].half++;
             agg[empId].ot += Number(r.otHours);
+            agg[empId].otDays += Number(r.otDays ?? 0);
+            agg[empId].teaOt += Number(r.teaOtCount ?? 0);
             agg[empId].late += Number(r.lateMinutes);
             agg[empId].dailyLate.push(Number(r.lateMinutes));
             agg[empId].perm += Number(r.permissionMinutes);
@@ -1949,6 +1840,8 @@ const PayrollRun: React.FC = () => {
               absentDays: a.absent,
               halfDays: a.half,
               otHours: a.ot,
+              otDays: a.otDays,
+              teaOtCount: a.teaOt,
               lateMinutes: a.late,
               dailyLateMinutes: a.dailyLate,
               permissionMinutes: a.perm,
@@ -2025,7 +1918,7 @@ const PayrollRun: React.FC = () => {
 
   // Rebuild att rows when category/employees change
   const isWeeklyEmployee = (e: any) =>
-    e.payrollConfig?.salaryType === 'DAILY_WEEKLY' || e.salaryType === 'daily' || e.salaryType === 'weekly';
+    e.payrollConfig?.salaryType === 'DAILY_WEEKLY' || e.payrollConfig?.salaryType === 'WEEKLY' || e.salaryType === 'daily' || e.salaryType === 'weekly';
 
   const handleCategoryChange = (c: SalaryCategory) => {
     setAttValidationError(null);
@@ -2043,6 +1936,8 @@ const PayrollRun: React.FC = () => {
       absentDays: 0,
       halfDays: 0,
       otHours: 0,
+      otDays: 0,
+      teaOtCount: 0,
       lateMinutes: 0,
       dailyLateMinutes: [],
       permissionMinutes: 0,
@@ -2071,6 +1966,8 @@ const PayrollRun: React.FC = () => {
       absentDays: 0,
       halfDays: 0,
       otHours: 0,
+      otDays: 0,
+      teaOtCount: 0,
       lateMinutes: 0,
       dailyLateMinutes: [],
       permissionMinutes: 0,
@@ -2119,16 +2016,18 @@ const PayrollRun: React.FC = () => {
     }
 
     // ── All employees complete — aggregate attendance ──────────────────────────
-    type Agg = { present: number; absent: number; half: number; ot: number; late: number; dailyLate: number[]; perm: number; adv: number };
+    type Agg = { present: number; absent: number; half: number; ot: number; otDays: number; teaOt: number; late: number; dailyLate: number[]; perm: number; adv: number };
     const agg: Record<number, Agg> = {};
     uniqueRecords.forEach((r: any) => {
       const empId = Number(r.employeeId);
-      if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
+      if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, otDays: 0, teaOt: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
       if (r.status === 'PRESENT') agg[empId].present++;
       if (runType === 'MONTHLY' && (r.status === 'WEEKLY_OFF' || r.status === 'HOLIDAY' || r.status === 'LEAVE_PAID')) agg[empId].present++;
       if (r.status === 'ABSENT' || r.status === 'LEAVE_UNPAID') agg[empId].absent++;
       if (r.status === 'HALF_DAY') agg[empId].half++;
       agg[empId].ot += Number(r.otHours);
+      agg[empId].otDays += Number(r.otDays ?? 0);
+      agg[empId].teaOt += Number(r.teaOtCount ?? 0);
       agg[empId].late += Number(r.lateMinutes);
       agg[empId].dailyLate.push(Number(r.lateMinutes));
       agg[empId].perm += Number(r.permissionMinutes);
@@ -2176,6 +2075,8 @@ const PayrollRun: React.FC = () => {
           absentDays: a?.absent ?? 0,
           halfDays: a?.half ?? 0,
           otHours: a?.ot ?? 0,
+          otDays: a?.otDays ?? 0,
+          teaOtCount: a?.teaOt ?? 0,
           lateMinutes: a?.late ?? 0,
           dailyLateMinutes: a?.dailyLate ?? [],
           permissionMinutes: a?.perm ?? 0,
@@ -2202,6 +2103,8 @@ const PayrollRun: React.FC = () => {
         absentDays: r.absentDays,
         halfDays: r.halfDays,
         otHours: r.otHours,
+        otDays: r.otDays,
+        teaOtCount: r.teaOtCount,
         lateMinutes: r.lateMinutes,
         dailyLateMinutes: r.dailyLateMinutes ?? [],
         permissionMinutes: r.permissionMinutes,
@@ -2224,6 +2127,8 @@ const PayrollRun: React.FC = () => {
       absentDays: r.absentDays,
       halfDays: r.halfDays,
       otHours: r.otHours,
+      otDays: r.otDays,
+      teaOtCount: r.teaOtCount,
       lateMinutes: r.lateMinutes,
       dailyLateMinutes: r.dailyLateMinutes ?? [],
       permissionMinutes: r.permissionMinutes,

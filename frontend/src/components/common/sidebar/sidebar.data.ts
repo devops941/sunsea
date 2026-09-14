@@ -1070,6 +1070,7 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "payroll-settings.view", path: "/payroll/settings" },
       { permission: "payroll-attendance.view", path: "/payroll/attendance" },
       { permission: "payroll-advance.view", path: "/payroll/advance" },
+      { permission: "payroll.view", path: "/payroll/bonus" },
     ],
     children: [
       {
@@ -1086,6 +1087,11 @@ export const sidebarItems: SidebarItem[] = [
         title: "Attendance",
         path: "/payroll/attendance",
         permission: "payroll-attendance.view",
+      },
+      {
+        title: "Bonus Calculation",
+        path: "/payroll/bonus",
+        permission: "payroll.view",
       },
       {
         title: "Salary Advances",
@@ -1114,6 +1120,7 @@ export const sidebarItems: SidebarItem[] = [
       "/payroll/settings",
       "/payroll/attendance",
       "/payroll/advance",
+      "/payroll/bonus",
       "/payroll/weekly-report",
       "/payroll/monthly-report",
     ],
@@ -1126,3 +1133,4 @@ export const sidebarItems: SidebarItem[] = [
     ],
   },
 ];
+

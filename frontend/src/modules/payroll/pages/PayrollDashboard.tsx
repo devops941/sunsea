@@ -4,8 +4,9 @@ import {
   Users, IndianRupee, Clock, CheckCircle2,
   CalendarDays, FileText, Settings, BarChart3, ChevronRight,
   PlayCircle, AlertCircle, Building2, Loader2, ClipboardList, Trash2, Wallet,
-  Calendar, RotateCcw,
+  Calendar, RotateCcw, Gift,
 } from 'lucide-react';
+
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { toast } from 'react-toastify';
 import { StatusBadge } from '../../../components/ui/StatusBadge/Badge';
@@ -326,10 +327,12 @@ const PayrollDashboard: React.FC = () => {
           { label: 'Attendance',       path: '/payroll/attendance',       icon: ClipboardList, active: false, show: can("payroll-attendance.view") },
           // { label: 'Generate Weekly',  path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false, show: canCreateRun },
           // { label: 'Generate Monthly', path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false, show: canCreateRun },
+          { label: 'Bonus Calculation', path: '/payroll/bonus',           icon: Gift,          active: false, show: canViewRun },
           { label: 'Weekly Report',    path: '/payroll/weekly-report',    icon: FileText,      active: false, show: canViewRun },
           { label: 'Monthly Report',   path: '/payroll/monthly-report',   icon: FileText,      active: false, show: canViewRun },
           { label: 'Salary Advance',   path: '/payroll/advance',          icon: Wallet,        active: false, show: can("payroll-advance.view") },
           { label: 'Settings',         path: '/payroll/settings',         icon: Settings,      active: false, show: can("payroll-settings.view") },
+
         ].filter(t => t.show).map(tab => (
           <button
             key={tab.label}

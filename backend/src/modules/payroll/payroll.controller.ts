@@ -62,7 +62,11 @@ class PayrollController {
       date:              r.date,
       period,
       status:            r.status,
+      inTime:            r.inTime ?? null,
+      outTime:           r.outTime ?? null,
       otHours:           r.otHours ?? 0,
+      otDays:            r.otDays ?? 0,
+      teaOtCount:        r.teaOtCount ?? 0,
       lateMinutes:       r.lateMinutes ?? 0,
       permissionMinutes: r.permissionMinutes ?? 0,
       salaryAdvance:     r.salaryAdvance ?? 0,
@@ -176,6 +180,18 @@ class PayrollController {
     await payrollService.deleteAdvance(parseInt(String(req.params.id), 10));
     res.json(new ApiResponse('Advance deleted', null));
   });
+
+  // ── Bonus Calculation ───────────────────────────────────────────────────────
+  getBonusCalculation = asyncHandler(async (req: Request, res: Response) => {
+    const { startDate, endDate, category } = req.query as {
+      startDate: string;
+      endDate: string;
+      category?: string;
+    };
+    const result = await payrollService.getBonusCalculation({ startDate, endDate, category });
+    res.json(new ApiResponse('Bonus calculation fetched', result));
+  });
 }
 
 export const payrollController = new PayrollController();
+

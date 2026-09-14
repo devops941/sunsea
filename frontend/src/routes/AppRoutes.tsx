@@ -255,8 +255,10 @@ const AttendancePage = lazy(() => import("../modules/payroll/pages/AttendancePag
 const SalaryAdvancePage = lazy(() => import("../modules/payroll/pages/SalaryAdvancePage"));
 const MonthlyPayrollReport = lazy(() => import("../modules/payroll/pages/MonthlyPayrollReport"));
 const WeeklyPayrollReport = lazy(() => import("../modules/payroll/pages/WeeklyPayrollReport"));
+const BonusCalculationPage = lazy(() => import("../modules/payroll/pages/BonusCalculationPage"));
 
 const LoadingFallback = () => <CommonLoader text="Loading..." />;
+
 
 const AppRoutes = () => {
   return (
@@ -731,7 +733,9 @@ const AppRoutes = () => {
               <Route path="/payroll/advance" element={<SalaryAdvancePage />} />
               <Route path="/payroll/monthly-report" element={<MonthlyPayrollReport />} />
               <Route path="/payroll/weekly-report" element={<WeeklyPayrollReport />} />
+              <Route path="/payroll/bonus" element={<BonusCalculationPage />} />
             </Route>
+
 
           </Route>
         </Route>
