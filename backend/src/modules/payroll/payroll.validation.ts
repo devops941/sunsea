@@ -20,6 +20,7 @@ export const updatePayrollConfigSchema = z.object({
     maxOtHoursPerDay:          z.coerce.number().min(0).optional(),
     maxOtHoursPerWeek:         z.coerce.number().min(0).optional(),
     otSlabs:                   z.array(z.any()).optional(),
+    teaOtRate:                 z.coerce.number().min(0).optional(),
 
     pfEnabled:                 z.boolean().optional(),
     pfWageFormula:             z.enum(['BASIC', 'GROSS']).optional(),
@@ -36,6 +37,8 @@ export const updatePayrollConfigSchema = z.object({
 
     paidLeavePerYear:          z.coerce.number().int().min(0).optional(),
     lateEntryGraceMinutes:     z.coerce.number().int().min(0).optional(),
+    staffPermissionFreeMinutes: z.coerce.number().int().min(0).optional(),
+    staffExcessHourlyRate:     z.coerce.number().min(0).optional(),
     lateEntrySlabs:            z.array(z.any()).optional(),
     permissionSlabs:           z.array(z.any()).optional(),
 
@@ -52,7 +55,7 @@ export const updatePayrollConfigSchema = z.object({
 // ─── Employee Payroll Config ──────────────────────────────────────────────────
 export const upsertEmployeePayrollSchema = z.object({
   body: z.object({
-    salaryType:     z.enum(['FIXED_MONTHLY', 'PF_MONTHLY', 'CASH_MONTHLY', 'DAILY_WEEKLY']),
+    salaryType:     z.enum(['FIXED_MONTHLY', 'PF_MONTHLY', 'CASH_MONTHLY', 'DAILY_WEEKLY', 'WEEKLY']),
     monthlySalary:  z.coerce.number().min(0),
     basicSalary:    z.coerce.number().min(0),
     da:             z.coerce.number().min(0).default(0),
@@ -79,7 +82,11 @@ export const bulkUpsertAttendanceSchema = z.object({
       employeeId:        z.number().int().positive(),
       date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       status:            z.enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'WEEKLY_OFF', 'HOLIDAY', 'LEAVE_PAID', 'LEAVE_UNPAID']),
+      inTime:            z.string().nullable().optional(),
+      outTime:           z.string().nullable().optional(),
       otHours:           z.number().min(0).default(0),
+      otDays:            z.number().min(0).default(0),
+      teaOtCount:        z.number().int().min(0).default(0),
       lateMinutes:       z.number().int().min(0).default(0),
       permissionMinutes: z.number().int().min(0).default(0),
       salaryAdvance:     z.number().min(0).default(0),
@@ -108,7 +115,7 @@ export const createPayrollRunSchema = z.object({
   body: z.object({
     period:           z.string().regex(/^\d{4}-\d{2}$|^\d{4}-W\d{2}$/),
     type:             z.enum(['MONTHLY', 'WEEKLY']),
-    employeeCategory: z.enum(['ALL', 'FIXED_MONTHLY', 'PF_MONTHLY', 'CASH_MONTHLY', 'DAILY_WEEKLY']).default('ALL'),
+    employeeCategory: z.enum(['ALL', 'FIXED_MONTHLY', 'PF_MONTHLY', 'CASH_MONTHLY', 'DAILY_WEEKLY', 'WEEKLY']).default('ALL'),
     calendarDays:     z.number().int().min(1).max(366).default(31),
     attendance: z.array(z.object({
       employeeId:        z.number().int().positive(),
@@ -116,6 +123,8 @@ export const createPayrollRunSchema = z.object({
       absentDays:        z.number().min(0),
       halfDays:          z.number().min(0),
       otHours:           z.number().min(0).default(0),
+      otDays:            z.number().min(0).default(0),
+      teaOtCount:        z.number().int().min(0).default(0),
       lateMinutes:       z.number().int().min(0).default(0),
       dailyLateMinutes:  z.array(z.number().int().min(0)).optional(),
       permissionMinutes: z.number().int().min(0).default(0),
@@ -158,3 +167,15 @@ export const createAdvanceSchema = z.object({
   query:  z.object({}),
   params: z.object({}),
 });
+
+// ─── Bonus Calculation ────────────────────────────────────────────────────────
+export const getBonusCalculationSchema = z.object({
+  body: z.object({}),
+  query: z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    category:  z.string().optional(),
+  }),
+  params: z.object({}),
+});
+

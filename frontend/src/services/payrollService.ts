@@ -20,6 +20,7 @@ export interface ApiPayrollConfig {
   maxOtHoursPerDay: number;
   maxOtHoursPerWeek: number;
   otSlabs: any[];
+  teaOtRate: number;
   pfEnabled: boolean;
   pfWageFormula: string;
   employeePfPercent: number;
@@ -33,6 +34,8 @@ export interface ApiPayrollConfig {
   esiRoundingRule: string;
   paidLeavePerYear: number;
   lateEntryGraceMinutes: number;
+  staffPermissionFreeMinutes?: number;
+  staffExcessHourlyRate?: number;
   lateEntrySlabs: any[];
   permissionSlabs: any[];
   professionalTaxEnabled: boolean;
@@ -72,6 +75,8 @@ export interface AttendanceInput {
   absentDays: number;
   halfDays: number;
   otHours: number;
+  otDays: number;
+  teaOtCount: number;
   lateMinutes: number;
   dailyLateMinutes: number[];  // per-day late minutes for per-day slab deduction
   permissionMinutes: number;
@@ -113,6 +118,10 @@ export interface ApiPayrollResult {
   loanRecovery: number;
   otherDeductions: number;
   totalDeductions: number;
+  bankTransfer?: number;
+  cashPayment?: number;
+  cashPaid?: number;
+  actualSalary?: number;
   netSalary: number;
   paymentMode: string;
   hasVariance: boolean;
@@ -346,5 +355,66 @@ export const payrollService = {
     return data.data;
   },
 
+  // Bonus Calculation
+  getBonusCalculation: async (params: { startDate: string; endDate: string; category?: string }): Promise<ApiBonusCalculationResponse> => {
+    const { data } = await apiClient.get(`${BASE}/bonus`, { params });
+    return data.data;
+  },
+
   // Extended Compensation (Super Admin only)
 };
+
+export interface ApiBonusMonthMeta {
+  monthKey: string;
+  label: string;
+  year: number;
+  month: number;
+  daysInMonth: number;
+}
+
+export interface ApiBonusMonthlyData {
+  monthKey: string;
+  label: string;
+  totalDays: number;
+  presentDays: number;
+  leaveDays: number;
+}
+
+export interface ApiBonusEmployeeRow {
+  sNo: number;
+  employeeId: string;
+  rollNo: string;
+  employeeName: string;
+  department: string;
+  dateOfJoining: string | null;
+  formattedDoj: string;
+  experienceYears: number;
+  monthlySalary: number;
+  salaryType: string;
+  monthlyData: ApiBonusMonthlyData[];
+  totalLeaveDays: number;
+  totalPresentDays: number;
+  perDayBonus: number;
+  bonus: number;
+  paidAmount: number;
+  balance: number;
+}
+
+export interface ApiBonusSummary {
+  totalEmployees: number;
+  totalGrossSalary: number;
+  totalPresentDays: number;
+  totalLeaveDays: number;
+  totalBonus: number;
+  totalPaidAmount: number;
+  totalBalance: number;
+}
+
+export interface ApiBonusCalculationResponse {
+  startDate: string;
+  endDate: string;
+  months: ApiBonusMonthMeta[];
+  employees: ApiBonusEmployeeRow[];
+  summary: ApiBonusSummary;
+}
+

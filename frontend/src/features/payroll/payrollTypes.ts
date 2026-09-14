@@ -84,6 +84,8 @@ export interface PayrollSettings {
   halfDayRule: boolean;
   leaveEncashment: boolean;
   lateEntryGraceMinutes: number;
+  staffPermissionFreeMinutes?: number;
+  staffExcessHourlyRate?: number;
   lateEntrySlabs: SlabEntry[];
 
   // 4.7 Attendance Settings
@@ -116,6 +118,8 @@ export interface PayrollEmployee {
   name: string;
   department: string;
   designation: string;
+  employeeCategory?: string;
+  employeeType?: string;
   salaryType: SalaryType;
   monthlySalary: number;
   basicSalary: number;
@@ -198,6 +202,7 @@ export interface PayrollResult {
 
   // Net
   netSalary: number;
+  cashInHand?: number;
   paymentMode: 'BANK' | 'CASH';
 
   // Variance

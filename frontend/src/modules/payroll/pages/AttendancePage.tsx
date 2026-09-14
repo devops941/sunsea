@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Save, Loader2, AlertCircle, RefreshCw,
-  CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays, Lock,
+  CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays, Lock, Clock,
 } from 'lucide-react';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
@@ -13,32 +13,36 @@ import type { Shift } from '../../../features/shifts/types';
 import { usePermission } from '../../../hooks/usePermission';
 
 // ─── Status Config ────────────────────────────────────────────────────────────
-const STATUSES = ['PRESENT', 'ABSENT', 'HALF_DAY', 'WEEKLY_OFF', 'HOLIDAY', 'LEAVE_PAID', 'LEAVE_UNPAID'] as const;
-type AttStatus = typeof STATUSES[number];
+const STATUSES = ['PRESENT', 'ABSENT', 'HALF_DAY', 'HOLIDAY'] as const;
+type AttStatus = typeof STATUSES[number] | 'WEEKLY_OFF' | 'LEAVE_PAID' | 'LEAVE_UNPAID';
 
-const S: Record<AttStatus, { abbr: string; label: string; cell: string }> = {
+const S: Record<string, { abbr: string; label: string; cell: string }> = {
   PRESENT:      { abbr: 'P',  label: 'Present',        cell: 'bg-emerald-500 text-white'  },
   ABSENT:       { abbr: 'A',  label: 'Absent',          cell: 'bg-red-500 text-white'      },
   HALF_DAY:     { abbr: 'HD', label: 'Half Day',        cell: 'bg-amber-400 text-white'    },
-  WEEKLY_OFF:   { abbr: 'WO', label: 'Weekly Off',      cell: 'bg-slate-400 text-white'    },
   HOLIDAY:      { abbr: 'H',  label: 'Holiday',         cell: 'bg-blue-500 text-white'     },
-  LEAVE_PAID:   { abbr: 'LP', label: 'Leave (Paid)',    cell: 'bg-violet-500 text-white'   },
-  LEAVE_UNPAID: { abbr: 'LU', label: 'Leave (Unpaid)',  cell: 'bg-orange-500 text-white'   },
+  WEEKLY_OFF:   { abbr: 'H',  label: 'Holiday',         cell: 'bg-blue-500 text-white'     },
+  LEAVE_PAID:   { abbr: 'P',  label: 'Present',         cell: 'bg-emerald-500 text-white'  },
+  LEAVE_UNPAID: { abbr: 'A',  label: 'Absent',          cell: 'bg-red-500 text-white'      },
 };
 
-const CYCLE: (AttStatus | null)[] = [null, 'PRESENT', 'ABSENT', 'HALF_DAY', 'WEEKLY_OFF', 'HOLIDAY', 'LEAVE_PAID', 'LEAVE_UNPAID'];
+const CYCLE: (AttStatus | null)[] = [null, 'PRESENT', 'ABSENT', 'HALF_DAY', 'HOLIDAY'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type CellData = {
   status: AttStatus | null;
+  inTime: string | null;
+  outTime: string | null;
   otHours: number;
+  otDays: number;
+  teaOtCount: number;
   lateMinutes: number;
   permissionMinutes: number;
   shiftId: number | null;
 };
 type GridState = Record<string, CellData>;
 
-const EMPTY_CELL: CellData = { status: null, otHours: 0, lateMinutes: 0, permissionMinutes: 0, shiftId: null };
+const EMPTY_CELL: CellData = { status: null, inTime: null, outTime: null, otHours: 0, otDays: 0, teaOtCount: 0, lateMinutes: 0, permissionMinutes: 0, shiftId: null };
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -58,7 +62,7 @@ function dayOfWeek(dateStr: string): number {
 }
 
 function cycleStatus(cur: AttStatus | null): AttStatus | null {
-  if (cur === 'WEEKLY_OFF') return 'PRESENT';
+  if (cur === ('WEEKLY_OFF' as any)) return 'HOLIDAY';
   const i = CYCLE.indexOf(cur);
   return CYCLE[(i + 1) % CYCLE.length];
 }
@@ -141,7 +145,7 @@ const StatusCell: React.FC<{
   onClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }> = ({ cell, isLocked, onClick, onContextMenu }) => {
-  const hasExtra = cell.otHours > 0 || cell.lateMinutes > 0 || cell.permissionMinutes > 0;
+  const hasExtra = cell.otHours > 0 || cell.otDays > 0 || cell.teaOtCount > 0 || cell.lateMinutes > 0 || cell.permissionMinutes > 0 || !!cell.inTime || !!cell.outTime;
   return (
     <div className="relative inline-flex">
       <button
@@ -175,43 +179,48 @@ const StatusCell: React.FC<{
 // ─── Cell Edit Panel ──────────────────────────────────────────────────────────
 const CellEditPanel: React.FC<{
   empName: string; date: string; cell: CellData; isLocked?: boolean;
-  shifts: Shift[];
+  shifts: Shift[]; weeklyOffDays: number[];
   onChange: (c: CellData) => void; onClose: () => void;
-}> = ({ empName, date, cell, isLocked, shifts, onChange, onClose }) => {
+}> = ({ empName, date, cell, isLocked, shifts, weeklyOffDays, onChange, onClose }) => {
   const showExtras = cell.status === 'PRESENT' || cell.status === 'HALF_DAY';
+  const isWeeklyOff = weeklyOffDays.includes(dayOfWeek(date));
   return (
-  <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+  <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="bg-card text-ink border border-line-soft rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-bold text-text-primary text-sm">{empName}</p>
-          <p className="text-xs text-text-muted">{date} · {DAY_FULL[dayOfWeek(date)]}</p>
+          <p className="font-bold text-ink text-sm">{empName}</p>
+          <p className="text-xs text-ink-muted">{date} · {DAY_FULL[dayOfWeek(date)]}</p>
         </div>
-        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-lg text-text-muted hover:text-text-primary">×</button>
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-lg text-ink-muted hover:text-ink transition-colors cursor-pointer">×</button>
       </div>
 
       {isLocked && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-xl font-medium">
-          <Lock size={14} className="shrink-0" />
+        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-xl font-medium">
+          <Lock size={14} className="shrink-0 text-amber-400" />
           <span>This date is locked because payroll has been approved. Editing is disabled.</span>
         </div>
       )}
 
       {/* Status grid */}
       <div>
-        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Status</p>
-        <div className="grid grid-cols-4 gap-1.5">
+        <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">Status</p>
+        <div className="grid grid-cols-5 gap-1.5">
           {STATUSES.map(st => (
-            <button key={st} disabled={isLocked} onClick={() => onChange({ ...cell, status: cell.status === st ? null : st })}
-              className={`py-1.5 rounded-lg text-[10px] font-bold transition-all border-2 ${
-                cell.status === st ? `${S[st].cell} border-transparent` : 'bg-white text-text-muted border-border hover:border-slate-300'
+            <button key={st} disabled={isLocked} onClick={() => {
+              const newStatus = cell.status === st ? null : st;
+              const autoOtDay = isWeeklyOff && newStatus === 'PRESENT' ? 1 : (isWeeklyOff && newStatus !== 'PRESENT' ? 0 : cell.otDays);
+              onChange({ ...cell, status: newStatus, otDays: autoOtDay });
+            }}
+              className={`py-2 rounded-lg text-xs font-bold transition-all border-2 cursor-pointer ${
+                cell.status === st ? `${S[st].cell} border-transparent shadow-xs` : 'bg-card-2 text-ink border-line-soft hover:border-primary/40'
               } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
               {S[st].abbr}
             </button>
           ))}
           <button disabled={isLocked} onClick={() => onChange({ ...cell, status: null })}
-            className={`py-1.5 rounded-lg text-[10px] font-bold border-2 transition-all ${
-              cell.status === null ? 'bg-slate-700 text-white border-transparent' : 'bg-white text-text-muted border-border hover:border-slate-300'
+            className={`py-2 rounded-lg text-xs font-bold border-2 transition-all cursor-pointer ${
+              cell.status === null ? 'bg-primary text-white border-transparent shadow-xs' : 'bg-card-2 text-ink border-line-soft hover:border-primary/40'
             } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
             —
           </button>
@@ -220,42 +229,104 @@ const CellEditPanel: React.FC<{
 
       {/* Shift selector — only for Present or Half Day */}
       {showExtras && shifts.length > 0 && (
-        <SelectInput
-          label="Shift"
-          name="shiftId"
-          value={cell.shiftId ?? ''}
-          defaultOptionLabel="— No Shift —"
-          disabled={isLocked}
-          noMargin
-          searchable={false}
-          options={shifts.map(sh => ({
-            value: sh.id,
-            label: `${sh.shiftName} (${sh.startTime} – ${sh.endTime})`,
-          }))}
-          onChange={e => onChange({ ...cell, shiftId: e.target.value ? Number(e.target.value) : null })}
-        />
+        <div>
+          <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Shift</label>
+          <SelectInput
+            name="shiftId"
+            value={cell.shiftId ?? ''}
+            defaultOptionLabel="— No Shift —"
+            disabled={isLocked}
+            noMargin
+            searchable={false}
+            options={shifts.map(sh => ({
+              value: sh.id,
+              label: `${sh.shiftName} (${sh.startTime} – ${sh.endTime})`,
+            }))}
+            onChange={e => onChange({ ...cell, shiftId: e.target.value ? Number(e.target.value) : null })}
+          />
+        </div>
       )}
 
-      {/* OT / Late / Permission — only for Present or Half Day */}
+      {/* OT Hours / OT Days / Tea OT — only for Present or Half Day */}
       {showExtras && (
         <div className="grid grid-cols-3 gap-3">
           {([
-            { label: 'OT Hours',   field: 'otHours',           step: 0.5 },
-            { label: 'Late (min)', field: 'lateMinutes',       step: 1   },
-            { label: 'Perm (min)', field: 'permissionMinutes', step: 1   },
-          ] as const).map(f => (
+            { label: 'OT Hours',    field: 'otHours'    as const, step: 0.5 },
+            { label: 'OT Days',     field: 'otDays'     as const, step: 0.5 },
+            { label: 'Tea OT',      field: 'teaOtCount' as const, step: 1   },
+          ]).map(f => (
             <div key={f.field}>
-              <label className="block text-xs font-semibold text-text-muted mb-1">{f.label}</label>
-              <input type="number" min={0} step={f.step} disabled={isLocked}
+              <label className="block text-[11px] font-bold text-ink-muted mb-1">{f.label}</label>
+              <input
+                type="number"
+                min={0}
+                step={f.step}
+                disabled={isLocked}
                 value={cell[f.field]}
                 onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
-                className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed" />
+                className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              />
             </div>
           ))}
         </div>
       )}
 
-      <button onClick={onClose} className="w-full py-2.5 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
+      {/* Late / Permission — only for Present or Half Day */}
+      {showExtras && (
+        <div className="grid grid-cols-2 gap-3">
+          {([
+            { label: 'Late (min)', field: 'lateMinutes'       as const, step: 1 },
+            { label: 'Perm (min)', field: 'permissionMinutes' as const, step: 1 },
+          ]).map(f => (
+            <div key={f.field}>
+              <label className="block text-[11px] font-bold text-ink-muted mb-1">{f.label}</label>
+              <input
+                type="number"
+                min={0}
+                step={f.step}
+                disabled={isLocked}
+                value={cell[f.field]}
+                onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
+                className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* In Time & Out Time — only shown when late or permission is entered */}
+      {showExtras && (cell.status === 'HALF_DAY' || cell.lateMinutes > 0 || cell.permissionMinutes > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-ink-muted mb-1 flex items-center gap-1.5">
+              <Clock size={12} className="text-emerald-500" />
+              <span>In Time</span>
+            </label>
+            <input
+              type="time"
+              disabled={isLocked}
+              value={cell.inTime || ''}
+              onChange={e => onChange({ ...cell, inTime: e.target.value || null })}
+              className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-ink-muted mb-1 flex items-center gap-1.5">
+              <Clock size={12} className="text-red-400" />
+              <span>Out Time</span>
+            </label>
+            <input
+              type="time"
+              disabled={isLocked}
+              value={cell.outTime || ''}
+              onChange={e => onChange({ ...cell, outTime: e.target.value || null })}
+              className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            />
+          </div>
+        </div>
+      )}
+
+      <button onClick={onClose} className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all cursor-pointer shadow-sm">
         {isLocked ? 'Close' : 'Done'}
       </button>
     </div>
@@ -370,7 +441,7 @@ const AttendancePage: React.FC = () => {
           if (prev[k]) {
             next[k] = prev[k];
           } else {
-            next[k] = { ...EMPTY_CELL, status: isSun ? 'WEEKLY_OFF' : null };
+            next[k] = { ...EMPTY_CELL, status: isSun ? 'HOLIDAY' : null };
           }
         });
       });
@@ -396,7 +467,11 @@ const AttendancePage: React.FC = () => {
             if (k in next) {
               next[k] = {
                 status:            r.status as AttStatus,
+                inTime:            r.inTime ?? null,
+                outTime:           r.outTime ?? null,
                 otHours:           Number(r.otHours),
+                otDays:            Number(r.otDays ?? 0),
+                teaOtCount:        Number(r.teaOtCount ?? 0),
                 lateMinutes:       Number(r.lateMinutes),
                 permissionMinutes: Number(r.permissionMinutes),
                 shiftId:           r.shiftId ?? null,
@@ -457,7 +532,7 @@ const AttendancePage: React.FC = () => {
           if (!isDateLocked(date)) {
             const k = cellKey(Number(emp.id), date);
             const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
-            next[k] = { ...(next[k] ?? EMPTY_CELL), status: isOff ? 'WEEKLY_OFF' : 'PRESENT' };
+            next[k] = { ...(next[k] ?? EMPTY_CELL), status: isOff ? 'HOLIDAY' : 'PRESENT' };
           }
         });
       });
@@ -474,7 +549,7 @@ const AttendancePage: React.FC = () => {
           if (!isDateLocked(date)) {
             const k = cellKey(Number(emp.id), date);
             const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
-            next[k] = { ...EMPTY_CELL, status: isOff ? 'WEEKLY_OFF' : null };
+            next[k] = { ...EMPTY_CELL, status: isOff ? 'HOLIDAY' : null };
           }
         });
       });
@@ -491,7 +566,7 @@ const AttendancePage: React.FC = () => {
           const k = cellKey(empId, date);
           const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
           if (status === 'PRESENT' && isOff) {
-            next[k] = { ...(next[k] ?? EMPTY_CELL), status: 'WEEKLY_OFF' };
+            next[k] = { ...(next[k] ?? EMPTY_CELL), status: 'HOLIDAY' };
           } else {
             next[k] = { ...(next[k] ?? EMPTY_CELL), status };
           }
@@ -513,7 +588,11 @@ const AttendancePage: React.FC = () => {
           employeeId:        Number(emp.id),
           date,
           status:            c.status,
+          inTime:            c.inTime ?? null,
+          outTime:           c.outTime ?? null,
           otHours:           c.otHours,
+          otDays:            c.otDays,
+          teaOtCount:        c.teaOtCount,
           lateMinutes:       c.lateMinutes,
           permissionMinutes: c.permissionMinutes,
           salaryAdvance:     0,
@@ -583,17 +662,17 @@ const AttendancePage: React.FC = () => {
 
   // ── Summary per employee ──────────────────────────────────────────────────
   const summary = (empId: number) => {
-    let P = 0, A = 0, HD = 0, WO = 0, OT = 0, Late = 0;
+    let P = 0, A = 0, HD = 0, H = 0, OT = 0, Late = 0;
     dates.forEach(date => {
       const c = getCell(empId, date);
-      if (c.status === 'PRESENT')    P++;
-      if (c.status === 'ABSENT')     A++;
+      if (c.status === 'PRESENT' || c.status === 'LEAVE_PAID') P++;
+      if (c.status === 'ABSENT' || c.status === 'LEAVE_UNPAID')  A++;
       if (c.status === 'HALF_DAY')   HD++;
-      if (c.status === 'WEEKLY_OFF') WO++;
+      if (c.status === 'HOLIDAY' || c.status === 'WEEKLY_OFF') H++;
       OT   += c.otHours;
       Late += c.lateMinutes;
     });
-    return { P, A, HD, WO, OT, Late };
+    return { P, A, HD, H, OT, Late };
   };
 
   const totalMarked = useMemo(() => {
@@ -834,12 +913,12 @@ const AttendancePage: React.FC = () => {
         ) : (
           <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-hidden h-full">
             <div className="overflow-auto h-full">
-              <table className="text-xs border-collapse" style={{ minWidth: `${220 + dates.length * 40 + 200}px` }}>
+              <table className="text-xs border-collapse" style={{ minWidth: `${250 + dates.length * 38 + 200}px` }}>
 
                 {/* THEAD */}
                 <thead className="sticky top-0 z-20">
                   <tr className="bg-card-2">
-                    <th className="sticky left-0 z-30 bg-card-2 text-left px-4 py-2.5 font-semibold text-ink-muted uppercase tracking-wider border-b border-r border-line-soft" style={{ minWidth: 220 }}>
+                    <th className="sticky left-0 z-30 bg-card-2 text-left px-4 py-2.5 font-bold text-ink uppercase tracking-wider border-b border-r border-line-soft shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] w-[250px] min-w-[250px] max-w-[250px]">
                       Employee
                     </th>
                     {dates.map((date, idx) => {
@@ -853,7 +932,7 @@ const AttendancePage: React.FC = () => {
                         <th key={date}
                           className={`px-0 py-2 text-center font-semibold border-b border-r border-line-soft ${
                             isWeekStart ? 'border-l-2 border-l-primary/40' : ''
-                          } ${locked ? 'bg-card-2/80' : isOff ? (isSun ? 'bg-red-500/10' : 'bg-amber-500/10') : 'bg-card-2'}`}
+                          } ${locked ? 'bg-card-2' : isOff ? (isSun ? 'bg-red-500/10' : 'bg-amber-500/10') : 'bg-card-2'}`}
                           style={{ width: 38, minWidth: 38 }}
                           title={locked ? 'Payroll Approved/Locked' : isWeekStart ? `Week ${Math.ceil(day / 7)} starts` : undefined}
                         >
@@ -870,7 +949,7 @@ const AttendancePage: React.FC = () => {
                     <th className="px-2 py-2 text-center font-bold text-emerald-400 bg-emerald-500/10 border-b border-r border-line-soft">P</th>
                     <th className="px-2 py-2 text-center font-bold text-red-400 bg-red-500/10 border-b border-r border-line-soft">A</th>
                     <th className="px-2 py-2 text-center font-bold text-amber-400 bg-amber-500/10 border-b border-r border-line-soft">HD</th>
-                    <th className="px-2 py-2 text-center font-bold text-ink-muted bg-card-2 border-b border-r border-line-soft">WO</th>
+                    <th className="px-2 py-2 text-center font-bold text-blue-400 bg-blue-500/10 border-b border-r border-line-soft">H</th>
                     <th className="px-2 py-2 text-center font-semibold text-ink-subtle bg-card-2 border-b border-r border-line-soft whitespace-nowrap">OT h</th>
                     <th className="px-2 py-2 text-center font-semibold text-ink-subtle bg-card-2 border-b border-line-soft whitespace-nowrap">Late</th>
                   </tr>
@@ -881,22 +960,23 @@ const AttendancePage: React.FC = () => {
                   {filteredEmployees.map((emp, idx) => {
                     const empId = Number(emp.id);
                     const sum   = summary(empId);
-                    const rowBg = idx % 2 === 0 ? 'bg-card' : 'bg-card-2/40';
+                    const isEven = idx % 2 === 0;
+                    const solidBg = isEven ? 'bg-card' : 'bg-card-2';
                     return (
-                      <tr key={emp.id} className={`${rowBg} hover:bg-blue-500/10 transition-colors`}>
+                      <tr key={emp.id} className={`${solidBg} hover:bg-primary/5 transition-colors`}>
 
                         {/* Employee sticky col */}
-                        <td className={`sticky left-0 z-10 px-3 py-1.5 border-b border-r border-line-soft ${rowBg}`} style={{ minWidth: 220 }}>
+                        <td className={`sticky left-0 z-20 px-3 py-1.5 border-b border-r border-line-soft shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] w-[250px] min-w-[250px] max-w-[250px] ${solidBg}`}>
                           <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
+                            <div className="min-w-0 pr-1">
                               <p className="font-semibold text-ink text-xs truncate">{emp.fullName}</p>
                               <p className="text-[10px] text-ink-subtle">{emp.empCode} · {(emp.payrollConfig?.salaryType ?? '—').replace(/_/g,' ')}</p>
                             </div>
-                            <div className="flex gap-0.5 shrink-0">
+                            <div className="flex gap-1 shrink-0">
                               <button onClick={() => markEmployeeRow(empId, 'PRESENT')} title="All Present" disabled={allDatesLocked}
-                                className="w-5 h-5 rounded text-[8px] font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">P</button>
+                                className="w-5 h-5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">P</button>
                               <button onClick={() => markEmployeeRow(empId, 'ABSENT')} title="All Absent" disabled={allDatesLocked}
-                                className="w-5 h-5 rounded text-[8px] font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">A</button>
+                                className="w-5 h-5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">A</button>
                             </div>
                           </div>
                         </td>
@@ -927,7 +1007,7 @@ const AttendancePage: React.FC = () => {
                         <td className="px-2 py-1.5 text-center font-bold text-emerald-400 border-b border-r border-line-soft">{sum.P  > 0 ? sum.P  : '—'}</td>
                         <td className="px-2 py-1.5 text-center font-bold text-red-400   border-b border-r border-line-soft">{sum.A  > 0 ? sum.A  : '—'}</td>
                         <td className="px-2 py-1.5 text-center font-bold text-amber-400 border-b border-r border-line-soft">{sum.HD > 0 ? sum.HD : '—'}</td>
-                        <td className="px-2 py-1.5 text-center font-semibold text-ink-muted border-b border-r border-line-soft">{sum.WO > 0 ? sum.WO : '—'}</td>
+                        <td className="px-2 py-1.5 text-center font-bold text-blue-400  border-b border-r border-line-soft">{sum.H  > 0 ? sum.H  : '—'}</td>
                         <td className="px-2 py-1.5 text-center text-ink-subtle border-b border-r border-line-soft">{sum.OT > 0 ? sum.OT.toFixed(1) : '—'}</td>
                         <td className="px-2 py-1.5 text-center text-text-secondary border-b border-line-soft">{sum.Late > 0 ? `${sum.Late}m` : '—'}</td>
                       </tr>
@@ -948,6 +1028,7 @@ const AttendancePage: React.FC = () => {
           cell={getCell(selected.empId, selected.date)}
           isLocked={isDateLocked(selected.date)}
           shifts={shifts}
+          weeklyOffDays={weeklyOffDays}
           onChange={c => setCell(selected.empId, selected.date, c)}
           onClose={() => setSelected(null)}
         />

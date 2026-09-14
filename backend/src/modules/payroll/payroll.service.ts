@@ -59,6 +59,8 @@ interface AttendanceInput {
   absentDays: number;
   halfDays: number;
   otHours: number;
+  otDays: number;
+  teaOtCount: number;
   lateMinutes: number;
   dailyLateMinutes?: number[];  // per-day late minutes for per-day slab deduction
   permissionMinutes: number;
@@ -78,6 +80,7 @@ interface PayrollSettings {
   maxOtHoursPerDay: number;
   maxOtHoursPerWeek: number;
   otSlabs: Array<{ fromMinutes: number; toMinutes: number; amount: number }>;
+  teaOtRate: number;
   pfEnabled: boolean;
   pfWageFormula: string;
   employeePfPercent: number;
@@ -89,6 +92,8 @@ interface PayrollSettings {
   maxEsiSalary: number;
   paidLeavePerYear: number;
   lateEntryGraceMinutes: number;
+  staffPermissionFreeMinutes: number;
+  staffExcessHourlyRate: number;
   lateEntrySlabs: Array<{ fromMinutes: number; toMinutes: number; amount: number }>;
   permissionSlabs: Array<{
     fromMinutes: number;
@@ -107,6 +112,8 @@ interface EmployeePayrollData {
   fullName: string;
   departmentId: number | null;
   designation: string | null;
+  employeeCategory?: string | null;
+  employeeType?: string | null;
   payrollConfig: {
     salaryType: string;
     monthlySalary: any;
@@ -237,7 +244,7 @@ function computeResult(
   const dailySalaryStored = pc.dailySalary ? Number(pc.dailySalary) : 0; // stored per-day field (fallback only)
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 1 — Daily Rate  (always Monthly ÷ Calendar Days)
+  // STEP 1 — Daily Rates (Bank & Cash in Hand)
   // ─────────────────────────────────────────────────────────────────────────────
   const calDaysForFormula = monthCalendarDays > 0 ? monthCalendarDays : calendarDays;
   let dailyRate = 0;
@@ -262,9 +269,14 @@ function computeResult(
     dailyRate = monthlySalary / formulaDivisor;
   }
 
+  // Cash in Hand daily rate for proportional LOP deduction
+  const initialCashInHand = Number(pc.cashInHand) || 0;
+  const dailyCashRate = (initialCashInHand > 0 && formulaDivisor > 0)
+    ? initialCashInHand / formulaDivisor
+    : 0;
+
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 1b — Permission Slab Pre-evaluation
-  // Evaluate the permission slab BEFORE computing payable days so that
   // ─────────────────────────────────────────────────────────────────────────────
   let permSlabDeduction = 0;
   if (att.permissionMinutes > 0 && settings.permissionSlabs?.length > 0) {
@@ -279,60 +291,73 @@ function computeResult(
   const totalDays = calendarDays;
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 3 — Earned Salary
-  //
-  // DAILY_WEEKLY: pay only for days worked  → dailyRate × presentDays
-  // Monthly types: full month salary minus LOP deduction → monthlySalary − (lopDays × dailyRate)
+  // STEP 3 — Earned Bank Salary & Earned Cash in Hand
+  // Proportional LOP deduction applies to both Bank Gross and Cash in Hand
   // ─────────────────────────────────────────────────────────────────────────────
   let earnedSalary: number;
+  let earnedCashInHand = initialCashInHand;
+
   if (salaryType === 'DAILY_WEEKLY') {
-    // Daily wage workers: pay only for days actually worked
     earnedSalary = dailyRate * presentDays;
+    earnedCashInHand = initialCashInHand > 0 ? (dailyCashRate * presentDays) : 0;
   } else if (salaryType === 'WEEKLY') {
-    // Weekly salary: 6 working days baseline.
-    // If presentDays > 6 (e.g. Sunday worked = 7 days), add extra day's salary (1 × dailyRate).
-    // If presentDays < 6 (e.g. absent), deduct LOP days.
     if (presentDays > 6) {
       const extraDays = presentDays - 6;
       earnedSalary = monthlySalary + (extraDays * dailyRate);
+      earnedCashInHand = initialCashInHand + (extraDays * dailyCashRate);
     } else {
       const netLopDays = Math.max(0, 6 - presentDays);
       earnedSalary = monthlySalary - (netLopDays * dailyRate);
+      earnedCashInHand = initialCashInHand - (netLopDays * dailyCashRate);
     }
   } else {
     // Monthly: full month salary minus LOP deductions
     earnedSalary = monthlySalary - (lopDays * dailyRate);
+    earnedCashInHand = initialCashInHand - (lopDays * dailyCashRate);
   }
   earnedSalary = Math.max(0, earnedSalary);
+  earnedCashInHand = Math.max(0, earnedCashInHand);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 4 — OT Pay  (otHours × ratePerHour)
+  // STEP 4 — OT Pay  (combined: OT Hours + OT Days + Tea OT)
+  //   OT is a CASH BONUS — it does NOT inflate grossSalary for PF/ESI.
+  //   OT Hours pay  = otHours × otRatePerHour
+  //   OT Days pay   = otDays × employee's dailyRate (one full day salary)
+  //   Tea OT pay    = teaOtCount × teaOtRate
   // ─────────────────────────────────────────────────────────────────────────────
   const otEnabled = settings.otEnabled !== false;
   let otPay = 0;
-  let otH = 0;
-  const effectiveOtHours = att.otHours;
-  if (otEnabled && effectiveOtHours > 0 && settings.otRatePerHour > 0) {
-    otH = effectiveOtHours;
-    otPay = otH * settings.otRatePerHour;
+  let otH = att.otHours || 0;
+  const otD = att.otDays || 0;
+  const teaOt = att.teaOtCount || 0;
+
+  if (otEnabled) {
+    const otHoursPay = otH > 0 && settings.otRatePerHour > 0 ? otH * settings.otRatePerHour : 0;
+    const otDaysPay = otD > 0 ? otD * dailyRate : 0;
+    const teaOtPay = teaOt > 0 && settings.teaOtRate > 0 ? teaOt * settings.teaOtRate : 0;
+    otPay = otHoursPay + otDaysPay + teaOtPay;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 5 — Gross Pay = Earned + OT
+  // STEP 5 — Gross Pay = Earned (OT excluded — OT goes to cash, not bank)
+  //   PF/ESI are calculated on grossSalary (without OT).
+  //   OT pay is added to the cash portion in STEP 10.
   // ─────────────────────────────────────────────────────────────────────────────
-  const grossSalary = earnedSalary + otPay;
+  const grossSalary = earnedSalary;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 6 — PF (Provident Fund)
+  // PF Wage = 60% of Gross Bank Salary (up to max PF cap)
+  // Employee PF = 12% of PF Wage, Employer PF = 12% of PF Wage
   // ─────────────────────────────────────────────────────────────────────────────
   const isPfApp = pc.pfApplicable ?? (emp as any).pfApplicable ?? true;
   const hasPf = isPfApp && (settings.pfEnabled ?? true);
   let pfWage = 0, employeePf = 0, employerPf = 0;
   if (hasPf) {
     const maxPfCap = Number(settings.maxPfWage) > 0 ? Number(settings.maxPfWage) : 15000;
-    const baseWage = settings.pfWageFormula === 'GROSS'
-      ? grossSalary
-      : (basicSalary > 0 ? basicSalary : Math.round(grossSalary * 0.5));
+    const baseWage = settings.pfWageFormula === 'BASIC' && basicSalary > 0
+      ? basicSalary
+      : grossSalary * 0.60;
     pfWage = Math.min(baseWage, maxPfCap);
     const empPfRate = Number(settings.employeePfPercent) > 0 ? Number(settings.employeePfPercent) : 12;
     const emrPfRate = Number(settings.employerPfPercent) > 0 ? Number(settings.employerPfPercent) : 12;
@@ -342,11 +367,12 @@ function computeResult(
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 7 — ESI
-  // ESI applies only when gross ≤ max ESI salary (₹21,000 by default).
+  // Employee ESI = 0.75% of Gross Bank Salary
   // ─────────────────────────────────────────────────────────────────────────────
   const isEsiApp = pc.esiApplicable ?? (emp as any).esiApplicable ?? true;
   const maxEsiCap = Number(settings.maxEsiSalary) > 0 ? Number(settings.maxEsiSalary) : 21000;
-  const hasEsi = isEsiApp && (settings.esiEnabled ?? true) && grossSalary <= maxEsiCap;
+  // ESI eligibility based on MONTHLY salary (not pro-rated earned) — standard practice
+  const hasEsi = isEsiApp && (settings.esiEnabled ?? true) && monthlySalary <= maxEsiCap;
   let employeeEsi = 0, employerEsi = 0;
   if (hasEsi) {
     const empEsiRate = Number(settings.employeeEsiPercent) > 0 ? Number(settings.employeeEsiPercent) : 0.75;
@@ -380,55 +406,109 @@ function computeResult(
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 9 — Per-minute rate (shared by Late & Permission deduction fallback)
+  // STEP 9 — Role-based Late Entry & Permission deductions
   // ─────────────────────────────────────────────────────────────────────────────
   const workingMins = (settings.defaultWorkingHoursPerDay > 0 ? settings.defaultWorkingHoursPerDay : 8) * 60;
   const perMinuteRate = dailyRate / workingMins;
 
-  // ─ Late entry deduction ─
-  // Per-day calculation: each day's late minutes are checked independently against slabs.
-  // If dailyLateMinutes[] is provided by the frontend, use it; otherwise fall back to total.
   let lateEntryDeduction = 0;
-  const graceMins = settings.lateEntryGraceMinutes || 0;
-  if (att.dailyLateMinutes && att.dailyLateMinutes.length > 0) {
-    // Per-day slab lookup
-    for (const dayLate of att.dailyLateMinutes) {
-      if (dayLate > graceMins) {
-        if (settings.lateEntrySlabs?.length > 0) {
-          lateEntryDeduction += lookupSlab(dayLate, settings.lateEntrySlabs);
-        } else {
-          throw new Error(`Late Entry Deduction Slabs are not configured. Please add them in Payroll Settings before running payroll.`);
+  let permissionDeduction = 0;
+
+  const empCat = String(emp.employeeCategory || (emp as any).category || '').toLowerCase();
+  const isDailyWeeklyType = ['DAILY_WEEKLY', 'WEEKLY'].includes(salaryType);
+  const isOfficeStaff = !isDailyWeeklyType && (empCat === 'office_staff' || !empCat);
+
+  if (isOfficeStaff) {
+    // ── OFFICE STAFF RULE ──
+    // 1. Late minutes pool with permission minutes.
+    // 2. Free permission pool per period (configurable, default 240 minutes = 4 hrs).
+    // 3. Excess time beyond free pool deducted in 1-hour chunks at configurable rate (default ₹50/hr).
+    // 4. Late entry slab deduction is bypassed (₹0).
+    const freeMins = Number(settings.staffPermissionFreeMinutes ?? 240);
+    const hourlyRate = Number(settings.staffExcessHourlyRate ?? 50);
+    const totalPooledMinutes = (att.permissionMinutes || 0) + (att.lateMinutes || 0);
+    const excessMinutes = Math.max(0, totalPooledMinutes - freeMins);
+    const excessHours = Math.ceil(excessMinutes / 60);
+    permissionDeduction = excessHours * hourlyRate;
+    lateEntryDeduction = 0;
+  } else {
+    // ── LABOUR RULE ──
+    // 1. Daily grace time (configurable, default 10 min).
+    // 2. Late arrivals > grace time deducted via slabs (or fallback per-minute rate).
+    // 3. Permission deduction follows standard permission slabs.
+    const graceMins = Number(settings.lateEntryGraceMinutes ?? 10);
+    const hasSlabs = settings.lateEntrySlabs?.length > 0;
+    if (att.dailyLateMinutes && att.dailyLateMinutes.length > 0) {
+      for (const dayLate of att.dailyLateMinutes) {
+        if (dayLate > graceMins) {
+          const slabAmount = hasSlabs ? lookupSlab(dayLate, settings.lateEntrySlabs) : 0;
+          if (slabAmount > 0) {
+            lateEntryDeduction += slabAmount;
+          } else {
+            // No matching slab or no slabs configured — use per-minute rate
+            lateEntryDeduction += (dayLate - graceMins) * perMinuteRate;
+          }
         }
       }
+    } else if (att.lateMinutes > graceMins) {
+      const slabAmount = hasSlabs ? lookupSlab(att.lateMinutes, settings.lateEntrySlabs) : 0;
+      if (slabAmount > 0) {
+        lateEntryDeduction = slabAmount;
+      } else {
+        lateEntryDeduction = (att.lateMinutes - graceMins) * perMinuteRate;
+      }
     }
-  } else if (att.lateMinutes > graceMins) {
-    // Fallback: total late minutes (legacy — no per-day data)
-    if (settings.lateEntrySlabs?.length > 0) {
-      lateEntryDeduction = lookupSlab(att.lateMinutes, settings.lateEntrySlabs);
+    lateEntryDeduction = Math.round(lateEntryDeduction);
+
+    if (att.permissionMinutes > 0 && settings.permissionSlabs?.length > 0) {
+      permissionDeduction = applyPermissionSlab(att.permissionMinutes, settings.permissionSlabs);
+    } else {
+      permissionDeduction = 0;
     }
   }
 
-  // ─ Permission deduction ─
-  // The monetary deduction amount (permSlabDeduction) is pre-computed in STEP 1b.
-  // HALF_DAY / HALF_DAY_PLUS_OT actions were already applied to presentDays / OT above.
-  const permissionDeduction = permSlabDeduction;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 10 — Deduction Separation & Final Pay (Excel-matching logic)
+  // PF employees with Cash in Hand:
+  //   Bank Deductions = PF + ESI + PT + Loan + Other (from Bank Gross)
+  //   Cash Deductions = Advance + Late + Permission (from Earned Cash in Hand)
+  //   Bank Transfer  = round(earnedBank - bankDeductions)   ← to nearest ₹1
+  //   Cash Payment   = round(earnedCash - cashDeductions)   ← to nearest ₹1
+  //   Cash Paid      = ceil(cashPayment / 10) × 10          ← UP to nearest ₹10
+  // Non-PF / no cash-in-hand:
+  //   Cash Payment   = round(earned - allDeductions)
+  //   Cash Paid      = ceil(cashPayment / 10) × 10
+  // ─────────────────────────────────────────────────────────────────────────────
+  let totalDeductions = 0;
+  let bankTransfer = 0;
+  let cashPayment = 0;
+  let cashPaid = 0;
+  let finalCashInHand = 0;
 
-  // ─ Total deductions ─
-  // salaryAdvanceOverride is loaded server-side from the SalaryAdvance table filtered by period.
-  // att.advance comes from the frontend attendance payload — ignored here to prevent double-counting.
-  const totalDeductions =
-    employeePf + employeeEsi + professionalTax +
-    lateEntryDeduction + permissionDeduction +
-    salaryAdvanceOverride + loanRecoveryAmount + otherDeductionAmount;
+  if (initialCashInHand > 0 && hasPf) {
+    const bankDeductions = employeePf + employeeEsi + professionalTax + loanRecoveryAmount + otherDeductionAmount;
+    const cashDeductions = salaryAdvanceOverride + lateEntryDeduction + permissionDeduction;
+    totalDeductions = bankDeductions + cashDeductions;
 
-  // ─ Net salary ─
-  // For WEEKLY runs: allow negative net salary when salary advance exceeds earned salary.
-  // The payslip will display a negative balance — employee owes the difference.
-  // For MONTHLY runs: clamp at 0 (excess advance carries forward to next period).
-  const rawNet = grossSalary - totalDeductions;
-  const netSalary = applyRounding(
-    runType === 'WEEKLY' ? rawNet : Math.max(0, rawNet)
-  );
+    bankTransfer = Math.round(Math.max(0, grossSalary - bankDeductions));
+    cashPayment = Math.round(Math.max(0, earnedCashInHand + otPay - cashDeductions));
+    cashPaid = Math.ceil(cashPayment / 10) * 10;
+    finalCashInHand = cashPayment;
+  } else {
+    const allDeductions = employeePf + employeeEsi + professionalTax +
+      lateEntryDeduction + permissionDeduction +
+      salaryAdvanceOverride + loanRecoveryAmount + otherDeductionAmount;
+    totalDeductions = allDeductions;
+
+    const rawNet = grossSalary + earnedCashInHand + otPay - allDeductions;
+    const clampedNet = runType === 'WEEKLY' ? rawNet : Math.max(0, rawNet);
+    cashPayment = Math.round(clampedNet);
+    cashPaid = Math.ceil(cashPayment / 10) * 10;
+    finalCashInHand = Math.round(earnedCashInHand);
+  }
+
+  const actualSalary = bankTransfer + cashPayment;
+  const netSalary = bankTransfer + cashPaid;
 
   // ─ Variance detection (>20% deviation vs monthly salary for cash workers) ─
   let hasVariance = false;
@@ -441,12 +521,6 @@ function computeResult(
       varianceNote = `Net ₹${Math.round(netSalary)} vs expected ₹${Math.round(expectedNet)} (${Math.round(deviation * 100)}% deviation)`;
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 10 — Cash in Hand (added directly without LOP deductions)
-  // ─────────────────────────────────────────────────────────────────────────────
-  const cashInHand = Number(pc.cashInHand) || 0;
-  const finalNetSalary = cashInHand > 0 ? netSalary + cashInHand : netSalary;
 
   return {
     employeeId: emp.id,
@@ -464,7 +538,9 @@ function computeResult(
     formulaDivisor,
     earnedSalary,
     grossSalary,
-    otHours: otH || att.otHours,
+    otHours: otH,
+    otDays: otD,
+    teaOtCount: teaOt,
     otPay,
     pfWage,
     employeePf,
@@ -482,11 +558,16 @@ function computeResult(
     loanRecovery: loanRecoveryAmount,
     otherDeductions: otherDeductionAmount,
     totalDeductions,
-    netSalary: finalNetSalary,
+    bankTransfer,
+    cashPayment,
+    cashPaid,
+    actualSalary,
+    netSalary,
     paymentMode: pc.paymentMode,
     hasVariance,
     varianceNote,
-    cashInHand,
+    cashInHand: finalCashInHand,
+    initialCashInHand,
   };
 }
 
@@ -610,7 +691,9 @@ class PayrollService {
 
   async bulkUpsertAttendance(records: Array<{
     employeeId: bigint; date: string; period: string;
-    status: string; otHours: number; lateMinutes: number;
+    status: string; inTime?: string | null; outTime?: string | null;
+    otHours: number; otDays: number; teaOtCount: number;
+    lateMinutes: number;
     permissionMinutes: number; salaryAdvance: number;
     shiftId?: number | null;
   }>) {
@@ -656,11 +739,11 @@ class PayrollService {
     }
 
     const ops = records.map(r => {
-      const { shiftId, ...rest } = r;
-      return prisma.attendanceRecord.upsert({
+      const { shiftId, inTime, outTime, ...rest } = r;
+      return (prisma.attendanceRecord as any).upsert({
         where: { employeeId_date: { employeeId: r.employeeId, date: r.date } },
-        update: { status: r.status, otHours: r.otHours, lateMinutes: r.lateMinutes, permissionMinutes: r.permissionMinutes, salaryAdvance: r.salaryAdvance, period: r.period, shiftId: shiftId ?? null },
-        create: { ...rest, shiftId: shiftId ?? null },
+        update: { status: r.status, inTime: inTime ?? null, outTime: outTime ?? null, otHours: r.otHours, otDays: r.otDays, teaOtCount: r.teaOtCount, lateMinutes: r.lateMinutes, permissionMinutes: r.permissionMinutes, salaryAdvance: r.salaryAdvance, period: r.period, shiftId: shiftId ?? null },
+        create: { ...rest, inTime: inTime ?? null, outTime: outTime ?? null, shiftId: shiftId ?? null },
       });
     });
     return prisma.$transaction(ops);
@@ -797,6 +880,7 @@ class PayrollService {
       maxOtHoursPerDay: Number(config.maxOtHoursPerDay),
       maxOtHoursPerWeek: Number(config.maxOtHoursPerWeek),
       otSlabs: (config.otSlabs as any[]) ?? [],
+      teaOtRate: Number((config as any).teaOtRate ?? 0),
       pfEnabled: config.pfEnabled,
       pfWageFormula: config.pfWageFormula,
       employeePfPercent: Number(config.employeePfPercent),
@@ -807,7 +891,9 @@ class PayrollService {
       employerEsiPercent: Number(config.employerEsiPercent),
       maxEsiSalary: Number(config.maxEsiSalary),
       paidLeavePerYear: config.paidLeavePerYear,
-      lateEntryGraceMinutes: config.lateEntryGraceMinutes,
+      lateEntryGraceMinutes: config.lateEntryGraceMinutes ?? 10,
+      staffPermissionFreeMinutes: (config as any).staffPermissionFreeMinutes ?? 240,
+      staffExcessHourlyRate: Number((config as any).staffExcessHourlyRate ?? 50),
       lateEntrySlabs: (config.lateEntrySlabs as any[]) ?? [],
       permissionSlabs: (config.permissionSlabs as any[]) ?? [],
       professionalTaxEnabled: config.professionalTaxEnabled,
@@ -1030,11 +1116,16 @@ class PayrollService {
           loanRecovery: r!.loanRecovery,
           otherDeductions: r!.otherDeductions,
           totalDeductions: r!.totalDeductions,
+          bankTransfer: r!.bankTransfer,
+          cashPayment: r!.cashPayment,
+          cashPaid: r!.cashPaid,
+          actualSalary: r!.actualSalary,
           netSalary: r!.netSalary,
           paymentMode: r!.paymentMode,
           hasVariance: r!.hasVariance,
           varianceNote: r!.varianceNote ?? null,
           cashInHand: r!.cashInHand,
+          initialCashInHand: r!.initialCashInHand,
         })),
       });
 
@@ -1320,7 +1411,187 @@ class PayrollService {
     };
   }
 
+  // ─── Bonus Calculation ────────────────────────────────────────────────────────
+  async getBonusCalculation(opts: { startDate: string; endDate: string; category?: string }) {
+    const { startDate, endDate, category } = opts;
+
+    // 1. Generate months between startDate and endDate
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T00:00:00');
+    if (start > end) {
+      throw new ApiError(400, 'Start date must be before or equal to end date');
+    }
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months: Array<{ monthKey: string; label: string; year: number; month: number; daysInMonth: number }> = [];
+
+    const curr = new Date(start.getFullYear(), start.getMonth(), 1);
+    const endLimit = new Date(end.getFullYear(), end.getMonth(), 1);
+
+    while (curr <= endLimit) {
+      const y = curr.getFullYear();
+      const m = curr.getMonth() + 1;
+      const monthKey = `${y}-${String(m).padStart(2, '0')}`;
+      const label = `${monthNames[m - 1]}-${String(y).slice(-2)}`;
+      const daysInMonth = new Date(y, m, 0).getDate();
+
+      months.push({ monthKey, label, year: y, month: m, daysInMonth });
+      curr.setMonth(curr.getMonth() + 1);
+    }
+
+    // 2. Fetch employees
+    const employees = await prisma.employee.findMany({
+      where: { status: 'active' },
+      include: {
+        payrollConfig: true,
+        department: { select: { name: true } },
+      },
+      orderBy: { empCode: 'asc' },
+    });
+
+    const enrichedEmployees = employees.map(e => ({
+      ...e,
+      payrollConfig: getEffectivePayrollConfig(e),
+    }));
+
+    const filteredEmployees = (category && category !== 'ALL')
+      ? enrichedEmployees.filter(e => {
+          const st = String(e.payrollConfig?.salaryType || e.salaryType || '').toUpperCase();
+          if (category === 'MONTHLY') {
+            return st.includes('MONTHLY');
+          }
+          if (category === 'WEEKLY') {
+            return st.includes('WEEKLY') || st.includes('DAILY');
+          }
+          return st === category;
+        })
+      : enrichedEmployees;
+
+    // 3. Fetch all attendance records in the entire date range
+    const attendanceRecords = await prisma.attendanceRecord.findMany({
+      where: {
+        date: { gte: startDate, lte: endDate },
+        employeeId: { in: filteredEmployees.map(e => e.id) },
+      },
+      select: {
+        employeeId: true,
+        date: true,
+        status: true,
+      },
+    });
+
+    // 4. Index attendance per employee and monthKey
+    // Map<employeeIdStr, Map<monthKey, { presentDays: number, leaveDays: number }>>
+    const attMap = new Map<string, Map<string, { presentDays: number; leaveDays: number }>>();
+
+    for (const rec of attendanceRecords) {
+      const empIdStr = rec.employeeId.toString();
+      const mKey = rec.date.slice(0, 7);
+
+      if (!attMap.has(empIdStr)) {
+        attMap.set(empIdStr, new Map());
+      }
+      const empMonthMap = attMap.get(empIdStr)!;
+      if (!empMonthMap.has(mKey)) {
+        empMonthMap.set(mKey, { presentDays: 0, leaveDays: 0 });
+      }
+      const current = empMonthMap.get(mKey)!;
+
+      const st = rec.status;
+      if (st === 'PRESENT' || st === 'WEEKLY_OFF' || st === 'HOLIDAY' || st === 'LEAVE_PAID') {
+        current.presentDays += 1;
+      } else if (st === 'ABSENT' || st === 'LEAVE_UNPAID') {
+        current.leaveDays += 1;
+      } else if (st === 'HALF_DAY') {
+        current.presentDays += 0.5;
+        current.leaveDays += 0.5;
+      }
+    }
+
+    // 5. Calculate bonus breakdown per employee
+    const rows = filteredEmployees.map((emp, idx) => {
+      const empIdStr = emp.id.toString();
+      const empMonthMap = attMap.get(empIdStr) || new Map();
+      const pc = emp.payrollConfig;
+
+      // Date of Joining & Experience calculation
+      const doj = emp.dateOfJoining ? new Date(emp.dateOfJoining) : null;
+      let experienceYears = 0;
+      if (doj && !isNaN(doj.getTime())) {
+        const diffMs = end.getTime() - doj.getTime();
+        experienceYears = Math.max(0, Number((diffMs / (1000 * 60 * 60 * 24 * 365.25)).toFixed(2)));
+      }
+
+      const grossSalary = Number(pc?.monthlySalary || emp.grossSalary || emp.basicSalary || 0);
+      const salaryType = pc?.salaryType || (emp.salaryType === 'weekly' ? 'WEEKLY' : emp.salaryType === 'daily' ? 'DAILY' : 'MONTHLY');
+
+      // Month-by-month values
+      let totalPresentDays = 0;
+      let totalLeaveDays = 0;
+
+      const monthlyData = months.map(m => {
+        const stats = empMonthMap.get(m.monthKey) || { presentDays: 0, leaveDays: 0 };
+        totalPresentDays += stats.presentDays;
+        totalLeaveDays += stats.leaveDays;
+        return {
+          monthKey: m.monthKey,
+          label: m.label,
+          totalDays: m.daysInMonth,
+          presentDays: stats.presentDays,
+          leaveDays: stats.leaveDays,
+        };
+      });
+
+      // Per Day Bonus = Gross Salary / 365
+      const perDayBonus = grossSalary > 0 ? Number((grossSalary / 365).toFixed(2)) : 0;
+      // Overall Bonus = Total Present Days * (Gross Salary / 365)
+      const bonus = Number((totalPresentDays * (grossSalary / 365)).toFixed(2));
+      const paidAmount = 0;
+      const balance = Number((bonus - paidAmount).toFixed(2));
+
+      return {
+        sNo: idx + 1,
+        employeeId: empIdStr,
+        rollNo: emp.empCode,
+        employeeName: emp.fullName || '—',
+        department: emp.department?.name || '—',
+        dateOfJoining: doj ? doj.toISOString().split('T')[0] : null,
+        formattedDoj: doj ? `${String(doj.getDate()).padStart(2, '0')}-${String(doj.getMonth() + 1).padStart(2, '0')}-${doj.getFullYear()}` : '—',
+        experienceYears,
+        monthlySalary: grossSalary,
+        salaryType,
+        monthlyData,
+        totalLeaveDays: Number(totalLeaveDays.toFixed(1)),
+        totalPresentDays: Number(totalPresentDays.toFixed(1)),
+        perDayBonus,
+        bonus,
+        paidAmount,
+        balance,
+      };
+    });
+
+    // 6. Aggregated Totals
+    const summary = {
+      totalEmployees: rows.length,
+      totalGrossSalary: rows.reduce((s, r) => s + r.monthlySalary, 0),
+      totalPresentDays: Number(rows.reduce((s, r) => s + r.totalPresentDays, 0).toFixed(1)),
+      totalLeaveDays: Number(rows.reduce((s, r) => s + r.totalLeaveDays, 0).toFixed(1)),
+      totalBonus: Number(rows.reduce((s, r) => s + r.bonus, 0).toFixed(2)),
+      totalPaidAmount: Number(rows.reduce((s, r) => s + r.paidAmount, 0).toFixed(2)),
+      totalBalance: Number(rows.reduce((s, r) => s + r.balance, 0).toFixed(2)),
+    };
+
+    return {
+      startDate,
+      endDate,
+      months,
+      employees: rows,
+      summary,
+    };
+  }
+
 }
 
 export const payrollService = new PayrollService();
+
 

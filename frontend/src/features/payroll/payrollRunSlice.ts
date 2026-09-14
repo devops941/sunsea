@@ -5,19 +5,19 @@ import type { PayrollEmployee, EmployeeAttendance, PayrollRun, PayrollStatus, Da
 // ─── Mock Employees ───────────────────────────────────────────────────────────
 export const MOCK_EMPLOYEES: PayrollEmployee[] = [
   // Fixed Monthly (Admin/Office)
-  { id: 'E001', employeeCode: 'EMP001', name: 'Rajan Kumar',  department: 'Admin',      designation: 'Manager',        salaryType: 'FIXED_MONTHLY', monthlySalary: 25000, basicSalary: 15000, da: 1500, hra: 3000, otherAllowance: 5500, bankAccount: 'HDFC-001', pfNumber: 'TN/12345/001' },
-  { id: 'E002', employeeCode: 'EMP002', name: 'Meena Devi',   department: 'Admin',      designation: 'Accountant',     salaryType: 'FIXED_MONTHLY', monthlySalary: 18000, basicSalary: 10000, da: 1000, hra: 2000, otherAllowance: 5000, bankAccount: 'HDFC-002', pfNumber: 'TN/12345/002' },
+  { id: 'E001', employeeCode: 'EMP001', name: 'Rajan Kumar',  department: 'Admin',      designation: 'Manager',        employeeCategory: 'office_staff', salaryType: 'FIXED_MONTHLY', monthlySalary: 25000, basicSalary: 15000, da: 1500, hra: 3000, otherAllowance: 5500, bankAccount: 'HDFC-001', pfNumber: 'TN/12345/001' },
+  { id: 'E002', employeeCode: 'EMP002', name: 'Meena Devi',   department: 'Admin',      designation: 'Accountant',     employeeCategory: 'office_staff', salaryType: 'FIXED_MONTHLY', monthlySalary: 18000, basicSalary: 10000, da: 1000, hra: 2000, otherAllowance: 5000, bankAccount: 'HDFC-002', pfNumber: 'TN/12345/002' },
   // PF Monthly (Factory Workers)
-  { id: 'E003', employeeCode: 'EMP003', name: 'Arun S',       department: 'Production', designation: 'Operator',       salaryType: 'PF_MONTHLY',    monthlySalary: 12500, basicSalary: 8000,  da: 800,  hra: 1600, otherAllowance: 2100, pfNumber: 'TN/12345/003', esiNumber: 'ESI-003' },
-  { id: 'E004', employeeCode: 'EMP004', name: 'Sagar M',      department: 'Production', designation: 'Operator',       salaryType: 'PF_MONTHLY',    monthlySalary: 10900, basicSalary: 7000,  da: 700,  hra: 1400, otherAllowance: 1800, pfNumber: 'TN/12345/004', esiNumber: 'ESI-004' },
+  { id: 'E003', employeeCode: 'EMP003', name: 'Arun S',       department: 'Production', designation: 'Operator',       employeeCategory: 'labour',       salaryType: 'PF_MONTHLY',    monthlySalary: 12500, basicSalary: 8000,  da: 800,  hra: 1600, otherAllowance: 2100, pfNumber: 'TN/12345/003', esiNumber: 'ESI-003' },
+  { id: 'E004', employeeCode: 'EMP004', name: 'Sagar M',      department: 'Production', designation: 'Operator',       employeeCategory: 'labour',       salaryType: 'PF_MONTHLY',    monthlySalary: 10900, basicSalary: 7000,  da: 700,  hra: 1400, otherAllowance: 1800, pfNumber: 'TN/12345/004', esiNumber: 'ESI-004' },
   // Cash Monthly (Non-PF)
-  { id: 'E005', employeeCode: 'EMP005', name: 'Rajesh T',     department: 'Warehouse',  designation: 'Helper',         salaryType: 'CASH_MONTHLY',  monthlySalary: 9500,  basicSalary: 9500,  da: 0,    hra: 0,    otherAllowance: 0 },
-  { id: 'E006', employeeCode: 'EMP006', name: 'Nathiya K',    department: 'Warehouse',  designation: 'Helper',         salaryType: 'CASH_MONTHLY',  monthlySalary: 8500,  basicSalary: 8500,  da: 0,    hra: 0,    otherAllowance: 0 },
-  { id: 'E007', employeeCode: 'EMP007', name: 'Priya S',      department: 'Warehouse',  designation: 'Helper',         salaryType: 'CASH_MONTHLY',  monthlySalary: 9000,  basicSalary: 9000,  da: 0,    hra: 0,    otherAllowance: 0 },
+  { id: 'E005', employeeCode: 'EMP005', name: 'Rajesh T',     department: 'Warehouse',  designation: 'Helper',         employeeCategory: 'labour',       salaryType: 'CASH_MONTHLY',  monthlySalary: 9500,  basicSalary: 9500,  da: 0,    hra: 0,    otherAllowance: 0 },
+  { id: 'E006', employeeCode: 'EMP006', name: 'Nathiya K',    department: 'Warehouse',  designation: 'Helper',         employeeCategory: 'labour',       salaryType: 'CASH_MONTHLY',  monthlySalary: 8500,  basicSalary: 8500,  da: 0,    hra: 0,    otherAllowance: 0 },
+  { id: 'E007', employeeCode: 'EMP007', name: 'Priya S',      department: 'Warehouse',  designation: 'Helper',         employeeCategory: 'labour',       salaryType: 'CASH_MONTHLY',  monthlySalary: 9000,  basicSalary: 9000,  da: 0,    hra: 0,    otherAllowance: 0 },
   // Daily Wage Weekly
-  { id: 'E008', employeeCode: 'EMP008', name: 'Kumar V',      department: 'Production', designation: 'Daily Worker',   salaryType: 'DAILY_WEEKLY',  monthlySalary: 0,     basicSalary: 0,     da: 0,    hra: 0,    otherAllowance: 0, dailySalary: 500 },
-  { id: 'E009', employeeCode: 'EMP009', name: 'Shankar R',    department: 'Production', designation: 'Daily Worker',   salaryType: 'DAILY_WEEKLY',  monthlySalary: 0,     basicSalary: 0,     da: 0,    hra: 0,    otherAllowance: 0, dailySalary: 450 },
-  { id: 'E010', employeeCode: 'EMP010', name: 'Mani P',       department: 'Production', designation: 'Daily Worker',   salaryType: 'DAILY_WEEKLY',  monthlySalary: 0,     basicSalary: 0,     da: 0,    hra: 0,    otherAllowance: 0, dailySalary: 400 },
+  { id: 'E008', employeeCode: 'EMP008', name: 'Kumar V',      department: 'Production', designation: 'Daily Worker',   employeeCategory: 'labour',       salaryType: 'DAILY_WEEKLY',  monthlySalary: 0,     basicSalary: 0,     da: 0,    hra: 0,    otherAllowance: 0, dailySalary: 500 },
+  { id: 'E009', employeeCode: 'EMP009', name: 'Shankar R',    department: 'Production', designation: 'Daily Worker',   employeeCategory: 'labour',       salaryType: 'DAILY_WEEKLY',  monthlySalary: 0,     basicSalary: 0,     da: 0,    hra: 0,    otherAllowance: 0, dailySalary: 450 },
+  { id: 'E010', employeeCode: 'EMP010', name: 'Mani P',       department: 'Production', designation: 'Daily Worker',   employeeCategory: 'labour',       salaryType: 'DAILY_WEEKLY',  monthlySalary: 0,     basicSalary: 0,     da: 0,    hra: 0,    otherAllowance: 0, dailySalary: 400 },
 ];
 
 // ─── Helper to generate attendance for a period ───────────────────────────────
