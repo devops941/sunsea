@@ -141,9 +141,9 @@ export async function getTvSummary() {
         where: { productionDate: { gte: today, lt: tomorrow } },
         select: {
           machineId: true,
-          qtyProduced: true,
-          downtime: true,
-          downtimeReason: true,
+          totalQtyProduced: true,
+          totalDowntime: true,
+          hourlyEntries: true,
           machine: { select: { machineName: true } },
         },
       })
@@ -300,12 +300,19 @@ export async function getTvSummary() {
   /* ─── DOWNTIME (today, by machine) ───────────────────────────── */
   const dtAgg = new Map<string, { minutes: number; reason: string }>();
   for (const h of hourlyToday) {
-    const mins = num(h.downtime);
+    const mins = num((h as any).totalDowntime || (h as any).downtime);
     if (mins <= 0) continue;
     const key = h.machine?.machineName || h.machineId;
     const cur = dtAgg.get(key) || { minutes: 0, reason: "" };
     cur.minutes += mins;
-    if (h.downtimeReason && !cur.reason) cur.reason = h.downtimeReason;
+    if (Array.isArray((h as any).hourlyEntries)) {
+      const dtEntry = ((h as any).hourlyEntries as any[]).find((e: any) => e.downtimeReason);
+      if (dtEntry && dtEntry.downtimeReason && !cur.reason) {
+        cur.reason = dtEntry.downtimeReason;
+      }
+    } else if ((h as any).downtimeReason && !cur.reason) {
+      cur.reason = (h as any).downtimeReason;
+    }
     dtAgg.set(key, cur);
   }
   const downtime = [...dtAgg.entries()]

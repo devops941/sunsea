@@ -1,6 +1,6 @@
 import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { FaArrowLeft, FaIndustry, FaChartBar, FaCheckCircle, FaBoxOpen, FaTruck, FaArrowRight, FaShare, FaClipboardList, FaCalendarAlt } from "react-icons/fa";
+import { FaArrowLeft, FaIndustry, FaChartBar, FaCheckCircle, FaBoxOpen, FaTruck, FaArrowRight, FaShare, FaClipboardList } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 
 import apiClient from "../../../api/apiClient";
@@ -13,8 +13,13 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
-import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+
+const fmtDate = (d: string | undefined | null) => {
+  if (!d) return "—";
+  const dt = new Date(d.includes("T") ? d : `${d}T00:00:00`);
+  return isNaN(dt.getTime()) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
 
 const DailyPlanViewPage: React.FC = () => {
   const navigate = useNavigate();
@@ -60,8 +65,26 @@ const DailyPlanViewPage: React.FC = () => {
         productionOrderId: currentPlan.productionOrderId,
       }
     }).then(res => {
-      if (res.data?.success) setViewHourlyLogs((res.data.data || []).filter((h: any) => Number(h.hourIndex) > 0));
-      else setViewHourlyLogs([]);
+      if (res.data?.success) {
+        const rawList = res.data.data || [];
+        const entries: any[] = [];
+        rawList.forEach((hp: any) => {
+          if (Array.isArray(hp.hourlyEntries) && hp.hourlyEntries.length > 0) {
+            hp.hourlyEntries.forEach((e: any) => {
+              entries.push({
+                ...e,
+                hourlyProductionId: `${hp.hourlyProductionId || hp.id}-${e.hourIndex}`,
+              });
+            });
+          } else if (Number(hp.hourIndex) > 0) {
+            entries.push(hp);
+          }
+        });
+        entries.sort((a: any, b: any) => Number(a.hourIndex || 0) - Number(b.hourIndex || 0));
+        setViewHourlyLogs(entries);
+      } else {
+        setViewHourlyLogs([]);
+      }
     }).catch(() => setViewHourlyLogs([])
     ).finally(() => setLoadingViewLogs(false));
 
@@ -116,39 +139,25 @@ const DailyPlanViewPage: React.FC = () => {
   useSocketSync("hourlyProduction", undefined, fetchAllData);
 
   const handleLogHourly = (plan: any) => {
-    navigate("/hourly-work-reports/create", {
-      state: {
-        dailyPlanId: plan.dailyPlanId,
-        productionOrderId: plan.productionOrderId,
-        machineId: plan.machineId,
-        shiftId: plan.shiftId,
-        productionDate: plan.productionDate,
-        weeklyProgramId: plan.weeklyProgramId
-      }
-    });
+    navigate(`/daily-production-plans/hourly/${plan.dailyPlanId}`);
   };
 
-  const handleBack = () => {
-    navigate(-1);
+  const calcPlanGood = (p: any) => {
+    if (!Array.isArray(p?.hourlyProductions) || p.hourlyProductions.length === 0) return 0;
+    return p.hourlyProductions.reduce((s: number, h: any) => {
+      if (h.totalQtyProduced !== undefined) {
+        return s + Math.max(0, Number(h.totalQtyProduced || 0) - Number(h.totalRejectQty || 0));
+      }
+      return s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0));
+    }, 0);
   };
 
   const weeklyTargetQty = weeklyProgram ? Number(weeklyProgram.targetQty || 0) : 0;
-  const weeklyProducedQty = viewPlan?.productionOrder
-    ? (() => {
-        const totalProduced = Array.isArray(viewPlan.hourlyProductions)
-          ? viewPlan.hourlyProductions.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
-          : 0;
-        return totalProduced;
-      })()
-    : 0;
+  const weeklyProducedQty = viewPlan?.productionOrder ? calcPlanGood(viewPlan) : 0;
   const weeklyOrderTargetQty = viewPlan?.productionOrder ? Number(viewPlan.productionOrder.targetQty || 0) : 0;
-  // Net PO produced = sum of (qtyProduced - rejectQty - scrapQty) across ALL plans for this PO
+  // Net PO produced = sum of good pieces across ALL plans for this PO
   const netPoProduced = poHistoryPlans.length > 0
-    ? poHistoryPlans.reduce((total: number, p: any) =>
-        total + (Array.isArray(p.hourlyProductions)
-          ? p.hourlyProductions.reduce((s: number, h: any) =>
-              s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
-          : 0), 0)
+    ? poHistoryPlans.reduce((total: number, p: any) => total + calcPlanGood(p), 0)
     : null;
   // Use goodQty (net: producedQty − rejectQty − scrapQty) from OEE summary when available
   const weeklyOrderProducedQty = viewPlanOeeSummary?.goodQty ?? weeklyProducedQty;
@@ -205,9 +214,7 @@ const DailyPlanViewPage: React.FC = () => {
       header: "Produced",
       align: "center",
       render: (plan: any) => {
-        const producedQty = Array.isArray(plan.hourlyProductions)
-          ? plan.hourlyProductions.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
-          : 0;
+        const producedQty = calcPlanGood(plan);
         return (
           <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
             {producedQty.toLocaleString()}
@@ -239,18 +246,10 @@ const DailyPlanViewPage: React.FC = () => {
           </div>
           <div>
             <h3 className="text-xl font-bold text-ink leading-tight">Daily Plan — {viewPlan.dailyPlanId}</h3>
-            <p className="text-xs text-ink-subtle mt-0.5">{viewPlan.productionDate?.split("T")[0]} · {viewPlan.machine?.machineName || viewPlan.machineId} · {viewPlan.shift?.shiftName || viewPlan.shiftId}</p>
+            <p className="text-xs text-ink-subtle mt-0.5">{fmtDate(viewPlan.productionDate)} · {viewPlan.machine?.machineName || viewPlan.machineId} · {viewPlan.shift?.shiftName || viewPlan.shiftId}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* {(viewPlan.status === "PLANNED" || viewPlan.status === "IN_PROGRESS") && (
-            <CustomButton
-              text="Log Hourly Entry"
-              icon={FaClipboardList}
-              className="!bg-emerald-600 hover:!bg-emerald-700 !text-white shadow-sm"
-              onClick={() => handleLogHourly(viewPlan)}
-            />
-          )} */}
           <BackButton />
         </div>
       </div>
@@ -349,7 +348,7 @@ const DailyPlanViewPage: React.FC = () => {
               {[
                 { label: "Production Order", value: viewPlan.productionOrderId },
                 { label: "Product", value: viewPlan.productionOrder?.productItem?.productName || "—" },
-                { label: "Date", value: viewPlan.productionDate?.split("T")[0] },
+                { label: "Date", value: fmtDate(viewPlan.productionDate) },
                 { label: "Machine", value: viewPlan.machine?.machineName || viewPlan.machineId },
                 { label: "Shift", value: viewPlan.shift?.shiftName || viewPlan.shiftId },
               ].map(({ label, value }) => (
@@ -367,14 +366,6 @@ const DailyPlanViewPage: React.FC = () => {
                 <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Planned Qty:</dt>
                 <dd className="text-ink font-semibold">{viewPlan.plannedQty} pcs</dd>
               </div>
-              <div className="flex items-start gap-2">
-                <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Planned Hours:</dt>
-                <dd className="text-ink font-semibold">{viewPlan.plannedHours || "—"} hrs</dd>
-              </div>
-              <div className="flex items-center gap-2">
-                <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Priority:</dt>
-                <dd><StatusBadge status={viewPlan.priority || "MEDIUM"} /></dd>
-              </div>
               <div className="flex items-center gap-2">
                 <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Status:</dt>
                 <dd><StatusBadge status={viewPlan.status} /></dd>
@@ -389,11 +380,11 @@ const DailyPlanViewPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Post Production Steps ── */}
-        {viewPlan.productionOrder?.productItem?.productionSteps?.length > 0 && (
+        {/* ── Production Steps ── */}
+        {viewPlan?.productionOrder?.productItem?.productionSteps?.length > 0 && (
           <div className="border border-line rounded-xl overflow-hidden">
-            <div className="px-5 py-3 bg-card-2 border-b border-line">
-              <h6 className="text-xs font-bold text-ink-subtle uppercase tracking-wider m-0">Post Production Steps</h6>
+            <div className="px-4 py-2.5 bg-card-2 border-b border-line">
+              <h6 className="text-xs font-bold text-ink-subtle uppercase tracking-wider m-0">Production Steps</h6>
             </div>
             <div className="p-5 flex flex-wrap gap-3 items-center">
               {viewPlan.productionOrder.productItem.productionSteps.map((step: any, idx: number) => {
@@ -404,9 +395,6 @@ const DailyPlanViewPage: React.FC = () => {
 
                 if (viewPlan.status === "COMPLETED" || viewPlan.status === "READY_FOR_DISPATCH") {
                   isCompleted = true;
-                } else if (viewPlan.status === "POST_PRODUCTION") {
-                  isCompleted = stepNum < currentStep;
-                  isActive = stepNum === currentStep;
                 } else if (viewPlan.status === "STOPPED" || viewPlan.status === "CANCELLED" || viewPlan.status === "SHORT_CLOSED") {
                   isCompleted = stepNum < currentStep;
                 }
@@ -456,11 +444,23 @@ const DailyPlanViewPage: React.FC = () => {
                   { header: "Hour", align: "center", render: (h: any) => <span className="font-bold font-mono text-ink-muted text-sm">H{h.hourIndex}</span> },
                   { header: "Produced", align: "center", render: (h: any) => <span className="font-bold text-emerald-600 text-base">{h.qtyProduced}</span> },
                   { header: "Reject", align: "center", render: (h: any) => <span className="text-rose-500 text-sm">{h.rejectQty || 0}</span> },
-                  { header: "Scrap", align: "center", render: (h: any) => <span className="text-amber-500 text-sm">{h.scrapQty || 0}</span> },
-                  { header: "Downtime", align: "center", render: (h: any) => <span className="text-ink-subtle text-sm">{h.downtime > 0 ? `${h.downtime} min` : "—"}</span> },
-                  { header: "Avail%", align: "center", render: (h: any) => <span className="font-semibold text-emerald-700 text-sm">{h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}</span> },
-                  { header: "Qual%", align: "center", render: (h: any) => <span className="font-semibold text-purple-700 text-sm">{h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}</span> },
-                  { header: "OEE%", align: "center", render: (h: any) => <span className="font-extrabold text-indigo-700 text-sm">{h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}</span> },
+                  {
+                    header: "Downtime",
+                    align: "center",
+                    render: (h: any) => {
+                      const dt = Number(h.downtime || 0);
+                      if (dt <= 0) return <span className="text-ink-subtle text-sm">—</span>;
+                      const reason = h.downtimeReason || h.reason || h.remarks || "No reason specified";
+                      return (
+                        <span
+                          className="text-amber-400 font-semibold text-sm cursor-help underline decoration-dotted decoration-amber-400/60 underline-offset-2"
+                          title={`Downtime Reason: ${reason}`}
+                        >
+                          {dt} min
+                        </span>
+                      );
+                    }
+                  },
                   { header: "Operator", render: (h: any) => <span className="text-ink-muted font-medium text-sm truncate max-w-[150px] inline-block" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</span> }
                 ]}
                 data={viewHourlyLogs}
@@ -472,17 +472,24 @@ const DailyPlanViewPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-4 text-sm font-bold">
                   <span className="text-ink-subtle text-xs uppercase tracking-wider">Totals:</span>
                   <div className="flex flex-wrap gap-5 text-sm">
-                    <span className="text-emerald-600">✓ Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)}</span>
+                    <span className="text-emerald-600">✓ Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0)), 0)}</span>
                     <span className="text-rose-500">✕ Reject: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.rejectQty || 0), 0)}</span>
-                    <span className="text-amber-500">⚠ Scrap: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.scrapQty || 0), 0)}</span>
                     <span className="text-ink-subtle">↓ Downtime: {(() => { const t = viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-4 text-sm pt-3 border-t border-line border-dashed">
-                  <div className="flex gap-6 font-bold">
-                    <span className="text-ink-muted">Total Produced: <span className="text-emerald-600 ml-2">{weeklyOrderProducedQty} pcs</span></span>
-                    <span className="text-ink-muted">Pending: <span className="text-amber-500 ml-2">{Math.max(0, weeklyOrderTargetQty - weeklyOrderProducedQty)} pcs</span></span>
-                  </div>
+                  {(() => {
+                    const producedPcs = viewHourlyLogs.reduce((s: any, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0)), 0);
+                    const plannedPcs = Number(viewPlan?.plannedQty || 0);
+                    const pendingPcs = Math.max(0, plannedPcs - producedPcs);
+                    return (
+                      <div className="flex gap-6 font-bold">
+                        <span className="text-ink-muted">Total Produced: <span className="text-emerald-600 ml-2">{producedPcs} pcs</span></span>
+                        <span className="text-ink-muted">Pending: <span className="text-amber-500 ml-2">{pendingPcs} pcs</span></span>
+                      </div>
+                    );
+                  })()}
+                </div>
                   {viewPlan.carryForwardTo && viewPlan.carryForwardTo.length > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="text-ink-subtle uppercase tracking-wider text-xs">Carried Forward To:</span>
@@ -493,7 +500,6 @@ const DailyPlanViewPage: React.FC = () => {
                       </span>
                     </div>
                   )}
-                </div>
               </div>
             </div>
           ) : (
@@ -524,25 +530,25 @@ const DailyPlanViewPage: React.FC = () => {
                 <tbody className="divide-y divide-line">
                   {(() => {
                     const capacity = Number(viewPlan.plannedQty || 0);
-                    const totalProduced = Array.isArray(viewPlan.hourlyProductions)
-                      ? viewPlan.hourlyProductions.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
-                      : 0;
+                    const totalProduced = viewHourlyLogs.length > 0
+                      ? viewHourlyLogs.reduce((s: number, h: any) => s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0) - Number(h.scrapQty || 0)), 0)
+                      : calcPlanGood(viewPlan);
                     const pending = Math.max(0, capacity - totalProduced);
-                    const efficiency = capacity > 0 ? ((totalProduced / capacity) * 100).toFixed(0) : "0";
-                    const shortfallPct = capacity > 0 ? ((capacity - totalProduced) / capacity) * 100 : 0;
+                    const effNum = capacity > 0 ? Math.round((totalProduced / capacity) * 100) : 0;
+                    const efficiency = `${effNum}%`;
                     
-                    let statusText = "";
-                    let customColor = { bg: "", text: "" };
+                    let statusText = "Low";
+                    let customColor = { bg: "rgba(239,68,68,0.15)", text: "#f87171" };
 
-                    if (shortfallPct <= 0) {
-                       statusText = "Highest";
-                       customColor = { bg: '#d1fae5', text: '#065f46' };
-                    } else if (shortfallPct <= 15) {
-                       statusText = "Medium";
-                       customColor = { bg: '#fef3c7', text: '#b45309' };
+                    if (capacity > 0 && totalProduced >= capacity) {
+                      statusText = "High";
+                      customColor = { bg: "rgba(16,185,129,0.15)", text: "#34d399" };
+                    } else if (capacity > 0 && totalProduced >= capacity * 0.85) {
+                      statusText = "Medium";
+                      customColor = { bg: "rgba(245,158,11,0.15)", text: "#fbbf24" };
                     } else {
-                       statusText = "Low";
-                       customColor = { bg: '#fee2e2', text: '#b91c1c' };
+                      statusText = "Low";
+                      customColor = { bg: "rgba(239,68,68,0.15)", text: "#f87171" };
                     }
                     
                     return (
@@ -553,10 +559,10 @@ const DailyPlanViewPage: React.FC = () => {
                         <td className="px-5 py-4 text-ink-muted">
                           {viewPlan.productionOrder?.productItem?.productName || "—"}
                         </td>
-                        <td className="px-5 py-4 text-center text-ink-muted font-bold text-base">{capacity}</td>
-                        <td className="px-5 py-4 text-center text-emerald-600 font-bold text-base">{totalProduced}</td>
-                        <td className="px-5 py-4 text-center text-amber-600 font-bold text-base">{pending}</td>
-                        <td className="px-5 py-4 text-center text-indigo-600 font-bold text-base">{efficiency}%</td>
+                        <td className="px-5 py-4 text-center text-ink font-bold text-base">{capacity}</td>
+                        <td className="px-5 py-4 text-center text-emerald-400 font-bold text-base">{totalProduced}</td>
+                        <td className="px-5 py-4 text-center text-amber-400 font-bold text-base">{pending}</td>
+                        <td className="px-5 py-4 text-center text-indigo-400 font-bold text-base">{efficiency}</td>
                         <td className="px-5 py-4 text-center">
                           <StatusBadge status="CUSTOM" customText={statusText} customColor={customColor} />
                         </td>
@@ -568,59 +574,6 @@ const DailyPlanViewPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* ── Production Order History ── */}
-        <div className="border border-line-soft rounded-xl overflow-hidden shadow-xs">
-          <div className="px-5 py-4 bg-card-2 border-b border-line flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FaClipboardList className="text-ink-subtle" size={16} />
-              <h3 className="font-bold text-ink m-0">Production Order History</h3>
-              <span className="text-xs text-ink-subtle font-mono bg-line/50 px-2 py-0.5 rounded border border-line">
-                {viewPlan.productionOrderId}
-              </span>
-            </div>
-            {!loadingPOHistory && (
-              <span className="text-xs text-ink-subtle bg-line/50 px-3 py-1 rounded font-medium">
-                {poHistoryPlans.length} plan{poHistoryPlans.length !== 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-
-          {loadingPOHistory ? (
-            <div className="flex items-center justify-center gap-2 py-8 bg-card-2 text-ink-subtle text-sm">
-              <div className="w-5 h-5 border-2 border-line border-t-transparent rounded-full animate-spin" />
-              Loading history...
-            </div>
-          ) : poHistoryPlans.length > 0 ? (
-            <div className="flex flex-col">
-              <DataTable
-                columns={poHistoryColumns}
-                data={poHistoryPlans}
-                rowKey={(row) => row.dailyPlanId}
-                emptyMessage="No records found."
-                minHeightClassName="min-h-0"
-                density="compact"
-                rowClassName={(row) => row.dailyPlanId === viewPlan.dailyPlanId ? "bg-indigo-50/60 border-l-2 border-l-indigo-500" : ""}
-              />
-              <div className="flex items-center justify-between bg-card-2 border-t border-line px-5 py-4">
-                <div className="text-sm font-bold text-ink-muted">Total</div>
-                <div className="flex gap-10 md:gap-20 items-center pr-20">
-                  <div className="text-center text-sm font-bold text-ink">
-                    Planned: {poHistoryPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0).toLocaleString()}
-                  </div>
-                  <div className="text-center text-sm font-bold text-emerald-700">
-                    Produced: {weeklyOrderProducedQty.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-10 bg-card-2 text-center">
-              <FaCalendarAlt className="text-ink-subtle mb-3" size={32} />
-              <span className="text-ink-subtle font-medium text-sm">No other daily plans found for this production order.</span>
-            </div>
-          )}
-        </div>
 
       </div>
     </div>

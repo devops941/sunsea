@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaPlus } from "react-icons/fa";
@@ -10,8 +10,6 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
-import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import { goodsDispatchService } from "../../../services/goodsDispatchService";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -20,7 +18,6 @@ import EditButton from "../../../components/ui/EditButton/EditButton";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
-
 import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 15;
@@ -35,16 +32,12 @@ const GoodsDispatchList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Filter states (applied)
   const [filterStatus, setFilterStatus] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-
-  // Draft filter states (for popover)
   const [draftFilterStatus, setDraftFilterStatus] = useState("");
   const [draftFilterDateFrom, setDraftFilterDateFrom] = useState("");
   const [draftFilterDateTo, setDraftFilterDateTo] = useState("");
-
   const [currentPage, setCurrentPage] = useState(1);
 
   const hasActiveFilters = !!(filterStatus || filterDateFrom || filterDateTo);
@@ -55,7 +48,6 @@ const GoodsDispatchList: React.FC = () => {
     onNew: () => can("goods-dispatch.create") && navigate("/production/goods-dispatch/create"),
   });
 
-  // Handle search debouncing
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -64,7 +56,6 @@ const GoodsDispatchList: React.FC = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Backend-driven fetch
   useEffect(() => {
     dispatch(
       fetchGoodsDispatches({
@@ -107,53 +98,13 @@ const GoodsDispatchList: React.FC = () => {
     setDraftFilterDateTo(filterDateTo);
   };
 
-  const fetchDispatchesForExport = useCallback(async () => {
-    try {
-      const res = await goodsDispatchService.fetchAll({ page: 1, limit: 100000 });
-      const list = res?.dispatches || (Array.isArray(res) ? res : (res?.data || []));
-      if (Array.isArray(list) && list.length > 0) return list;
-    } catch {
-      // fallback
-    }
-    return Array.isArray(dispatches) ? dispatches : [];
-  }, [dispatches]);
-
-  const { csvColumns, csvFilename } = useMemo(() => {
-    const columns = [
-      { header: "Dispatch No", accessor: (item: any) => item.dispatchNumber || "" },
-      { header: "Date", accessor: (item: any) => item.dispatchDate ? formatDate(item.dispatchDate) : "" },
-      { header: "Vehicle No", accessor: (item: any) => item.vehicleNumber || "" },
-      { header: "Driver Name", accessor: (item: any) => item.driverName || "" },
-      { header: "Destination Store", accessor: (item: any) => item.store?.storeName || item.destinationStoreId || "" },
-      { header: "Total Items", accessor: (item: any) => item.items?.length || 0 },
-      { header: "Status", accessor: (item: any) => item.status || "" },
-    ];
-    return {
-      csvColumns: columns,
-      csvFilename: `Goods_Dispatch_List_${new Date().toISOString().split("T")[0]}.csv`,
-    };
-  }, []);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  // Stats computed from current filtered data on current page (showing what's on screen)
-  // Or we could compute from allData if we had it. For now use meta totals.
-  // const totalCount = meta?.total || 0;
-
   const displayDispatches = dispatches || [];
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
     count: displayDispatches.length,
-    onEnter: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/detail/${item.id}`); },
-    onEdit: (i) => {
-      const item = displayDispatches[i];
-      if (!item) return;
-      if (item.status === "PENDING_GATE_APPROVAL" && can("goods-dispatch.edit")) navigate(`/production/goods-dispatch/gate-approval/${item.id}`);
-      else if (item.status === "PENDING_STORE_RECEIPT" && can("goods-dispatch.edit")) navigate(`/production/goods-dispatch/store-approval/${item.id}`);
-    },
+    onEnter: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/view/${item.id}`); },
+    onEdit: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/view/${item.id}`); },
     containerRef: tableRef,
   });
 
@@ -194,24 +145,19 @@ const GoodsDispatchList: React.FC = () => {
       header: "Status",
       width: "185px",
       accessor: "status",
-      render: (item: any) => {
-        return <StatusBadge status={item.status} />;
-      },
+      render: (item: any) => <StatusBadge status={item.status} />,
     },
     {
       header: "Action",
       width: "90px",
       accessor: "id",
       render: (item: any) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {can("goods-dispatch.view") && (
-            <ViewButton onClick={() => navigate(`/production/goods-dispatch/detail/${item.id}`)} />
+            <ViewButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
           )}
-          {item.status === "PENDING_GATE_APPROVAL" && can("goods-dispatch.edit") && (
-            <EditButton onClick={() => navigate(`/production/goods-dispatch/gate-approval/${item.id}`)} />
-          )}
-          {item.status === "PENDING_STORE_RECEIPT" && can("goods-dispatch.edit") && (
-            <EditButton onClick={() => navigate(`/production/goods-dispatch/store-approval/${item.id}`)} />
+          {(item.status === "PENDING_GATE_APPROVAL" || item.status === "PENDING_STORE_RECEIPT") && can("goods-dispatch.edit") && (
+            <EditButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
           )}
         </div>
       ),
@@ -220,8 +166,7 @@ const GoodsDispatchList: React.FC = () => {
 
   return (
     <div>
-      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-        {/* Page Header */}
+      <div className="w-full bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
             <h2 className="text-2xl font-bold text-ink">Goods Dispatch</h2>
@@ -276,15 +221,6 @@ const GoodsDispatchList: React.FC = () => {
               </div>
             </FilterPopover>
 
-            {can("goods-dispatch.export") && (
-              <ExportCSVButton
-                fetchData={fetchDispatchesForExport}
-                columns={csvColumns}
-                filename={csvFilename}
-                text="Export"
-              />
-            )}
-
             {can("goods-dispatch.create") && (
               <CustomButton
                 text="Create Dispatch"
@@ -295,29 +231,27 @@ const GoodsDispatchList: React.FC = () => {
           </div>
         </div>
 
-        {/* Error State */}
         {error && (
           <div className="bg-red-500/15 border-l-4 border-red-500 p-4 m-4 rounded-r-xl">
             <p className="text-red-400 font-semibold">{error}</p>
           </div>
         )}
 
-        {/* Data Table */}
         <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
-        <DataTable
-          columns={columns}
-          data={displayDispatches}
-          loading={loading}
-          rowKey={(item) => item.id.toString()}
-          rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
-          onRowClick={(item, i) => { setFocusedIndex(i); navigate(`/production/goods-dispatch/detail/${item.id}`); }}
-          emptyMessage="No dispatches found"
-          pagination={meta && meta.totalPages > 1 ? {
-            currentPage,
-            totalPages: meta.totalPages,
-            onPageChange: handlePageChange
-          } : undefined}
-        />
+          <DataTable
+            columns={columns}
+            data={displayDispatches}
+            loading={loading}
+            rowKey={(item) => item.id.toString()}
+            rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+            onRowClick={(item, i) => { setFocusedIndex(i); navigate(`/production/goods-dispatch/view/${item.id}`); }}
+            emptyMessage="No dispatches found"
+            pagination={meta && meta.totalPages > 1 ? {
+              currentPage,
+              totalPages: meta.totalPages,
+              onPageChange: setCurrentPage,
+            } : undefined}
+          />
         </div>
       </div>
     </div>

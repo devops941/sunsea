@@ -89,8 +89,6 @@ const ProductForm = lazy(() => import("../modules/product/pages/ProductForm"));
 
 // New modules
 const MachineForm = lazy(() => import("../modules/machines/pages/MachineForm"));
-const MachineAssignmentList = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentList"));
-const MachineAssignmentForm = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentForm"));
 
 // ===========================================================================
 // STORES & LOCATIONS
@@ -119,25 +117,16 @@ const WastageStockEdit = lazy(() => import("../modules/wastage-stock/pages/Wasta
 // PRODUCTION & PLANNING
 // ===========================================================================
 const ProductionOrderList = lazy(() => import("../modules/production-orders/pages/ProductionOrderList"));
-const AllProductionOrderList = lazy(() => import("../modules/production-orders/pages/AllProductionOrderList"));
 const ProductionOrderCreate = lazy(() => import("../modules/production-orders/pages/ProductionOrderCreate"));
 const ProductionOrderHistoryView = lazy(() => import("../modules/production-orders/pages/ProductionOrderHistoryView"));
+const WeeklyPlanView = lazy(() => import("../modules/production-orders/pages/WeeklyPlanView"));
 
-const WeeklyMachineScheduleList = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleList"));
-const WeeklyMachineScheduleCreate = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleCreate"));
-const WeeklyMachineScheduleEdit = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleEdit"));
 
 const DailyProductionPlanningPage = lazy(() => import("../modules/daily-machine-planning/pages/DailyProductionPlanningPage"));
 const DailyPlanCreate = lazy(() => import("../modules/daily-machine-planning/pages/DailyPlanCreate"));
 const DailyPlanViewPage = lazy(() => import("../modules/daily-machine-planning/pages/DailyPlanViewPage"));
 const DailyReportPage = lazy(() => import("../modules/daily-machine-planning/pages/DailyReportPage"));
-
-const HourlyWorkReportList = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportList"));
-const HourlyWorkReportCreate = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportCreate"));
-const HourlyWorkReportEdit = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportEdit"));
-
-const WastageList = lazy(() => import("../modules/production-wastage/pages/WastageList"));
-const WastageForm = lazy(() => import("../modules/production-wastage/pages/WastageCreate"));
+const HourlyProductionEntryPage = lazy(() => import("../modules/daily-machine-planning/pages/HourlyProductionEntryPage"));
 
 const ShiftExecutionBoard = lazy(() => import("../modules/shift-execution/pages/ShiftExecutionBoard"));
 
@@ -145,9 +134,6 @@ const ShiftExecutionBoard = lazy(() => import("../modules/shift-execution/pages/
 const GoodsDispatchList = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchList"));
 const GoodsDispatchCreate = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchCreate"));
 const GoodsDispatchView = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchView"));
-const GoodsDispatchDetail = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchDetail"));
-const GoodsDispatchGateApproval = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchGateApproval"));
-const GoodsDispatchStoreApproval = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchStoreApproval"));
 
 // ===========================================================================
 // REPORTS
@@ -350,9 +336,6 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permission="machines.view" />}>
                 <Route path="/machines" element={<MachineList />} />
               </Route>
-              <Route element={<ProtectedRoute permission="machine-assignments.view" />}>
-                <Route path="/machines/assignments" element={<MachineAssignmentList />} />
-              </Route>
 
               {/* ---------- Stores & Locations ---------- */}
               <Route element={<ProtectedRoute permission="stores.view" />}>
@@ -385,22 +368,13 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permission="production_orders.view" />}>
                 <Route path="/production-orders" element={<ProductionOrderList />} />
                 <Route path="/approved-sales-orders" element={<ProductionOrderList />} />
-                <Route path="/allproduction-orders" element={<AllProductionOrderList />} />
               </Route>
               <Route element={<ProtectedRoute permission="oee-dashboard.view" />}>
                 <Route path="/oee-dashboard" element={<OeeDashboard />} />
               </Route>
-              <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
-                <Route path="/weekly-machine-schedules" element={<WeeklyMachineScheduleList />} />
-              </Route>
+
               <Route element={<ProtectedRoute permission="daily-machine-planning.view" />}>
                 <Route path="/daily-machine-planning" element={<DailyProductionPlanningPage />} />
-              </Route>
-              <Route element={<ProtectedRoute permission="hourly_productions.view" />}>
-                <Route path="/hourly-work-reports" element={<HourlyWorkReportList />} />
-              </Route>
-              <Route element={<ProtectedRoute permission="production-wastages.view" />}>
-                <Route path="/production-wastages" element={<WastageList />} />
               </Route>
               <Route element={<ProtectedRoute permission="goods-dispatch.view" />}>
                 <Route path="/production/goods-dispatch" element={<GoodsDispatchList />} />
@@ -564,12 +538,6 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="machines.edit" />}>
               <Route path="/machines/edit/:id" element={<MachineForm />} />
             </Route>
-            <Route element={<ProtectedRoute permissionAny={["machine-assignments.create", "machines.create"]} />}>
-              <Route path="/machines/assignments/create" element={<MachineAssignmentForm />} />
-            </Route>
-            <Route element={<ProtectedRoute permissionAny={["machine-assignments.edit", "machines.edit"]} />}>
-              <Route path="/machines/assignments/edit/:id" element={<MachineAssignmentForm />} />
-            </Route>
             <Route element={<ProtectedRoute permission="shifts.create" />}>
               <Route path="/shifts/create" element={<ShiftForm />} />
             </Route>
@@ -601,15 +569,12 @@ const AppRoutes = () => {
             </Route>
 
             {/* ---------- Production ---------- */}
-            <Route element={<ProtectedRoute permission="weekly_programs.create" />}>
-              <Route path="/weekly-machine-schedules/create" element={<WeeklyMachineScheduleCreate />} />
-            </Route>
-            <Route element={<ProtectedRoute permission="weekly_programs.edit" />}>
-              <Route path="/weekly-machine-schedules/edit/:id" element={<WeeklyMachineScheduleEdit />} />
-            </Route>
+
             <Route element={<ProtectedRoute permission="daily-machine-planning.view" />}>
               <Route path="/daily-machine-planning/view/:id" element={<DailyPlanViewPage />} />
               <Route path="/daily-machine-planning/report" element={<DailyReportPage />} />
+              <Route path="/daily-production-plans/hourly/:id" element={<HourlyProductionEntryPage />} />
+              <Route path="/daily-production-plans/hourly" element={<HourlyProductionEntryPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="daily-machine-planning.create" />}>
               <Route path="/daily-production-plans/create" element={<DailyPlanCreate />} />
@@ -622,6 +587,8 @@ const AppRoutes = () => {
             </Route>
             <Route element={<ProtectedRoute permission="production_orders.view" />}>
               <Route path="/production-dashboard" element={<ProductionDashboard />} />
+              <Route path="/production-orders/weekly-plan/:baseId" element={<WeeklyPlanView />} />
+              <Route path="/production-orders/weekly-plan" element={<WeeklyPlanView />} />
               <Route path="/production-orders/history/view/:id" element={<ProductionOrderHistoryView />} />
             </Route>
             <Route element={<ProtectedRoute permission="production_orders.create" />}>
@@ -630,27 +597,10 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="production_orders.edit" />}>
               <Route path="/production-orders/edit/:id" element={<ProductionOrderCreate />} />
             </Route>
-            <Route element={<ProtectedRoute permission="hourly_productions.create" />}>
-              <Route path="/hourly-work-reports/create" element={<HourlyWorkReportCreate />} />
-            </Route>
-            <Route element={<ProtectedRoute permission="hourly_productions.edit" />}>
-              <Route path="/hourly-work-reports/edit/:id" element={<HourlyWorkReportEdit />} />
-            </Route>
-            <Route element={<ProtectedRoute permission="production-wastages.create" />}>
-              <Route path="/production-wastages/create" element={<WastageForm />} />
-            </Route>
-            <Route element={<ProtectedRoute permission="production-wastages.edit" />}>
-              <Route path="/production-wastages/edit/:id" element={<WastageForm />} />
-            </Route>
 
             {/* ---------- Goods Dispatch ---------- */}
             <Route element={<ProtectedRoute permission="goods-dispatch.view" />}>
               <Route path="/production/goods-dispatch/view/:id" element={<GoodsDispatchView />} />
-              <Route path="/production/goods-dispatch/detail/:id" element={<GoodsDispatchDetail />} />
-            </Route>
-            <Route element={<ProtectedRoute permission="goods-dispatch.edit" />}>
-              <Route path="/production/goods-dispatch/gate-approval/:id" element={<GoodsDispatchGateApproval />} />
-              <Route path="/production/goods-dispatch/store-approval/:id" element={<GoodsDispatchStoreApproval />} />
             </Route>
             <Route element={<ProtectedRoute permission="goods-dispatch.create" />}>
               <Route path="/production/goods-dispatch/create" element={<GoodsDispatchCreate />} />

@@ -61,27 +61,60 @@ function convertToBaseUom(qty: number, selectedUom: string, baseUomStr: string):
 // ============================================================
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ["DRAFT", "PLANNED", "CREATED", "WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "CANCELLED"],
-  CREATED: ["WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "CANCELLED"],
-  WAITING_FOR_MATERIAL: ["READY_FOR_PLANNING", "CANCELLED"],
-  READY_FOR_PLANNING: ["WAITING_FOR_MATERIAL", "WEEKLY_SCHEDULED", "CANCELLED"],
-  WEEKLY_SCHEDULED: ["READY_FOR_PLANNING", "DAILY_PLANNED", "CANCELLED"],
-  DAILY_PLANNED: ["WEEKLY_SCHEDULED", "IN_PRODUCTION", "CANCELLED"],
+  DRAFT: ["DRAFT", "WEEKLY_SCHEDULED", "CANCELLED"],
+  WEEKLY_SCHEDULED: ["DRAFT", "CANCELLED"],
+  CANCELLED: [],
+  // Legacy (backward compat for existing orders in old statuses)
+  CREATED: ["WEEKLY_SCHEDULED", "CANCELLED"],
+  WAITING_FOR_MATERIAL: ["WEEKLY_SCHEDULED", "CANCELLED"],
+  READY_FOR_PLANNING: ["WEEKLY_SCHEDULED", "CANCELLED"],
+  DAILY_PLANNED: ["WEEKLY_SCHEDULED", "CANCELLED"],
   IN_PRODUCTION: ["POST_PRODUCTION", "CANCELLED"],
   POST_PRODUCTION: ["READY_FOR_DISPATCH", "PARTIAL_COMPLETED"],
   PARTIAL_COMPLETED: ["READY_FOR_DISPATCH", "DISPATCHED"],
   READY_FOR_DISPATCH: ["DISPATCHED"],
   DISPATCHED: [],
-  CANCELLED: [],
-  // Legacy aliases (tolerated for backward compat)
-  PLANNED: ["READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "CANCELLED"],
-  SCHEDULED: ["WEEKLY_SCHEDULED", "DAILY_PLANNED", "CANCELLED"],
+  PLANNED: ["WEEKLY_SCHEDULED", "CANCELLED"],
+  SCHEDULED: ["WEEKLY_SCHEDULED", "CANCELLED"],
   COMPLETED: ["READY_FOR_DISPATCH", "DISPATCHED"],
 };
 
 class ProductionOrderService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Compute edit/delete restrictions based on linked DailyProductionPlans.
+   * - nonCancelledPlans: CANCELLED / SHORT_CLOSED / STOPPED / COMPLETED are treated as finished → not blocking
+   * - activePlans: PLANNED / APPROVED / IN_PROGRESS / POST_PRODUCTION → block product + qty edits
+   */
+  private async computeEditRestrictions(productionOrderId: string) {
+    const [order, plans] = await Promise.all([
+      prisma.productionOrder.findUnique({
+        where: { productionOrderId },
+        select: { status: true },
+      }),
+      prisma.dailyProductionPlan.findMany({
+        where: { productionOrderId },
+        select: { status: true },
+      }),
+    ]);
+
+    const nonCancelledPlans = plans.filter((p) => p.status !== "CANCELLED");
+    const isOrderAdvanced = order && !["DRAFT", "WEEKLY_SCHEDULED"].includes(order.status);
+    const isLocked = nonCancelledPlans.length > 0 || isOrderAdvanced;
+
+    const canEditDates = !isLocked;
+    const canEditProductQty = !isLocked;
+    const canDelete = !isLocked;
+    const reason = nonCancelledPlans.length > 0
+      ? `Assigned to ${nonCancelledPlans.length} daily plan(s)`
+      : isOrderAdvanced
+      ? `Order is in ${order?.status} status`
+      : "";
+
+    return { canEditDates, canEditProductQty, canDelete, reason, nonCancelledCount: nonCancelledPlans.length };
+  }
 
   private validateStatusTransition(from: string, to: string) {
     const allowed = VALID_TRANSITIONS[from] || [];
@@ -123,7 +156,6 @@ class ProductionOrderService {
   // - No StockAdjustment
   async create(data: CreateProductionOrderInput, userId?: string) {
     const productItemId = BigInt(data.productItemId);
-    const sourceSalesOrderLineId = data.sourceSalesOrderLineId ? BigInt(data.sourceSalesOrderLineId) : null;
 
     const existing = await prisma.productionOrder.findUnique({
       where: { productionOrderId: data.productionOrderId },
@@ -143,44 +175,22 @@ class ProductionOrderService {
     const weightPerPieceUsed = product.weightPerPiece ? Number(product.weightPerPiece) : 0;
     const requiredRawMaterialQty = Number(data.targetQty) * weightPerPieceUsed;
 
-    if (data.sourceSalesOrderId) {
-      let salesOrder = null;
-      if (!isNaN(Number(data.sourceSalesOrderId))) {
-        salesOrder = await prisma.salesOrder.findUnique({ where: { id: Number(data.sourceSalesOrderId) } });
-      }
-      if (!salesOrder) {
-        salesOrder = await prisma.salesOrder.findUnique({ where: { orderNo: data.sourceSalesOrderId } });
-      }
-      if (!salesOrder) {
-        throw new ApiError(404, `Sales Order with ID/No ${data.sourceSalesOrderId} not found`);
-      }
-
-      const existingPoForSo = await prisma.productionOrder.findFirst({
-        where: {
-          sourceSalesOrderId: data.sourceSalesOrderId,
-          ...(sourceSalesOrderLineId ? { sourceSalesOrderLineId } : {}),
-          NOT: { status: "CANCELLED" },
-        },
-      });
-      if (existingPoForSo) {
-        throw new ApiError(400, "A Production Order has already been created for this item in the Sales Order.");
-      }
-    }
-
     if (data.sourceStoreId) {
       const store = await prisma.store.findUnique({ where: { storeId: data.sourceStoreId } });
       if (!store) throw new ApiError(404, `Source Store with ID ${data.sourceStoreId} not found`);
-    }
-
-    if (data.destinationStoreId) {
-      const store = await prisma.store.findUnique({ where: { storeId: data.destinationStoreId } });
-      if (!store) throw new ApiError(404, `Destination Store with ID ${data.destinationStoreId} not found`);
     }
 
     if (data.machineMachineId) {
       const machine = await prisma.machine.findUnique({ where: { machineId: data.machineMachineId } });
       if (!machine) throw new ApiError(404, `Machine with ID ${data.machineMachineId} not found`);
     }
+
+    // Check if product has a BOM defined — warn if missing (raw material tracking will be skipped)
+    const bomCount = await prisma.billOfMaterial.count({ where: { productId: productItemId } });
+    const hasBom = bomCount > 0 || (Array.isArray(data.rawMaterials) && data.rawMaterials.length > 0);
+    const bomWarning = !hasBom
+      ? `Warning: Product "${product.productName}" has no Bill of Materials defined. Raw material consumption will NOT be tracked for this order. Please add a BOM before starting production.`
+      : null;
 
     // ✅ STEP 1 RULE: Status is always CREATED on creation. No exceptions.
     const result = await prisma.$transaction(async (tx) => {
@@ -198,15 +208,12 @@ class ProductionOrderService {
           priority: data.priority ?? "MEDIUM",
           orderType: data.orderType ?? "STANDARD",
           batchNo: data.batchNo,
-          lotNo: data.lotNo,
-          sourceSalesOrderId: data.sourceSalesOrderId,
-          sourceSalesOrderLineId,
           sourceStoreId: data.sourceStoreId,
-          destinationStoreId: data.destinationStoreId,
-          billOfMaterialId: data.billOfMaterialId ? String(data.billOfMaterialId) : null,
           routingId: data.routingId,
           machineMachineId: data.machineMachineId,
-          status: data.status === "DRAFT" ? "DRAFT" : "CREATED",
+          weekStartDate: (data as any).weekStartDate ? new Date((data as any).weekStartDate) : null,
+          weekEndDate: (data as any).weekEndDate ? new Date((data as any).weekEndDate) : null,
+          status: data.status === "DRAFT" ? "DRAFT" : "WEEKLY_SCHEDULED",
           remarks: data.remarks,
           createdBy: userId,
           weightPerPieceUsed,
@@ -223,35 +230,16 @@ class ProductionOrderService {
         tx,
         data.productionOrderId,
         null,
-        data.status === "DRAFT" ? "DRAFT" : "CREATED",
+        data.status === "DRAFT" ? "DRAFT" : "WEEKLY_SCHEDULED",
         userId,
         data.remarks ?? "Production order created",
         "CREATE"
       );
 
-      // Update linked Sales Order productionStatus
-      if (data.sourceSalesOrderId) {
-        await StatusSyncService.syncSalesOrderProductionStatus(tx, data.sourceSalesOrderId);
-      }
-
       return createdOrder;
     }, { timeout: 15000, maxWait: 10000 });
 
-    // STEP 2: Auto-check raw material availability immediately after creation
-    try {
-      if (result.status !== "DRAFT") {
-        await this.checkMaterialAvailability(result.productionOrderId, userId);
-      }
-      // Return the updated order with the new status
-      const updatedOrder = await prisma.productionOrder.findUnique({
-        where: { productionOrderId: result.productionOrderId },
-        include: { productItem: true },
-      });
-      return updatedOrder || result;
-    } catch (error) {
-      console.error("Auto material check failed after PO creation:", error);
-      return result;
-    }
+    return { ...result, bomWarning };
   }
 
   // ── Check Material Availability ────────────────────────────────────────────
@@ -362,7 +350,6 @@ class ProductionOrderService {
       toDate,
       sortBy = "createdAt",
       sortOrder = "desc",
-      sourceSalesOrderId,
     } = query;
 
     const skip = (page - 1) * pageSize;
@@ -372,13 +359,13 @@ class ProductionOrderService {
 
     if (productItemId) where.productItemId = BigInt(productItemId);
     if (productionOrderId) where.productionOrderId = { contains: productionOrderId, mode: "insensitive" };
-    if (sourceSalesOrderId) where.sourceSalesOrderId = sourceSalesOrderId;
     if (status) where.status = status;
     if (search) {
       where.OR = [
         { productionOrderId: { contains: search, mode: "insensitive" } },
         { remarks: { contains: search, mode: "insensitive" } },
-        { sourceSalesOrderId: { contains: search, mode: "insensitive" } },
+        { productItem: { productName: { contains: search, mode: "insensitive" } } },
+        { productItem: { productCode: { contains: search, mode: "insensitive" } } },
       ];
     }
     if (fromDate || toDate) {
@@ -400,42 +387,89 @@ class ProductionOrderService {
 
     const totalPages = Math.ceil(total / pageSize);
 
-    const soIdsOrNos = Array.from(new Set(items.map((i) => i.sourceSalesOrderId).filter(Boolean))) as string[];
-    const salesOrders = await prisma.salesOrder.findMany({
-      where: {
-        OR: [
-          { id: { in: soIdsOrNos.map((id) => Number(id)).filter((id) => !isNaN(id)) } },
-          { orderNo: { in: soIdsOrNos } },
-        ],
-      },
-      include: { customer: true, items: true },
+    // Bulk fetch daily plan statuses for this page's orders (single query, no N+1)
+    const orderIds = items.map((i) => i.productionOrderId);
+    const [allPlans, completedAggregates] = await Promise.all([
+      prisma.dailyProductionPlan.findMany({
+        where: { productionOrderId: { in: orderIds } },
+        select: { productionOrderId: true, status: true },
+      }),
+      prisma.hourlyProduction.groupBy({
+        by: ["productionOrderId"],
+        where: {
+          productionOrderId: { in: orderIds },
+        },
+        _sum: {
+          totalQtyProduced: true,
+          totalRejectQty: true,
+        }
+      })
+    ]);
+
+    // Group by productionOrderId
+    const plansByOrder = new Map<string, string[]>();
+    allPlans.forEach((p) => {
+      const arr = plansByOrder.get(p.productionOrderId) || [];
+      arr.push(p.status);
+      plansByOrder.set(p.productionOrderId, arr);
     });
 
-    const salesOrderMap = new Map(
-      salesOrders.flatMap((so) => [
-        [so.id.toString(), so],
-        [so.orderNo, so],
-      ])
-    );
+    const completedGoodQtyMap = new Map<string, number>();
+    completedAggregates.forEach((agg) => {
+      const prod = Number(agg._sum.totalQtyProduced || 0);
+      const rej = Number(agg._sum.totalRejectQty || 0);
+      completedGoodQtyMap.set(agg.productionOrderId, Math.max(0, prod - rej));
+    });
 
     const formattedItems = items.map((item) => {
-      const so = item.sourceSalesOrderId ? salesOrderMap.get(item.sourceSalesOrderId) : null;
-      const totalProducts = so ? so.items.length : 1;
-      const totalProductionQuantity = so
-        ? so.items.reduce((sum, i) => sum + Number(i.quantity), 0)
-        : Number(item.targetQty);
+      const statuses = plansByOrder.get(item.productionOrderId) || [];
+      const nonCancelled = statuses.filter((s) => s !== "CANCELLED");
+      
+      const goodQty = completedGoodQtyMap.get(item.productionOrderId) ?? Number(item.producedQty || 0);
+      const targetQty = Number(item.targetQty || 0);
+
+      let effectiveStatus = item.status;
+      if (targetQty > 0 && goodQty >= targetQty) {
+        if (!["READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(effectiveStatus)) {
+          effectiveStatus = "COMPLETED";
+        }
+      }
+
+      if (item.status !== effectiveStatus || Number(item.producedQty || 0) !== goodQty) {
+        prisma.productionOrder.update({
+          where: { productionOrderId: item.productionOrderId },
+          data: { status: effectiveStatus, producedQty: goodQty }
+        }).catch(() => {});
+
+        if (effectiveStatus === "COMPLETED") {
+          prisma.weeklyMachineProgram.updateMany({
+            where: { productionOrderId: item.productionOrderId },
+            data: { status: "COMPLETED" }
+          }).catch(() => {});
+        }
+      }
+
+      const isOrderAdvanced = !["DRAFT", "WEEKLY_SCHEDULED"].includes(effectiveStatus);
+      const isLocked = nonCancelled.length > 0 || isOrderAdvanced;
+
       return {
         ...item,
+        status: effectiveStatus,
+        producedQty: goodQty,
         productItemId: item.productItemId.toString(),
-        sourceSalesOrderLineId: item.sourceSalesOrderLineId?.toString(),
-        totalProducts,
-        totalProductionQuantity,
-        salesOrderDetails: so
-          ? {
-              orderNo: so.orderNo,
-              customerName: so.customer?.firmName || so.customer?.displayName || "Unknown",
-            }
-          : null,
+        totalProducts: 1,
+        totalProductionQuantity: Number(item.targetQty),
+        salesOrderDetails: null,
+        _editRestrictions: {
+          canEditDates: !isLocked,
+          canEditProductQty: !isLocked,
+          canDelete: !isLocked,
+          reason: nonCancelled.length > 0
+            ? `Assigned to ${nonCancelled.length} daily plan(s)`
+            : isOrderAdvanced
+            ? `Order is in ${effectiveStatus} status`
+            : "",
+        },
       };
     });
 
@@ -481,144 +515,110 @@ class ProductionOrderService {
       throw new ApiError(404, `Production Order with ID ${productionOrderId} not found`);
     }
 
+    // Ensure producedQty strictly reflects Net Good Quantity (produced minus reject)
+    const completedHpAgg = await prisma.hourlyProduction.aggregate({
+      where: { productionOrderId },
+      _sum: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true }
+    });
+    const trueProducedQty = Number(completedHpAgg._sum.totalQtyProduced || 0);
+    const trueRejectQty = Number(completedHpAgg._sum.totalRejectQty || 0);
+    const trueScrapQty = Number(completedHpAgg._sum.totalScrapQty || 0);
+    const trueGoodQty = Math.max(0, trueProducedQty - trueRejectQty);
+    const targetQty = Number(order.targetQty || 0);
+
+    let updatedStatus = order.status;
+    if (targetQty > 0 && trueGoodQty >= targetQty) {
+      if (!["READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED", "COMPLETED"].includes(updatedStatus)) {
+        updatedStatus = "COMPLETED";
+      }
+    }
+
+    // Do not overwrite producedQty for orders already past the production phase —
+    // those quantities were set deliberately by daily-plan / post-production completion.
+    const isDownstreamStatus = ["READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(order.status);
+
+    if (!isDownstreamStatus && (Number(order.producedQty || 0) !== trueGoodQty || order.status !== updatedStatus)) {
+      await prisma.productionOrder.update({
+        where: { productionOrderId },
+        data: {
+          producedQty: trueGoodQty,
+          rejectedQty: trueRejectQty,
+          scrapQty: trueScrapQty,
+          status: updatedStatus,
+        }
+      }).catch(() => {});
+      order.producedQty = trueGoodQty;
+      order.rejectedQty = trueRejectQty;
+      order.scrapQty = trueScrapQty;
+      order.status = updatedStatus;
+
+      if (updatedStatus === "COMPLETED") {
+        await prisma.weeklyMachineProgram.updateMany({
+          where: { productionOrderId },
+          data: { status: "COMPLETED" }
+        }).catch(() => {});
+      }
+    }
+
     const activeRawMaterials = await prisma.rawMaterial.findMany({ where: { isActive: true } });
     const rmMap = new Map(activeRawMaterials.map((rm) => [rm.rawMaterialId, rm]));
 
-    let products: any[] = [];
-
-    if (order.sourceSalesOrderId) {
-      let salesOrder = null;
-      if (!isNaN(Number(order.sourceSalesOrderId))) {
-        salesOrder = await prisma.salesOrder.findUnique({
-          where: { id: Number(order.sourceSalesOrderId) },
-          include: { items: { include: { product: { include: { uom: true } } } }, customer: true },
-        });
-      }
-      if (!salesOrder) {
-        salesOrder = await prisma.salesOrder.findUnique({
-          where: { orderNo: order.sourceSalesOrderId },
-          include: { items: { include: { product: { include: { uom: true } } } }, customer: true },
-        });
-      }
-
-      if (salesOrder) {
-        products = await Promise.all(
-          salesOrder.items.map(async (item: any) => {
-            const productId = item.productId;
-            const quantity = Number(item.quantity);
-            let bomItems: any[] = [];
-            try {
-              bomItems = await (prisma as any).billOfMaterial.findMany({
-                where: { productId },
-                include: { rawMaterial: true },
-              });
-            } catch (e) {
-              bomItems = [];
-            }
-
-            let requiredRms: any[] = [];
-            if (bomItems && bomItems.length > 0) {
-              requiredRms = bomItems.map((bi: any) => {
-                const currentRm = rmMap.get(bi.rawMaterialId) || bi.rawMaterial;
-                const requiredQty = Number(bi.requiredQuantity) * quantity;
-                const availableStock = currentRm ? Number(currentRm.onHandQty) : 0;
-                return {
-                  rawMaterialId: bi.rawMaterialId,
-                  materialName: currentRm?.materialName || bi.rawMaterial?.materialName || bi.rawMaterialId,
-                  requiredQty,
-                  availableStock,
-                  status: availableStock >= requiredQty ? "AVAILABLE" : "INSUFFICIENT",
-                };
-              });
-            }
-
-            const isSelectedLine = productId.toString() === order.productItemId.toString();
-            const weightUsed = isSelectedLine && order.weightPerPieceUsed != null
-              ? Number(order.weightPerPieceUsed)
-              : Number(item.product?.weightPerPiece || 0);
-
-            let finalRms: any[] = [];
-            if (order.draftRawMaterials && Array.isArray(order.draftRawMaterials) && order.draftRawMaterials.length > 0) {
-              finalRms = (order.draftRawMaterials as any[]).map((rm: any) => {
-                const currentRm = rmMap.get(rm.rawMaterialId);
-                const availableStock = currentRm ? Number(currentRm.onHandQty) : 0;
-                const reqQty = Number(rm.requiredQty);
-                return {
-                  ...rm,
-                  materialName: currentRm?.materialName || rm.rawMaterialId,
-                  availableStock,
-                  status: availableStock >= reqQty ? "AVAILABLE" : "INSUFFICIENT",
-                };
-              });
-            } else {
-              finalRms = requiredRms;
-            }
-
-            return {
-              productId: productId.toString(),
-              productCode: item.product?.productCode,
-              productName: item.product?.productName,
-              quantity,
-              uom: item.product?.uom?.uomCode || "PCS",
-              weightPerPieceUsed: weightUsed,
-              rawMaterials: finalRms,
-            };
-          })
-        );
-      }
+    const productId = order.productItemId;
+    const quantity = Number(order.targetQty);
+    let bomItems: any[] = [];
+    try {
+      bomItems = await (prisma as any).billOfMaterial.findMany({
+        where: { productId },
+        include: { rawMaterial: true },
+      });
+    } catch (e) {
+      bomItems = [];
     }
 
-    if (products.length === 0) {
-      const productId = order.productItemId;
-      const quantity = Number(order.targetQty);
-      let bomItems: any[] = [];
-      try {
-        bomItems = await (prisma as any).billOfMaterial.findMany({
-          where: { productId },
-          include: { rawMaterial: true },
-        });
-      } catch (e) {
-        bomItems = [];
-      }
-
-      let requiredRms: any[] = [];
-      if (bomItems && bomItems.length > 0) {
-        requiredRms = bomItems.map((bi: any) => {
-          const currentRm = rmMap.get(bi.rawMaterialId) || bi.rawMaterial;
-          const requiredQty = Number(bi.requiredQuantity) * quantity;
-          const availableStock = currentRm ? Number(currentRm.onHandQty) : 0;
-          return {
-            rawMaterialId: bi.rawMaterialId,
-            materialName: currentRm?.materialName || bi.rawMaterial?.materialName || bi.rawMaterialId,
-            requiredQty,
-            availableStock,
-            status: availableStock >= requiredQty ? "AVAILABLE" : "INSUFFICIENT",
-          };
-        });
-      }
-
-      products = [
-        {
-          productId: productId.toString(),
-          productCode: order.productItem?.productCode,
-          productName: order.productItem?.productName,
-          quantity,
-          uom: order.uom,
-          weightPerPieceUsed: order.weightPerPieceUsed != null ? Number(order.weightPerPieceUsed) : Number(order.productItem?.weightPerPiece || 0),
-          rawMaterials:
-            order.draftRawMaterials && Array.isArray(order.draftRawMaterials) && order.draftRawMaterials.length > 0
-              ? (order.draftRawMaterials as any[])
-              : requiredRms,
-        },
-      ];
+    let requiredRms: any[] = [];
+    if (bomItems && bomItems.length > 0) {
+      requiredRms = bomItems.map((bi: any) => {
+        const currentRm = rmMap.get(bi.rawMaterialId) || bi.rawMaterial;
+        const requiredQty = Number(bi.requiredQuantity) * quantity;
+        const availableStock = currentRm ? Number(currentRm.onHandQty) : 0;
+        return {
+          rawMaterialId: bi.rawMaterialId,
+          materialName: currentRm?.materialName || bi.rawMaterial?.materialName || bi.rawMaterialId,
+          requiredQty,
+          availableStock,
+          status: availableStock >= requiredQty ? "AVAILABLE" : "INSUFFICIENT",
+        };
+      });
     }
+
+    const products = [
+      {
+        productId: productId.toString(),
+        productCode: order.productItem?.productCode,
+        productName: order.productItem?.productName,
+        quantity,
+        uom: order.uom,
+        weightPerPieceUsed: order.weightPerPieceUsed != null ? Number(order.weightPerPieceUsed) : Number(order.productItem?.weightPerPiece || 0),
+        rawMaterials:
+          order.draftRawMaterials && Array.isArray(order.draftRawMaterials) && order.draftRawMaterials.length > 0
+            ? (order.draftRawMaterials as any[])
+            : requiredRms,
+      },
+    ];
+
+    const restrictions = await this.computeEditRestrictions(productionOrderId);
 
     return {
       ...order,
       productItemId: order.productItemId.toString(),
-      sourceSalesOrderLineId: order.sourceSalesOrderLineId?.toString(),
       products,
       statusHistory: order.productionOrderHistories || [],
+      _editRestrictions: {
+        canEditDates: restrictions.canEditDates,
+        canEditProductQty: restrictions.canEditProductQty,
+        canDelete: restrictions.canDelete,
+        reason: restrictions.reason,
+      },
     };
   }
 
@@ -626,8 +626,54 @@ class ProductionOrderService {
   async update(productionOrderId: string, data: UpdateProductionOrderInput, userId?: string) {
     const existing = await this.findById(productionOrderId);
 
+    // ── Guard 1: Date Lock — if any non-finished daily plan exists, dates cannot be modified ──
+    const restrictions = await this.computeEditRestrictions(productionOrderId);
+    const isChangingDates =
+      data.orderDate !== undefined ||
+      data.dueDate !== undefined ||
+      (data as any).weekStartDate !== undefined ||
+      (data as any).weekEndDate !== undefined;
+    if (isChangingDates && !restrictions.canEditDates) {
+      throw new ApiError(400, "Cannot modify dates: Order is assigned to Daily Production Plan");
+    }
+
+    // ── Guard 2: Product + Qty Lock — if active daily plan exists, product/qty cannot be modified ──
+    const isChangingProductQty = data.productItemId !== undefined || data.targetQty !== undefined;
+    if (isChangingProductQty && !restrictions.canEditProductQty) {
+      throw new ApiError(400, "Cannot modify product or quantity: Daily production is in progress");
+    }
+
+    // ── Guard 3: Target Qty Lock — if raw material has already been issued, targetQty cannot change ──
+    if (data.targetQty !== undefined && Number(data.targetQty) !== Number(existing.targetQty ?? 0)) {
+      const materialIssued = await prisma.stockAdjustment.findFirst({
+        where: {
+          productionOrderId,
+          adjustmentType: { in: ["PRODUCTION_MATERIAL_ISSUE", "RAW_MATERIAL_ISSUE"] },
+          status: { not: "REJECTED" },
+          autoGenerated: true,
+        },
+        select: { id: true, adjustmentNumber: true },
+      });
+      if (materialIssued) {
+        throw new ApiError(
+          400,
+          `Cannot change Target Quantity: Raw materials have already been issued for this order (Ref: ${materialIssued.adjustmentNumber}). The issued quantities were calculated based on the original target. Please cancel and create a new order if a quantity change is required.`
+        );
+      }
+    }
+
     // Locked statuses — only allow status-only updates
-    const lockedStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED"];
+    const lockedStatuses = [
+      "IN_PRODUCTION",
+      "POST_PRODUCTION",
+      "PARTIAL_COMPLETED",
+      "COMPLETED_WITH_SHORTFALL",
+      "READY_FOR_DISPATCH",
+      "DISPATCHED",
+      "COMPLETED",
+      "CLOSED",
+      "CANCELLED",
+    ];
     if (lockedStatuses.includes(existing.status || "")) {
       const keys = Object.keys(data).filter((k) => (data as any)[k] !== undefined);
       const allowedExecutionKeys = ["status", "producedQty", "rejectedQty", "scrapQty", "remarks"];
@@ -638,11 +684,25 @@ class ProductionOrderService {
     }
 
     const updateData: any = {};
-    const editableStatuses = ["DRAFT", "CREATED", "WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "DAILY_PLANNED"];
+    const editableStatuses = [
+      "DRAFT",
+      "CREATED",
+      "WAITING_FOR_MATERIAL",
+      "READY_FOR_PLANNING",
+      "PENDING_PLANNING",
+      "WEEKLY_SCHEDULED",
+      "DAILY_PLANNED",
+      "PLANNED",
+      "SCHEDULED",
+    ];
 
-    if (editableStatuses.includes(existing.status || "")) {
+    if (!lockedStatuses.includes(existing.status || "") || editableStatuses.includes(existing.status || "")) {
       if (data.orderDate !== undefined) updateData.orderDate = new Date(data.orderDate);
       if (data.dueDate !== undefined) updateData.dueDate = new Date(data.dueDate);
+      if (data.weekStartDate !== undefined) updateData.weekStartDate = data.weekStartDate ? new Date(data.weekStartDate) : null;
+      if (data.weekEndDate !== undefined) updateData.weekEndDate = data.weekEndDate ? new Date(data.weekEndDate) : null;
+      if (data.machineMachineId !== undefined) updateData.machineMachineId = data.machineMachineId;
+      if (data.routingId !== undefined) updateData.routingId = data.routingId;
 
       if (data.productItemId !== undefined) {
         const productItemId = BigInt(data.productItemId);
@@ -656,7 +716,6 @@ class ProductionOrderService {
       if (data.priority !== undefined) updateData.priority = data.priority;
       if (data.orderType !== undefined) updateData.orderType = data.orderType;
       if (data.batchNo !== undefined) updateData.batchNo = data.batchNo;
-      if (data.lotNo !== undefined) updateData.lotNo = data.lotNo;
       if (data.remarks !== undefined) updateData.remarks = data.remarks;
 
       if (data.sourceStoreId !== undefined) {
@@ -665,14 +724,6 @@ class ProductionOrderService {
           if (!store) throw new ApiError(404, `Source Store with ID ${data.sourceStoreId} not found`);
         }
         updateData.sourceStoreId = data.sourceStoreId;
-      }
-
-      if (data.destinationStoreId !== undefined) {
-        if (data.destinationStoreId) {
-          const store = await prisma.store.findUnique({ where: { storeId: data.destinationStoreId } });
-          if (!store) throw new ApiError(404, `Destination Store with ID ${data.destinationStoreId} not found`);
-        }
-        updateData.destinationStoreId = data.destinationStoreId;
       }
 
       if (data.rawMaterials) updateData.draftRawMaterials = data.rawMaterials as any;
@@ -710,6 +761,20 @@ class ProductionOrderService {
         include: { productItem: true },
       });
 
+      // Update linked weekly machine programs if week dates or machine changed
+      if (updateData.weekStartDate !== undefined || updateData.weekEndDate !== undefined || updateData.machineMachineId !== undefined) {
+        const wpUpdateData: any = {};
+        if (updateData.weekStartDate !== undefined) wpUpdateData.weekStartDate = updateData.weekStartDate;
+        if (updateData.weekEndDate !== undefined) wpUpdateData.weekEndDate = updateData.weekEndDate;
+        if (updateData.machineMachineId !== undefined) wpUpdateData.machineId = updateData.machineMachineId;
+        if (Object.keys(wpUpdateData).length > 0) {
+          await tx.weeklyMachineProgram.updateMany({
+            where: { productionOrderId },
+            data: wpUpdateData,
+          });
+        }
+      }
+
       // Log status change in history
       if (calculatedStatus !== existing.status) {
         await this.addHistory(
@@ -721,11 +786,6 @@ class ProductionOrderService {
           data.remarks || `Status changed to ${calculatedStatus}`,
           "STATUS_CHANGE"
         );
-      }
-
-      // Sync linked Sales Order
-      if (existing.sourceSalesOrderId) {
-        await StatusSyncService.syncSalesOrderProductionStatus(tx, existing.sourceSalesOrderId);
       }
 
       return resultOrder;
@@ -807,14 +867,21 @@ class ProductionOrderService {
       : [];
 
     if (rawMaterials.length === 0) {
+      // Check if there is a BOM for this product (but not in draftRawMaterials)
+      const bomCount = await prisma.billOfMaterial.count({ where: { productId: order.productItemId ? BigInt(order.productItemId) : undefined } });
+      const noBomWarning = bomCount === 0;
+
       return await prisma.$transaction(async (tx) => {
         const result = await tx.productionOrder.update({
           where: { productionOrderId },
           data: { status: "IN_PRODUCTION", updatedBy: userId },
         });
-        await this.addHistory(tx, productionOrderId, order.status, "IN_PRODUCTION", userId,
-          "Production started (no raw materials configured)", "PRODUCTION_START");
-        return result;
+        const remarks = noBomWarning
+          ? "Production started — WARNING: No Bill of Materials found. Raw material consumption is NOT being tracked for this order."
+          : "Production started (no raw materials configured)";
+        await this.addHistory(tx, productionOrderId, order.status, "IN_PRODUCTION", userId, remarks,
+          noBomWarning ? "NO_BOM_WARNING" : "PRODUCTION_START");
+        return { ...result, bomWarning: noBomWarning ? remarks : null };
       }, { timeout: 15000, maxWait: 10000 });
     }
 
@@ -974,10 +1041,6 @@ class ProductionOrderService {
         `Post-production completed. Produced qty: ${producedQty}. Order is ready for dispatch.`,
         "POST_PRODUCTION_COMPLETE"
       );
-
-      if (order.sourceSalesOrderId) {
-        await StatusSyncService.syncSalesOrderProductionStatus(tx, order.sourceSalesOrderId);
-      }
 
       return result;
     }, { timeout: 15000, maxWait: 10000 });
@@ -1149,21 +1212,61 @@ class ProductionOrderService {
   async delete(productionOrderId: string) {
     const existing = await this.findById(productionOrderId);
 
-    const undeletableStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "WEEKLY_SCHEDULED", "DAILY_PLANNED"];
+    // ── Primary Guard: block delete if any non-finished daily plan exists ──
+    const finishedStatuses = ["CANCELLED", "SHORT_CLOSED", "STOPPED", "COMPLETED"];
+    const activePlanCount = await prisma.dailyProductionPlan.count({
+      where: {
+        productionOrderId,
+        status: { notIn: finishedStatuses },
+      },
+    });
+    if (activePlanCount > 0) {
+      throw new ApiError(
+        400,
+        `Cannot delete: Order has ${activePlanCount} active Daily Production Plan(s). Cancel them in Daily Machine Planning first.`
+      );
+    }
+
+    const undeletableStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "DAILY_PLANNED"];
     if (undeletableStatuses.includes(existing.status)) {
-      throw new ApiError(400, `Production Order cannot be deleted with status "${existing.status}". Only CREATED, WAITING_FOR_MATERIAL, or READY_FOR_PLANNING orders can be deleted.`);
+      throw new ApiError(400, `Production Order cannot be deleted with status "${existing.status}".`);
     }
 
-    if (existing.sourceSalesOrderId) {
-      throw new ApiError(400, "Production Orders linked to Sales Orders cannot be deleted directly. Please cancel the Sales Order instead.");
-    }
+    await prisma.$transaction(async (tx) => {
+      // 1. Nullify optional FKs that have no cascade
+      await tx.rawMaterialTransaction.updateMany({
+        where: { productionOrderId },
+        data: { productionOrderId: null },
+      });
+      await tx.stockAdjustment.updateMany({
+        where: { productionOrderId },
+        data: { productionOrderId: null },
+      });
 
-    await prisma.productionOrder.update({
-      where: { productionOrderId },
-      data: { status: "CANCELLED" },
+      // 2. Nullify HourlyProduction.dailyPlanId before daily plans are deleted
+      const dailyPlanIds = (await tx.dailyProductionPlan.findMany({
+        where: { productionOrderId },
+        select: { dailyPlanId: true },
+      })).map((p) => p.dailyPlanId);
+
+      if (dailyPlanIds.length > 0) {
+        await tx.hourlyProduction.updateMany({
+          where: { dailyPlanId: { in: dailyPlanIds } },
+          data: { dailyPlanId: null },
+        });
+      }
+
+      // 3. Delete WeeklyMachinePrograms (cascades to DailyProductionPlan)
+      await tx.weeklyMachineProgram.deleteMany({ where: { productionOrderId } });
+
+      // 4. Delete remaining DailyProductionPlans not linked to a weekly program
+      await tx.dailyProductionPlan.deleteMany({ where: { productionOrderId } });
+
+      // 5. Delete the ProductionOrder (cascades: HourlyProduction, ProductionWastage, ProductionOrderHistory)
+      await tx.productionOrder.delete({ where: { productionOrderId } });
     });
 
-    return { message: "Production order cancelled successfully" };
+    return { message: "Production order deleted successfully" };
   }
 
   // ── Get next ID ───────────────────────────────────────────────────────────
@@ -1229,6 +1332,157 @@ class ProductionOrderService {
       id: h.id.toString(),
       changedByName: h.changedBy ? (nameMap.get(h.changedBy) ?? h.changedBy) : null,
     }));
+  }
+
+  // ── Machine Program List ──────────────────────────────────────────────────
+  // Returns all production orders for a given machine and week (Mon–Sun)
+  // Used by the create form to show the machine program board for the selected week
+  async getMachinePrograms(machineId: string, weekStartDate: string) {
+    // snapToMonday() on the frontend sends Monday (e.g. 2026-09-07), but production
+    // orders may have been created with Sunday as weekStartDate (e.g. 2026-09-06).
+    // Extend start back by 1 day so the range [Sun, Sun+7] covers both cases.
+    const start = new Date(weekStartDate);
+    start.setDate(start.getDate() - 1);
+    // Week end = original Monday + 6 days (Saturday)
+    const end = new Date(weekStartDate);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    // The actual Monday–Saturday calendar week the board is showing (distinct from
+    // the padded start/end above, which only exists to match legacy
+    // ProductionOrder.weekStartDate values that may have been stored as Sunday).
+    const viewedWeekStart = new Date(weekStartDate);
+    viewedWeekStart.setHours(0, 0, 0, 0);
+    const viewedWeekEnd = new Date(weekStartDate);
+    viewedWeekEnd.setDate(viewedWeekEnd.getDate() + 5);
+    viewedWeekEnd.setHours(23, 59, 59, 999);
+
+    // A shift whose date has already passed is done, whether or not anyone
+    // bothered to flip its status to a terminal one — its real contribution is
+    // already captured in producedQty. Only a shift that HASN'T happened yet
+    // still counts as "reserved" capacity that shouldn't be re-offered.
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    // Quantity already committed to this order in OTHER weeks that hasn't been
+    // produced yet: still-active (non-terminal) daily plans dated today or later.
+    // Excluding terminal statuses (COMPLETED/STOPPED/SHORT_CLOSED/CANCELLED) AND
+    // requiring productionDate >= today are both applied — belt-and-suspenders —
+    // so a shift that under-produced (e.g. power cut) and was simply left in
+    // PLANNED/IN_PROGRESS status without ever being formally closed still stops
+    // counting once its date passes, instead of masking the real shortfall.
+    const getPlannedElsewhereMap = async (rows: any[]) => {
+      const orderIds = rows.map((o: any) => o.productionOrderId);
+      if (orderIds.length === 0) return new Map<string, number>();
+      const grouped = await prisma.dailyProductionPlan.groupBy({
+        by: ["productionOrderId"],
+        where: {
+          productionOrderId: { in: orderIds },
+          status: { notIn: ["CANCELLED", "COMPLETED", "STOPPED", "SHORT_CLOSED"] },
+          productionDate: { gte: today },
+          OR: [
+            { productionDate: { lt: viewedWeekStart } },
+            { productionDate: { gt: viewedWeekEnd } },
+          ],
+        },
+        _sum: { plannedQty: true },
+      });
+      const map = new Map<string, number>();
+      grouped.forEach((g: any) => map.set(g.productionOrderId, Number(g._sum.plannedQty || 0)));
+      return map;
+    };
+
+    // Whether this order genuinely has ANY plan dated before the week being
+    // viewed — real history, not a guess from ProductionOrder.weekStartDate
+    // (which is just a one-time, user-entered field set at order creation and
+    // isn't reliable proof of what week the order was actually worked in).
+    // This is what "Carried forward" should be based on: did real prior-week
+    // activity happen, not "is this order's nominal week tag older."
+    const getHadPriorPlanSet = async (rows: any[]) => {
+      const orderIds = rows.map((o: any) => o.productionOrderId);
+      if (orderIds.length === 0) return new Set<string>();
+      const grouped = await prisma.dailyProductionPlan.groupBy({
+        by: ["productionOrderId"],
+        where: {
+          productionOrderId: { in: orderIds },
+          status: { not: "CANCELLED" },
+          productionDate: { lt: viewedWeekStart },
+        },
+      });
+      return new Set(grouped.map((g: any) => g.productionOrderId));
+    };
+
+    const mapOrders = (rows: any[], plannedElsewhereMap: Map<string, number>, hadPriorPlanSet: Set<string>) => rows.map((o: any) => ({
+      productionOrderId: o.productionOrderId,
+      productName: o.productItem.productName,
+      productCode: o.productItem.productCode,
+      productItemId: o.productItemId.toString(),
+      machineId: o.machineMachineId ?? null,
+      noOfPcs: Number(o.targetQty),
+      producedQty: Number(o.producedQty ?? 0),
+      plannedElsewhere: plannedElsewhereMap.get(o.productionOrderId) || 0,
+      hadPriorPlan: hadPriorPlanSet.has(o.productionOrderId),
+      // Its own originally-scheduled window (weekStartDate–weekEndDate) has
+      // fully elapsed with nothing done — overdue regardless of whether it
+      // ever had a plan or shift created. Anchored to real "today", not to
+      // whichever week happens to be on screen, so it stays correct whether
+      // you're viewing the order's own current week (not overdue) or looking
+      // at it weeks later after it sat untouched (overdue).
+      isOverdue: Boolean(o.weekEndDate && new Date(o.weekEndDate) < today),
+      uom: o.uom,
+      weekStartDate: o.weekStartDate ?? null,
+      weekEndDate: o.weekEndDate ?? null,
+      status: o.status,
+      remarks: o.remarks ?? "",
+    }));
+
+    try {
+      // Include orders originally scheduled on or before this week (so an order
+      // whose target wasn't fully planned/produced keeps resurfacing in later
+      // weeks instead of being stuck on its first-assigned week forever)
+      // OR orders that have no weekStartDate set yet (unscheduled / legacy orders)
+      const orders = await (prisma.productionOrder as any).findMany({
+        where: {
+          machineMachineId: machineId,
+          OR: [
+            { weekStartDate: { lte: end } },
+            { weekStartDate: null },
+          ],
+          // COMPLETED_WITH_SHORTFALL is deliberately excluded alongside CANCELLED/DISPATCHED/DRAFT:
+          // unlike an order that's merely behind schedule (which SHOULD keep resurfacing, per the
+          // comment above), a shortfall order was explicitly force-stopped/closed via "Permanent
+          // Stop" — its remaining qty must never be schedulable again.
+          status: { notIn: ["CANCELLED", "DISPATCHED", "DRAFT", "COMPLETED_WITH_SHORTFALL"] },
+        },
+        include: {
+          productItem: { select: { productName: true, productCode: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      const [plannedElsewhereMap, hadPriorPlanSet] = await Promise.all([
+        getPlannedElsewhereMap(orders),
+        getHadPriorPlanSet(orders),
+      ]);
+      return mapOrders(orders, plannedElsewhereMap, hadPriorPlanSet);
+    } catch {
+      // Fallback: weekStartDate column may not exist yet (migration pending).
+      // Return all plannable orders for the machine without the week filter.
+      const orders = await prisma.productionOrder.findMany({
+        where: {
+          machineMachineId: machineId,
+          status: { notIn: ["CANCELLED", "DISPATCHED", "DRAFT", "COMPLETED_WITH_SHORTFALL"] },
+        },
+        include: {
+          productItem: { select: { productName: true, productCode: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      const [plannedElsewhereMap, hadPriorPlanSet] = await Promise.all([
+        getPlannedElsewhereMap(orders),
+        getHadPriorPlanSet(orders),
+      ]);
+      return mapOrders(orders, plannedElsewhereMap, hadPriorPlanSet);
+    }
   }
 }
 

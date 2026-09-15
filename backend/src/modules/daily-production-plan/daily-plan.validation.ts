@@ -10,8 +10,9 @@ export const createDailyPlanSchema = z.object({
   body: z.object({
     weeklyProgramId: z
       .string()
-      .min(1, "Weekly Program ID is required")
-      .max(20),
+      .max(20)
+      .optional()
+      .nullable(),
 
     productionOrderId: z
       .string()
@@ -144,3 +145,49 @@ export const updateDailyPlanSchema = z.object({
 
 export type CreateDailyPlanInput = z.infer<typeof createDailyPlanSchema>["body"];
 export type UpdateDailyPlanInput = z.infer<typeof updateDailyPlanSchema>["body"];
+
+export const bulkCreateDailyPlanSchema = z.object({
+  body: z.object({
+    items: z.array(
+      z.object({
+        productionOrderId: z.string().min(1).max(20),
+        machineId: z.string().min(1).max(20),
+        shiftId: z.string().min(1).max(20),
+        productionDate: z
+          .string()
+          .refine((val) => !isNaN(Date.parse(val)), "Invalid date format (use YYYY-MM-DD)"),
+        plannedQty: z.number().positive("Planned Quantity must be greater than 0"),
+        weeklyProgramId: z.string().max(20).optional().nullable(),
+      })
+    ).min(0),
+    status: z.enum(["DRAFT", "PLANNED"]).optional().default("DRAFT"),
+    weekStart: z.string().optional().nullable(),
+  }),
+});
+
+export type BulkCreateDailyPlanInput = z.infer<typeof bulkCreateDailyPlanSchema>["body"];
+
+export const bulkDeleteDailyPlanSchema = z.object({
+  body: z.object({
+    dailyPlanIds: z.array(z.string()).min(1, "At least one daily plan ID is required"),
+  }),
+});
+
+export type BulkDeleteDailyPlanInput = z.infer<typeof bulkDeleteDailyPlanSchema>["body"];
+
+export const issueRawMaterialsSchema = z.object({
+  body: z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be in YYYY-MM-DD format"),
+    items: z
+      .array(
+        z.object({
+          rawMaterialId: z.string().min(1).max(20),
+          storeId: z.string().min(1).max(20),
+          issuedQty: z.number().positive("Issued quantity must be greater than 0"),
+          remarks: z.string().max(255).optional(),
+        })
+      )
+      .min(1, "At least one item is required"),
+  }),
+});
+

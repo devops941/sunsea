@@ -1,1194 +1,1454 @@
-import { formatDate } from "../../../utils/dateUtils";
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
-import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
-import { z } from "zod";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { usePermission } from "../../../hooks/usePermission";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  FaSave, FaArrowLeft, FaInfoCircle, FaExclamationTriangle,
-  FaClock
+  FaSave, FaCalendarAlt, FaCheckCircle,
+  FaGripVertical, FaTimes, FaExclamationTriangle,
+  FaSpinner, FaHistory,
 } from "react-icons/fa";
-
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
-import { useSocketSync } from "../../../hooks/useSocketSync";
-import { createDailyPlan, updateDailyPlan } from "../../../features/daily-plans/dailyPlanSlice";
-import { weeklyProgramService } from "../../../services/weeklyProgramService";
-import { dailyPlanService } from "../../../services/dailyPlanService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
-import { oeeService } from "../../../services/oeeService";
-import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
-import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
+import { dailyPlanService } from "../../../services/dailyPlanService";
 
-import TextInput from "../../../components/form/TextInput/TextInput";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import TextArea from "../../../components/form/TextArea/TextArea";
-import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-import CustomButton from "../../../components/ui/Button/Button";
-import BackButton from "../../../components/ui/BackButton/BackButton";
-import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import { usePermission } from "../../../hooks/usePermission";
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+type DayName = typeof DAY_NAMES[number];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
-const formatLocalDateString = (d: Date) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const SHIFT_SLOTS = [
+  { code: "DAY",   label: "Day"   },
+  { code: "NIGHT", label: "Night" },
+] as const;
+type ShiftSlot = "DAY" | "NIGHT";
+
+// Full cell sequence: Mon/Day → Mon/Night → Tue/Day → … → Sat/Night
+const CELL_ORDER = DAY_NAMES.flatMap((day) =>
+  SHIFT_SLOTS.map(({ code }) => ({ day, shift: code as ShiftSlot }))
+);
+
+// Colors for product cards (cycles if more than 16 products)
+const CARD_COLORS = [
+  "bg-blue-500", "bg-indigo-500", "bg-violet-500", "bg-purple-500",
+  "bg-fuchsia-500", "bg-sky-500", "bg-teal-500", "bg-emerald-500",
+  "bg-lime-500", "bg-green-500", "bg-orange-500", "bg-amber-500",
+  "bg-rose-500", "bg-pink-500", "bg-red-500", "bg-cyan-500",
+];
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface BoardOrder {
+  id:               string;  // productionOrderId
+  productName:      string;
+  productCode:      string;
+  productItemId:    string;
+  machineId:        string;
+  machineName:      string;
+  targetQty:        number;
+  producedQty:      number;
+  plannedElsewhere: number;
+  hadPriorPlan:     boolean;
+  isOverdue:        boolean;
+  capacityPerShift: number;
+  uom:              string;
+  color:            string;
+  status?:          string;
+  remarks:          string;
+}
+
+interface CellAssignment {
+  orderId:     string;
+  productName: string;
+  qty:         number;
+  targetQty:   number;
+  color:       string;
+  seqNo?:      number;
+}
+
+type CellKey = `${string}__${DayName}__${ShiftSlot}`;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const normalizeDateStr = (s: any): string => {
+  if (!s) return "";
+  if (s instanceof Date) return fmt(s);
+  const trimmed = String(s).trim().split("T")[0];
+  // If DD-MM-YYYY or DD/MM/YYYY
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(trimmed)) {
+    const parts = trimmed.split(/[-/]/);
+    return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+  }
+  return trimmed;
 };
 
-/** Compute shift duration in hours from "HH:MM" start and end strings */
-const computeShiftHours = (startTime: string, endTime: string): number => {
-  if (!startTime || !endTime) return 8;
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  const startMins = sh * 60 + sm;
-  let endMins = eh * 60 + em;
-  if (endMins <= startMins) endMins += 24 * 60; // overnight shift
-  return Math.round(((endMins - startMins) / 60) * 10) / 10; // e.g. 8.5
+const snapToMonday = (dateStr: string): string => {
+  const normalized = normalizeDateStr(dateStr);
+  const d = new Date(normalized + "T00:00:00");
+  if (isNaN(d.getTime())) return getTodayMonday();
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
+  d.setDate(d.getDate() + diff);
+  return fmt(d);
+};
+const getTodayMonday = (): string => {
+  const d = new Date();
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  return fmt(mon);
+};
+const fmt = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const addDays = (base: string, n: number) => {
+  const normalized = normalizeDateStr(base);
+  const d = new Date(normalized + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return fmt(d);
+};
+const shortDate = (s: string) => {
+  const normalized = normalizeDateStr(s);
+  return new Date(normalized + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-// ─── Component ────────────────────────────────────────────────────────────
+const getShiftSlot = (plan: any, shiftsList: Array<{ shiftCode: string; shiftName: string }>): ShiftSlot => {
+  // Prefer the actual shiftCode from the included shift relation over shiftId (which may be a UUID)
+  const sCode = (plan.shift?.shiftCode || "").trim();
+  const sId   = (plan.shiftId || "").trim();
+  const sName = (plan.shift?.shiftName || "").toLowerCase();
+
+  // 1. Match by shiftCode against the loaded shifts list (most reliable)
+  if (sCode && shiftsList.length > 1 && sCode === shiftsList[1]?.shiftCode) return "NIGHT";
+  if (sCode && shiftsList.length > 0 && sCode === shiftsList[0]?.shiftCode) return "DAY";
+
+  // 2. Match by shiftId against the loaded shifts list (in case shiftId == shiftCode)
+  if (sId && shiftsList.length > 1 && sId === shiftsList[1]?.shiftCode) return "NIGHT";
+  if (sId && shiftsList.length > 0 && sId === shiftsList[0]?.shiftCode) return "DAY";
+
+  // 3. Name-based detection (most robust fallback)
+  if (sName.includes("night") || sName.includes("evening") || sName.includes("second")) return "NIGHT";
+
+  // 4. Code-based keyword fallback
+  const combined = `${sCode} ${sId}`.toLowerCase();
+  if (combined.includes("night") || combined.includes("eve") || combined.includes("shift2") || combined.includes("shift_2")) return "NIGHT";
+
+  return "DAY";
+};
+
+const cellKey = (m: string, d: DayName, s: ShiftSlot): CellKey => `${m}__${d}__${s}`;
+
+// ─── StatusBadge ──────────────────────────────────────────────────────────────
+
+type PlanStatus = "draft" | "in-progress" | "ready";
+
+const StatusBadge: React.FC<{ status: PlanStatus }> = ({ status }) => {
+  const cfg: Record<PlanStatus, { label: string; cls: string }> = {
+    "draft":       { label: "DRAFT",       cls: "bg-zinc-500/10 text-zinc-400 border-zinc-500/25"           },
+    "in-progress": { label: "IN PROGRESS", cls: "bg-primary/10 text-primary border-primary/25"              },
+    "ready":       { label: "READY",       cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"  },
+  };
+  const { label, cls } = cfg[status];
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold tracking-widest uppercase border ${cls}`}>
+      {label}
+    </span>
+  );
+};
+
+// ─── OrderCard ────────────────────────────────────────────────────────────────
+
+interface OrderCardProps {
+  order:             BoardOrder;
+  remaining:         number;
+  allocatedQty:      number;
+  isCarriedForward:  boolean;
+  isDragging:        boolean;
+  isHovered:         boolean;
+  onDragStart:       (id: string) => void;
+  onMouseEnter:      () => void;
+  onMouseLeave:      () => void;
+  onClearGroup:      () => void;
+}
+
+const OrderCard: React.FC<OrderCardProps> = ({
+  order, remaining, allocatedQty, isCarriedForward, isDragging, isHovered,
+  onDragStart, onMouseEnter, onMouseLeave, onClearGroup,
+}) => {
+  const isComplete     = remaining <= 0;
+  const hasAllocations = allocatedQty > 0;
+  const remainingPct   = order.targetQty > 0 ? Math.max(0, remaining / order.targetQty) : 0;
+
+  return (
+    <div
+      draggable
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "copyMove";
+        e.dataTransfer.setData("orderId", order.id);
+        e.dataTransfer.setData("text/plain", order.id);
+        onDragStart(order.id);
+      }}
+      onDragEnd={() => onDragStart("")}
+      className={`
+        group relative flex items-center justify-between gap-2 p-2 rounded-lg border transition-all duration-150 select-none
+        cursor-grab active:cursor-grabbing overflow-hidden
+        ${isDragging ? "opacity-35 scale-[0.97]" : ""}
+        ${isHovered  ? "ring-1 ring-primary/50 border-primary shadow-xs" : ""}
+        ${isComplete
+          ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50"
+          : "border-line bg-card hover:border-primary/40 hover:bg-card-2/60 shadow-xs"}
+      `}
+    >
+      {/* Left accent */}
+      <div
+        className={`absolute left-0 inset-y-0 w-1 rounded-l ${
+          isComplete ? "bg-emerald-400" : hasAllocations ? "bg-primary" : "bg-line-soft"
+        }`}
+      />
+
+      <div className="pl-1.5 flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-1">
+          <span
+            className={`text-[11px] font-bold truncate leading-snug ${
+              isComplete ? "text-emerald-400" : "text-ink"
+            }`}
+            title={order.productName}
+          >
+            {order.productName}
+          </span>
+        </div>
+        {!isComplete && isCarriedForward && (
+          <div
+            className="flex items-center gap-1 text-[8.5px] font-bold text-amber-400/90 mt-0.5"
+            title={`Produced ${order.producedQty.toLocaleString()} + planned ${order.plannedElsewhere.toLocaleString()} of ${order.targetQty.toLocaleString()} in other weeks — pending amount carried forward`}
+          >
+            <FaHistory size={7} />
+            <span>Carried forward · Pending {remaining.toLocaleString()}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between text-[9.5px] text-ink-muted mt-0.5">
+          <span>Target: <strong className="text-ink font-semibold">{order.targetQty.toLocaleString()}</strong></span>
+          {isComplete ? (
+            <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+              <FaCheckCircle size={8} /> Done
+            </span>
+          ) : (
+            <span>Rem: <strong className="text-primary font-bold">{remaining.toLocaleString()}</strong></span>
+          )}
+        </div>
+        {/* Mini progress bar */}
+        <div className="mt-1 h-[2px] w-full bg-line-soft rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${isComplete ? "bg-emerald-400" : "bg-primary/60"}`}
+            style={{ width: `${Math.round((1 - remainingPct) * 100)}%` }}
+          />
+        </div>
+        <div className="text-[8.5px] text-ink-muted mt-0.5">
+          Cap: <strong className="text-ink">{order.capacityPerShift.toLocaleString()}</strong>/shift
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        {hasAllocations && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onClearGroup(); }}
+            title="Remove all shifts"
+            className="p-1 rounded text-ink-muted hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+          >
+            <FaTimes size={9} />
+          </button>
+        )}
+        <FaGripVertical className="text-ink-muted/30 group-hover:text-ink-muted transition-colors" size={9} />
+      </div>
+    </div>
+  );
+};
+
+// ─── DropCell ────────────────────────────────────────────────────────────────
+
+interface DropCellProps {
+  assignment:             CellAssignment | null;
+  isOver:                 boolean;
+  isGroupHovered:         boolean;
+  draggingOrderId?:       string;
+  isMachineMatch?:        boolean;
+  isLocked?:              boolean;  // true when RM has been issued for this date
+  onDragEnter?:           (e: React.DragEvent) => void;
+  onDragOver:             (e: React.DragEvent) => void;
+  onDrop:                 (e: React.DragEvent) => void;
+  onDragLeave?:           (e: React.DragEvent) => void;
+  onClear:                () => void;
+  onMouseEnter:           () => void;
+  onMouseLeave:           () => void;
+  onDragStartAssignment?: (orderId: string) => void;
+  onDragEndAssignment?:   () => void;
+}
+
+const DropCell: React.FC<DropCellProps> = ({
+  assignment, isOver, isGroupHovered, draggingOrderId, isMachineMatch = true,
+  isLocked = false,
+  onDragEnter, onDragOver, onDrop, onDragLeave, onClear,
+  onMouseEnter, onMouseLeave, onDragStartAssignment, onDragEndAssignment,
+}) => {
+  const isDraggingAny = Boolean(draggingOrderId);
+  // Locked cells can never be a swap/drop target
+  const isSwapTarget  = !isLocked && isOver && Boolean(assignment) && isDraggingAny && assignment?.orderId !== draggingOrderId && isMachineMatch;
+  const isSelfMove    = !isLocked && isOver && Boolean(assignment) && isDraggingAny && assignment?.orderId === draggingOrderId;
+  const isEmptyDrop   = !isLocked && isOver && !assignment && isDraggingAny && isMachineMatch;
+  const isInvalidDrop = isOver && isDraggingAny && (!isMachineMatch || isLocked);
+
+  let cellCls = "";
+  if      (isLocked && assignment) cellCls = "border-amber-500/40 bg-amber-500/8 cursor-default";
+  else if (isInvalidDrop) cellCls = "border-red-500/50 bg-red-500/8 cursor-not-allowed";
+  else if (isSwapTarget)  cellCls = "border-amber-400 bg-amber-500/15 ring-1 ring-amber-400/60 scale-[1.02] z-10 shadow-md";
+  else if (isSelfMove)    cellCls = "border-primary/60 bg-primary/12 ring-1 ring-primary/30";
+  else if (isEmptyDrop)   cellCls = "border-primary bg-primary/15 ring-2 ring-primary/40 scale-[1.01] z-10 shadow-sm";
+  else if (isGroupHovered && !isLocked) cellCls = "ring-1 ring-primary/50 border-primary/60 bg-primary/8";
+
+  if (!assignment) {
+    return (
+      <div
+        onDragEnter={isLocked ? undefined : onDragEnter}
+        onDragOver={isLocked ? undefined : onDragOver}
+        onDragLeave={isLocked ? undefined : onDragLeave}
+        onDrop={isLocked ? undefined : onDrop}
+        className={`
+          relative h-[62px] rounded-lg border border-dashed transition-all duration-150 flex items-center justify-center select-none
+          ${isLocked ? "border-amber-500/25 bg-amber-500/5 cursor-default" : (cellCls || "border-line-soft/40 hover:border-line-soft hover:bg-card-2/30")}
+        `}
+      >
+        {isLocked ? (
+          <span className="text-[9px] font-bold tracking-wider uppercase text-amber-500/70 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded">
+            RM Issued
+          </span>
+        ) : isOver && isMachineMatch ? (
+          <span className="text-[10px] font-bold text-primary animate-pulse">+ Drop here</span>
+        ) : isOver && !isMachineMatch ? (
+          <span className="text-[9px] font-medium text-red-400">Wrong machine</span>
+        ) : (
+          <span className="text-[10px] text-ink-muted/30 font-medium select-none">—</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      draggable={!isLocked}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onDragEnter={isLocked ? undefined : onDragEnter}
+      onDragOver={isLocked ? undefined : onDragOver}
+      onDragLeave={isLocked ? undefined : onDragLeave}
+      onDrop={isLocked ? undefined : onDrop}
+      onDragStart={isLocked ? undefined : (e) => {
+        e.dataTransfer.effectAllowed = "copyMove";
+        e.dataTransfer.setData("orderId", assignment.orderId);
+        e.dataTransfer.setData("text/plain", assignment.orderId);
+        onDragStartAssignment?.(assignment.orderId);
+      }}
+      onDragEnd={isLocked ? undefined : onDragEndAssignment}
+      className={`
+        group/cell relative h-[62px] rounded-lg border px-2 py-1 flex flex-col justify-between transition-all duration-150 select-none
+        overflow-hidden shadow-2xs
+        ${isLocked
+          ? (cellCls || "border-amber-500/40 bg-amber-500/8 cursor-default")
+          : (`cursor-grab active:cursor-grabbing ${cellCls || "border-line bg-card hover:border-primary/50 hover:bg-card-2/80"}`)
+        }
+      `}
+    >
+
+      {/* Header: PO Reference + lock/sequence tag */}
+      <div className="flex items-center justify-between gap-1 min-w-0">
+        <span className="text-[8.5px] font-mono font-bold text-ink-muted/80 truncate leading-tight flex-1" title={assignment.orderId}>
+          {assignment.orderId}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {isLocked && (
+            <span
+              title="RM issued — this shift is locked"
+              className="text-[7px] font-black tracking-widest uppercase text-amber-500 border border-amber-500/40 bg-amber-500/15 px-1 py-px rounded leading-none"
+            >
+              RM
+            </span>
+          )}
+          {assignment.seqNo && (
+            <span className="text-[8px] font-mono font-extrabold text-ink-muted/70 bg-card-2 px-1 rounded">
+              #{assignment.seqNo}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Body: Product Name */}
+      <div className="text-[10px] font-bold text-ink truncate leading-tight" title={assignment.productName}>
+        {assignment.productName}
+      </div>
+
+      {/* Footer: assigned qty + remove button (hidden when locked) */}
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[9.5px] font-extrabold text-primary">
+          {assignment.qty.toLocaleString()} <span className="text-[8px] font-normal text-ink-muted">pcs</span>
+        </span>
+        {!isLocked && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            title="Remove assignment"
+            className="w-4 h-4 rounded flex items-center justify-center text-ink-muted hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/cell:opacity-100 transition-all cursor-pointer"
+          >
+            <FaTimes size={8} />
+          </button>
+        )}
+      </div>
+
+      {/* Swap indicator overlay */}
+      {isSwapTarget && (
+        <div className="absolute inset-0 bg-amber-500/20 rounded-lg flex items-center justify-center pointer-events-none">
+          <span className="text-[9.5px] font-black text-amber-300 bg-black/60 px-1.5 py-0.5 rounded shadow">
+            ⇄ SWAP
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Main Component ────────────────────────────────────────────────────────────
+
 const DailyPlanCreate: React.FC = () => {
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const location = useLocation();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const [searchParams] = useSearchParams();
+  const dispatch   = useAppDispatch();
   const { can } = usePermission();
-  const { id: editId } = useParams<{ id?: string }>();
-  const isEdit = !!editId;
-  const formRef = useRef<HTMLFormElement>(null);
-  const handleFormKeyDown = useFormKeyboardNav(formRef as any);
 
-  // Redux
-  const { data: machines } = useAppSelector((state) => state.machines);
-  const { data: shifts } = useAppSelector((state: any) => state.shifts || { data: [] });
+  // ── Redux state ──────────────────────────────────────────────────────────
+  const rawMachines = useAppSelector((state: any) => state.machines?.data);
+  const rawShifts   = useAppSelector((state: any) => state.shifts?.data);
 
-  // ── Form fields ──────────────────────────────────────────────────────────
-  const [weeklyProgramId, setWeeklyProgramId] = useState("");
-  const [productionDate, setProductionDate] = useState(formatLocalDateString(new Date()));
-  const [machineId, setMachineId] = useState("");
-  const [shiftId, setShiftId] = useState("");
-  const [plannedQty, setPlannedQty] = useState("");
-  const [plannedHours, setPlannedHours] = useState("0");
-  const [priority, setPriority] = useState("MEDIUM");
-  const [status, setStatus] = useState("DRAFT");
-  const [remarks, setRemarks] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [availableShiftHours, setAvailableShiftHours] = useState<number>(0);
-  const [totalShiftHours, setTotalShiftHours] = useState<number>(0);
+  const machines: Array<{ machineId: string; machineName: string }> = useMemo(() => {
+    const list = Array.isArray(rawMachines) ? rawMachines : (rawMachines?.machines ?? []);
+    return list.filter((m: any) => m.isActive !== false);
+  }, [rawMachines]);
 
-  // ── Fetch active assignment ──────────────────────────────────────────────
-  const loadedPlanRef = useRef<{ machineId?: string; shiftId?: string; prodDate?: string } | null>(null);
-  const [availableOperators, setAvailableOperators] = useState<any[]>([]);
-  const [selectedOperators, setSelectedOperators] = useState<string[]>([]);
-  const operatorName = useMemo(() => {
-    return selectedOperators
-      .map((id) => {
-        const op = availableOperators.find((o: any) => (o.id || o.employeeId)?.toString() === id);
-        return op ? op.fullName : id;
-      })
-      .filter(Boolean)
-      .join(", ");
-  }, [selectedOperators, availableOperators]);
+  const shifts: Array<{ shiftCode: string; shiftName: string }> = useMemo(() => {
+    return Array.isArray(rawShifts) ? rawShifts : [];
+  }, [rawShifts]);
 
-  const [loadingAssignment, setLoadingAssignment] = useState(false);
-  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const urlWeek = (location.state as any)?.weekStart || searchParams.get("week");
+  const passedIsEdit = Boolean((location.state as any)?.isEdit);
+  const [weekStart] = useState<string>(urlWeek ? snapToMonday(urlWeek) : getTodayMonday());
+  const [selectedDay,    setSelectedDay]    = useState<DayName | "ALL">("ALL");
+  const [boardMap,       setBoardMap]       = useState<Record<CellKey, CellAssignment>>({});
+  const [draggingId,     setDraggingId]     = useState<string>("");
+  const [hoverKey,       setHoverKey]       = useState<CellKey | "">("");
+  const [hoveredOrderId, setHoveredOrderId] = useState<string>("");
+  const [selectedMachineFilter, setSelectedMachineFilter] = useState<string>("ALL");
+  const [isEditMode,     setIsEditMode]     = useState<boolean>(passedIsEdit);
+  const [rmIssuedDates,  setRmIssuedDates]  = useState<Set<string>>(new Set());
 
-  // ── Carry Forward ─────────────────────────────────────────────────────────
-  const [carryForwardFromPlanId, setCarryForwardFromPlanId] = useState<string | null>(null);
-  const [carryForwardFromInfo, setCarryForwardFromInfo] = useState<any>(null);
+  // ── Data loading state ───────────────────────────────────────────────────
+  const [productionOrders, setProductionOrders] = useState<BoardOrder[]>([]);
+  const [loadingOrders,    setLoadingOrders]    = useState(false);
+  const [isSubmitting,     setIsSubmitting]     = useState(false);
 
-  // ── Auto-fill data ───────────────────────────────────────────────────────
-  const [weeklyPrograms, setWeeklyPrograms] = useState<any[]>([]);
-  const [loadingWeekly, setLoadingWeekly] = useState(false);
-  const [selectedWeeklyProg, setSelectedWeeklyProg] = useState<any>(null);
-  const [remainingQty, setRemainingQty] = useState<number | null>(null);
-  const [loadingRemaining, setLoadingRemaining] = useState(false);
+  const weekEnd = addDays(weekStart, 5);
 
-  // ── Machine-specific product capacity ────────────────────────────────────
-  const [machineProductCapacity, setMachineProductCapacity] = useState<number | null>(null);
-  const [noCapacityWarning, setNoCapacityWarning] = useState(false);
-
-  // States to keep track of existing plans for this Date & Machine to disable fully utilized shifts
-  const [plansForDateAndMachine, setPlansForDateAndMachine] = useState<any[]>([]);
-
-  // ── Machine OEE Summary ──────────────────────────────────────────────────
-  const [machineOeeSummary, setMachineOeeSummary] = useState<any>(null);
-  const [loadingOee, setLoadingOee] = useState(false);
-
-  // ── Dirty / discard confirm ───────────────────────────────────────────────
-  const [isDirty, setIsDirty] = useState(false);
-  const [showDiscardModal, setShowDiscardModal] = useState(false);
-  const isDirtyRef = useRef(false);
-  const showDiscardRef = useRef(false);
-  const lastFocusedRef = useRef<HTMLElement | null>(null);
-  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
-  useEffect(() => { showDiscardRef.current = showDiscardModal; }, [showDiscardModal]);
-
-  const goBack = useCallback(() => navigate(-1), [navigate]);
-
-  const openDiscardModal = useCallback(() => {
-    lastFocusedRef.current = document.activeElement as HTMLElement;
-    setShowDiscardModal(true);
-  }, []);
-
-  const handleResume = useCallback(() => {
-    setShowDiscardModal(false);
-    if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
-    setTimeout(() => lastFocusedRef.current?.focus(), 50);
-  }, []);
-
-  const handleDiscard = useCallback(() => {
-    setShowDiscardModal(false);
-    if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
-    goBack();
-  }, [goBack]);
-
-  const handleSaveAndLeave = useCallback(() => {
-    setShowDiscardModal(false);
-    if (!isSubmitting) handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED");
-  }, [isSubmitting, isEdit, status]);
-
-  // Ref to remember blocker's proceed()/reset() from the current block-attempt
-  // so the existing discard modal can drive them from its buttons.
-  const proceedRef = useRef<(() => void) | null>(null);
-  const resetRef = useRef<(() => void) | null>(null);
-  useDirtyNavGuard(isDirty, (proceed, reset) => {
-    proceedRef.current = proceed;
-    resetRef.current = reset;
-    setShowDiscardModal(true);
-  });
-
-  const handleBackClick = useCallback(() => {
-    if (isDirtyRef.current) openDiscardModal();
-    else goBack();
-  }, [openDiscardModal, goBack]);
-
-  useFormShortcuts({
-    onSave: () => { if (!isSubmitting) handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED"); },
-  });
-
-  // Esc — canonical pattern (matches CustomerFormPage)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (document.querySelector("[data-select-portal]")) return; // let open dropdowns close first
-      e.preventDefault();
-      e.stopPropagation();
-      if (showDiscardRef.current) {
-        handleResume();
-      } else if (isDirtyRef.current) {
-        openDiscardModal();
-      } else {
-        goBack();
-      }
-    };
-    window.addEventListener("keydown", handler, { capture: true });
-    return () => window.removeEventListener("keydown", handler, { capture: true });
-  }, [handleResume, openDiscardModal, goBack]);
-
-  useEffect(() => {
-    if (!productionDate || !machineId) {
-      setPlansForDateAndMachine([]);
-      return;
-    }
-    dailyPlanService.getAll({ productionDate, machineId }).then((res) => {
-      let data = [];
-      if (Array.isArray(res)) data = res;
-      else if (res && Array.isArray(res.data)) data = res.data;
-      else if (res && res.data && Array.isArray(res.data.dailyPlans)) data = res.data.dailyPlans;
-      else if (res && Array.isArray(res.dailyPlans)) data = res.dailyPlans;
-      else if (res && Array.isArray(res.content)) data = res.content;
-      setPlansForDateAndMachine(data);
-    }).catch(() => { });
-
-    // Fetch OEE summary for selected machine
-    setLoadingOee(true);
-    oeeService.getMachineOeeSummary(machineId, productionDate)
-      .then((data: any) => setMachineOeeSummary(data))
-      .catch(() => setMachineOeeSummary(null))
-      .finally(() => setLoadingOee(false));
-  }, [productionDate, machineId]);
-
-  // ── Fetch machine-specific product capacity ─────────────────────────────
-  useEffect(() => {
-    if (!machineId || !selectedWeeklyProg?.productionOrder?.productItem?.id) {
-      setMachineProductCapacity(null);
-      return;
-    }
-    const productId = Number(selectedWeeklyProg.productionOrder.productItem.id);
-    productCapacityHistoryService.fetchByProductAndMachine(productId, machineId)
-      .then((rec: any) => {
-        if (rec && rec.newCapacity != null) {
-          setMachineProductCapacity(Number(rec.newCapacity));
-        } else {
-          setMachineProductCapacity(null);
-        }
-      })
-      .catch(() => setMachineProductCapacity(null));
-  }, [machineId, selectedWeeklyProg]);
-
-  useEffect(() => {
-    if (!machineId || !shiftId || !productionDate) {
-      setAvailableOperators([]);
-      setSelectedOperators([]);
-      setAssignmentError(null);
-      return;
-    }
-
-    setLoadingAssignment(true);
-    setAssignmentError(null);
-
-    machineOperationAssignmentService.resolveAssignment({
-      machineId,
-      shiftId,
-      date: productionDate,
-    })
-      .then((res: any) => {
-        const assignment = res.data;
-        if (!assignment || !assignment.operators || assignment.operators.length === 0) {
-          setAvailableOperators([]);
-          setSelectedOperators([]);
-          setAssignmentError("No operator is assigned to the selected machine for this shift in Weekly Machine Assignment.");
-          return;
-        }
-
-        const isInitialEditLoad = isEdit &&
-          loadedPlanRef.current &&
-          loadedPlanRef.current.machineId === machineId &&
-          loadedPlanRef.current.shiftId === shiftId &&
-          loadedPlanRef.current.prodDate === productionDate;
-
-        setAvailableOperators(assignment.operators);
-        if (!isInitialEditLoad) {
-          setSelectedOperators(assignment.operators.map((op: any) => (op.id || op.employeeId)?.toString()).filter(Boolean));
-        }
-        setAssignmentError(null);
-      })
-      .catch((err: any) => {
-        console.error("Failed to resolve machine assignment:", err);
-        setAvailableOperators([]);
-        setSelectedOperators([]);
-        setAssignmentError("Error resolving machine shift assignment. Please check Weekly Machine Assignment.");
-      })
-      .finally(() => {
-        setLoadingAssignment(false);
-      });
-  }, [machineId, shiftId, productionDate]);
-
-  const remainingShiftsHours = useMemo(() => {
-    const hoursMap: Record<string, number> = {};
-    if (!productionDate || !machineId || !shifts || shifts.length === 0) return hoursMap;
-
-    const TERMINAL_STATUSES = ["COMPLETED", "STOPPED", "SHORT_CLOSED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL"];
-
-    shifts.forEach((s: any) => {
-      const shiftHrs = computeShiftHours(s.startTime, s.endTime);
-      const safePlans = Array.isArray(plansForDateAndMachine) ? plansForDateAndMachine : [];
-      const existingPlans = safePlans.filter(
-        (p: any) => p.shiftId === s.shiftCode && p.status !== "CANCELLED" && p.dailyPlanId !== editId
-      );
-
-      const plannedHrsSum = existingPlans
-        .reduce((sum: number, p: any) => {
-          const loggedHours = Array.isArray(p.hourlyProductions) ? p.hourlyProductions.length : 0;
-          if (TERMINAL_STATUSES.includes(p.status)) {
-            return sum + loggedHours;
-          } else {
-            return sum + Math.max(Number(p.plannedHours || 0), loggedHours);
-          }
-        }, 0);
-
-      hoursMap[s.shiftCode] = Math.max(0, shiftHrs - plannedHrsSum);
-    });
-
-    return hoursMap;
-  }, [productionDate, machineId, shifts, plansForDateAndMachine, editId]);
-
-  // ── Load on mount ────────────────────────────────────────────────────────
+  // ── Load machines + shifts on mount ─────────────────────────────────────
   useEffect(() => {
     dispatch(fetchMachines());
     dispatch(fetchShifts());
   }, [dispatch]);
 
-  // ── Real-time socket callbacks ────────────────────────────────────────────
-
-  // Re-fetch daily plans for the current date+machine (affects remaining shift hours)
-  const refreshDailyPlans = useCallback(() => {
-    if (!productionDate || !machineId) return;
-    dailyPlanService.getAll({ productionDate, machineId }).then((res) => {
-      let data: any[] = [];
-      if (Array.isArray(res)) data = res;
-      else if (res && Array.isArray((res as any).data)) data = (res as any).data;
-      else if (res && (res as any).data && Array.isArray((res as any).data.dailyPlans)) data = (res as any).data.dailyPlans;
-      else if (res && Array.isArray((res as any).dailyPlans)) data = (res as any).dailyPlans;
-      else if (res && Array.isArray((res as any).content)) data = (res as any).content;
-      setPlansForDateAndMachine(data);
-    }).catch(() => {});
-  }, [productionDate, machineId]);
-
-  // Re-resolve machine assignment (operators) when assignments change
-  const refreshAssignment = useCallback(() => {
-    if (!machineId || !shiftId || !productionDate) return;
-    machineOperationAssignmentService.resolveAssignment({ machineId, shiftId, date: productionDate })
-      .then((res: any) => {
-        const assignment = res.data;
-        if (!assignment || !assignment.operators || assignment.operators.length === 0) {
-          setAvailableOperators([]);
-          setAssignmentError("No operator is assigned to the selected machine for this shift in Weekly Machine Assignment.");
-          return;
-        }
-        setAvailableOperators(assignment.operators);
-        setAssignmentError(null);
-      })
-      .catch(() => {
-        setAvailableOperators([]);
-        setAssignmentError("Error resolving machine shift assignment.");
-      });
-  }, [machineId, shiftId, productionDate]);
-
-  const loadWeeklyPrograms = useCallback(async () => {
-    setLoadingWeekly(true);
+  // ── Load production orders + existing daily plans for selected week ──────
+  const loadOrders = useCallback(async () => {
+    if (!machines.length) return;
+    setLoadingOrders(true);
+    setHoveredOrderId("");
     try {
-      const d = new Date(productionDate || new Date());
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      const year = monday.getFullYear();
-      const month = String(monday.getMonth() + 1).padStart(2, '0');
-      const dateStr = String(monday.getDate()).padStart(2, '0');
-      const selectedWeekPrefix = `${year}-${month}-${dateStr}`;
-
-      const res = await weeklyProgramService.getAll({});
-      const list: any[] = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
-      const stateWpId = (location.state as any)?.weeklyProgramId;
-
-      setWeeklyPrograms(list.filter((p: any) => {
-        if (p.status === "CANCELLED") return p.weeklyProgramId === stateWpId;
-
-        const po = p.productionOrder;
-
-        // PO was permanently stopped (COMPLETED_WITH_SHORTFALL/CLOSED from force-stop) → hide from dropdown
-        if (po && (po.status === "COMPLETED_WITH_SHORTFALL" || po.status === "CLOSED") && p.weeklyProgramId !== stateWpId) return false;
-        if (po) {
-          const targetQty = Number(po.targetQty || 0);
-          const producedQty = Math.max(0, Number(po.producedQty || 0) - Number(po.rejectedQty || 0) - Number(po.scrapQty || 0));
-
-          const plans = po.dailyProductionPlans || [];
-
-          // poRemaining = simply how many pcs still need to be produced for the PO
-          // po.producedQty already reflects all completed production, so we just subtract that
-          const poRemaining = targetQty > 0 ? Math.max(0, targetQty - producedQty) : 0;
-
-          // Only count ACTIVE plans (not yet finished) — finished plan quantities
-          // are already reflected in poProducedQty, so counting them again would double-subtract.
-          const alreadyPlanned = plans
-            .filter((dp: any) => ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(dp.status))
-            .reduce((sum: number, dp: any) => {
-              const produced = Array.isArray(dp.hourlyProductions)
-                ? dp.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
-                : 0;
-              return sum + Math.max(Number(dp.plannedQty || 0), produced);
-            }, 0);
-
-          const wpPlanned = Number(p.plannedQty || 0);
-          const baseCapacity = (wpPlanned > 0 && targetQty > 0) ? Math.min(wpPlanned, poRemaining) : (poRemaining || wpPlanned);
-          const remaining = Math.max(0, baseCapacity - alreadyPlanned);
-
-          if (remaining <= 0 && p.weeklyProgramId !== stateWpId) {
-            return false;
-          }
-
-          const isTargetMet = targetQty > 0 && producedQty >= targetQty;
-          const poTerminal = po.status === "CANCELLED" || isTargetMet;
-
-          if (isTargetMet && p.weeklyProgramId !== stateWpId) {
-            return false;
-          }
-
-          if (p.status === "COMPLETED") {
-            if (p.weeklyProgramId === stateWpId) return true;
-            const hasActiveWp = list.some(
-              (other: any) =>
-                other.productionOrderId === p.productionOrderId &&
-                other.weeklyProgramId !== p.weeklyProgramId &&
-                ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(other.status)
-            );
-            if (!poTerminal && producedQty < targetQty && !hasActiveWp) return true;
-            return false;
-          }
-
-          if (poTerminal && p.weeklyProgramId !== stateWpId) {
-            return false;
-          }
-        } else if (p.status === "COMPLETED") {
-          return p.weeklyProgramId === stateWpId;
-        }
-
-        const isSelectedWeek = p.weekStartDate && p.weekStartDate.startsWith(selectedWeekPrefix);
-        const isPending = ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status);
-        return isSelectedWeek || isPending || p.weeklyProgramId === stateWpId;
-      }).map((p: any) => {
-        const isSelectedWeek = p.weekStartDate && p.weekStartDate.startsWith(selectedWeekPrefix);
-        const isPending = ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status);
-        // Tag completed WPs with remaining PO qty so the label can show it
-        if (p.status === "COMPLETED" && p.weeklyProgramId !== stateWpId) {
-          const po = p.productionOrder;
-          const netProduced = po ? Math.max(0, Number(po.producedQty || 0) - Number(po.rejectedQty || 0) - Number(po.scrapQty || 0)) : 0;
-          const poRemaining = po ? Math.max(0, Number(po.targetQty || 0) - netProduced) : 0;
-          return { ...p, _isBacklog: true, _poRemaining: poRemaining };
-        }
-        if (!isSelectedWeek && isPending) {
-          return { ...p, _isBacklog: true };
-        }
-        return p;
-      }));
-    } catch {
-      toast.error("Failed to load weekly programs");
-    } finally {
-      setLoadingWeekly(false);
-    }
-  }, [location.state, productionDate]);
-
-  useEffect(() => { loadWeeklyPrograms(); }, [loadWeeklyPrograms]);
-
-  // ── Socket sync: keep dropdowns and remaining quantities live ─────────────
-  useSocketSync("machine", undefined, () => dispatch(fetchMachines()));
-  useSocketSync("shift", undefined, () => dispatch(fetchShifts()));
-  useSocketSync("weeklyProgram", undefined, loadWeeklyPrograms);
-  useSocketSync("dailyPlan", undefined, refreshDailyPlans);
-  useSocketSync("machineAssignment", undefined, refreshAssignment);
-
-  // If editing, load existing plan
-  useEffect(() => {
-    if (!isEdit || !editId) return;
-    dailyPlanService.getById(editId).then((res) => {
-      const plan = res.data;
-      if (!plan) return;
-      setWeeklyProgramId(plan.weeklyProgramId || "");
-      setProductionDate(plan.productionDate?.split("T")[0] || formatLocalDateString(new Date()));
-      setMachineId(plan.machineId || "");
-      setShiftId(plan.shiftId || "");
-      setPlannedQty(String(plan.plannedQty || ""));
-      setPlannedHours(String(plan.plannedHours || "8"));
-      setPriority(plan.priority || "MEDIUM");
-      setStatus(plan.status || "DRAFT");
-      setRemarks(plan.remarks || "");
-      loadedPlanRef.current = {
-        machineId: plan.machineId,
-        shiftId: plan.shiftId,
-        prodDate: plan.productionDate?.split("T")[0]
-      };
-      if (plan.selectedOperatorIds && plan.selectedOperatorIds.trim() !== "") {
-        setSelectedOperators(plan.selectedOperatorIds.split(",").map((id: string) => id.trim()).filter(Boolean));
-      } else if (plan.operators && Array.isArray(plan.operators)) {
-        setSelectedOperators(plan.operators.map((op: any) => (op.id || op.employeeId)?.toString()).filter(Boolean));
-      }
-      setIsDirty(false);
-    }).catch(() => toast.error("Failed to load plan for editing"));
-  }, [isEdit, editId]);
-
-  // ── Auto-fill: Weekly Program selected or Machine changes ────────────────
-  useEffect(() => {
-    if (!weeklyProgramId) {
-      setSelectedWeeklyProg(null);
-      setRemainingQty(null);
-      setNoCapacityWarning(false);
-      return;
-    }
-    const wp = weeklyPrograms.find((p: any) => p.weeklyProgramId === weeklyProgramId);
-    if (!wp) return;
-    setSelectedWeeklyProg(wp);
-
-    // Auto-fill priority from Production Order
-    const poPriority = wp.productionOrder?.priority || wp.priority;
-    if (poPriority) {
-      const p = poPriority.toUpperCase();
-      if (["LOW", "MEDIUM", "HIGH", "URGENT"].includes(p)) setPriority(p);
-    }
-
-    const isCarryForward = !!carryForwardFromPlanId;
-    const wpPlanned = Number(wp.plannedQty || 0);
-
-    // Use machine-specific capacity when machine is selected, else product-level
-    const effectiveCapacity = machineId && machineProductCapacity != null
-      ? machineProductCapacity
-      : Number(wp.productionOrder?.productItem?.capacityLitres || 0);
-
-    const getCapacity = async (): Promise<number> => {
-      if (effectiveCapacity > 0) return effectiveCapacity;
-      try {
-        const po = await productionOrderService.getById(wp.productionOrderId);
-        return Number((po as any)?.productItem?.capacityLitres || 0);
-      } catch { return 0; }
-    };
-
-    const poTarget = Number(wp.productionOrder?.targetQty || 0);
-    const poProduced = Math.max(0, Number(wp.productionOrder?.producedQty || 0) - Number(wp.productionOrder?.rejectedQty || 0) - Number(wp.productionOrder?.scrapQty || 0));
-    const poRemaining = Math.max(0, poTarget - poProduced);
-
-    if (!isCarryForward) {
-      // First plan — auto-fill from machine capacity; if none set, warn and leave blank
-      getCapacity().then((cap) => {
-        setRemainingQty(poRemaining);
-        if (!isEdit && machineId) {
-          if (location.state && (location.state as any).plannedQty) {
-            setNoCapacityWarning(false);
-            setPlannedQty(String(Number((location.state as any).plannedQty)));
-          } else if (cap > 0) {
-            setNoCapacityWarning(false);
-            setPlannedQty(String(cap));
-          } else {
-            setNoCapacityWarning(true);
-            setPlannedQty("");
-          }
-        }
-      });
-      return;
-    }
-
-    // Carry forward — compute remaining
-    setLoadingRemaining(true);
-    dailyPlanService.getAll({ weeklyProgramId }).then((res) => {
-      let existingPlans: any[] = [];
-      if (Array.isArray(res)) existingPlans = res;
-      else if (res && Array.isArray(res.data)) existingPlans = res.data;
-      else if (res && res.data && Array.isArray(res.data.dailyPlans)) existingPlans = res.data.dailyPlans;
-      else if (res && Array.isArray(res.dailyPlans)) existingPlans = res.dailyPlans;
-      else if (res && Array.isArray(res.content)) existingPlans = res.content;
-
-      const safePlans = Array.isArray(existingPlans) ? existingPlans : [];
-      const alreadyPlanned = safePlans
-        .filter((p: any) =>
-          ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status) &&
-          p.dailyPlanId !== editId &&
-          p.dailyPlanId !== carryForwardFromPlanId
-        )
-        .reduce((sum: number, p: any) => {
-          const produced = Array.isArray(p.hourlyProductions)
-            ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
-            : 0;
-          return sum + Math.max(Number(p.plannedQty || 0), produced);
-        }, 0);
-      const remaining = Math.max(0, poTarget - poProduced);
-      setRemainingQty(remaining);
-      if (!isEdit) {
-        if (location.state && (location.state as any).plannedQty) {
-          setNoCapacityWarning(false);
-          const stateQty = Number((location.state as any).plannedQty);
-          setPlannedQty(String(Math.round(stateQty * 1000) / 1000));
-        } else if (effectiveCapacity > 0) {
-          setNoCapacityWarning(false);
-          setPlannedQty(String(effectiveCapacity));
-        } else {
-          setNoCapacityWarning(true);
-          setPlannedQty("");
-        }
-      }
-    }).catch(() => setRemainingQty(null))
-      .finally(() => setLoadingRemaining(false));
-  }, [weeklyProgramId, weeklyPrograms, editId, isEdit, location.state, carryForwardFromPlanId, machineId, machineProductCapacity]);
-
-  // Handle location.state pre-fill
-  useEffect(() => {
-    if (location.state && !isEdit) {
-      const s = location.state as any;
-      if (s.weeklyProgramId) setWeeklyProgramId(s.weeklyProgramId);
-      if (s.machineId) setMachineId(s.machineId);
-      if (s.remarks) setRemarks(s.remarks);
-      if (s.carryForwardFromPlanId) {
-        setCarryForwardFromPlanId(s.carryForwardFromPlanId);
-        setCarryForwardFromInfo(s.carryForwardFromInfo || null);
-      }
-    }
-  }, [location.state, isEdit]);
-
-  // ── Auto-fill: Shift selected → compute hours ────────────────────────────
-  useEffect(() => {
-    if (!shiftId) { setPlannedHours("0"); return; }
-    const selectedShift = shifts.find((s: any) => s.shiftCode === shiftId);
-    if (selectedShift?.startTime && selectedShift?.endTime) {
-      const shiftHrs = computeShiftHours(selectedShift.startTime, selectedShift.endTime);
-      setTotalShiftHours(shiftHrs);
-      if (productionDate && machineId) {
-        setLoadingRemaining(true);
-        dailyPlanService.getAll({ productionDate, machineId, shiftId })
-          .then((res: any) => {
-            let existingPlans: any[] = [];
-            if (Array.isArray(res)) existingPlans = res;
-            else if (Array.isArray(res?.data)) existingPlans = res.data;
-            else if (Array.isArray(res?.data?.dailyPlans)) existingPlans = res.data.dailyPlans;
-            else if (Array.isArray(res?.dailyPlans)) existingPlans = res.dailyPlans;
-
-            const plannedHrsSum = existingPlans
-              .filter((p: any) => p.status !== "CANCELLED" && p.dailyPlanId !== editId)
-              .reduce((sum: number, p: any) => {
-                const loggedHours = Array.isArray(p.hourlyProductions) ? p.hourlyProductions.length : 0;
-                if (p.status === "COMPLETED" || p.status === "STOPPED" || p.status === "SHORT_CLOSED") {
-                  return sum + loggedHours;
-                } else {
-                  return sum + Math.max(Number(p.plannedHours || 0), loggedHours);
-                }
-              }, 0);
-            const remainingHrs = Math.max(0, shiftHrs - plannedHrsSum);
-            setPlannedHours(String(remainingHrs));
-            setAvailableShiftHours(remainingHrs);
+      // Fetch programs for all machines, existing daily plans, and RM issued dates in parallel
+      const [results, dailyPlansRes, issuedDatesArr] = await Promise.all([
+        Promise.all(
+          machines.map((m) =>
+            productionOrderService.getMachinePrograms(m.machineId, weekStart).catch((err) => {
+              console.error(`Failed to load programs for machine ${m.machineId}:`, err);
+              return [] as any[];
+            })
+          )
+        ),
+        // Fetch plans for each day of this week in parallel (backend filters by productionDate)
+        Promise.all(
+          DAY_NAMES.map((_, i) => {
+            const d = addDays(weekStart, i);
+            return dailyPlanService.getAll({ productionDate: d }).catch(() => null);
           })
-          .catch(() => {
-            setPlannedHours(String(shiftHrs));
-            setAvailableShiftHours(shiftHrs);
-          })
-          .finally(() => {
-            setLoadingRemaining(false);
+        ).then((dayResults) => {
+          // Merge all per-day results into one array
+          return dayResults.flatMap((res) => {
+            if (Array.isArray(res)) return res;
+            if (Array.isArray(res?.data)) return res.data;
+            if (Array.isArray(res?.data?.dailyPlans)) return res.data.dailyPlans;
+            if (Array.isArray(res?.dailyPlans)) return res.dailyPlans;
+            return [];
           });
-      } else {
-        setPlannedHours(String(shiftHrs));
-        setAvailableShiftHours(shiftHrs);
-      }
-    } else {
-      setAvailableShiftHours(0);
-      setTotalShiftHours(0);
-    }
-  }, [shiftId, shifts, productionDate, machineId, editId]);
+        }),
+        dailyPlanService.getRmIssuedDates(weekStart).catch(() => []),
+      ]);
 
-  // ── Derived values ───────────────────────────────────────────────────────
-  const allowedMachines = useMemo(() =>
-    (machines || []).filter((m: any) => m.machineId !== "MAC-001")
-    , [machines]);
+      // Flatten and attach machine name (exclude DRAFT status orders)
+      const flat = results.flatMap((items, idx) =>
+        items
+          .filter((item) => item.status?.toUpperCase() !== "DRAFT")
+          .map((item) => ({ ...item, machineId: item.machineId ?? machines[idx].machineId, _machineIdx: idx }))
+      );
 
-  const selectedShiftInfo = useMemo(() =>
-    shifts.find((s: any) => s.shiftCode === shiftId)
-    , [shiftId, shifts]);
+      // Fetch capacity for each order (product+machine) in parallel
+      const capacities = await Promise.all(
+        flat.map((item) =>
+          productCapacityHistoryService
+            .fetchByProductAndMachine(Number(item.productItemId), item.machineId ?? "")
+            .catch(() => null)
+        )
+      );
 
-  const overCapacity = remainingQty !== null && Number(plannedQty) > remainingQty;
+      // Distinct color generator
+      const productColors: Record<string, string> = {};
+      let colorIndex = 0;
+      const getColorForProduct = (key: string) => {
+        if (!productColors[key]) {
+          productColors[key] = CARD_COLORS[colorIndex % CARD_COLORS.length];
+          colorIndex++;
+        }
+        return productColors[key];
+      };
 
-  // ── Submit ───────────────────────────────────────────────────────────────
-  const handleSubmit = async (targetStatus: string) => {
+      const orders: BoardOrder[] = flat.map((item, i) => {
+        const machineName =
+          machines.find((m) => m.machineId === (item.machineId ?? ""))?.machineName ??
+          item.machineId ?? "Unknown";
+        const cap = capacities[i];
+        const capacityPerShift = cap
+          ? Number(cap.newCapacity ?? cap.capacity ?? 1000)
+          : 1000;
 
-    const schema = z.object({
-      weeklyProgramId: z.string().min(1, "Weekly Program is required"),
-      productionDate: z.string().min(1, "Production Date is required"),
-      machineId: z.string().min(1, "Machine is required"),
-      shiftId: z.string().min(1, "Shift is required"),
-      plannedQty: z.coerce.number().positive("Planned Quantity must be greater than 0"),
-      plannedHours: z.coerce.number()
-        .positive("Planned Hours must be greater than 0")
-        .max(availableShiftHours, `Planned Hours cannot exceed available shift hours (${availableShiftHours}h)`)
-        .optional(),
-      selectedOperators: z.array(z.string()).min(1, "Please select at least one operator"),
-    });
-
-    const result = schema.safeParse({
-      weeklyProgramId,
-      productionDate,
-      machineId,
-      shiftId,
-      plannedQty,
-      plannedHours,
-      selectedOperators
-    });
-
-    if (!result.success) {
-      const errors: Record<string, string> = {};
-      result.error.issues.forEach(issue => {
-        const path = issue.path[0] as string;
-        if (!errors[path]) errors[path] = issue.message;
+        return {
+          id:               item.productionOrderId,
+          productName:      item.productName,
+          productCode:      item.productCode,
+          productItemId:    item.productItemId,
+          machineId:        item.machineId ?? "",
+          machineName,
+          targetQty:        item.noOfPcs,
+          producedQty:      item.producedQty ?? 0,
+          plannedElsewhere: item.plannedElsewhere ?? 0,
+          hadPriorPlan:     item.hadPriorPlan ?? false,
+          isOverdue:        item.isOverdue ?? false,
+          capacityPerShift,
+          uom:              item.uom,
+          color:            getColorForProduct(item.productName || item.productionOrderId),
+          status:           item.status,
+          remarks:          item.remarks,
+        };
       });
-      setFormErrors(errors);
+
+      // ── Pre-populate boardMap from existing daily plans for this week ─────
+      // Backend returns: { success, data: { dailyPlans: [...], total, page, limit }, message }
+      // So response.data (= dailyPlansRes) is { success, data: { dailyPlans: [...] } }
+      const passedPlans = (location.state as any)?.existingPlans;
+      const extractPlans = (res: any): any[] => {
+        if (Array.isArray(res)) return res;                           // direct array
+        if (Array.isArray(res?.data)) return res.data;               // { data: [...] }
+        if (Array.isArray(res?.data?.dailyPlans)) return res.data.dailyPlans; // { data: { dailyPlans: [...] } }
+        if (Array.isArray(res?.dailyPlans)) return res.dailyPlans;   // { dailyPlans: [...] }
+        if (Array.isArray(passedPlans)) return passedPlans;
+        return [];
+      };
+      const allDailyPlans: any[] = extractPlans(dailyPlansRes);
+
+      const curWeekDates = DAY_NAMES.map((_, i) => addDays(weekStart, i));
+      const existingWeekPlans = allDailyPlans.filter((p: any) => {
+        const pDate = normalizeDateStr(p.productionDate);
+        return p.status !== "CANCELLED" && curWeekDates.includes(pDate);
+      });
+
+      // Build set of production orders already assigned a plan this week (any day)
+      const poIdsInDailyPlans = new Set<string>();
+      allDailyPlans.forEach((p: any) => {
+        if (p.status !== "CANCELLED" && p.productionOrderId) {
+          poIdsInDailyPlans.add(p.productionOrderId);
+        }
+      });
+
+      const weekPlanPoIds = new Set<string>(existingWeekPlans.map((p: any) => p.productionOrderId).filter(Boolean));
+
+      // Ensure all production orders from existing week plans are included in orders
+      const existingOrderIds = new Set(orders.map((o) => o.id));
+      existingWeekPlans.forEach((plan: any) => {
+        const orderId = plan.productionOrderId;
+        if (orderId && !existingOrderIds.has(orderId)) {
+          existingOrderIds.add(orderId);
+          const po = plan.productionOrder;
+          const pName = po?.productItem?.productName || "Product";
+          const pCode = po?.productItem?.productCode || "";
+          const pItemId = po?.productItemId ? String(po.productItemId) : "";
+          const targetQty = Number(po?.targetQty || plan.plannedQty || 1000);
+          const producedQty = Number(po?.producedQty || 0);
+          const machineObj = machines.find((m) => m.machineId === plan.machineId);
+          const machineName = machineObj?.machineName || plan.machine?.machineName || plan.machineId || "Machine";
+
+          orders.push({
+            id:               orderId,
+            productName:      pName,
+            productCode:      pCode,
+            productItemId:    pItemId,
+            machineId:        plan.machineId || "",
+            machineName,
+            targetQty,
+            producedQty,
+            plannedElsewhere: 0,
+            hadPriorPlan:     false,
+            isOverdue:        false,
+            capacityPerShift: 1000,
+            uom:              po?.uom || "pcs",
+            color:            getColorForProduct(pName || orderId),
+            status:           po?.status || plan.status,
+            remarks:          po?.remarks || plan.remarks || "",
+          });
+        }
+      });
+
+      // Filter available orders:
+      // Keep an order plannable in ANY week — including weeks after the one it
+      // was first scheduled for — as long as its true remaining quantity
+      // (targetQty - producedQty - plannedElsewhere) hasn't hit zero.
+      // Only genuinely finished/closed statuses hide it permanently; being
+      // DAILY_PLANNED/IN_PRODUCTION just means work has started, not that the
+      // target was fully produced, so it must keep resurfacing (carry-forward).
+      const validOrders = orders.filter((o) => {
+        if (weekPlanPoIds.has(o.id)) {
+          return true; // Keep orders currently planned on this week's board
+        }
+        const isFullyDone = Math.max(0, o.targetQty - o.producedQty - o.plannedElsewhere) <= 0;
+        const isTerminalStatus = ["COMPLETED", "READY_FOR_DISPATCH", "CLOSED", "COMPLETED_WITH_SHORTFALL", "CANCELLED", "DISPATCHED"].includes(
+          (o.status || "").toUpperCase()
+        );
+        const isAlreadyAssigned = isFullyDone || isTerminalStatus || poIdsInDailyPlans.has(o.id);
+        return !isAlreadyAssigned;
+      });
+
+      setProductionOrders(validOrders);
+      setRmIssuedDates(new Set((issuedDatesArr || []).map((d: string) => normalizeDateStr(d))));
+
+      if (existingWeekPlans.length > 0) {
+        setIsEditMode(true);
+        const orderSeqMap: Record<string, number> = {};
+        const initialBoardMap: Record<CellKey, CellAssignment> = {};
+
+        // Sort plans chronologically by date and shift
+        const sortedPlans = [...existingWeekPlans].sort((a, b) => {
+          const dateDiff = new Date(normalizeDateStr(a.productionDate)).getTime() - new Date(normalizeDateStr(b.productionDate)).getTime();
+          if (dateDiff !== 0) return dateDiff;
+          const slotA = getShiftSlot(a, shifts);
+          const slotB = getShiftSlot(b, shifts);
+          return (slotA === "DAY" ? 0 : 1) - (slotB === "DAY" ? 0 : 1);
+        });
+
+        sortedPlans.forEach((plan: any) => {
+          const planDate = normalizeDateStr(plan.productionDate);
+          if (!planDate) return;
+          const dayIdx = curWeekDates.indexOf(planDate);
+          if (dayIdx < 0) return;
+          const dayName = DAY_NAMES[dayIdx];
+          const slot: ShiftSlot = getShiftSlot(plan, shifts);
+          const machineId = plan.machineId || plan.machine?.machineId;
+          const orderId = plan.productionOrderId;
+          const order = orders.find((o) => o.id === orderId);
+          const pName = plan.productionOrder?.productItem?.productName || order?.productName || "Product";
+
+          const k = cellKey(machineId, dayName, slot);
+          orderSeqMap[orderId] = (orderSeqMap[orderId] || 0) + 1;
+
+          initialBoardMap[k] = {
+            orderId,
+            productName: pName,
+            qty: Number(plan.plannedQty || 0),
+            targetQty: Number(plan.productionOrder?.targetQty || order?.targetQty || 0),
+            color: order?.color || getColorForProduct(pName || orderId),
+            seqNo: orderSeqMap[orderId],
+          };
+        });
+
+        setBoardMap(initialBoardMap);
+      } else {
+        setIsEditMode(false);
+        setBoardMap({});
+      }
+    } catch (err) {
+      console.error("Failed to load machine programs:", err);
+      toast.error("Failed to load production orders for this week");
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, [machines, weekStart, shifts, location.state]);
+
+  useEffect(() => {
+    if (machines.length) loadOrders();
+  }, [loadOrders, machines.length]);
+
+  // ── Derived: per-order allocation totals ─────────────────────────────────
+  const orderStats = useMemo(() => {
+    const stats: Record<string, { allocatedQty: number; seqCount: number }> = {};
+    productionOrders.forEach((o) => { stats[o.id] = { allocatedQty: 0, seqCount: 0 }; });
+    Object.values(boardMap).forEach((cell) => {
+      if (stats[cell.orderId]) {
+        stats[cell.orderId].allocatedQty += cell.qty;
+        stats[cell.orderId].seqCount     += 1;
+      }
+    });
+    return stats;
+  }, [boardMap, productionOrders]);
+
+  // Outstanding quantity regardless of week — target minus everything actually
+  // produced (any week, real hourly logs) minus whatever's still committed to
+  // OTHER weeks' active plans. This is the cap auto-fill (drag/drop, swap) must
+  // never exceed — using raw order.targetQty there would re-plan quantity
+  // that's already produced or already scheduled elsewhere.
+  const trueRemainingFor = useCallback((order: BoardOrder) => {
+    return Math.max(0, order.targetQty - order.producedQty - order.plannedElsewhere);
+  }, []);
+
+  // Same, minus whatever's freshly placed on THIS week's board — this is the
+  // live "Rem" figure shown on each Program List card.
+  const remainingFor = useCallback((order: BoardOrder) => {
+    const allocatedQty = orderStats[order.id]?.allocatedQty ?? 0;
+    return Math.max(0, trueRemainingFor(order) - allocatedQty);
+  }, [orderStats, trueRemainingFor]);
+
+  // "Carried forward" is a look-ahead indicator only — it must never appear
+  // while planning the CURRENT (or a past) week, only when looking at a week
+  // that comes after today's real date. Whatever's overdue is just "this
+  // week's work" until you actually move past today into a future week.
+  const isFutureWeek = weekStart > getTodayMonday();
+
+  // Within a future week, an order counts as "carried forward" if:
+  //  - it already has real progress (produced, or still committed to another
+  //    week's active plan), OR
+  //  - it genuinely had a plan dated before the week being viewed
+  //    (hadPriorPlan — real DailyProductionPlan history), OR
+  //  - its own originally-scheduled window has fully elapsed against TODAY's
+  //    real date with nothing done (isOverdue).
+  // Deliberately not just "order.weekStartDate < the week on screen" — that
+  // false-positived on brand-new orders being viewed in their own first week.
+  const isCarriedForward = useCallback((order: BoardOrder) => {
+    if (!isFutureWeek) return false;
+    return order.producedQty > 0 || order.plannedElsewhere > 0 || order.hadPriorPlan || order.isOverdue;
+  }, [isFutureWeek]);
+
+  // ── Day dates ────────────────────────────────────────────────────────────
+  const dayDates = useMemo(() => {
+    const obj = {} as Record<DayName, string>;
+    DAY_NAMES.forEach((d, i) => { obj[d] = addDays(weekStart, i); });
+    return obj;
+  }, [weekStart]);
+
+  // ── Day filter ───────────────────────────────────────────────────────────
+  const filteredDays: readonly DayName[] = selectedDay === "ALL"
+    ? DAY_NAMES
+    : [selectedDay as DayName];
+
+  // ── Machine groups for right panel ───────────────────────────────────────
+  const machineGroups = useMemo(() => {
+    const groups: Record<string, { machine: { machineId: string; machineName: string }; orders: BoardOrder[] }> = {};
+    machines.forEach((m) => { groups[m.machineId] = { machine: m, orders: [] }; });
+    productionOrders.forEach((o) => {
+      if (groups[o.machineId]) {
+        groups[o.machineId].orders.push(o);
+      } else {
+        groups[o.machineId] = {
+          machine: { machineId: o.machineId, machineName: o.machineName },
+          orders: [o],
+        };
+      }
+    });
+    return Object.values(groups).filter((g) => g.orders.length > 0);
+  }, [machines, productionOrders]);
+
+  const displayedMachineGroups = useMemo(() =>
+    selectedMachineFilter === "ALL"
+      ? machineGroups
+      : machineGroups.filter((g) => g.machine.machineId === selectedMachineFilter),
+    [machineGroups, selectedMachineFilter]
+  );
+
+  // ── Drag handlers ─────────────────────────────────────────────────────────
+
+  const handleDragEnter = (_machineId: string, key: CellKey) => (e: React.DragEvent) => {
+    e.preventDefault();
+    setHoverKey(key);
+  };
+
+  const handleDragOver = (machineId: string, key: CellKey) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const draggingOrder = productionOrders.find((o) => o.id === draggingId);
+    if (draggingOrder && draggingOrder.machineId !== machineId) {
+      e.dataTransfer.dropEffect = "none";
+    } else {
+      e.dataTransfer.dropEffect = "move";
+    }
+    if (hoverKey !== key) setHoverKey(key);
+  };
+
+  const handleDragLeave = (key: CellKey) => (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (hoverKey === key) setHoverKey("");
+  };
+
+  const handleDrop = (machineId: string, day: DayName, shift: ShiftSlot) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const orderId = e.dataTransfer.getData("orderId") || e.dataTransfer.getData("text/plain") || draggingId;
+    const order   = productionOrders.find((o) => o.id === orderId);
+    if (!order) { setHoverKey(""); setDraggingId(""); return; }
+
+    if (order.machineId !== machineId) {
+      const targetMachineName = machines.find((m) => m.machineId === machineId)?.machineName ?? machineId;
+      toast.error(
+        `"${order.productName}" belongs to ${order.machineName}. Cannot assign to ${targetMachineName}.`,
+        { position: "top-right", autoClose: 3500 }
+      );
+      setHoverKey(""); setDraggingId(""); return;
+    }
+
+    const targetKey        = cellKey(machineId, day, shift);
+    const targetAssignment = boardMap[targetKey];
+    const targetOrderId    = targetAssignment?.orderId;
+
+    // Helper: check if an order has any locked cells (RM issued dates)
+    const hasLockedCells = (oid: string) =>
+      Object.keys(boardMap).some((k) => {
+        if (boardMap[k as CellKey]?.orderId !== oid) return false;
+        const [, d] = k.split("__");
+        const cd = dayDates[d as DayName];
+        return Boolean(cd && rmIssuedDates.has(cd));
+      });
+
+    // ── SWAP ─────────────────────────────────────────────────────────────
+    if (targetOrderId && targetOrderId !== order.id) {
+      const targetOrder = productionOrders.find((o) => o.id === targetOrderId);
+
+      // Block swap when either side has locked cells — swap moves the whole order
+      if (hasLockedCells(order.id)) {
+        toast.error(
+          `Cannot swap: "${order.productName}" has locked shifts (RM already issued).`,
+          { position: "top-right", autoClose: 3500 }
+        );
+        setHoverKey(""); setDraggingId(""); return;
+      }
+      if (hasLockedCells(targetOrderId)) {
+        toast.error(
+          `Cannot swap: "${targetOrder?.productName || targetOrderId}" has locked shifts (RM already issued).`,
+          { position: "top-right", autoClose: 3500 }
+        );
+        setHoverKey(""); setDraggingId(""); return;
+      }
+
+      const sortByCellOrder = (a: string, b: string) => {
+        const [, dA, sA] = a.split("__");
+        const [, dB, sB] = b.split("__");
+        return (
+          CELL_ORDER.findIndex((c) => c.day === dA && c.shift === sA) -
+          CELL_ORDER.findIndex((c) => c.day === dB && c.shift === sB)
+        );
+      };
+
+      const sourceCells = Object.keys(boardMap).filter((k) => boardMap[k as CellKey]?.orderId === order.id).sort(sortByCellOrder);
+      const targetCells = Object.keys(boardMap).filter((k) => boardMap[k as CellKey]?.orderId === targetOrderId).sort(sortByCellOrder);
+
+      const targetStartKey   = targetCells[0] || targetKey;
+      const [, tStartDay, tStartShift] = targetStartKey.split("__");
+      const sourceStartKey   = sourceCells[0];
+      const sourceStartDay   = sourceStartKey ? (sourceStartKey.split("__")[1] as DayName)   : null;
+      const sourceStartShift = sourceStartKey ? (sourceStartKey.split("__")[2] as ShiftSlot) : null;
+
+      const nextMap = { ...boardMap };
+      Object.keys(nextMap).forEach((k) => {
+        const oid = nextMap[k as CellKey]?.orderId;
+        if (oid === order.id || oid === targetOrderId) delete nextMap[k as CellKey];
+      });
+
+      const srcStartIdx = CELL_ORDER.findIndex((c) => c.day === tStartDay && c.shift === tStartShift);
+      let srcRem = trueRemainingFor(order); let srcSeq = 1;
+      for (let i = 0; i < CELL_ORDER.length && srcRem > 0; i++) {
+        const { day: d, shift: s } = CELL_ORDER[(srcStartIdx + i) % CELL_ORDER.length];
+        const k = cellKey(machineId, d, s);
+        if (nextMap[k]) continue;
+        const qty = Math.min(srcRem, order.capacityPerShift);
+        nextMap[k] = { orderId: order.id, productName: order.productName, qty, targetQty: order.targetQty, color: order.color, seqNo: srcSeq++ };
+        srcRem -= qty;
+      }
+
+      if (targetOrder) {
+        let tgtStartIdx = 0;
+        if (sourceStartDay && sourceStartShift) {
+          tgtStartIdx = CELL_ORDER.findIndex((c) => c.day === sourceStartDay && c.shift === sourceStartShift);
+          if (tgtStartIdx === -1) tgtStartIdx = 0;
+        } else {
+          const firstEmpty = CELL_ORDER.findIndex((c) => !nextMap[cellKey(machineId, c.day, c.shift)]);
+          tgtStartIdx = firstEmpty !== -1 ? firstEmpty : 0;
+        }
+        let tgtRem = trueRemainingFor(targetOrder); let tgtSeq = 1;
+        for (let i = 0; i < CELL_ORDER.length && tgtRem > 0; i++) {
+          const { day: d, shift: s } = CELL_ORDER[(tgtStartIdx + i) % CELL_ORDER.length];
+          const k = cellKey(machineId, d, s);
+          if (nextMap[k]) continue;
+          const qty = Math.min(tgtRem, targetOrder.capacityPerShift);
+          nextMap[k] = { orderId: targetOrder.id, productName: targetOrder.productName, qty, targetQty: targetOrder.targetQty, color: targetOrder.color, seqNo: tgtSeq++ };
+          tgtRem -= qty;
+        }
+      }
+
+      setBoardMap(nextMap); setHoverKey(""); setDraggingId("");
+      if (targetOrder) toast.info(`Swapped: "${order.productName}" ⇄ "${targetOrder.productName}"`, { autoClose: 2000 });
       return;
     }
 
-    if (selectedOperators.length === 0 && assignmentError) {
-      setSubmitError(assignmentError);
-      toast.error(assignmentError);
+    // ── Normal drop / re-position ─────────────────────────────────────────
+    const nextMap = { ...boardMap };
+    // Preserve locked cells (RM issued dates); only remove unlocked cells of this order
+    Object.keys(nextMap).forEach((k) => {
+      if (nextMap[k as CellKey]?.orderId !== order.id) return;
+      const [, d] = k.split("__");
+      const cd = dayDates[d as DayName];
+      if (!rmIssuedDates.has(cd)) delete nextMap[k as CellKey];
+    });
+
+    // Subtract already-locked qty so we only fill the remaining unissued portion
+    let lockedQty = 0;
+    let lockedSeqCount = 0;
+    Object.keys(nextMap).forEach((k) => {
+      if (nextMap[k as CellKey]?.orderId !== order.id) return;
+      lockedQty += nextMap[k as CellKey]?.qty || 0;
+      lockedSeqCount++;
+    });
+
+    let remaining = Math.max(0, trueRemainingFor(order) - lockedQty);
+    const startIdx = CELL_ORDER.findIndex((c) => c.day === day && c.shift === shift);
+    if (startIdx === -1) { setHoverKey(""); setDraggingId(""); return; }
+
+    const toFill: { key: CellKey; qty: number; seqNo: number }[] = [];
+    let seqNo = lockedSeqCount + 1;  // continue numbering after locked shifts
+    for (let i = startIdx; i < CELL_ORDER.length && remaining > 0; i++) {
+      const { day: d, shift: s } = CELL_ORDER[i];
+      const k = cellKey(machineId, d, s);
+      if (nextMap[k]) continue;
+      const qty = Math.min(remaining, order.capacityPerShift);
+      toFill.push({ key: k, qty, seqNo: seqNo++ });
+      remaining -= qty;
+    }
+
+    if (toFill.length === 0) {
+      if (remaining > 0) toast.warning("No available shift slots from this cell.");
+      setHoverKey(""); setDraggingId(""); return;
+    }
+
+    toFill.forEach(({ key: k, qty, seqNo: seq }) => {
+      nextMap[k] = { orderId: order.id, productName: order.productName, qty, targetQty: order.targetQty, color: order.color, seqNo: seq };
+    });
+    setBoardMap(nextMap); setHoverKey(""); setDraggingId("");
+  };
+
+  const handleClearOrderGroup = (orderId: string) => {
+    let hadLocked = false;
+    setBoardMap((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        if (next[k as CellKey].orderId !== orderId) return;
+        const [, d] = k.split("__");
+        const cellDate = dayDates[d as DayName];
+        if (rmIssuedDates.has(cellDate)) {
+          hadLocked = true; // keep locked cells intact
+        } else {
+          delete next[k as CellKey];
+        }
+      });
+      return next;
+    });
+    if (hadLocked) {
+      toast.warning("Some shifts are locked (RM already issued) and cannot be removed.", { autoClose: 3000 });
+    }
+    if (hoveredOrderId === orderId) setHoveredOrderId("");
+  };
+
+  const handleClear = (key: CellKey) => {
+    // Safety guard: locked cells should never reach here (DropCell hides the X button),
+    // but we double-check to prevent bypassing the lock via keyboard or other means.
+    const [, d] = key.split("__");
+    const cellDate = dayDates[d as DayName];
+    if (rmIssuedDates.has(cellDate)) {
+      toast.warning("This shift is locked — Raw Material has already been issued.", { autoClose: 3000 });
+      return;
+    }
+    const targetOrderId = boardMap[key]?.orderId;
+    if (targetOrderId) {
+      handleClearOrderGroup(targetOrderId);
+    } else {
+      setBoardMap((prev) => { const next = { ...prev }; delete next[key]; return next; });
+    }
+  };
+
+  const handleReset = () => {
+    setBoardMap((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        const [, d] = k.split("__");
+        const cellDate = dayDates[d as DayName];
+        if (!rmIssuedDates.has(cellDate)) delete next[k as CellKey];
+      });
+      return next;
+    });
+    setHoveredOrderId("");
+  };
+
+  // ── Save / Confirm ────────────────────────────────────────────────────────
+
+  // Map board slot "DAY"/"NIGHT" → real shift codes from DB
+  const getShiftId = useCallback((slotCode: ShiftSlot): string => {
+    if (!shifts.length) return slotCode;
+    return slotCode === "DAY"
+      ? (shifts[0]?.shiftCode ?? slotCode)
+      : (shifts[1]?.shiftCode ?? shifts[0]?.shiftCode ?? slotCode);
+  }, [shifts]);
+
+  const buildPlanItems = useCallback(() => {
+    return Object.entries(boardMap).map(([key, cell]) => {
+      const parts     = key.split("__");
+      const machineId = parts[0];
+      const dayName   = parts[1] as DayName;
+      const slotCode  = parts[2] as ShiftSlot;
+      const date      = dayDates[dayName];
+      return {
+        productionOrderId: cell.orderId,
+        machineId,
+        shiftId:           getShiftId(slotCode),
+        productionDate:    date,
+        plannedQty:        cell.qty,
+      };
+    });
+  }, [boardMap, dayDates, getShiftId]);
+
+  const handleSave = async (status: "DRAFT" | "PLANNED") => {
+    const items = buildPlanItems();
+    if (items.length === 0 && !isEditMode) {
+      toast.warning("No shifts assigned. Drag production orders onto the grid first.");
       return;
     }
 
-    // Allow overproduction, so we removed the overCapacity block
-
-    setFormErrors({});
-
-    setSubmitError(null);
     setIsSubmitting(true);
     try {
-      const payload = {
-        weeklyProgramId,
-        productionDate,
-        machineId,
-        shiftId,
-        plannedQty: Number(plannedQty),
-        plannedHours: Number(plannedHours) || null,
-        priority,
-        status: targetStatus,
-        remarks: remarks.trim() || null,
-        productionOrderId: selectedWeeklyProg?.productionOrderId,
-        carryForwardFromPlanId: carryForwardFromPlanId || null,
-        selectedOperatorIds: selectedOperators.join(","),
-      };
-
-      if (isEdit && editId) {
-        await dispatch(updateDailyPlan({ id: editId, data: payload })).unwrap();
-        toast.success("Daily Production Plan updated successfully!");
-      } else {
-        const created = await dispatch(createDailyPlan(payload)).unwrap();
-        const planId = created?.data?.dailyPlanId || created?.dailyPlanId || "New Plan";
-        const machineName = (machines || []).find((m: any) => m.machineId === machineId)?.machineName || machineId;
-        const shiftName = shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId;
-        toast.success(
-          ` Plan ${planId} created!\n ${productionDate}   ${machineName}   ${shiftName} ${plannedQty} pcs`,
-          { autoClose: 6000 }
-        );
-        // Rich reminder notification
-        setTimeout(() => {
-          toast.info(
-            ` Reminder: Plan ${planId} is scheduled for ${productionDate} on ${machineName} (${shiftName}). Target: ${plannedQty} pcs. Don't forget to start production and log hourly entries!`,
-            { autoClose: 10000, toastId: `reminder-${planId}` }
-          );
-        }, 1200);
-      }
-      setIsDirty(false);
-      if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
-      if (isEdit) {
-        navigate(-1);
-      } else {
-        setWeeklyProgramId("");
-        setMachineId("");
-        setShiftId("");
-        setPlannedQty("");
-        setPlannedHours("");
-        setRemarks("");
-        setSelectedOperators([]);
-        setFormErrors({});
-        setSubmitError(null);
-        setTimeout(() => {
-          document.querySelector<HTMLElement>('[data-nav]:not([disabled])')?.focus();
-        }, 50);
-      }
+      await dailyPlanService.bulkCreate({ items, status, weekStart });
+      toast.success(
+        items.length === 0
+          ? "Plan cleared successfully."
+          : status === "PLANNED"
+          ? `${items.length} shift(s) confirmed and planned!`
+          : `${items.length} shift(s) saved as draft.`
+      );
+      navigate("/daily-machine-planning");
     } catch (err: any) {
-      let errMsg = "Failed to save daily plan";
-      if (err?.data?.message) {
-        errMsg = err.data.message;
-      } else if (err?.message) {
-        errMsg = err.message;
-      } else if (typeof err === "string") {
-        errMsg = err;
-      }
-      setSubmitError(errMsg);
-      toast.error(errMsg);
+      toast.error(err?.response?.data?.message || "Failed to save plan. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  useFormShortcuts({ onSave: () => handleSave("PLANNED") });
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const totalPlanned   = Object.keys(boardMap).length;
+  const totalShifts    = machines.length * 12;
+  const fullyDone      = productionOrders.filter((o) => remainingFor(o) <= 0).length;
+  const hasUnallocated = productionOrders.some((o) => remainingFor(o) > 0);
+  const carriedForwardCount = productionOrders.filter(
+    (o) => remainingFor(o) > 0 && isCarriedForward(o)
+  ).length;
+
+  const planStatus: PlanStatus =
+    totalPlanned === 0 ? "draft" :
+    productionOrders.length > 0 && fullyDone === productionOrders.length ? "ready" :
+    "in-progress";
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="w-full max-w-[1024px] xl:mr-auto">
-    <form ref={formRef} onKeyDown={handleFormKeyDown} onInput={() => setIsDirty(true)} onChange={() => setIsDirty(true)} onSubmit={(e) => e.preventDefault()} data-escape-guarded className="bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 px-4 py-3 border-b border-line">
-        <div>
-          <h2 className="text-xl font-bold text-ink">
-            {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
-          </h2>
+    <div
+      className="w-full flex flex-col overflow-hidden bg-card rounded-xl border border-line shadow-xs"
+      style={{ height: "calc(100vh - 130px)", minHeight: "560px" }}
+    >
+      {/* ══ PAGE HEADER ════════════════════════════════════════════════════════ */}
+      <div className="bg-card border-b border-line px-5 pt-3 pb-3 shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-[16px] font-bold text-ink leading-tight">
+                  {isEditMode ? "Edit Daily Production Plan" : "Daily Production Plan"}
+                </h1>
+                {isEditMode && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    Editing Week: {shortDate(weekStart)} – {shortDate(weekEnd)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center shrink-0">
+            <BackButton onClick={() => navigate("/daily-machine-planning")} />
+          </div>
         </div>
-        <BackButton
-          text="Back to Daily Planning"
-          onClick={handleBackClick}
-        />
       </div>
 
-      {submitError && (
-        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
-          <FaExclamationTriangle className="text-red-400" size={20} />
-          <div>
-            <p className="font-bold text-red-400 text-sm">Failed to Save Plan</p>
-            <p className="text-red-300 text-xs">{submitError}</p>
-          </div>
+      {/* ─── Controls Bar ─── */}
+      <div className="px-4 pt-2 pb-3 border-b border-line-soft space-y-2 shrink-0">
+        <div className="flex items-center gap-1 text-[12px]">
+          <span className="font-semibold text-ink">{shortDate(weekStart)}</span>
+          <span className="text-ink-muted px-1">–</span>
+          <span className="font-semibold text-ink">{shortDate(weekEnd)}</span>
+          <span className="text-[10.5px] text-ink-muted ml-1">· Mon – Sat</span>
         </div>
-      )}
 
-      {assignmentError && (
-        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
-          <FaExclamationTriangle className="text-red-400" size={20} />
-          <div>
-            <p className="font-bold text-red-400 text-sm">Assignment Validation Failed</p>
-            <p className="text-red-300 text-xs">{assignmentError}</p>
-          </div>
+        {/* ── Day filter pills ─────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setSelectedDay("ALL")}
+            className={`px-2 py-0.5 text-[9.5px] font-semibold rounded transition-all shrink-0 cursor-pointer ${
+              selectedDay === "ALL"
+                ? "bg-primary text-white shadow-xs"
+                : "bg-card text-ink-muted hover:text-ink hover:bg-card-2 border border-line"
+            }`}
+          >
+            All Days
+          </button>
+          {DAY_NAMES.map((day) => (
+            <button
+              key={day}
+              type="button"
+              onClick={() => setSelectedDay(day)}
+              className={`px-2 py-0.5 text-[9.5px] font-semibold rounded transition-all shrink-0 cursor-pointer ${
+                selectedDay === day
+                  ? "bg-primary text-white shadow-xs"
+                  : "bg-card text-ink-muted hover:text-ink hover:bg-card-2 border border-line"
+              }`}
+            >
+              {day.slice(0, 3)} {Number(dayDates[day]?.split("-")[2] || 0)}
+            </button>
+          ))}
         </div>
-      )}
 
-      {/* ── Carry Forward Banner ──────────────────────────── */}
-      {carryForwardFromPlanId && (
-        <div className="mx-6 mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
-          <FaArrowLeft className="text-amber-400 rotate-180" size={18} />
-          <div>
-            <p className="font-bold text-amber-400 text-sm">Carry Forward from {carryForwardFromPlanId}</p>
-            {carryForwardFromInfo && (
-              <p className="text-amber-300 text-xs">
-                {carryForwardFromInfo.shiftName || carryForwardFromInfo.shiftId} — {carryForwardFromInfo.productionDate ? formatDate(carryForwardFromInfo.productionDate) : ""}
-              </p>
-            )}
-            <p className="text-amber-300 text-xs mt-0.5">The remaining quantity from plan <strong>{carryForwardFromPlanId}</strong> has been pre-filled below.</p>
-          </div>
+        <div className="flex items-center justify-between text-[11px]">
+          {loadingOrders ? (
+            <span className="text-ink-muted flex items-center gap-1.5">
+              <FaSpinner className="animate-spin" size={10} /> Loading programs…
+            </span>
+          ) : (
+            <span className="text-ink-muted">
+              <strong className="text-ink">{productionOrders.length}</strong> orders · {" "}
+              <strong className="text-primary">{totalPlanned}</strong>
+              <span className="text-ink-muted font-normal">/{totalShifts}</span> shifts filled
+            </span>
+          )}
+
+          {carriedForwardCount > 0 && (
+            <span
+              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"
+              title="Production orders on this board with quantity carried forward from another week"
+            >
+              <FaHistory size={9} />
+              {carriedForwardCount} Carried Forward
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
+      {/* ══ MAIN CONTENT ═══════════════════════════════════════════════════════ */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-      {/* ─── Form Body ─── */}
-      <div className="p-3 lg:p-4 space-y-3">
+        {/* ── LEFT: Planning Grid ──────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 overflow-auto">
+          {machines.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-ink-muted text-sm">
+              <FaSpinner className="animate-spin mr-2" /> Loading machines…
+            </div>
+          ) : (
+            <table
+              className="border-collapse table-fixed"
+              style={{ minWidth: filteredDays.length === 1 ? "400px" : "900px", width: "100%" }}
+            >
+              <colgroup>
+                <col style={{ width: filteredDays.length === 1 ? "18%" : "9%" }} />
+                {Array.from({ length: filteredDays.length * 2 }).map((_, i) => (
+                  <col key={i} style={{ width: `${(filteredDays.length === 1 ? 82 : 91) / (filteredDays.length * 2)}%` }} />
+                ))}
+              </colgroup>
+              <thead className="sticky top-0 z-20">
+                <tr>
+                  <th rowSpan={2} className="bg-card-2 border border-line px-2 py-2 text-left align-middle">
+                    <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">Machine</span>
+                  </th>
+                  {filteredDays.map((day) => (
+                    <th key={day} colSpan={2} className="bg-card-2 border border-line px-1 py-1.5 text-center">
+                      <div className="text-[11px] font-bold text-ink leading-tight">{day}</div>
+                      <div className="text-[9px] text-primary font-semibold mt-0.5">{shortDate(dayDates[day])}</div>
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  {filteredDays.flatMap((day) =>
+                    SHIFT_SLOTS.map(({ code, label }) => (
+                      <th key={`${day}-${code}`} className="bg-card-2 border border-line px-1 py-1 text-center">
+                        <span className="text-[10.5px] font-bold text-ink">{label}</span>
+                      </th>
+                    ))
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {machines.map(({ machineId, machineName }, rowIdx) => {
+                  const draggingOrder   = productionOrders.find((o) => o.id === draggingId);
+                  const isTargetMachine = draggingOrder?.machineId === machineId;
+                  const isOtherMachine  = Boolean(draggingOrder) && !isTargetMachine;
 
-        {/* Section 1: Weekly Program */}
-        <div>
-          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-2">Weekly Program</h6>
-          <SelectInput
-            label="Weekly Program"
-            required
-            disabled={isEdit || !!(location.state as any)?.weeklyProgramId}
-            value={weeklyProgramId}
-            onChange={(e: any) => { setWeeklyProgramId(e.target.value); setIsDirty(true); }}
-            error={formErrors.weeklyProgramId}
-            defaultOptionLabel="— Select Weekly Program —"
-            horizontal
-            data-nav
-            options={weeklyPrograms.map((wp: any) => {
-              const po = wp.productionOrder;
-              const poTargetQty = Number(wp.poTargetQty ?? po?.targetQty ?? 0);
-              const poProducedRaw = Number(wp.poProducedQty ?? po?.producedQty ?? 0);
-              const poRejectedQty = Number(po?.rejectedQty ?? 0);
-              const poScrapQty = Number(po?.scrapQty ?? 0);
-              const poNetProduced = Math.max(0, poProducedRaw - poRejectedQty - poScrapQty);
-              const poRemaining = Math.max(0, poTargetQty - poNetProduced);
-              const displayQty = poRemaining;
-              const productName = po?.productItem?.productName || "";
-              let tagNode: React.ReactNode = null;
-              if (wp._poRemaining !== undefined) {
-                tagNode = <span className="text-amber-400 font-semibold">REMAINING: {wp._poRemaining} pcs</span>;
-              } else if (wp._isBacklog) {
-                tagNode = <span className="text-orange-400 font-semibold">PENDING FROM PREVIOUS WEEK</span>;
-              }
-              return {
-                value: wp.weeklyProgramId,
-                selectedLabel: `${productName} — ${displayQty} pcs`,
-                label: <span>{productName} — {displayQty} pcs{tagNode ? <span className="ml-2">{tagNode}</span> : null}</span>
-              };
-            })}
-          />
+                  const filledCells = DAY_NAMES.flatMap((d) =>
+                    SHIFT_SLOTS.map(({ code }) => cellKey(machineId, d, code as ShiftSlot))
+                  ).filter((k) => boardMap[k]).length;
+                  const utilPct = Math.round((filledCells / 12) * 100);
 
-          {/* Auto-filled info banner */}
-          {selectedWeeklyProg && (
-            <div className="rounded-xl p-2 mt-2 bg-emerald-500/10 border border-emerald-500/20 text-ink">
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
-                <div>
-                  <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">Production Order</div>
-                  <div className="font-bold text-ink text-sm">{selectedWeeklyProg.productionOrderId}</div>
+                  const rowBg = rowIdx % 2 === 0 ? "var(--card)" : "color-mix(in srgb, var(--card) 65%, transparent)";
+
+                  return (
+                    <tr
+                      key={machineId}
+                      className={[
+                        "transition-colors duration-150",
+                        isTargetMachine ? "outline outline-1 outline-primary/30 bg-primary/3" : "",
+                        isOtherMachine  ? "opacity-30" : "",
+                      ].filter(Boolean).join(" ")}
+                    >
+                      <td className="border border-line px-2 py-1.5 align-middle" style={{ background: rowBg }}>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="text-[12px] font-bold text-ink leading-none truncate">{machineName}</span>
+                          {isTargetMachine && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />}
+                        </div>
+                        <div className="mt-1.5 h-[2px] w-full bg-line-soft rounded-full overflow-hidden">
+                          <div className="h-full bg-primary/50 rounded-full transition-all duration-500" style={{ width: `${utilPct}%` }} />
+                        </div>
+                        <div className="text-[8.5px] text-ink-muted mt-0.5 tabular-nums">{filledCells}/12 shifts</div>
+                      </td>
+                      {filteredDays.flatMap((day) =>
+                        SHIFT_SLOTS.map(({ code }) => {
+                          const key        = cellKey(machineId, day, code as ShiftSlot);
+                          const assignment = boardMap[key] ?? null;
+                          const isGroupHov = !!(assignment && hoveredOrderId === assignment.orderId);
+                          const cellDate   = dayDates[day];
+                          const isLocked   = rmIssuedDates.has(cellDate);
+                          return (
+                            <td
+                              key={key}
+                              className="border border-line p-1 align-top overflow-hidden"
+                              style={{ background: rowBg }}
+                              title={isLocked ? "🔒 Raw Material has been issued — this shift is locked and cannot be changed" : undefined}
+                            >
+                              <DropCell
+                                assignment={assignment}
+                                isOver={hoverKey === key}
+                                isGroupHovered={isGroupHov}
+                                draggingOrderId={draggingId}
+                                isMachineMatch={!draggingId || isTargetMachine}
+                                isLocked={isLocked}
+                                onDragEnter={handleDragEnter(machineId, key)}
+                                onDragOver={handleDragOver(machineId, key)}
+                                onDrop={handleDrop(machineId, day, code as ShiftSlot)}
+                                onDragLeave={handleDragLeave(key)}
+                                onClear={() => handleClear(key)}
+                                onMouseEnter={() => assignment && setHoveredOrderId(assignment.orderId)}
+                                onMouseLeave={() => setHoveredOrderId("")}
+                                onDragStartAssignment={setDraggingId}
+                                onDragEndAssignment={() => { setDraggingId(""); setHoverKey(""); }}
+                              />
+                            </td>
+                          );
+                        })
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* ── RIGHT: Program List Panel ─────────────────────────────────────── */}
+        <div className="w-[300px] shrink-0 border-l border-line bg-card flex flex-col overflow-y-auto">
+          <div className="sticky top-0 z-10 bg-card-2 border-b border-line px-3 py-2.5 shrink-0 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-bold text-ink uppercase tracking-wider">Program List</div>
+                <div className="text-[10px] text-ink-muted mt-0.5 tabular-nums">
+                  {loadingOrders ? "Loading…" : `${fullyDone} of ${productionOrders.length} completed`}
                 </div>
-                <div>
-                  <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">Product</div>
-                  <div className="text-sm font-bold text-ink">{selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">PO Target Qty</div>
-                  <div className="font-bold text-ink text-sm">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
-                </div>
-                <div>
-                  <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">Remaining</div>
-                  {(() => {
-                    const tgt = Number(selectedWeeklyProg.productionOrder?.targetQty || 0);
-                    const produced = Math.max(0, Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0) - Number(selectedWeeklyProg.productionOrder?.scrapQty || 0));
-                    const rem = Math.max(0, tgt - produced);
-                    return <div className={`font-bold text-sm ${rem <= 0 ? "text-red-400" : "text-emerald-400"}`}>{rem} pcs</div>;
-                  })()}
-                </div>
-                <div>
-                  <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">Produced</div>
-                  <div className="font-bold text-ink text-sm">{Math.max(0, Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0) - Number(selectedWeeklyProg.productionOrder?.scrapQty || 0))} pcs</div>
-                </div>
-                {machineId && machineProductCapacity != null && (
-                  <div>
-                    <div className="text-ink-subtle text-[10px] font-bold uppercase mb-0.5">Capacity/Shift</div>
-                    <div className="font-bold text-ink text-sm">{machineProductCapacity.toLocaleString()}</div>
+              </div>
+              {!loadingOrders && productionOrders.length > 0 && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  fullyDone === productionOrders.length
+                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                    : "bg-primary/10 text-primary border border-primary/20"
+                }`}>
+                  {Math.round((fullyDone / productionOrders.length) * 100)}%
+                </span>
+              )}
+            </div>
+
+            {/* Machine filter pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+              <button
+                type="button"
+                onClick={() => setSelectedMachineFilter("ALL")}
+                className={`px-2 py-0.5 text-[9.5px] font-semibold rounded transition-all shrink-0 cursor-pointer ${
+                  selectedMachineFilter === "ALL"
+                    ? "bg-primary text-white shadow-xs"
+                    : "bg-card text-ink-muted hover:text-ink hover:bg-card-2 border border-line"
+                }`}
+              >
+                All ({productionOrders.length})
+              </button>
+              {machineGroups.map(({ machine, orders }) => (
+                <button
+                  key={machine.machineId}
+                  type="button"
+                  onClick={() => setSelectedMachineFilter(machine.machineId)}
+                  className={`px-2 py-0.5 text-[9.5px] font-semibold rounded transition-all shrink-0 cursor-pointer ${
+                    selectedMachineFilter === machine.machineId
+                      ? "bg-primary text-white shadow-xs"
+                      : "bg-card text-ink-muted hover:text-ink hover:bg-card-2 border border-line"
+                  }`}
+                >
+                  {machine.machineName.split(" ")[0]} ({orders.length})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Loader */}
+          {loadingOrders && (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-ink-muted text-xs">
+              <FaSpinner className="animate-spin text-primary" size={20} />
+              <span>Loading programs for this week…</span>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loadingOrders && productionOrders.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-ink-muted text-xs px-4 text-center">
+              <FaCalendarAlt size={24} className="opacity-30" />
+              <span>No production orders found for this week.</span>
+              <span className="text-[10px] opacity-60">Go to Production Orders and create orders with a machine assigned to see them here.</span>
+            </div>
+          )}
+
+          {/* Machine sections */}
+          {!loadingOrders && (
+            <div className="p-3 flex flex-col gap-3">
+              {displayedMachineGroups.map(({ machine, orders }) => {
+                const machineDone = orders.filter((o) => remainingFor(o) <= 0).length;
+                const allDone = machineDone === orders.length;
+                return (
+                  <div key={machine.machineId} className="bg-card-2/60 border border-line rounded-xl overflow-hidden shadow-xs flex flex-col">
+                    <div className={`flex items-center justify-between px-3 py-2 shrink-0 border-b border-line ${allDone ? "bg-emerald-500/10" : "bg-card-2"}`}>
+                      <span className={`text-[11.5px] font-bold ${allDone ? "text-emerald-400" : "text-ink"}`}>
+                        {machine.machineName}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        allDone
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-primary/10 text-primary border border-primary/20"
+                      }`}>
+                        {allDone ? "✓ Done" : `${machineDone}/${orders.length}`}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 p-2">
+                      {orders.map((order) => {
+                        const stats     = orderStats[order.id] || { allocatedQty: 0, seqCount: 0 };
+                        const remaining = remainingFor(order);
+                        return (
+                          <OrderCard
+                            key={order.id}
+                            order={order}
+                            remaining={remaining}
+                            allocatedQty={stats.allocatedQty}
+                            isCarriedForward={isCarriedForward(order)}
+                            isDragging={draggingId === order.id}
+                            isHovered={hoveredOrderId === order.id}
+                            onDragStart={setDraggingId}
+                            onMouseEnter={() => setHoveredOrderId(order.id)}
+                            onMouseLeave={() => setHoveredOrderId("")}
+                            onClearGroup={() => handleClearOrderGroup(order.id)}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                );
+              })}
+            </div>
+          )}
+
+          {/* Warning footer */}
+          {!loadingOrders && hasUnallocated && productionOrders.length > 0 && (
+            <div className="sticky bottom-0 z-10 bg-card border-t border-line px-3 py-2 mt-auto">
+              <div className="flex items-start gap-1.5 text-[9.5px] text-amber-400">
+                <FaExclamationTriangle size={9} className="mt-0.5 shrink-0" />
+                <span>Drag cards to assign shifts. Unassigned orders will not be planned.</span>
               </div>
             </div>
           )}
         </div>
-
-        <div className="border-t border-line-soft" />
-
-        {/* Section 2: Schedule Details */}
-        <div>
-          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-2">Schedule Details</h6>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-6 gap-y-2 md:gap-y-2.5">
-
-            <DatePickerCalendar
-              label="Production Date"
-              name="productionDate"
-              required
-              horizontal
-              data-nav
-              value={productionDate}
-              error={formErrors.productionDate}
-              onChange={(e: any) => { setProductionDate(e.target.value); setIsDirty(true); }}
-            />
-
-            <SelectInput
-              label="Machine"
-              required
-              horizontal
-              data-nav
-              value={machineId}
-              onChange={(e: any) => { setMachineId(e.target.value); setIsDirty(true); }}
-              error={formErrors.machineId}
-              defaultOptionLabel="— Select Machine —"
-              options={allowedMachines.map((m: any) => ({
-                value: m.machineId,
-                label: `${m.machineName} (${m.machineId})`
-              }))}
-            />
-
-            <div>
-              <SelectInput
-                label="Shift"
-                required
-                horizontal
-                data-nav
-                value={shiftId}
-                onChange={(e: any) => { setShiftId(e.target.value); setIsDirty(true); }}
-                error={formErrors.shiftId}
-                defaultOptionLabel="— Select Shift —"
-                options={shifts.map((s: any) => {
-                  const totalHrs = computeShiftHours(s.startTime, s.endTime);
-                  const remainingHrs = remainingShiftsHours[s.shiftCode] ?? totalHrs;
-                  return {
-                    value: s.shiftCode,
-                    label: remainingHrs > 0
-                      ? `${s.shiftName} (${s.startTime} – ${s.endTime}) — ${remainingHrs}h available`
-                      : `${s.shiftName} (${s.startTime} – ${s.endTime}) — Full`,
-                    disabled: remainingHrs === 0,
-                  };
-                })}
-              />
-              {shiftId && (() => {
-                const sel = shifts.find((s: any) => s.shiftCode === shiftId);
-                if (!sel) return null;
-                const hrs = computeShiftHours(sel.startTime, sel.endTime);
-                return (
-                  <div className="mt-1.5 ml-[148px] flex items-center gap-2 text-ink-subtle text-xs">
-                    <FaClock size={11} />
-                    {sel.startTime} → {sel.endTime} | <strong className="text-ink">{hrs} hrs</strong>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div>
-              {loadingAssignment ? (
-                <div className="flex items-center gap-3">
-                  <span className="shrink-0 w-[140px] text-[12px] font-extrabold uppercase tracking-[0.5px] text-ink">Operators <span className="text-red-500">*</span></span>
-                  <div className="flex-1 p-2.5 bg-card-2 border border-line-soft rounded-lg">
-                    <div className="animate-pulse flex gap-2 items-center">
-                      <div className="w-4 h-4 bg-card rounded-full"></div>
-                      <div className="h-2 bg-card rounded w-24"></div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <MultiSelect
-                  label="Operators"
-                  name="operators"
-                  required={true}
-                  horizontal
-                  data-nav
-                  options={availableOperators.map((op: any) => ({
-                    value: (op.id || op.employeeId)?.toString(),
-                    label: op.fullName + (op.empCode ? ` (${op.empCode})` : "") + (op.role?.name ? ` • ${op.role.name}` : ""),
-                  }))}
-                  value={selectedOperators}
-                  onChange={(_name, vals) => {
-                    setSelectedOperators(vals);
-                    setAssignmentError(null);
-                    setIsDirty(true);
-                  }}
-                  placeholder={availableOperators.length === 0 ? "No operators assigned to this machine..." : "-- Select Assigned Operators --"}
-                  error={formErrors.selectedOperators || (selectedOperators.length === 0 && assignmentError ? assignmentError : undefined)}
-                />
-              )}
-              {availableOperators.length === 0 && !loadingAssignment && (
-                <div className="mt-1.5 px-2.5 py-1.5 bg-amber-500/15 border border-amber-500/30 rounded-lg text-amber-300 text-[11px] font-medium flex items-center gap-1.5">
-                  <FaExclamationTriangle className="text-amber-400 shrink-0" size={11} />
-                  <span>No operator assigned to this machine in Weekly Assignment.</span>
-                </div>
-              )}
-            </div>
-
-            {isEdit && status !== "DRAFT" && (
-              <SelectInput
-                label="Status"
-                horizontal
-                value={status}
-                onChange={(e: any) => { setStatus(e.target.value); setIsDirty(true); }}
-                options={[
-                  { value: "DRAFT", label: "Draft" },
-                  { value: "PLANNED", label: "Planned" },
-                  { value: "IN_PROGRESS", label: "In Progress" },
-                  { value: "COMPLETED", label: "Completed" },
-                  { value: "CANCELLED", label: "Cancelled" }
-                ]}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="border-t border-line-soft" />
-
-        {/* Section 3: Quantity & Time */}
-        <div>
-          <h6 className="text-xs font-bold text-ink uppercase tracking-[1.5px] mb-2">Quantity & Time</h6>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-6 gap-y-2 md:gap-y-2.5">
-
-            <div>
-              <TextInput
-                label="Planned Qty (pcs)"
-                name="plannedQty"
-                type="number"
-                required
-                horizontal
-                data-nav
-                value={plannedQty}
-                error={formErrors.plannedQty}
-                placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
-                onChange={(e) => { setPlannedQty(e.target.value); setIsDirty(true); }}
-              />
-              {machineId && machineProductCapacity != null && (
-                <div className="text-[11px] text-primary font-semibold mt-1 ml-[148px]">
-                  Capacity: {machineProductCapacity.toLocaleString()} / Shift
-                  {Number(plannedQty) < machineProductCapacity && ` · ${machineProductCapacity - Number(plannedQty)} pcs remaining`}
-                </div>
-              )}
-              {noCapacityWarning && machineId && weeklyProgramId && (
-                <div className="mt-1.5 ml-[148px] flex items-center gap-1.5 text-amber-400 text-[11px] font-medium">
-                  <FaExclamationTriangle size={11} />
-                  <span>Machine capacity not set for this product. Please enter planned quantity manually.</span>
-                </div>
-              )}
-              {overCapacity && (
-                <div className="text-amber-400 text-xs flex items-center mt-1 ml-[148px]">
-                  <FaExclamationTriangle className="mr-1" />
-                  Exceeds remaining ({remainingQty} pcs) — Overproduction allowed
-                </div>
-              )}
-              {remainingQty !== null && !overCapacity && Number(plannedQty) > 0 && (
-                <div className="text-ink-subtle text-xs mt-1 ml-[148px]">
-                  Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
-                </div>
-              )}
-            </div>
-
-            <div>
-              <TextInput
-                label="Planned Hours"
-                name="plannedHours"
-                type="number"
-                horizontal
-                data-nav
-                value={plannedHours}
-                error={formErrors.plannedHours}
-                placeholder="Auto-filled from shift"
-                onChange={(e) => { setPlannedHours(e.target.value); setIsDirty(true); }}
-              />
-              <div className="flex items-center gap-1.5 mt-1.5 ml-[148px] text-xs text-ink-muted font-medium">
-                <FaInfoCircle className="text-primary text-xs" />
-                Max: {availableShiftHours}/{totalShiftHours}h available
-              </div>
-            </div>
-
-            <SelectInput
-              label={selectedWeeklyProg?.productionOrder?.priority
-                ? "Priority (auto)"
-                : "Priority"}
-              horizontal
-              data-nav
-              value={priority}
-              onChange={(e: any) => { setPriority(e.target.value); setIsDirty(true); }}
-              options={[
-                { value: "LOW", label: "LOW" },
-                { value: "MEDIUM", label: "MEDIUM" },
-                { value: "HIGH", label: "HIGH" },
-                { value: "URGENT", label: "URGENT" }
-              ]}
-            />
-
-            <div className="md:col-span-2">
-              <TextArea
-                label="Narration"
-                name="remarks"
-                rows={2}
-                data-nav
-                value={remarks}
-                onChange={(e: any) => { setRemarks(e.target.value); setIsDirty(true); }}
-                placeholder="Optional notes for this daily production plan..."
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* ─── Action Buttons ─── */}
-      <div className="flex justify-end items-center gap-3 px-4 py-3 border-t border-line bg-card-2">
+      {/* ══ BOTTOM ACTION BAR ══════════════════════════════════════════════════ */}
+      <div className="bg-card border-t border-line px-5 py-2.5 flex items-center justify-end gap-3 shrink-0">
         <CustomButton
           text="Cancel"
           variant="secondary"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/daily-machine-planning")}
           disabled={isSubmitting}
         />
-        {(isEdit ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) && (
-          <>
-            {/* Show Save as Draft + Create Plan when creating, or when editing a DRAFT plan */}
-            {(!isEdit || (isEdit && status === "DRAFT")) && (
-              <CustomButton
-                text={isSubmitting ? "Saving..." : "Save as Draft"}
-                icon={isSubmitting ? undefined : FaSave}
-                variant="secondary"
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handleSubmit("DRAFT")}
-              />
-            )}
-            <CustomButton
-              text={isSubmitting ? "Saving..." : (isEdit && status !== "DRAFT" ? "Update Plan" : "Create Plan")}
-              icon={isSubmitting ? undefined : FaSave}
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleSubmit(isEdit && status !== "DRAFT" ? status : "PLANNED")}
-            />
-          </>
+        {!isEditMode && can("daily-machine-planning.create") && (
+          <CustomButton
+            text={isSubmitting ? "Saving…" : "Save Draft"}
+            icon={isSubmitting ? undefined : FaSave}
+            variant="secondary"
+            onClick={() => handleSave("DRAFT")}
+            disabled={isSubmitting || loadingOrders || Object.keys(boardMap).length === 0}
+          />
+        )}
+        {(isEditMode ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) && (
+          <CustomButton
+            text={isSubmitting ? "Confirming…" : isEditMode ? "Update Plan" : "Confirm Plan"}
+            icon={isSubmitting ? undefined : FaCheckCircle}
+            onClick={() => handleSave("PLANNED")}
+            disabled={isSubmitting || loadingOrders || (!isEditMode && Object.keys(boardMap).length === 0)}
+          />
         )}
       </div>
 
-    </form>
-
-    <CommonConfirmModal
-      show={showDiscardModal}
-      onHide={handleResume}
-      onCancel={handleDiscard}
-      onConfirm={handleSaveAndLeave}
-      title="Unsaved Changes"
-      message="You have unsaved changes. What would you like to do?"
-      cancelText="Discard"
-      cancelVariant="danger"
-      confirmText="Save & Leave"
-      confirmVariant="success"
-      confirmIcon={FaSave}
-      warningText=""
-    />
     </div>
   );
 };

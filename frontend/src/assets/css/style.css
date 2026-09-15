@@ -165,6 +165,42 @@
 }
 
 /* ===============================
+   Daily Production Board — theme fixes
+================================ */
+
+/* ── Light theme ── */
+:root[data-theme="light"] .plan-card {
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    background-color: #ffffff;
+}
+
+/* Status tint overlays — stronger on light background */
+:root[data-theme="light"] .plan-card.bg-sky-500\/10     { background-color: rgba(14, 165, 233, 0.10) !important; border-color: rgba(14, 165, 233, 0.20); }
+:root[data-theme="light"] .plan-card.bg-indigo-500\/10  { background-color: rgba(99,  102, 241, 0.10) !important; border-color: rgba(99,  102, 241, 0.20); }
+:root[data-theme="light"] .plan-card.bg-violet-500\/10  { background-color: rgba(139, 92,  246, 0.10) !important; border-color: rgba(139, 92,  246, 0.20); }
+:root[data-theme="light"] .plan-card.bg-emerald-500\/10 { background-color: rgba(16,  185, 129, 0.10) !important; border-color: rgba(16,  185, 129, 0.20); }
+:root[data-theme="light"] .plan-card.bg-rose-500\/10    { background-color: rgba(244, 63,  94, 0.10)  !important; border-color: rgba(244, 63,  94, 0.20); }
+:root[data-theme="light"] .plan-card.bg-zinc-500\/10    { background-color: rgba(113, 113, 122, 0.08) !important; border-color: rgba(113, 113, 122, 0.18); }
+:root[data-theme="light"] .plan-card.bg-red-500\/10     { background-color: rgba(239, 68,  68, 0.10)  !important; border-color: rgba(239, 68,  68, 0.20); }
+
+/* Empty cell placeholder */
+:root[data-theme="light"] .board-empty-cell {
+    background-color: #f8fafc;
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Board table header */
+:root[data-theme="light"] thead tr th {
+    background-color: #f1f5f9 !important;
+}
+
+/* ── Dark theme ── */
+:root[data-theme="dark"] .plan-card {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* ===============================
    Global style
 ================================ */
 *,

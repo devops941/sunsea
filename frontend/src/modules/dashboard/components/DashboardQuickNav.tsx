@@ -19,7 +19,7 @@ const DashboardQuickNav: React.FC<DashboardQuickNavProps> = ({ alerts }) => {
 
     const quickLinks = [
         { title: 'Production Orders', icon: FaBoxes, path: '/production-orders', colorClass: '!text-primary', bgClass: '!bg-primary' },
-        { title: 'Weekly Schedule', icon: FaCalendarCheck, path: '/weekly-machine-schedules', colorClass: 'text-green-600', bgClass: 'bg-green-100' },
+        { title: 'Weekly Schedule', icon: FaCalendarCheck, path: '/production-orders/weekly-plan', colorClass: 'text-green-600', bgClass: 'bg-green-100' },
         { title: 'Daily Plan', icon: FaCogs, path: '/daily-machine-planning', colorClass: 'text-blue-600', bgClass: 'bg-blue-100' },
         { title: 'Raw Materials', icon: FaLayerGroup, path: '/raw-materials', colorClass: 'text-red-600', bgClass: 'bg-red-100' },
         { title: 'Finished Goods', icon: FaBoxOpen, path: '/finished-stock', colorClass: 'text-yellow-600', bgClass: 'bg-yellow-100' },

@@ -2,30 +2,27 @@ import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
-import { FaSave, FaEraser, FaPlus, FaCheck } from "react-icons/fa";
+import { usePermission } from "../../../hooks/usePermission";
+import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, Controller, useFieldArray, useWatch, useController } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import AutocompleteInput from "../../../components/form/AutocompleteInput/AutocompleteInput";
-import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
-import TextArea from "../../../components/form/TextArea/TextArea";
-import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import DatePickerCalendar, { formatLocalDate } from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import { productionOrderService } from "../../../services/productionOrderService";
+import { dailyPlanService } from "../../../services/dailyPlanService";
 import { storeService } from "../../../services/storeService";
-import { salesOrderService } from "../../../services/salesOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
-import { billOfMaterialService } from "../../../services/billOfMaterialService";
+import { machineService } from "../../../services/machineService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -45,21 +42,28 @@ interface RowRawMaterialState {
     fetchedForStoreId: string | null; // track which storeId we last fetched for
 }
 
+interface WeeklyGroupItem {
+    uid: string;
+    productItemId: string;
+    targetQty: number;
+    narration: string;
+    existingPoId?: string;
+    isLocked?: boolean;
+    lockReason?: string;
+}
+
+interface WeeklyGroup {
+    uid: string;
+    machineId: string;
+    items: WeeklyGroupItem[];
+}
 
 
 
-const salesOrderColumns: DataTableColumn<any>[] = [
-    { header: "#", width: "60px", render: (_, index) => index + 1 },
-    { header: "PRODUCT NAME", render: (item) => item.product?.productName || `Product ID: ${item.productId}` },
-    { header: "PRODUCT CODE", render: (item) => item.product?.productCode || "-" },
-    { header: "ORDERED QUANTITY", align: "right", render: (item) => item.quantity },
-    { header: "UOM", render: (item) => item.product?.uom?.name || "PCS" },
-];
+
 
 const productionOrderSchema = z.object({
     id: z.number().optional(),
-    sourceSalesOrderId: z.string().optional().nullable(),
-    sourceSalesOrderLineId: z.string().optional().nullable(),
     products: z.array(z.object({
         productItemId: z.string().min(1, "Product is required"),
         targetQty: z.number().min(0.01, "Target Quantity must be > 0"),
@@ -90,9 +94,10 @@ const productionOrderSchema = z.object({
     priority: z.string().optional(),
     orderType: z.string().optional(),
     batchNo: z.string().optional(),
-    lotNo: z.string().optional(),
     sourceStoreId: z.string().optional(),
-    destinationStoreId: z.string().optional(),
+    machineMachineId: z.string().optional().nullable(),
+    weekStartDate: z.string().optional().nullable(),
+    weekEndDate: z.string().optional().nullable(),
     status: z.string().min(1, "Status is required"),
     remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -101,6 +106,13 @@ const productionOrderSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: "Due date must be on or after the order date",
             path: ["dueDate"],
+        });
+    }
+    if (data.weekStartDate && data.weekEndDate && data.weekEndDate < data.weekStartDate) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Week End Date must be on or after Week Start Date",
+            path: ["weekEndDate"],
         });
     }
 });
@@ -114,10 +126,35 @@ const nextWeek = new Date(
     new Date().setDate(new Date().getDate() + 7)
 ).toISOString().split("T")[0];
 
+/** Add N days to a YYYY-MM-DD string */
+function addDays(dateStr: string, n: number): string {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + n);
+    return d.toISOString().split("T")[0];
+}
+
+/** Safely extract YYYY-MM-DD string from ISO string, date string, or Date object */
+function toDateInputString(val: any, fallback: string): string {
+    if (!val) return fallback;
+    if (typeof val === "string") {
+        if (val.includes("T")) return val.split("T")[0];
+        if (val.length >= 10) return val.substring(0, 10);
+    }
+    try {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) return formatLocalDate(d);
+    } catch {}
+    return fallback;
+}
+
+const newWeeklyGroup = (): WeeklyGroup => ({
+    uid: crypto.randomUUID(),
+    machineId: "",
+    items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+});
+
 const defaultValues: ProductionOrderFormValues = {
     id: undefined,
-    sourceSalesOrderId: "",
-    sourceSalesOrderLineId: "",
     products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "ea", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }],
     productionOrderId: "",
     orderDate: today,
@@ -125,9 +162,10 @@ const defaultValues: ProductionOrderFormValues = {
     priority: "",
     orderType: "",
     batchNo: "",
-    lotNo: "",
     sourceStoreId: "",
-    destinationStoreId: "",
+    machineMachineId: "",
+    weekStartDate: "",
+    weekEndDate: "",
     status: "CREATED",
     remarks: "",
 };
@@ -159,6 +197,11 @@ const StoreCellRenderer: React.FC<{
             onChange={(v) => {
                 field.onChange(v);
                 onStoreChange(index, v);
+                setTimeout(() => {
+                    const rmCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                    const rmInput = rmCell?.querySelector("input, [tabindex='0']") as HTMLElement | null;
+                    if (rmInput) { rmInput.focus(); }
+                }, 50);
             }}
         />
     );
@@ -216,6 +259,11 @@ const RawMaterialCellRenderer: React.FC<{
             onChange={(v) => {
                 field.onChange(v);
                 onRmChange(index, v);
+                setTimeout(() => {
+                    const qtyCell = document.querySelector(`[data-r="${index}"][data-c="2"]`) as HTMLElement | null;
+                    const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                    if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                }, 50);
             }}
         />
     );
@@ -435,6 +483,8 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
 const ProductionOrderCreate: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { id } = useParams<{ id: string }>();
+    const { can } = usePermission();
 
     // ── Generic state ─────────────────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -442,12 +492,14 @@ const ProductionOrderCreate: React.FC = () => {
     const [orderId, setOrderId] = useState<number | string | null>(null);
 
     const [stores, setStores] = useState<any[]>([]);
-    const [boms, setBoms] = useState<any[]>([]);
-
-    const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
-    const [selectedSalesOrderItems, setSelectedSalesOrderItems] = useState<any[]>([]);
-    const [isFetchingSalesOrder, setIsFetchingSalesOrder] = useState(false);
+    const [machines, setMachines] = useState<any[]>([]);
     const [isCalculatingRM, setIsCalculatingRM] = useState(false);
+
+    // ── Weekly Plan State ────────────────────────────────────────────────────────
+    const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([newWeeklyGroup()]);
+    const [isWeeklySubmitting, setIsWeeklySubmitting] = useState(false);
+    const [isWeeklyEditMode, setIsWeeklyEditMode] = useState(false);
+    const [weeklyErrors, setWeeklyErrors] = useState<{ weekStart?: string; weekEnd?: string; schedules?: string }>({});
 
     // ── Per-row raw material state ────────────────────────────────────────────────
     const [rowRmStates, setRowRmStates] = useState<Record<string, RowRawMaterialState>>({});
@@ -462,11 +514,7 @@ const ProductionOrderCreate: React.FC = () => {
 
     handleSubmitRef.current = () => {
         handleSubmit((data) => {
-            const targetStatus = (isEditMode && (data.status === "DRAFT" || data.status === "CREATED"))
-                ? "READY_FOR_PLANNING"
-                : data.status === "DRAFT"
-                    ? "CREATED"
-                    : data.status;
+            const targetStatus = data.status === "DRAFT" ? "WEEKLY_SCHEDULED" : data.status;
             onSubmit({ ...data, status: targetStatus });
         })();
     };
@@ -479,6 +527,17 @@ const ProductionOrderCreate: React.FC = () => {
             if (!isEditMode) {
                 reset(defaultValues);
                 setRowRmStates({});
+                if (machines.length > 0) {
+                    setWeeklyGroups(
+                        machines.map((m) => ({
+                            uid: crypto.randomUUID(),
+                            machineId: m.machineId,
+                            items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                        }))
+                    );
+                } else {
+                    setWeeklyGroups([newWeeklyGroup()]);
+                }
                 productionOrderService
                     .fetchNextId()
                     .then((orderNo) => setValue("productionOrderId", orderNo))
@@ -512,7 +571,7 @@ const ProductionOrderCreate: React.FC = () => {
         setValue,
         getValues,
         reset,
-        formState: { errors, isDirty: rhfIsDirty },
+        formState: { isDirty: rhfIsDirty },
     } = useForm<ProductionOrderFormValues>({
         resolver: zodResolver(productionOrderSchema) as any,
         defaultValues,
@@ -533,11 +592,14 @@ const ProductionOrderCreate: React.FC = () => {
         name: "products",
     });
 
-    const watchSalesOrderId = useWatch({ control, name: "sourceSalesOrderId" });
     const watchProducts = useWatch({ control, name: "products" });
     const watchStatus = useWatch({ control, name: "status" });
     // DRAFT or CREATED edit → promote to READY_FOR_PLANNING on main submit
     const isDraftEdit = isEditMode && (watchStatus === "DRAFT" || watchStatus === "CREATED");
+
+    const hasAnyLockedWeeklyOrder = useMemo(() => {
+        return isWeeklyEditMode && weeklyGroups.some((g) => g.items.some((it) => it.isLocked));
+    }, [isWeeklyEditMode, weeklyGroups]);
 
     // ── Store changed for a specific row ───────────────────────────────────────────
     const fetchRawMaterialsForStore = useCallback(async (
@@ -658,91 +720,137 @@ const ProductionOrderCreate: React.FC = () => {
         productService.fetchAll().then((r) => setProducts(extractArray(r))).catch(() => { });
     }, [extractArray]);
 
-    const fetchBomsData = useCallback(() => {
-        billOfMaterialService.fetchAll().then((r) => setBoms(extractArray(r))).catch(() => { });
-    }, [extractArray]);
+    const fetchMachinesData = useCallback(() => {
+        machineService.getAll({ limit: 500 }).then((r) => {
+            const arr = Array.isArray(r) ? r : (r?.machines ?? r?.data ?? []);
+            setMachines(arr);
+        }).catch(() => { });
+    }, []);
 
     const refreshRmStates = useCallback(() => {
         storeRmCacheRef.current = {};
         setRowRmStates({});
     }, []);
 
+    // ── Existing Production Orders (for disabling already booked weeks/dates) ────
+    const [existingOrders, setExistingOrders] = useState<any[]>([]);
+
+    const fetchExistingOrdersData = useCallback(() => {
+        productionOrderService.fetchAll({ pageSize: 1000 })
+            .then((r) => {
+                const arr = extractArray(r);
+                setExistingOrders(arr);
+            })
+            .catch(() => { });
+    }, [extractArray]);
+
     useSocketSync("store", undefined, fetchStoresData);
     useSocketSync("product", undefined, fetchProductsData);
-    useSocketSync("billOfMaterial", undefined, fetchBomsData);
     useSocketSync("rawMaterial", undefined, refreshRmStates);
+    useSocketSync("machine", undefined, fetchMachinesData);
+    useSocketSync("productionOrder", undefined, fetchExistingOrdersData);
 
     useEffect(() => {
         fetchStoresData();
         fetchProductsData();
-        fetchBomsData();
-    }, [fetchStoresData, fetchProductsData, fetchBomsData]);
+        fetchMachinesData();
+        fetchExistingOrdersData();
+    }, [fetchStoresData, fetchProductsData, fetchMachinesData, fetchExistingOrdersData]);
 
-    // â”€â”€ Sales Order watch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // ————————————————————————————————————————————————————————————————————————————————
-    useEffect(() => {
-        if (!watchSalesOrderId) {
-            setSelectedSalesOrder(null);
-            setSelectedSalesOrderItems([]);
-            setValue("sourceSalesOrderLineId", "");
-            setValue("products", [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }]);
-            return;
-        }
+    const watchProductionOrderId = watch("productionOrderId");
 
-        const fetchSODetails = async () => {
-            setIsFetchingSalesOrder(true);
-            try {
-                const so = await salesOrderService.fetchById(watchSalesOrderId);
-                const items = so?.items || [];
-                setSelectedSalesOrder(so);
-                setSelectedSalesOrderItems(items);
+    // Compute set of all dates belonging to already planned weeks
+    const bookedDatesSet = useMemo(() => {
+        const set = new Set<string>();
+        const currentOrderId = watchProductionOrderId || (isEditMode && id ? String(id) : "");
+        const currentBaseId = currentOrderId.includes("-") ? currentOrderId.split("-")[0] : currentOrderId;
 
-                if (!isEditMode) {
-                    if (items.length > 0) {
-                        const newProducts = items.map((item: any) => {
-                            return {
-                                productItemId: item.productId?.toString() || "",
-                                targetQty: item.quantity ? Number(item.quantity) : 0,
-                                damageQty: 0,
-                                uom: item.product?.uom?.name || "PCS",
-                                sourceSalesOrderLineId: item.id?.toString() || "",
-                                rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }]
-                            };
-                        });
-                        setValue("products", newProducts);
-                        setValue("sourceSalesOrderLineId", ""); // clear line ID
-                    }
-                    if (so?.orderDate) {
-                        setValue("orderDate", so.orderDate.split("T")[0]);
-                    }
-                    if ((so as any)?.expectedCompletionDate) {
-                        setValue("dueDate", (so as any).expectedCompletionDate.split("T")[0]);
-                    }
-                    if (so?.dispatchType) {
-                        setValue("priority", so.dispatchType);
-                    } else {
-                        setValue("priority", "standard");
-                    }
-                    if (so?.orderType) {
-                        setValue("orderType", so.orderType);
-                    } else {
-                        setValue("orderType", "STANDARD");
-                    }
-                    if (so?.remarks) {
-                        setValue("remarks", so.remarks);
-                    }
+        existingOrders.forEach((po: any) => {
+            if (po.status?.toUpperCase() === "CANCELLED") return;
+
+            const poId = po.productionOrderId || "";
+            const poBaseId = poId.includes("-") ? poId.split("-")[0] : poId;
+
+            // In edit mode (standalone or weekly), do not disable the dates belonging to the order/group currently being edited
+            if (isWeeklyEditMode || isEditMode) {
+                if (
+                    poId === currentOrderId ||
+                    poBaseId === currentBaseId ||
+                    (id && String(po.id) === String(id)) ||
+                    (orderId && String(po.id) === String(orderId))
+                ) {
+                    return;
                 }
-            } catch {
-                toast.error("Failed to fetch Sales Order details");
-                setSelectedSalesOrder(null);
-                setSelectedSalesOrderItems([]);
-            } finally {
-                setIsFetchingSalesOrder(false);
             }
-        };
 
-        fetchSODetails();
-    }, [watchSalesOrderId, setValue, getValues, isEditMode]);
+            // Extract start date from weekStartDate or orderDate
+            const startRaw = po.weekStartDate || po.orderDate;
+            const startStr = toDateInputString(startRaw, "");
+            if (!startStr) return;
+
+            const endRaw = po.weekEndDate || po.dueDate;
+            const endStr = toDateInputString(endRaw, startStr);
+
+            // Disable all dates from startStr to endStr (inclusive)
+            let curr = startStr;
+            let count = 0;
+            while (curr <= endStr && count < 60) {
+                set.add(curr);
+                curr = addDays(curr, 1);
+                count++;
+            }
+        });
+
+        return set;
+    }, [existingOrders, isWeeklyEditMode, isEditMode, id, orderId, watchProductionOrderId]);
+
+    const isDateDisabled = useCallback((date: Date): boolean => {
+        const dateStr = formatLocalDate(date);
+        return bookedDatesSet.has(dateStr);
+    }, [bookedDatesSet]);
+
+    // ── Clear schedules error when any product with qty > 0 is entered ──────────
+    useEffect(() => {
+        if (weeklyErrors.schedules) {
+            const hasAny = weeklyGroups.some(g => g.items.some(it => it.productItemId && it.targetQty > 0));
+            if (hasAny) setWeeklyErrors(prev => ({ ...prev, schedules: undefined }));
+        }
+    }, [weeklyGroups, weeklyErrors.schedules]);
+
+    // ── Auto-populate / ensure all machine groups in weekly plan mode ───────
+    useEffect(() => {
+        if (machines.length > 0 && (!isEditMode || isWeeklyEditMode)) {
+            setWeeklyGroups((prev) => {
+                const isInitial =
+                    prev.length === 0 ||
+                    (prev.length === 1 &&
+                        !prev[0].machineId &&
+                        prev[0].items.every((it) => !it.productItemId && !it.targetQty));
+                if (isInitial) {
+                    return machines.map((m) => ({
+                        uid: crypto.randomUUID(),
+                        machineId: m.machineId,
+                        items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                    }));
+                }
+
+                // If in weekly mode and some machines are missing, append missing machines as empty groups
+                const existingMachineIds = new Set(prev.map((g) => g.machineId).filter(Boolean));
+                const missingMachines = machines.filter((m) => !existingMachineIds.has(m.machineId));
+                if (missingMachines.length > 0) {
+                    const extraGroups = missingMachines.map((m) => ({
+                        uid: crypto.randomUUID(),
+                        machineId: m.machineId,
+                        items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                    }));
+                    return [...prev, ...extraGroups];
+                }
+
+                return prev;
+            });
+        }
+    }, [machines, isEditMode, isWeeklyEditMode]);
+
 
     // ── Recalculate Raw Material Required Qty when Target Qty/Damage Qty changes ──────────────────
     const [initialTargetQtyLoaded, setInitialTargetQtyLoaded] = useState(false);
@@ -898,11 +1006,9 @@ const ProductionOrderCreate: React.FC = () => {
                 setIsCalculatingRM(false);
             }, 50);
         }
-    }, [watchProducts, selectedSalesOrderItems, products, boms, watchSalesOrderId, setValue, getValues, initialTargetQtyLoaded, isEditMode]);
+    }, [watchProducts, products, setValue, getValues, initialTargetQtyLoaded, isEditMode]);
 
-    const { id } = useParams<{ id: string }>();
-
-    // â”€â”€ Edit mode: hydrate form from route parameter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Edit mode: hydrate form from route parameter ────────────────────────
     useEffect(() => {
         if (id) {
             setIsEditMode(true);
@@ -929,19 +1035,23 @@ const ProductionOrderCreate: React.FC = () => {
                         }));
                     }
 
+                    const parsedOrderDate = toDateInputString(fullOrder.orderDate, today);
+                    const parsedDueDate = toDateInputString(fullOrder.dueDate, nextWeek);
+                    const parsedWeekStart = toDateInputString((fullOrder as any).weekStartDate, parsedOrderDate);
+                    const parsedWeekEnd = toDateInputString((fullOrder as any).weekEndDate, "");
+
                     reset({
                         id: fullOrder.id,
-                        sourceSalesOrderId: fullOrder.sourceSalesOrderId?.toString() || "",
-                        sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId?.toString() || "",
                         productionOrderId: fullOrder.productionOrderId || "",
-                        orderDate: fullOrder.orderDate?.split("T")[0] || today,
-                        dueDate: fullOrder.dueDate?.split("T")[0] || nextWeek,
+                        orderDate: parsedOrderDate,
+                        dueDate: parsedDueDate,
                         priority: fullOrder.priority || "MEDIUM",
                         orderType: fullOrder.orderType || "STANDARD",
                         batchNo: fullOrder.batchNo || "",
-                        lotNo: fullOrder.lotNo || "",
                         sourceStoreId: fullOrder.sourceStoreId?.toString() || "",
-                        destinationStoreId: fullOrder.destinationStoreId?.toString() || "",
+                        machineMachineId: (fullOrder as any).machineMachineId || "",
+                        weekStartDate: parsedWeekStart,
+                        weekEndDate: parsedWeekEnd,
                         status: fullOrder.status || "CREATED",
                         remarks: fullOrder.remarks || "",
                         products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
@@ -961,6 +1071,19 @@ const ProductionOrderCreate: React.FC = () => {
                         }],
                     });
                     setRowRmStates({});
+                    // Stamp current product states so BOM recalculation doesn't overwrite
+                    // saved raw materials when the products list loads asynchronously
+                    const loadedProds = (fullOrder as any).products || [{
+                        productId: fullOrder.productItemId,
+                        quantity: fullOrder.targetQty,
+                        damageQty: (fullOrder as any).damageQty || 0,
+                    }];
+                    loadedProds.forEach((p: any, pIdx: number) => {
+                        const pid = p.productItemId?.toString() || p.productId?.toString() || "";
+                        const tQty = Number(p.targetQty || p.quantity || 0);
+                        const dQty = Number(p.damageQty || (fullOrder as any).damageQty) || 0;
+                        lastCalculatedProductStates.current[pIdx] = `${pid}-${tQty}-${dQty}`;
+                    });
                 })
                 .catch(() => {
                     toast.error("Failed to load production order details");
@@ -972,17 +1095,105 @@ const ProductionOrderCreate: React.FC = () => {
 
             reset({
                 ...defaultValues,
-                sourceSalesOrderId:
-                    (location.state as any)?.sourceSalesOrderId?.toString() || "",
                 products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }],
             });
 
-            productionOrderService
-                .fetchNextId()
-                .then((orderNo) => setValue("productionOrderId", orderNo))
-                .catch(() => { });
+            // Check if navigated from list's Edit button for a DRAFT weekly plan
+            const locState = (location.state || {}) as {
+                editWeeklyPlan?: boolean;
+                baseId?: string;
+                children?: any[];
+                weekStart?: string;
+                weekEnd?: string;
+            };
 
+            if (locState.editWeeklyPlan && locState.children && locState.children.length > 0) {
+                setIsWeeklyEditMode(true);
+                setValue("productionOrderId", locState.baseId || "");
+                if (locState.weekStart) setValue("weekStartDate", toDateInputString(locState.weekStart, today));
+                if (locState.weekEnd) setValue("weekEndDate", toDateInputString(locState.weekEnd, ""));
 
+                // Group children by machine and build weeklyGroups
+                const groupMap = new Map<string, WeeklyGroup>();
+                locState.children.forEach((child: any) => {
+                    const machineId = child.machineMachineId || child.Machine?.machineId || "";
+                    if (!groupMap.has(machineId)) {
+                        groupMap.set(machineId, { uid: crypto.randomUUID(), machineId, items: [] });
+                    }
+                    const isLocked = child._editRestrictions
+                        ? (!child._editRestrictions.canEditProductQty || !child._editRestrictions.canEditDates || !child._editRestrictions.canDelete)
+                        : (child.status && !["DRAFT", "WEEKLY_SCHEDULED"].includes(child.status.toUpperCase()));
+
+                    groupMap.get(machineId)!.items.push({
+                        uid: crypto.randomUUID(),
+                        productItemId: child.productItem?.id?.toString() || child.productId?.toString() || "",
+                        targetQty: Number(child.targetQty || 0),
+                        narration: child.remarks || "",
+                        existingPoId: child.productionOrderId,
+                        isLocked: Boolean(isLocked),
+                        lockReason: child._editRestrictions?.reason || (isLocked ? "Assigned to Daily Production Plan" : undefined),
+                    });
+                });
+
+                // Also include any other known machines so all machines are visible
+                machines.forEach((m) => {
+                    if (m.machineId && !groupMap.has(m.machineId)) {
+                        groupMap.set(m.machineId, {
+                            uid: crypto.randomUUID(),
+                            machineId: m.machineId,
+                            items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "", isLocked: false }],
+                        });
+                    }
+                });
+
+                const machineOrderMap = new Map<string, number>();
+                machines.forEach((m, idx) => {
+                    if (m.machineId) machineOrderMap.set(m.machineId, idx);
+                });
+
+                const sortedGroups = Array.from(groupMap.values()).sort((a, b) => {
+                    const orderA = machineOrderMap.has(a.machineId) ? machineOrderMap.get(a.machineId)! : 999;
+                    const orderB = machineOrderMap.has(b.machineId) ? machineOrderMap.get(b.machineId)! : 999;
+                    return orderA - orderB;
+                });
+
+                setWeeklyGroups(sortedGroups);
+
+                // Live check against daily plans API to ensure all assigned items are locked
+                dailyPlanService.getAll().then((plansRes: any) => {
+                    const rawList = plansRes?.data?.data || plansRes?.data || (Array.isArray(plansRes) ? plansRes : []);
+                    const allPlans: any[] = Array.isArray(rawList) ? rawList : [];
+                    const assignedPoIds = new Set(
+                        allPlans
+                            .filter((p: any) => p.status !== "CANCELLED" && p.productionOrderId)
+                            .map((p: any) => p.productionOrderId)
+                    );
+
+                    if (assignedPoIds.size > 0) {
+                        setWeeklyGroups((prev) =>
+                            prev.map((g) => ({
+                                ...g,
+                                items: g.items.map((it) => {
+                                    if (it.existingPoId && assignedPoIds.has(it.existingPoId)) {
+                                        return {
+                                            ...it,
+                                            isLocked: true,
+                                            lockReason: "Assigned to Daily Production Plan",
+                                        };
+                                    }
+                                    return it;
+                                }),
+                            }))
+                        );
+                    }
+                }).catch(() => {});
+            } else {
+                setIsWeeklyEditMode(false);
+                productionOrderService
+                    .fetchNextId()
+                    .then((orderNo) => setValue("productionOrderId", orderNo))
+                    .catch(() => { });
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, reset, setValue]);
@@ -995,6 +1206,24 @@ const ProductionOrderCreate: React.FC = () => {
                 value: (s.storeId ?? s.id)?.toString(),
             })),
         [stores]
+    );
+
+    const machineOptions = useMemo(
+        () =>
+            machines.map((m) => ({
+                label: m.machineName || m.machineId,
+                value: m.machineId,
+            })),
+        [machines]
+    );
+
+    const productOptions = useMemo(
+        () =>
+            products.map((p) => ({
+                label: p.productName || "",
+                value: p.id?.toString() || "",
+            })),
+        [products]
     );
 
 
@@ -1015,19 +1244,23 @@ const ProductionOrderCreate: React.FC = () => {
                         storeId: rm.storeId?.toString() || "",
                         remarks: rm.remarks || "",
                     }));
+                    const parsedOrderDate = toDateInputString(fullOrder.orderDate, today);
+                    const parsedDueDate = toDateInputString(fullOrder.dueDate, nextWeek);
+                    const parsedWeekStart = toDateInputString((fullOrder as any).weekStartDate, parsedOrderDate);
+                    const parsedWeekEnd = toDateInputString((fullOrder as any).weekEndDate, "");
+
                     reset({
                         id: fullOrder.id,
-                        sourceSalesOrderId: fullOrder.sourceSalesOrderId?.toString() || "",
-                        sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId?.toString() || "",
                         productionOrderId: fullOrder.productionOrderId || "",
-                        orderDate: fullOrder.orderDate?.split("T")[0] || today,
-                        dueDate: fullOrder.dueDate?.split("T")[0] || nextWeek,
+                        orderDate: parsedOrderDate,
+                        dueDate: parsedDueDate,
                         priority: fullOrder.priority || "MEDIUM",
                         orderType: fullOrder.orderType || "STANDARD",
                         batchNo: fullOrder.batchNo || "",
-                        lotNo: fullOrder.lotNo || "",
                         sourceStoreId: fullOrder.sourceStoreId?.toString() || "",
-                        destinationStoreId: fullOrder.destinationStoreId?.toString() || "",
+                        machineMachineId: (fullOrder as any).machineMachineId || "",
+                        weekStartDate: parsedWeekStart,
+                        weekEndDate: parsedWeekEnd,
                         status: fullOrder.status || "CREATED",
                         remarks: fullOrder.remarks || "",
                         products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
@@ -1047,6 +1280,18 @@ const ProductionOrderCreate: React.FC = () => {
                         }],
                     });
                     setRowRmStates({});
+                    // Stamp product states to prevent BOM from overwriting after refresh
+                    const refreshedProds = (fullOrder as any).products || [{
+                        productId: fullOrder.productItemId,
+                        quantity: fullOrder.targetQty,
+                        damageQty: (fullOrder as any).damageQty || 0,
+                    }];
+                    refreshedProds.forEach((p: any, pIdx: number) => {
+                        const pid = p.productItemId?.toString() || p.productId?.toString() || "";
+                        const tQty = Number(p.targetQty || p.quantity || 0);
+                        const dQty = Number(p.damageQty || (fullOrder as any).damageQty) || 0;
+                        lastCalculatedProductStates.current[pIdx] = `${pid}-${tQty}-${dQty}`;
+                    });
                     toast.info("Production order details refreshed");
                 } catch {
                     toast.error("Failed to reload production order details");
@@ -1054,6 +1299,17 @@ const ProductionOrderCreate: React.FC = () => {
             } else if (!isEditMode) {
                 reset({ ...defaultValues });
                 setRowRmStates({});
+                if (machines.length > 0) {
+                    setWeeklyGroups(
+                        machines.map((m) => ({
+                            uid: crypto.randomUUID(),
+                            machineId: m.machineId,
+                            items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                        }))
+                    );
+                } else {
+                    setWeeklyGroups([newWeeklyGroup()]);
+                }
                 productionOrderService
                     .fetchNextId()
                     .then((orderNo) => setValue("productionOrderId", orderNo))
@@ -1071,11 +1327,29 @@ const ProductionOrderCreate: React.FC = () => {
             e.preventDefault(); e.stopPropagation();
             if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
             if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
-            else { navigate(-1); }
+            else { navigate("/production-orders"); }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
     }, [navigate]);
+
+    const handleBack = useCallback(() => {
+        if (isDirtyRef.current) {
+            lastFocusedRef.current = document.activeElement as HTMLElement;
+            setSaveConfirmOpen(true);
+        } else {
+            navigate("/production-orders");
+        }
+    }, [navigate]);
+
+    // Auto-focus the first navigable field on mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const first = formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled]), input:not([disabled])");
+            first?.focus();
+        }, 250);
+        return () => clearTimeout(timer);
+    }, []);
 
     const submitLock = React.useRef(false);
 
@@ -1093,11 +1367,10 @@ const ProductionOrderCreate: React.FC = () => {
                     priority: data.priority,
                     orderType: data.orderType,
                     batchNo: data.batchNo || null,
-                    lotNo: data.lotNo || null,
-                    sourceSalesOrderId: data.sourceSalesOrderId || null,
-                    sourceSalesOrderLineId: data.sourceSalesOrderLineId || null,
                     sourceStoreId: data.sourceStoreId || null,
-                    destinationStoreId: data.destinationStoreId || null,
+                    machineMachineId: data.machineMachineId || null,
+                    weekStartDate: data.weekStartDate ? new Date(data.weekStartDate).toISOString() : null,
+                    weekEndDate: data.weekEndDate ? new Date(data.weekEndDate).toISOString() : null,
                     status: data.status,
                     remarks: data.remarks || null,
                     productItemId: data.products?.[0]?.productItemId || "",
@@ -1131,11 +1404,10 @@ const ProductionOrderCreate: React.FC = () => {
                         priority: data.priority,
                         orderType: data.orderType,
                         batchNo: data.batchNo || null,
-                        lotNo: data.lotNo || null,
-                        sourceSalesOrderId: data.sourceSalesOrderId || null,
-                        sourceSalesOrderLineId: prod.sourceSalesOrderLineId || null,
                         sourceStoreId: data.sourceStoreId || null,
-                        destinationStoreId: data.destinationStoreId || null,
+                        machineMachineId: data.machineMachineId || null,
+                        weekStartDate: data.weekStartDate ? new Date(data.weekStartDate).toISOString() : null,
+                        weekEndDate: data.weekEndDate ? new Date(data.weekEndDate).toISOString() : null,
                         status: data.status,
                         remarks: data.remarks || null,
                         productItemId: prod.productItemId,
@@ -1176,17 +1448,188 @@ const ProductionOrderCreate: React.FC = () => {
         }
     };
 
+    // ── Weekly Plan Submit ───────────────────────────────────────────────────────
+    const onWeeklySubmit = async (targetStatus: "WEEKLY_SCHEDULED" | "DRAFT" = "WEEKLY_SCHEDULED") => {
+        const weekStart = (getValues("weekStartDate") ?? "") as string;
+        const weekEnd = (getValues("weekEndDate") ?? "") as string;
+        const baseOrderId = getValues("productionOrderId");
+
+        const allOrders: Array<{ group: WeeklyGroup; item: WeeklyGroup["items"][number]; gIdx: number; iIdx: number }> = [];
+        weeklyGroups.forEach((group, gIdx) => {
+            group.items.forEach((item, iIdx) => {
+                if (item.productItemId && item.targetQty > 0) {
+                    allOrders.push({ group, item, gIdx, iIdx });
+                }
+            });
+        });
+
+        const validationErrors: { weekStart?: string; weekEnd?: string; schedules?: string } = {};
+        if (!weekStart) validationErrors.weekStart = "Week Start Date is required";
+        if (!weekEnd) validationErrors.weekEnd = "Week End Date is required";
+        else if (weekEnd < weekStart) validationErrors.weekEnd = "Week End Date must be on or after Week Start Date";
+        if (allOrders.length === 0) validationErrors.schedules = "At least one product with quantity > 0 is required";
+        if (Object.keys(validationErrors).length > 0) {
+            setWeeklyErrors(validationErrors);
+            return;
+        }
+        setWeeklyErrors({});
+
+        setIsWeeklySubmitting(true);
+        try {
+            const orderDate = new Date().toISOString();
+            const dueDate = new Date(weekEnd).toISOString();
+
+            // Track all used PO IDs across existingOrders, locState.children, and all current groups
+            const usedPoIds = new Set<string>();
+            existingOrders.forEach((o: any) => {
+                if (o.productionOrderId) usedPoIds.add(o.productionOrderId);
+            });
+            const locState = (location.state || {}) as { children?: any[] };
+            (locState.children || []).forEach((c: any) => {
+                if (c.productionOrderId) usedPoIds.add(c.productionOrderId);
+            });
+            weeklyGroups.forEach((g) => {
+                g.items.forEach((it) => {
+                    if (it.existingPoId) usedPoIds.add(it.existingPoId);
+                });
+            });
+
+            // Helper to get consistent machine number (mNum) for a group
+            const getMachineIndex = (group: WeeklyGroup, gIdx: number): number => {
+                for (const it of group.items) {
+                    if (it.existingPoId) {
+                        const match = it.existingPoId.match(/-M(\d+)-/);
+                        if (match) return parseInt(match[1], 10);
+                    }
+                }
+                const mIndex = machines.findIndex((m) => m.machineId === group.machineId);
+                if (mIndex >= 0) return mIndex + 1;
+                return gIdx + 1;
+            };
+
+            // Helper to generate a unique, non-colliding PO ID
+            const generateUniquePoId = (group: WeeklyGroup, gIdx: number): string => {
+                const mNum = getMachineIndex(group, gIdx);
+                let itemNum = 1;
+                let candidateId = `${baseOrderId}-M${mNum}-${itemNum}`.slice(0, 20);
+                while (usedPoIds.has(candidateId)) {
+                    itemNum++;
+                    candidateId = `${baseOrderId}-M${mNum}-${itemNum}`.slice(0, 20);
+                }
+                usedPoIds.add(candidateId);
+                return candidateId;
+            };
+
+            const payloads = allOrders.map(({ group, item, gIdx }) => {
+                const product = products.find((p) => p.id?.toString() === item.productItemId);
+                const rawUom = product?.uom?.uomCode || product?.uom?.name || "PCS";
+                const uom = rawUom.slice(0, 10);
+                const orderId = generateUniquePoId(group, gIdx);
+                return {
+                    productionOrderId: orderId,
+                    orderDate,
+                    dueDate,
+                    priority: "MEDIUM",
+                    orderType: "STANDARD",
+                    machineMachineId: group.machineId || null,
+                    weekStartDate: weekStart,
+                    weekEndDate: weekEnd,
+                    status: targetStatus,
+                    productItemId: item.productItemId,
+                    targetQty: Number(item.targetQty),
+                    uom,
+                    remarks: item.narration || null,
+                    rawMaterials: [],
+                };
+            });
+
+            if (isWeeklyEditMode) {
+                // Update existing POs (skip locked ones that are assigned to daily planning)
+                const updatePromises = allOrders
+                    .filter(({ item }) => item.existingPoId && !item.isLocked)
+                    .map(({ group, item }) => {
+                        return productionOrderService.update(item.existingPoId!, {
+                            targetQty: Number(item.targetQty),
+                            remarks: item.narration || null,
+                            status: targetStatus,
+                            machineMachineId: group.machineId || null,
+                            productItemId: item.productItemId,
+                            weekStartDate: weekStart,
+                            weekEndDate: weekEnd,
+                            orderDate,
+                            dueDate,
+                        } as any);
+                    });
+
+                // Create new POs added during edit mode
+                const createPromises = allOrders
+                    .filter(({ item }) => !item.existingPoId)
+                    .map(({ group, item, gIdx }) => {
+                        const product = products.find((p) => p.id?.toString() === item.productItemId);
+                        const rawUom = product?.uom?.uomCode || product?.uom?.name || "PCS";
+                        const uom = rawUom.slice(0, 10);
+                        const orderId = generateUniquePoId(group, gIdx);
+                        return productionOrderService.create({
+                            productionOrderId: orderId,
+                            orderDate,
+                            dueDate,
+                            priority: "MEDIUM",
+                            orderType: "STANDARD",
+                            machineMachineId: group.machineId || null,
+                            weekStartDate: weekStart,
+                            weekEndDate: weekEnd,
+                            status: targetStatus,
+                            productItemId: item.productItemId,
+                            targetQty: Number(item.targetQty),
+                            uom,
+                            remarks: item.narration || null,
+                            rawMaterials: [],
+                        } as any);
+                    });
+
+                // Delete POs that were removed during edit
+                const locState = (location.state || {}) as { children?: any[] };
+                const keptPoIds = new Set(allOrders.map(({ item }) => item.existingPoId).filter(Boolean));
+                const initialPoIds: string[] = (locState.children || []).map((c: any) => c.productionOrderId).filter(Boolean);
+                const removedPoIds = initialPoIds.filter((poId: string) => !keptPoIds.has(poId));
+                const deletePromises = removedPoIds.map((poId: string) => productionOrderService.delete(poId).catch(() => {}));
+
+                await Promise.all([...updatePromises, ...createPromises, ...deletePromises]);
+                toast.success(targetStatus === "DRAFT"
+                    ? `Weekly plan saved as draft — updated successfully!`
+                    : `Weekly plan updated successfully!`);
+            } else {
+                await Promise.all(payloads.map((p) => productionOrderService.create(p as any)));
+                toast.success(targetStatus === "DRAFT"
+                    ? `Weekly plan saved as draft — ${allOrders.length} order(s) saved!`
+                    : `Weekly plan created — ${allOrders.length} order(s) generated!`);
+            }
+            navigate("/production-orders");
+        } catch (err: any) {
+            const data = err?.response?.data;
+            const apiErrors: Array<{ path: string; message: string }> = data?.errors || [];
+            const detail = apiErrors.length
+                ? apiErrors.map((e) => `${e.path}: ${e.message}`).join(" | ")
+                : data?.message || err?.message || "Failed to create weekly plan";
+            toast.error(detail);
+        } finally {
+            setIsWeeklySubmitting(false);
+        }
+    };
+
     return (
         <>
-        <div className="max-w-[1024px] xl:mr-auto">
+        <div className="w-full">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-                    <h2 className="text-xl font-bold text-ink flex items-start">
-                        {isEditMode && !isDraftEdit ? "Edit Production Order" : "Create Production Order"}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b border-line">
+                    <h2 className="text-base font-bold text-ink flex items-start">
+                        {isWeeklyEditMode ? "Edit Weekly Plan" : isEditMode && !isDraftEdit ? "Edit Production Order" : "Create Production Order"}
                         <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("productionOrderId")}</span>
                     </h2>
-                    <BackButton text="Back to List" />
+                    <div className="flex items-center gap-2">
+                        <BackButton text="Back" onClick={handleBack} />
+                    </div>
                 </div>
 
                 <form
@@ -1197,295 +1640,343 @@ const ProductionOrderCreate: React.FC = () => {
                     className="p-4 lg:p-5 space-y-4"
                     noValidate
                 >
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
 
-                        {/* ── 1. Source Information ─────────────────────────── */}
-                        {watchSalesOrderId && (
-                            <>
-                                <div className="md:col-span-12">
-                                    <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2">
-                                        1. Selected Sales Order
-                                    </h3>
-                                    <div className="p-0" >
-                                        {isFetchingSalesOrder ? (
-                                            <div className="text-ink-muted">
-                                                Fetching Sales Order details…
-                                            </div>
-                                        ) : selectedSalesOrder ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-card-2 p-4 rounded-xl border border-line-soft">
-                                                <div className="md:col-span-3">
-                                                    <div className="text-ink-muted text-sm">
-                                                        Sales Order No
-                                                    </div>
-                                                    <div className="font-bold text-ink">
-                                                        {selectedSalesOrder.orderNo || "-"}
-                                                    </div>
-                                                </div>
-                                                <div className="md:col-span-3">
-                                                    <div className="text-ink-muted text-sm">
-                                                        Customer
-                                                    </div>
-                                                    <div className="font-bold text-ink">
-                                                        {selectedSalesOrder.customer
-                                                            ?.firmName || "-"}
-                                                    </div>
-                                                </div>
-                                                <div className="md:col-span-3">
-                                                    <div className="text-ink-muted text-sm">
-                                                        Order Date
-                                                    </div>
-                                                    <div className="font-bold text-ink">
-                                                        {selectedSalesOrder.orderDate
-                                                            ? formatDate(
-                                                                selectedSalesOrder.orderDate
-                                                            )
-                                                            : "-"}
-                                                    </div>
-                                                </div>
-                                                <div className="md:col-span-3">
-                                                    <div className="text-ink-muted text-sm">
-                                                        Due Date
-                                                    </div>
-                                                    <div className="font-bold text-ink">
-                                                        {selectedSalesOrder.expectedCompletionDate
-                                                            ? formatDate(
-                                                                selectedSalesOrder.expectedCompletionDate
-                                                            )
-                                                            : "-"}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="text-red-500">
-                                                No Sales Order selected. Please navigate
-                                                from Approved Sales Orders.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                {selectedSalesOrderItems.length > 0 && (
-                                    <div className="md:col-span-12 mt-2 mb-2">
-                                        <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2">
-                                            Sales Order Items
-                                        </h3>
-                                        <div className="mt-1 mb-2 border rounded-lg border-line-soft shadow-sm overflow-hidden">
-                                            <DataTable
-                                                columns={salesOrderColumns}
-                                                data={selectedSalesOrderItems}
-                                                rowKey={(item: any) => item.productId}
-                                                emptyMessage="No sales order items found."
-                                                className="border-0"
-                                                minHeightClassName="min-h-0"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                        <div className="md:col-span-12">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-xs font-extrabold text-ink uppercase tracking-wider">
-                                    {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}
-                                </h3>
-                                {!watchSalesOrderId && (
-                                    <CustomButton
-                                        text="Add Production"
-                                        icon={FaPlus}
-                                        type="button"
-                                        variant="secondary"
-                                        onClick={() => appendProduct({ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] })}
-                                    />
-                                )}
+
+                    {/* ── Weekly Plan Mode ─────────────────────────────────── */}
+                    {(!isEditMode || isWeeklyEditMode) && (
+                        <div className="space-y-4">
+                            {/* Week dates */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-2">
+                                <Controller
+                                    name="weekStartDate"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <DatePickerCalendar
+                                            label="Week Start"
+                                            name={field.name}
+                                            value={field.value ? field.value.substring(0, 10) : ""}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                field.onChange(val);
+                                                if (weeklyErrors.weekStart) setWeeklyErrors(prev => ({ ...prev, weekStart: undefined }));
+                                                const currentWeekEnd = getValues("weekEndDate");
+                                                if (currentWeekEnd && val && currentWeekEnd < val) {
+                                                    setValue("weekEndDate", "", { shouldDirty: true, shouldValidate: true });
+                                                }
+                                            }}
+                                            isDateDisabled={isDateDisabled}
+                                            disabled={hasAnyLockedWeeklyOrder}
+                                            error={weeklyErrors.weekStart}
+                                            horizontal
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name="weekEndDate"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <DatePickerCalendar
+                                            label="Week End"
+                                            name={field.name}
+                                            value={field.value ? field.value.substring(0, 10) : ""}
+                                            onChange={(e) => {
+                                                field.onChange(e.target.value);
+                                                if (weeklyErrors.weekEnd) setWeeklyErrors(prev => ({ ...prev, weekEnd: undefined }));
+                                            }}
+                                            minDate={watch("weekStartDate") ? watch("weekStartDate")?.substring(0, 10) : undefined}
+                                            isDateDisabled={isDateDisabled}
+                                            disabled={hasAnyLockedWeeklyOrder}
+                                            error={weeklyErrors.weekEnd}
+                                            horizontal
+                                        />
+                                    )}
+                                />
                             </div>
-                            <div className="p-0">
-                                {productFields.map((prodItem, index) => (
-                                    <div key={prodItem.id} className={index > 0 ? "mt-3 pt-3 border-t border-line-soft" : ""}>
-                                        <div className="flex justify-between items-center mb-2">
-                                            <h3 className="text-sm font-bold text-ink-muted">Product {index + 1}</h3>
-                                            {!watchSalesOrderId && productFields.length > 1 && (
-                                                <DeleteButton onClick={() => removeProduct(index)} />
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-3">
-                                            <Controller
-                                                name={`products.${index}.productItemId` as const}
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <SelectInput
-                                                        label="Finished Product"
-                                                        name={field.name}
-                                                        value={field.value}
-                                                        options={products.map((p) => {
-                                                            const isSelected = watchProducts?.some(
-                                                                (wp: any, wpIdx: number) => wpIdx !== index && wp.productItemId === p.id?.toString()
-                                                            );
-                                                            return {
-                                                                label: p.productName || p.productCode || p.id?.toString(),
-                                                                value: p.id?.toString() || "",
-                                                                disabled: isSelected
-                                                            };
-                                                        })}
-                                                        defaultOptionLabel="Select Finished Product"
-                                                        onChange={async (e) => {
-                                                            field.onChange(e);
-                                                            const p = products.find((x) => x.id?.toString() === e.target.value);
-                                                            if (p) {
-                                                                setValue(`products.${index}.uom` as any, p.uom?.name || p.uom?.uomCode || "ea");
-                                                            }
-                                                        }}
-                                                        required
-                                                        horizontal
-                                                        disabled={!!watchSalesOrderId}
-                                                        error={errors.products?.[index]?.productItemId?.message}
-                                                    />
-                                                )}
-                                            />
-                                            <Controller
-                                                name={`products.${index}.targetQty` as const}
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <TextInput
-                                                        label="Target Qty"
-                                                        name={field.name}
-                                                        type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        value={field.value !== undefined ? String(field.value) : ""}
-                                                        onChange={(e) => field.onChange(Number(e.target.value))}
-                                                        required
-                                                        horizontal
-                                                        disabled={!!watchSalesOrderId}
-                                                        error={errors.products?.[index]?.targetQty?.message}
-                                                    />
-                                                )}
-                                            />
-                                            <Controller
-                                                name={`products.${index}.uom` as const}
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <input type="hidden" name={field.name} value={field.value || "ea"} />
-                                                )}
-                                            />
-                                            <div className="sm:col-span-2">
-                                                <ProductRawMaterialsSection
-                                                    productIndex={index}
-                                                    productName={products.find(p => p.id?.toString() === watchProducts?.[index]?.productItemId)?.productName}
-                                                    control={control}
-                                                    errors={errors.products?.[index]}
-                                                    storeOptions={storeOptions}
-                                                    rowRmStates={rowRmStates}
-                                                    handleStoreChange={handleStoreChange}
-                                                    handleRmChange={handleRmChange}
-                                                    fetchRawMaterialsForStore={fetchRawMaterialsForStore}
-                                                    setValue={setValue}
-                                                    isCalculatingRM={isCalculatingRM}
+
+                            {/* Machine groups */}
+                            <div className="flex items-center justify-between mb-1">
+                                <div>
+                                    <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Production Schedules</h3>
+                                    {weeklyErrors.schedules && (
+                                        <p className="text-red-400 text-xs font-medium mt-0.5">{weeklyErrors.schedules}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {weeklyGroups.map((group, gIdx) => {
+                                    const hasLockedItems = group.items.some((it) => it.isLocked);
+                                    const usedMachineIds = new Set(
+                                        weeklyGroups
+                                            .filter((_, i) => i !== gIdx)
+                                            .map((g) => g.machineId)
+                                            .filter(Boolean)
+                                    );
+                                    const filteredMachineOptions = machineOptions.map((opt) => ({
+                                        ...opt,
+                                        disabled: usedMachineIds.has(String(opt.value)),
+                                    }));
+                                    return (
+                                    <div key={group.uid} id={`weekly-group-${group.uid}`} className="border border-line rounded-xl p-4">
+                                        {/* Machine selector */}
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className="flex-1">
+                                                <SelectInput
+                                                    label="Machine"
+                                                    horizontal
+                                                    name={`weekly-machine-${group.uid}`}
+                                                    value={group.machineId}
+                                                    options={filteredMachineOptions}
+                                                    defaultOptionLabel="Select Machine"
+                                                    disabled={hasLockedItems}
+                                                    onChange={(e) =>
+                                                        setWeeklyGroups((prev) =>
+                                                            prev.map((g, i) => i === gIdx ? { ...g, machineId: e.target.value } : g)
+                                                        )
+                                                    }
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Product + Qty table */}
+                                        <BusyItemsTable
+                                            columns={[
+                                                {
+                                                    key: "productItemId",
+                                                    header: "Product",
+                                                    width: "1fr",
+                                                    render: (row: any, iIdx: number) => {
+                                                        const isRowLocked = Boolean(row.isLocked);
+                                                        const usedIds = new Set(
+                                                            group.items
+                                                                .filter((_, j) => j !== iIdx)
+                                                                .map((it) => it.productItemId)
+                                                                .filter(Boolean)
+                                                        );
+                                                        const opts = productOptions.map((o) => ({
+                                                            ...o,
+                                                            disabled: usedIds.has(o.value),
+                                                        }));
+                                                        return (
+                                                            <div className="w-full">
+                                                                <AutocompleteInput
+                                                                    inline
+                                                                    name={`weekly-${group.uid}-product-${iIdx}`}
+                                                                    value={group.items[iIdx]?.productItemId || ""}
+                                                                    options={opts}
+                                                                    placeholder="Type to search..."
+                                                                    disabled={isRowLocked}
+                                                                    onChange={(v) => {
+                                                                        setWeeklyGroups((prev) =>
+                                                                            prev.map((g, gi) =>
+                                                                                gi !== gIdx ? g : {
+                                                                                    ...g,
+                                                                                    items: g.items.map((it, ii) =>
+                                                                                        ii === iIdx ? { ...it, productItemId: v } : it
+                                                                                    )
+                                                                                }
+                                                                            )
+                                                                        );
+                                                                        // Auto-focus Qty cell so user can enter quantity immediately (referencing Sales Order CreateOrder.tsx)
+                                                                        const focusQty = () => {
+                                                                            const groupEl = document.getElementById(`weekly-group-${group.uid}`);
+                                                                            const qtyCell = groupEl?.querySelector(`[data-r="${iIdx}"][data-c="1"]`) as HTMLElement | null;
+                                                                            const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                                                            if (qtyInput) {
+                                                                                qtyInput.focus();
+                                                                                qtyInput.select();
+                                                                                return true;
+                                                                            }
+                                                                            return false;
+                                                                        };
+                                                                        if (!focusQty()) {
+                                                                            setTimeout(focusQty, 50);
+                                                                            setTimeout(focusQty, 120);
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    },
+                                                },
+                                                {
+                                                    key: "targetQty",
+                                                    header: "Qty",
+                                                    width: "100px",
+                                                    align: "center" as const,
+                                                    render: (row: any, iIdx: number) => {
+                                                        const isRowLocked = Boolean(row.isLocked);
+                                                        return (
+                                                            <input
+                                                                type="text"
+                                                                inputMode="numeric"
+                                                                value={row.targetQty || ""}
+                                                                disabled={isRowLocked}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value.replace(/[^0-9.]/g, "");
+                                                                    setWeeklyGroups((prev) =>
+                                                                        prev.map((g, gi) =>
+                                                                            gi !== gIdx ? g : {
+                                                                                ...g,
+                                                                                items: g.items.map((it, ii) =>
+                                                                                    ii === iIdx ? { ...it, targetQty: Number(val) } : it
+                                                                                )
+                                                                            }
+                                                                        )
+                                                                    );
+                                                                }}
+                                                                placeholder="0"
+                                                                className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            />
+                                                        );
+                                                    },
+                                                },
+                                                {
+                                                    key: "narration",
+                                                    header: "Narration",
+                                                    width: "1fr",
+                                                    render: (row: any, iIdx: number) => {
+                                                        const isRowLocked = Boolean(row.isLocked);
+                                                        return (
+                                                            <input
+                                                                type="text"
+                                                                value={row.narration || ""}
+                                                                disabled={isRowLocked}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setWeeklyGroups((prev) =>
+                                                                        prev.map((g, gi) =>
+                                                                            gi !== gIdx ? g : {
+                                                                                ...g,
+                                                                                items: g.items.map((it, ii) =>
+                                                                                    ii === iIdx ? { ...it, narration: val } : it
+                                                                                )
+                                                                            }
+                                                                        )
+                                                                    );
+                                                                }}
+                                                                placeholder="Notes..."
+                                                                className="w-full bg-transparent text-[13px] text-ink outline-none border-none p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            />
+                                                        );
+                                                    },
+                                                },
+                                            ]}
+                                            rows={group.items}
+                                            isRowDeletable={(row) => !row.isLocked}
+                                            rowDeleteDisabledMessage={(row) => row.lockReason || "Cannot delete: This order is assigned to Daily Production Plan"}
+                                            onAdd={() =>
+                                                setWeeklyGroups((prev) =>
+                                                    prev.map((g, gi) =>
+                                                        gi !== gIdx ? g : {
+                                                            ...g,
+                                                            items: [...g.items, { uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "", isLocked: false }],
+                                                        }
+                                                    )
+                                                )
+                                            }
+                                            onRemove={(iIdx) => {
+                                                const item = group.items[iIdx];
+                                                if (item?.isLocked) {
+                                                    toast.warning(item.lockReason || "Cannot delete: This order is assigned to Daily Production Plan");
+                                                    return;
+                                                }
+                                                setWeeklyGroups((prev) =>
+                                                    prev.map((g, gi) =>
+                                                        gi !== gIdx ? g : {
+                                                            ...g,
+                                                            items: g.items.filter((_, ii) => ii !== iIdx),
+                                                        }
+                                                    )
+                                                );
+                                            }}
+                                            editable
+                                            visibleRows={6}
+                                        />
                                     </div>
-                                ))}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-3 mt-3 pt-3 border-t border-line-soft">
-                                    <Controller
-                                        name="orderDate"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <DatePickerCalendar
-                                                label="Order Date"
-                                                name={field.name}
-                                                value={field.value ? field.value.substring(0, 10) : ""}
-                                                onChange={(e) => field.onChange(e.target.value)}
-                                                required
-                                                horizontal
-                                                disabled={!!watchSalesOrderId}
-                                                error={errors.orderDate?.message}
-                                            />
-                                        )}
-                                    />
-                                    <Controller
-                                        name="dueDate"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <DatePickerCalendar
-                                                label="Due Date"
-                                                name={field.name}
-                                                value={field.value ? field.value.substring(0, 10) : ""}
-                                                onChange={(e) => field.onChange(e.target.value)}
-                                                required
-                                                horizontal
-                                                minDate={watch("orderDate")}
-                                                error={errors.dueDate?.message}
-                                            />
-                                        )}
-                                    />
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
-
-
-                        {/* ── 2. General Details ──────────────────────────── */}
-                        <div className="md:col-span-12">
-                            
-                            <Controller
-                                name="remarks"
-                                control={control}
-                                render={({ field }) => (
-                                    <TextArea
-                                        label="Narration "
-                                        name={field.name}
-                                        value={field.value ?? ""}
-                                        placeholder="Any remarks for this order"
-                                        rows={2}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     {/* ── Form Actions ──────────────────────────────────────── */}
-                    <div className="flex justify-end gap-3 px-5 py-4 border-t border-line -mx-5 lg:-mx-6 -mb-6">
-                        <CustomButton
-                            text="Clear Form"
-                            icon={FaEraser}
-                            variant="secondary"
-                            onClick={() => {
-                                reset(defaultValues);
-                                setRowRmStates({});
-                            }}
-                            disabled={isSubmitting}
-                        />
-                        <div className="ml-2">
-                            <CustomButton
-                                text={isSubmitting ? "Saving..." : "Save as Draft"}
-                                onClick={handleSubmit((data) => onSubmit({ ...data, status: "DRAFT" }))}
-                                disabled={isSubmitting}
-
-                            />
-                        </div>
-                        <div className="ml-2">
-                            <CustomButton
-                                text={
-                                    isSubmitting
-                                        ? (isEditMode && !isDraftEdit ? "Updating" : "Creating")
-                                        : (isEditMode && !isDraftEdit ? "Update Order" : "Create Production Order")
-                                }
-                                icon={isSubmitting ? undefined : FaSave}
-                                onClick={handleSubmit((data) => {
-                                    const targetStatus = (isEditMode && (data.status === "DRAFT" || data.status === "CREATED"))
-                                        ? "READY_FOR_PLANNING"
-                                        : data.status === "DRAFT"
-                                            ? "CREATED"
+                    <div className="flex justify-end gap-2 pt-4 border-t border-line">
+                        {!isEditMode && (
+                            <>
+                                <CustomButton
+                                    text="Clear"
+                                    icon={FaEraser}
+                                    variant="secondary"
+                                    onClick={() => {
+                                        if (machines.length > 0) {
+                                            setWeeklyGroups(
+                                                machines.map((m) => ({
+                                                    uid: crypto.randomUUID(),
+                                                    machineId: m.machineId,
+                                                    items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                                                }))
+                                            );
+                                        } else {
+                                            setWeeklyGroups([newWeeklyGroup()]);
+                                        }
+                                    }}
+                                    disabled={isWeeklySubmitting}
+                                />
+                                <CustomButton
+                                    text={isWeeklySubmitting ? "Saving..." : "Save as Draft"}
+                                    icon={isWeeklySubmitting ? undefined : FaSave}
+                                    variant="secondary"
+                                    type="button"
+                                    onClick={() => onWeeklySubmit("DRAFT")}
+                                    disabled={isWeeklySubmitting || !(isWeeklyEditMode ? can("production_orders.edit") : can("production_orders.create"))}
+                                />
+                                <CustomButton
+                                    text={isWeeklySubmitting ? (isWeeklyEditMode ? "Updating..." : "Creating...") : (isWeeklyEditMode ? "Update Weekly Plan" : "Create Weekly Plan")}
+                                    icon={isWeeklySubmitting ? undefined : FaSave}
+                                    type="button"
+                                    onClick={() => onWeeklySubmit("WEEKLY_SCHEDULED")}
+                                    disabled={isWeeklySubmitting || !(isWeeklyEditMode ? can("production_orders.edit") : can("production_orders.create"))}
+                                />
+                            </>
+                        )}
+                        {isEditMode && (
+                            <>
+                                <CustomButton
+                                    text="Clear Form"
+                                    icon={FaEraser}
+                                    variant="secondary"
+                                    onClick={() => { reset(defaultValues); setRowRmStates({}); }}
+                                    disabled={isSubmitting}
+                                />
+                                {watchStatus === "DRAFT" && (
+                                    <CustomButton
+                                        text={isSubmitting ? "Saving..." : "Save as Draft"}
+                                        variant="secondary"
+                                        onClick={handleSubmit((data) => onSubmit({ ...data, status: "DRAFT" }))}
+                                        disabled={isSubmitting || !can("production_orders.edit")}
+                                    />
+                                )}
+                                <CustomButton
+                                    text={isSubmitting ? "Updating..." : (watchStatus === "DRAFT" ? "Finalize Order" : "Update Order")}
+                                    icon={isSubmitting ? undefined : FaSave}
+                                    onClick={handleSubmit((data) => {
+                                        const targetStatus = data.status === "DRAFT"
+                                            ? "WEEKLY_SCHEDULED"
                                             : data.status;
-                                    onSubmit({ ...data, status: targetStatus });
-                                })}
-                                type="button"
-                                disabled={isSubmitting}
-                            />
-                        </div>
+                                        onSubmit({ ...data, status: targetStatus });
+                                    })}
+                                    type="button"
+                                    disabled={isSubmitting || !can("production_orders.edit")}
+                                />
+                            </>
+                        )}
                     </div>
+
                 </form>
             </div>
         </div>
+       
+
         <CommonConfirmModal
             show={saveConfirmOpen}
             onHide={() => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaCheck, FaTimes, FaTruck } from "react-icons/fa";
+import { FaCheck, FaTimes } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import {
@@ -10,7 +10,6 @@ import {
   storeReceiveDispatch,
 } from "../../../features/goods-dispatch/goodsDispatchSlice";
 
-import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -32,15 +31,21 @@ const formatUOM = (code: string | null | undefined) => {
 
 const GoodsDispatchView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
+
+  // Only show approval actions when on the /approval/ route
+  const isApprovalRoute = location.pathname.includes("/approval/");
 
   const { currentDispatch: dispatchData, loading } = useAppSelector((state) => state.goodsDispatch);
-  const { can } = usePermission();
-  const canEdit = can("production_orders.edit");
 
   const [remarks, setRemarks] = useState("");
   const [receivedQuantities, setReceivedQuantities] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (id) dispatch(fetchGoodsDispatchById(id));
+  }, [dispatch, id]);
 
   useEffect(() => {
     if (dispatchData?.items && dispatchData.status === "PENDING_STORE_RECEIPT") {
@@ -52,12 +57,6 @@ const GoodsDispatchView: React.FC = () => {
     }
   }, [dispatchData]);
 
-  useEffect(() => {
-    if (id) {
-      dispatch(fetchGoodsDispatchById(id));
-    }
-  }, [dispatch, id]);
-
   if (loading && !dispatchData) {
     return <div className="p-8 text-center text-ink-subtle font-semibold">Loading dispatch details...</div>;
   }
@@ -66,66 +65,98 @@ const GoodsDispatchView: React.FC = () => {
     return <div className="p-8 text-center text-red-400 font-semibold">Goods Dispatch not found.</div>;
   }
 
-  const handleGateApproval = async (action: "APPROVE" | "REJECT") => {
-    if (action === "REJECT" && !remarks) {
-      toast.error("Remarks are required for rejection");
-      return;
-    }
+  const isGate = dispatchData.status === "PENDING_GATE_APPROVAL";
+  const isStore = dispatchData.status === "PENDING_STORE_RECEIPT";
+  const canAct = (isGate || isStore) && can("goods-dispatch.edit");
+
+  const handleApprove = async () => {
     try {
-      await dispatch(gateApproveDispatch({ id: dispatchData.id, data: { action, remarks } })).unwrap();
-      toast.success(`Gate approval ${action.toLowerCase()} processed`);
+      if (isGate) {
+        await dispatch(gateApproveDispatch({ id: dispatchData.id, data: { action: "APPROVE", remarks } })).unwrap();
+        toast.success("Gate approved successfully");
+      } else {
+        const receivedItems = dispatchData.items?.map((item: any) => ({
+          itemId: Number(item.id),
+          receivedQty: Number(receivedQuantities[item.id] ?? item.dispatchQty),
+        }));
+        await dispatch(storeReceiveDispatch({ id: dispatchData.id, data: { action: "APPROVE", remarks, receivedItems } })).unwrap();
+        toast.success("Stock received successfully. Stock updated.");
+      }
+      dispatch(fetchGoodsDispatchById(dispatchData.id));
       setRemarks("");
     } catch (err: any) {
       toast.error(err);
     }
   };
 
-  const handleStoreReceipt = async (action: "APPROVE" | "REJECT") => {
-    if (action === "REJECT" && !remarks) {
+  const handleReject = async () => {
+    if (!remarks.trim()) {
       toast.error("Remarks are required for rejection");
       return;
     }
     try {
-      const receivedItems = action === "APPROVE" 
-        ? dispatchData.items?.map((item: any) => ({
-            itemId: Number(item.id),
-            receivedQty: Number(receivedQuantities[item.id] || item.dispatchQty)
-          }))
-        : undefined;
-
-      await dispatch(storeReceiveDispatch({ 
-        id: dispatchData.id, 
-        data: { action, remarks, receivedItems } 
-      })).unwrap();
-      toast.success(`Store receipt ${action.toLowerCase()} processed`);
+      if (isGate) {
+        await dispatch(gateApproveDispatch({ id: dispatchData.id, data: { action: "REJECT", remarks } })).unwrap();
+        toast.success("Gate rejected");
+      } else {
+        await dispatch(storeReceiveDispatch({ id: dispatchData.id, data: { action: "REJECT", remarks } })).unwrap();
+        toast.success("Store receipt rejected");
+      }
+      dispatch(fetchGoodsDispatchById(dispatchData.id));
       setRemarks("");
     } catch (err: any) {
       toast.error(err);
     }
   };
+
+  const steps = [
+    {
+      label: "Dispatch Created",
+      date: dispatchData.createdAt,
+      done: true,
+      rejected: false,
+      remarks: null,
+      color: "bg-primary",
+    },
+    {
+      label: dispatchData.status === "GATE_REJECTED" ? "Gate Rejected" : "Gate Approved",
+      date: dispatchData.gateApprovedAt,
+      done: !!dispatchData.gateApprovedAt,
+      rejected: dispatchData.status === "GATE_REJECTED",
+      remarks: dispatchData.gateRemarks,
+      color: dispatchData.status === "GATE_REJECTED" ? "bg-red-500" : "bg-primary",
+    },
+    {
+      label: dispatchData.status === "STORE_REJECTED" ? "Store Rejected" : "Warehouse Received",
+      date: dispatchData.storeReceivedAt,
+      done: !!dispatchData.storeReceivedAt,
+      rejected: dispatchData.status === "STORE_REJECTED",
+      remarks: dispatchData.storeRemarks,
+      color: dispatchData.status === "STORE_REJECTED" ? "bg-red-500" : "bg-emerald-500",
+    },
+  ];
 
   return (
-    <div className="p-4 md:p-6 min-h-screen">
-      <div className="w-full mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-extrabold text-ink tracking-tight flex items-center gap-3">
-              {dispatchData.dispatchNumber}
-              <StatusBadge status={dispatchData.status} />
-            </h2>
-            <p className="text-ink-subtle text-sm font-semibold mt-0.5">
-              Dispatch Date: {formatDate(dispatchData.dispatchDate)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <BackButton text="Back" to="/production/goods-dispatch" />
-          </div>
+    <div className="w-full bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
+        <div>
+          <h2 className="text-base font-bold text-ink flex items-center gap-3">
+            {dispatchData.dispatchNumber}
+            <StatusBadge status={dispatchData.status} />
+          </h2>
+          <p className="text-ink-subtle text-xs mt-0.5">
+            Dispatch Date: {formatDate(dispatchData.dispatchDate)}
+          </p>
         </div>
+        <BackButton text="Back to List" to="/production/goods-dispatch" />
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            {/* Items List */}
+      <div className="p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Dispatched Items */}
             <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
                 <h3 className="font-extrabold text-ink text-base">Dispatched Items</h3>
@@ -135,15 +166,25 @@ const GoodsDispatchView: React.FC = () => {
                   <thead className="bg-card-2 border-b border-line-soft">
                     <tr>
                       {["PO No", "Product", "Dispatch Qty", "Received Qty"].map((h, i) => (
-                        <th key={h} className={`text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold px-4 py-3 ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
+                        <th
+                          key={h}
+                          className={`text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold px-4 py-3 ${i >= 2 ? "text-right" : "text-left"}`}
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line-soft bg-card">
-                    {dispatchData.items?.map((item) => (
+                    {dispatchData.items?.map((item: any) => (
                       <tr key={item.id} className="hover:bg-card-2/60 transition-colors">
                         <td className="px-4 py-3 text-sm text-ink font-bold">
-                          {item.productionOrder?.productionOrderId}
+                          <div>{item.productionOrder?.productionOrderId}</div>
+                          {item.bypassGate && (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              ✓ Direct
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-ink">
                           <div className="font-bold text-ink">{item.product?.productName}</div>
@@ -152,8 +193,8 @@ const GoodsDispatchView: React.FC = () => {
                         <td className="px-4 py-3 text-sm text-right font-bold text-ink">
                           {Number(item.dispatchQty)} {formatUOM(item.uom)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-bold text-primary">
-                          {dispatchData.status === "PENDING_STORE_RECEIPT" && canEdit ? (
+                        <td className="px-4 py-3 text-sm text-right">
+                          {isStore && canAct ? (
                             <div className="flex items-center justify-end gap-2">
                               <div className="w-24">
                                 <TextInput
@@ -165,19 +206,28 @@ const GoodsDispatchView: React.FC = () => {
                                   value={receivedQuantities[item.id] ?? ""}
                                   onChange={(e: any) => {
                                     let val = Number(e.target.value);
-                                    if (val > Number(item.dispatchQty)) {
-                                      val = Number(item.dispatchQty);
-                                    }
-                                    setReceivedQuantities(prev => ({ ...prev, [item.id]: String(val) }));
+                                    if (val > Number(item.dispatchQty)) val = Number(item.dispatchQty);
+                                    setReceivedQuantities((prev) => ({ ...prev, [item.id]: String(val) }));
                                   }}
                                 />
                               </div>
                               <span className="text-xs text-ink-subtle font-semibold">{formatUOM(item.uom)}</span>
                             </div>
+                          ) : item.bypassGate ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-bold text-emerald-400">
+                                {Number(item.dispatchQty)} {formatUOM(item.uom)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30">
+                                ✓ Stock Added Directly
+                              </span>
+                            </div>
                           ) : (
                             <div className="flex flex-col items-end gap-1">
-                              <div>{item.receivedQty !== null && item.receivedQty !== undefined ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}</div>
-                              {item.receivedQty !== null && item.receivedQty !== undefined && Number(item.receivedQty) < Number(item.dispatchQty) && (
+                              <span className="font-bold text-primary">
+                                {item.receivedQty != null ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}
+                              </span>
+                              {item.receivedQty != null && Number(item.receivedQty) < Number(item.dispatchQty) && (
                                 <span className="inline-flex items-center bg-red-500/15 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
                                   {Number(item.dispatchQty) - Number(item.receivedQty)} {formatUOM(item.uom)} Missing
                                 </span>
@@ -192,7 +242,7 @@ const GoodsDispatchView: React.FC = () => {
               </div>
             </div>
 
-            {/* Vehicle Info */}
+            {/* Vehicle Information */}
             <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
                 <h3 className="font-extrabold text-ink text-base">Vehicle Information</h3>
@@ -210,168 +260,101 @@ const GoodsDispatchView: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column - Workflow / Approvals */}
+          {/* Right Column */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Gate Approval Actions */}
-            {dispatchData.status === "PENDING_GATE_APPROVAL" && canEdit && (
+            {/* Action Panel — only when actionable and user has permission */}
+            {canAct && (
               <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
                 <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
-                  <h3 className="font-extrabold text-ink text-base">Gate Approval</h3>
+                  <h3 className="font-extrabold text-ink text-base">
+                    {isGate ? "Gate Approval" : "Store Receipt"}
+                  </h3>
                 </div>
                 <div className="p-5 space-y-4">
+                  {isStore && (
+                    <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2.5">
+                      <p className="text-xs text-primary font-medium">
+                        Approving will automatically update Finished Goods Stock in{" "}
+                        <span className="font-bold">{dispatchData.store?.storeName || "the destination store"}</span>.
+                      </p>
+                    </div>
+                  )}
                   <textarea
-                    className="w-full px-3.5 py-2.5 border border-line-soft rounded-xl text-sm text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-ink-subtle bg-card-2"
-                    placeholder="Enter approval or rejection remarks here..."
+                    className="w-full px-3 py-2.5 border border-line-soft rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none placeholder:text-ink-subtle bg-card-2"
+                    placeholder={isGate ? "Enter approval or rejection remarks..." : "Enter receipt or rejection remarks..."}
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     rows={3}
                   />
                   <div className="flex gap-3">
                     <button
-                      onClick={() => handleGateApproval("APPROVE")}
+                      onClick={handleApprove}
                       disabled={loading}
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                      className={`flex-1 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors ${
+                        isGate ? "bg-emerald-500 hover:bg-emerald-600" : "bg-primary hover:bg-primary/90"
+                      }`}
                     >
-                      <FaCheck className="w-4 h-4" /> Approve
+                      <FaCheck className="w-3.5 h-3.5" />
+                      {isGate ? "Approve" : "Receive Stock"}
                     </button>
                     <button
-                      onClick={() => handleGateApproval("REJECT")}
+                      onClick={handleReject}
                       disabled={loading}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
                     >
-                      <FaTimes className="w-4 h-4" /> Reject
+                      <FaTimes className="w-3.5 h-3.5" /> Reject
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Store Receipt Actions */}
-            {dispatchData.status === "PENDING_STORE_RECEIPT" && canEdit && (
-              <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
-                  <h3 className="font-extrabold text-ink text-base">Store Receipt</h3>
-                </div>
-                <div className="p-5 space-y-4">
-                  <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
-                    <p className="text-xs text-primary font-medium leading-relaxed">
-                      Approving this will automatically update the Finished Goods Stock in <span className="font-bold">{dispatchData.store?.storeName || "the destination store"}</span>.
-                    </p>
-                  </div>
-                  <textarea
-                    className="w-full px-3.5 py-2.5 border border-line-soft rounded-xl text-sm text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-ink-subtle bg-card-2"
-                    placeholder="Enter receipt or rejection remarks here..."
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    rows={3}
-                  />
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleStoreReceipt("APPROVE")}
-                      disabled={loading}
-                      className="flex-1 bg-primary hover:bg-primary/90 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      <FaCheck className="w-4 h-4" /> Receive Stock
-                    </button>
-                    <button
-                      onClick={() => handleStoreReceipt("REJECT")}
-                      disabled={loading}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      <FaTimes className="w-4 h-4" /> Reject
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Timeline / History */}
+            {/* Status History */}
             <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
                 <h3 className="font-extrabold text-ink text-base">Status History</h3>
               </div>
               <div className="p-5">
-                {(() => {
-                  const steps = [
-                    {
-                      label: "Dispatch Created",
-                      date: dispatchData.createdAt,
-                      done: true,
-                      rejected: false,
-                      remarks: null,
-                      color: "bg-primary",
-                    },
-                    {
-                      label: dispatchData.status === "GATE_REJECTED" ? "Gate Rejected" : "Gate Approved",
-                      date: dispatchData.gateApprovedAt,
-                      done: !!dispatchData.gateApprovedAt,
-                      rejected: dispatchData.status === "GATE_REJECTED",
-                      remarks: dispatchData.gateRemarks,
-                      color: dispatchData.status === "GATE_REJECTED" ? "bg-red-500" : "bg-primary",
-                    },
-                    {
-                      label: dispatchData.status === "STORE_REJECTED" ? "Store Rejected" : "Warehouse Received",
-                      date: dispatchData.storeReceivedAt,
-                      done: !!dispatchData.storeReceivedAt,
-                      rejected: dispatchData.status === "STORE_REJECTED",
-                      remarks: dispatchData.storeRemarks,
-                      color: dispatchData.status === "STORE_REJECTED" ? "bg-red-500" : "bg-emerald-500",
-                    },
-                  ];
-
-                  return (
-                    <div className="flex flex-col gap-0">
-                      {steps.map((step, idx) => (
-                        <div key={idx} className="flex items-start gap-3">
-                          {/* Left: circle + vertical connector */}
-                          <div className="flex flex-col items-center">
-                            <div
-                              className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-extrabold shadow-sm shrink-0
-                                ${step.done ? step.color : "bg-card-2 border-2 border-line-soft"}`}
-                            >
-                              {step.done ? (
-                                step.rejected ? (
-                                  <FaTimes className="w-3 h-3" />
-                                ) : (
-                                  <FaCheck className="w-3 h-3" />
-                                )
-                              ) : (
-                                <span className="w-2 h-2 rounded-full bg-line-soft" />
-                              )}
-                            </div>
-                            {/* Vertical connector line */}
-                            {idx < steps.length - 1 && (
-                              <div
-                                className={`w-0.5 flex-1 min-h-[28px] mt-1 ${
-                                  steps[idx + 1].done
-                                    ? steps[idx + 1].rejected
-                                      ? "bg-red-500/40"
-                                      : "bg-primary/40"
-                                    : "bg-line-soft"
-                                }`}
-                              />
-                            )}
-                          </div>
-
-                          {/* Right: label + date + remarks */}
-                          <div className={`pb-4 ${idx === steps.length - 1 ? "pb-0" : ""}`}>
-                            <p className={`text-[12px] font-extrabold leading-tight ${step.rejected ? "text-red-400" : step.done ? "text-ink" : "text-ink-subtle"}`}>
-                              {step.label}
-                            </p>
-                            {step.date && (
-                              <p className="text-[11px] text-ink-subtle font-semibold mt-0.5 leading-tight">
-                                {formatDateTime(step.date)}
-                              </p>
-                            )}
-                            {step.remarks && (
-                              <p className="text-[11px] text-ink-subtle mt-1 italic leading-tight">"{step.remarks}"</p>
-                            )}
-                          </div>
+                <div className="flex flex-col gap-0">
+                  {steps.map((step, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-extrabold shadow-sm shrink-0
+                            ${step.done ? step.color : "bg-card-2 border-2 border-line-soft"}`}
+                        >
+                          {step.done ? (
+                            step.rejected ? <FaTimes className="w-3 h-3" /> : <FaCheck className="w-3 h-3" />
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-line-soft" />
+                          )}
                         </div>
-                      ))}
+                        {idx < steps.length - 1 && (
+                          <div
+                            className={`w-0.5 flex-1 min-h-[28px] mt-1 ${
+                              steps[idx + 1].done
+                                ? steps[idx + 1].rejected ? "bg-red-500/40" : "bg-primary/40"
+                                : "bg-line-soft"
+                            }`}
+                          />
+                        )}
+                      </div>
+                      <div className={`pb-4 ${idx === steps.length - 1 ? "pb-0" : ""}`}>
+                        <p className={`text-[12px] font-extrabold leading-tight ${step.rejected ? "text-red-400" : step.done ? "text-ink" : "text-ink-subtle"}`}>
+                          {step.label}
+                        </p>
+                        {step.date && (
+                          <p className="text-[11px] text-ink-subtle font-semibold mt-0.5 leading-tight">
+                            {formatDateTime(step.date)}
+                          </p>
+                        )}
+                        {step.remarks && (
+                          <p className="text-[11px] text-ink-subtle mt-1 italic leading-tight">"{step.remarks}"</p>
+                        )}
+                      </div>
                     </div>
-                  );
-                })()}
+                  ))}
+                </div>
               </div>
             </div>
           </div>

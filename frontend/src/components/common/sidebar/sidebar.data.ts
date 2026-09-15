@@ -42,7 +42,6 @@ export const sidebarItems: SidebarItem[] = [
           "suppliers.view",
           "employees.view",
           "machines.view",
-          "machine-assignments.view",
           "shifts.view",
         ],
         children: [
@@ -93,22 +92,6 @@ export const sidebarItems: SidebarItem[] = [
                 path: "/machines",
                 permission: "machines.view",
                 badge: "Ctrl+M",
-              },
-            ],
-          },
-          {
-            title: "Machine Assignments",
-            permission: "machine-assignments.view",
-            children: [
-              {
-                title: "Add",
-                path: "/machines/assignments/create",
-                permission: "machine-assignments.create",
-              },
-              {
-                title: "List",
-                path: "/machines/assignments",
-                permission: "machine-assignments.view",
               },
             ],
           },
@@ -189,7 +172,6 @@ export const sidebarItems: SidebarItem[] = [
       "invoice-settings.view",
       "employees.view",
       "machines.view",
-      "machine-assignments.view",
       "shifts.view",
       "customers.view",
       "suppliers.view",
@@ -522,8 +504,6 @@ export const sidebarItems: SidebarItem[] = [
     pathsByPermission: [
       { permission: "production_orders.view", path: "/production-orders" },
       { permission: "daily-machine-planning.view", path: "/daily-machine-planning" },
-      { permission: "hourly_productions.view", path: "/hourly-work-reports" },
-      { permission: "weekly_programs.view", path: "/weekly-machine-schedules" },
       { permission: "goods-dispatch.view", path: "/production/goods-dispatch" },
     ],
     children: [
@@ -534,23 +514,15 @@ export const sidebarItems: SidebarItem[] = [
         children: [
           { title: "Add", path: "/production-orders/create", permission: "production_orders.create" },
           { title: "List", path: "/production-orders", permission: "production_orders.view", badge: "Alt+U" },
-          { title: "Order History", path: "/allproduction-orders", permission: "production_orders.view" },
         ],
       },
-      // ── Planning & Reports ──
+      // ── Daily Machine Planning ──
       {
-        title: "Planning & Reports",
-        permissionAny: [
-          "daily-machine-planning.view",
-          "hourly_productions.view",
-          "weekly_programs.view",
-          "production-wastages.view",
-        ],
+        title: "Daily Machine Planning",
+        permission: "daily-machine-planning.view",
         children: [
-          { title: "Weekly Schedules", path: "/weekly-machine-schedules", permission: "weekly_programs.view" },
-          { title: "Daily Machine Planning", path: "/daily-machine-planning", permission: "daily-machine-planning.view" },
-          { title: "Hourly Work Reports", path: "/hourly-work-reports", permission: "hourly_productions.view" },
-          { title: "Production Wastages", path: "/production-wastages", permission: "production-wastages.view" },
+          { title: "Add", path: "/daily-production-plans/create", permission: "daily-machine-planning.create" },
+          { title: "List", path: "/daily-machine-planning", permission: "daily-machine-planning.view" },
         ],
       },
       // ── Dispatch ──
@@ -565,19 +537,13 @@ export const sidebarItems: SidebarItem[] = [
     ],
     activePaths: [
       "/production-orders",
-      "/allproduction-orders",
-      "/weekly-machine-schedules",
       "/daily-machine-planning",
-      "/hourly-work-reports",
-      "/production-wastages",
+      "/daily-production-plans",
       "/production/goods-dispatch",
     ],
     permissionAny: [
       "production_orders.view",
-      "weekly_programs.view",
       "daily-machine-planning.view",
-      "hourly_productions.view",
-      "production-wastages.view",
       "goods-dispatch.view",
     ],
   },
@@ -857,11 +823,6 @@ export const sidebarItems: SidebarItem[] = [
   //           badge: "P",
   //         },
   //         {
-  //           title: "Order History",
-  //           path: "/allproduction-orders",
-  //           permission: "production_orders.view",
-  //         },
-  //         {
   //           title: "Daily Machine Planning",
   //           path: "/daily-machine-planning",
   //           permission: "daily-machine-planning.view",
@@ -925,7 +886,6 @@ export const sidebarItems: SidebarItem[] = [
   //     "/accounts/contra-entry",
   //     "/expenses",
   //     "/production-orders",
-  //     "/allproduction-orders",
   //     "/weekly-machine-schedules",
   //     "/daily-machine-planning",
   //     "/hourly-work-reports",
@@ -1133,4 +1093,3 @@ export const sidebarItems: SidebarItem[] = [
     ],
   },
 ];
-

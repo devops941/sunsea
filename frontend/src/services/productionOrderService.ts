@@ -40,6 +40,12 @@ export interface ProductionOrder {
     remarks?: string;
     createdAt: string;
     updatedAt: string;
+    _editRestrictions?: {
+        canEditDates: boolean;
+        canEditProductQty: boolean;
+        canDelete: boolean;
+        reason: string;
+    } | null;
 }
 
 export interface CreateProductionOrderDto {
@@ -59,8 +65,29 @@ export interface CreateProductionOrderDto {
     destinationStoreId?: string;
     bomId?: string;
     routingId?: string;
+    machineMachineId?: string | null;
+    weekStartDate?: string | null;
+    weekEndDate?: string | null;
     status: string;
     remarks?: string;
+}
+
+export interface MachineProgramItem {
+    productionOrderId: string;
+    productName: string;
+    productCode: string;
+    productItemId: string;
+    machineId: string | null;
+    noOfPcs: number;
+    producedQty: number;
+    plannedElsewhere: number;
+    hadPriorPlan: boolean;
+    isOverdue: boolean;
+    uom: string;
+    weekStartDate: string | null;
+    weekEndDate: string | null;
+    status: string;
+    remarks: string;
 }
 
 
@@ -141,5 +168,12 @@ export const productionOrderService = {
     getHistory: async (id: number | string): Promise<any> => {
         const response = await apiClient.get(`${config.productionOrder.base}/${id}/history`);
         return response.data?.data || response.data;
+    },
+
+    getMachinePrograms: async (machineId: string, weekStartDate: string): Promise<MachineProgramItem[]> => {
+        const response = await apiClient.get(`${config.productionOrder.base}/machine-program`, {
+            params: { machineId, weekStartDate },
+        });
+        return response.data?.data || response.data || [];
     },
 };

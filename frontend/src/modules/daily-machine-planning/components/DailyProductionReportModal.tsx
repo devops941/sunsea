@@ -338,7 +338,7 @@ export const DailyProductionReportModal: React.FC<DailyProductionReportModalProp
           <DataTable
             columns={columns}
             data={reportData.machineWise}
-            rowKey={(row) => row.id || row.machineId || Math.random().toString()}
+            rowKey={(row) => String(row.id || row.machineId || row.machineName)}
             emptyMessage="No production records found for the selected date."
           />
         </div>

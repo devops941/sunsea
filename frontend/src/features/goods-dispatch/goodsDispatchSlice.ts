@@ -124,12 +124,6 @@ const goodsDispatchSlice = createSlice({
   name: "goodsDispatch",
   initialState,
   reducers: {
-    clearCurrentDispatch: (state) => {
-      state.currentDispatch = null;
-    },
-    clearError: (state) => {
-      state.error = null;
-    },
     goodsDispatchCreated: (state, action) => {
       if (Array.isArray(state.dispatches)) {
         const exists = state.dispatches.find((m: any) => String(m.id) === String(action.payload.id));
@@ -235,5 +229,5 @@ const goodsDispatchSlice = createSlice({
   },
 });
 
-export const { clearCurrentDispatch, clearError, goodsDispatchCreated, goodsDispatchUpdated, goodsDispatchDeleted } = goodsDispatchSlice.actions;
+export const { goodsDispatchCreated, goodsDispatchUpdated, goodsDispatchDeleted } = goodsDispatchSlice.actions;
 export default goodsDispatchSlice.reducer;

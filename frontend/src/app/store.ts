@@ -15,13 +15,11 @@ import storeReducer from "../features/stores/storeSlice";
 import rawMaterialReducer from "../features/raw-materials/rawMaterialSlice";
 import rawMaterialStockReducer from "../features/raw-materials/rawMaterialStockSlice";
 import machineReducer from "../features/machines/machineSlice";
-import weeklyProgramReducer from "../features/weekly-programs/weeklyProgramSlice";
 import productionOrderReducer from "../features/production-orders/productionOrderSlice";
 import hourlyProductionReducer from "../features/hourly-productions/hourlyProductionSlice";
 import profileReducer from "../features/profiles/profileSlice";
 import stockAdjustmentReducer from "../features/stock-adjustments/stockAdjustmentSlice";
 import purchaseOrderReducer from "../features/purchaseOrder/purchaseOrderSlice";
-import productionWastageReducer from "../features/production-wastage/productionWastageSlice";
 import companyReducer from "../features/company/companySlice";
 import finishedGoodsStockReducer from "../features/finished-goods-stock/finishedGoodsStockSlice";
 import dailyPlanReducer from "../features/daily-plans/dailyPlanSlice";
@@ -52,13 +50,11 @@ export const store = configureStore({
         rawMaterials: rawMaterialReducer,
         rawMaterialStocks: rawMaterialStockReducer,
         machines: machineReducer,
-        weeklyPrograms: weeklyProgramReducer,
         productionOrders: productionOrderReducer,
         hourlyProductions: hourlyProductionReducer,
         stockAdjustments: stockAdjustmentReducer,
         [baseApi.reducerPath]: baseApi.reducer,
         purchaseOrder: purchaseOrderReducer,
-        productionWastages: productionWastageReducer,
         company: companyReducer,
         finishedGoodsStocks: finishedGoodsStockReducer,
         dailyPlans: dailyPlanReducer,

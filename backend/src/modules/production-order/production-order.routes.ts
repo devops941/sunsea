@@ -8,7 +8,8 @@ import {
   updateProductionOrderSchema,
   productionOrderIdSchema,
   productionOrderQuerySchema,
-  issueMaterialsSchema
+  issueMaterialsSchema,
+  machineProgramQuerySchema
 } from "./production-order.validation";
 
 const router = Router();
@@ -18,6 +19,15 @@ router.get(
   authMiddleware,
   requirePermission("production_orders.view"),
   productionOrderController.getNextId
+);
+
+// Machine program list for a given machine + week (Mon–Sun)
+router.get(
+  "/machine-program",
+  authMiddleware,
+  requirePermission("production_orders.view"),
+  validateMiddleware(machineProgramQuerySchema),
+  productionOrderController.getMachinePrograms
 );
 
 router.post(

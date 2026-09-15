@@ -290,11 +290,16 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
           {/* Inline: show rich display when not focused and has value */}
           {inline && !isFocused && value && selectedOption ? (
             <div
-              tabIndex={0}
-              data-nav
-              {...(dataNavDefault ? { "data-nav-default": "true" } : {})}
-              className="w-full text-[13px] truncate cursor-pointer h-full flex items-center justify-between gap-2 outline-none text-ink select-none px-1 focus:ring-1 focus:ring-primary/60 rounded-xs"
+              tabIndex={disabled ? -1 : 0}
+              data-nav={disabled ? undefined : true}
+              {...(dataNavDefault && !disabled ? { "data-nav-default": "true" } : {})}
+              className={`w-full text-[13px] truncate h-full flex items-center justify-between gap-2 outline-none text-ink select-none px-1 rounded-xs ${
+                disabled
+                  ? "opacity-50 cursor-not-allowed pointer-events-none"
+                  : "cursor-pointer focus:ring-1 focus:ring-primary/60"
+              }`}
               onClick={() => {
+                if (disabled) return;
                 setIsFocused(true);
                 setSearch("");
                 updatePosition();
@@ -302,9 +307,11 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
                 setTimeout(() => inputRef.current?.focus(), 0);
               }}
               onFocus={() => {
+                if (disabled) return;
                 // Focus container
               }}
               onKeyDown={(e) => {
+                if (disabled) return;
                 if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown" || e.key === "F2" || (e.altKey && e.key === "ArrowDown")) {
                   e.preventDefault();
                   e.stopPropagation();
@@ -325,8 +332,8 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             id={id || name}
             name={name}
             type="text"
-            data-nav
-            {...(dataNavDefault ? { "data-nav-default": "true" } : {})}
+            data-nav={disabled ? undefined : true}
+            {...(dataNavDefault && !disabled ? { "data-nav-default": "true" } : {})}
             autoFocus={autoFocus}
             data-autocomplete
             autoComplete="off"
@@ -349,6 +356,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               setOpen(true);
             }}
             onChange={(e) => {
+              if (disabled) return;
               setSearch(e.target.value);
               if (!open) {
                 updatePosition();
@@ -358,7 +366,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             title={inline && error ? error : undefined}
             onKeyDown={handleKeyDown}
             className={inline
-              ? "w-full bg-transparent text-[13px] text-ink outline-none border-none p-0 h-full placeholder:text-ink-subtle/80 placeholder:font-normal"
+              ? `w-full bg-transparent text-[13px] text-ink outline-none border-none p-0 h-full placeholder:text-ink-subtle/80 placeholder:font-normal ${disabled ? "opacity-50 cursor-not-allowed" : ""}`
               : `
               w-full h-8 sm:h-9 px-3
               border rounded-[5px] outline-none

@@ -5,7 +5,7 @@ import DeleteButton from "../../ui/DeleteButton/DeleteButton";
 
 export interface BusyColumn<T = any> {
   key: string;
-  header: string;
+  header: string | React.ReactNode;
   width?: string;
   align?: "left" | "center" | "right";
   render?: (row: T, index: number, update: (patch: Partial<T>) => void) => React.ReactNode;
@@ -17,7 +17,7 @@ export interface BusyColumn<T = any> {
 
 export interface TotalCell {
   colKey: string;
-  value: string | number;
+  value: string | number | React.ReactNode;
 }
 
 export interface SundryOption { value: string; label: string; sign: 1 | -1; }
@@ -43,6 +43,8 @@ export interface BusyItemsTableProps<T = any> {
   className?: string;
   onAdd?: () => void;
   onRemove?: (index: number) => void;
+  isRowDeletable?: (row: T, index: number) => boolean;
+  rowDeleteDisabledMessage?: string | ((row: T, index: number) => string);
   renderExpandedRow?: (row: T, index: number) => React.ReactNode;
   expandedIndex?: number | null;
   onExpandToggle?: (index: number) => void;
@@ -147,6 +149,7 @@ function isInputAtRightBoundary(input: HTMLInputElement): boolean {
 function BusyItemsTable<T extends Record<string, any>>({
   columns, rows, onChange, emptyRow, visibleRows = 10, rowHeight, showTotals, billSundry,
   editable = true, className = "", onAdd, onRemove,
+  isRowDeletable, rowDeleteDisabledMessage,
   renderExpandedRow, expandedIndex, onExpandToggle, expandable = false, canExpand,
   getFieldBeforeTable: propGetFieldBefore, getFieldAfterTable: propGetFieldAfter,
   onNavigateRight: propOnNavigateRight, onNavigateLeft: propOnNavigateLeft,
@@ -573,7 +576,19 @@ function BusyItemsTable<T extends Record<string, any>>({
                   {/* Delete */}
                   {editable && (
                     <div style={{ ...cellStyle, justifyContent: "center", borderRight: "none" }}>
-                      {real && rows.length > 1 && <DeleteButton onClick={() => doRemove(i)} />}
+                      {real && rows.length > 1 && (
+                        <DeleteButton
+                          onClick={() => doRemove(i)}
+                          disabled={isRowDeletable ? !isRowDeletable(row, i) : Boolean((row as any)?.isLocked)}
+                          disabledMessage={
+                            (isRowDeletable ? !isRowDeletable(row, i) : Boolean((row as any)?.isLocked))
+                              ? (typeof rowDeleteDisabledMessage === "function"
+                                  ? rowDeleteDisabledMessage(row, i)
+                                  : rowDeleteDisabledMessage || (row as any)?.lockReason || "Cannot delete: This order is assigned to Daily Production Plan")
+                              : undefined
+                          }
+                        />
+                      )}
                     </div>
                   )}
                 </div>

@@ -65,10 +65,6 @@ const config = {
         base: "/machines",
         nextId: "/machines/next-id",
     },
-    weeklyProgram: {
-        base: "/weekly-machine-programs",
-        nextId: "/weekly-machine-programs/next-id",
-    },
     productionOrder: {
         base: "/production-orders",
         nextId: "/production-orders/next-id",

@@ -66,7 +66,7 @@ class ReportsService {
 
       const totalActualQty = productionOrders.reduce((sum, po) => {
         const orderSum = po.hourlyProductions.reduce(
-          (hSum, hp) => hSum + Number(hp.qtyProduced),
+          (hSum, hp) => hSum + Number(hp.totalQtyProduced || 0),
           0
         );
         return sum + orderSum;
@@ -146,7 +146,7 @@ class ReportsService {
 
     return weeklyPrograms.map((wp) => {
       const totalActualQty = wp.productionOrder ? wp.productionOrder.hourlyProductions.reduce((sum: number, hp: any) => {
-        return sum + Number(hp.qtyProduced);
+        return sum + Number(hp.totalQtyProduced || 0);
       }, 0) : 0;
 
       const plannedQty = Number(wp.plannedQty);
@@ -182,9 +182,7 @@ class ReportsService {
       include: {
         Machine: true,
         productItem: true,
-        hourlyProductions: {
-          orderBy: { hourIndex: "asc" },
-        },
+        hourlyProductions: true,
       },
     });
 
@@ -193,18 +191,30 @@ class ReportsService {
     }
 
     const totalQtyProduced = order.hourlyProductions.reduce(
-      (sum, hp) => sum + Number(hp.qtyProduced),
+      (sum, hp) => sum + Number(hp.totalQtyProduced || 0),
       0
     );
 
     const targetQty = Number(order.targetQty);
 
+    const hourEntriesMap = new Map<number, { qtyProduced: number; createdAt: any; updatedAt: any }>();
+    order.hourlyProductions.forEach((hp) => {
+      if (Array.isArray(hp.hourlyEntries)) {
+        (hp.hourlyEntries as any[]).forEach((e) => {
+          const hIdx = Number(e.hourIndex);
+          const current = hourEntriesMap.get(hIdx) || { qtyProduced: 0, createdAt: hp.createdAt, updatedAt: hp.updatedAt };
+          current.qtyProduced += Number(e.qtyProduced || 0);
+          hourEntriesMap.set(hIdx, current);
+        });
+      }
+    });
+
     const hourlyBreakdown = Array.from({ length: 24 }, (_, i) => {
       const hour = i + 1;
-      const log = order.hourlyProductions.find((h) => h.hourIndex === hour);
+      const log = hourEntriesMap.get(hour);
       return {
         hourIndex: hour,
-        qtyProduced: log ? Number(log.qtyProduced) : 0,
+        qtyProduced: log ? log.qtyProduced : 0,
         loggedAt: log ? log.createdAt : null,
         updatedAt: log ? log.updatedAt : null,
       };
@@ -221,8 +231,6 @@ class ReportsService {
       targetQty,
       uom: order.uom,
       weeklyProgramId: null,
-      sourceSalesOrderId: order.sourceSalesOrderId,
-      sourceSalesOrderLineId: order.sourceSalesOrderLineId ? order.sourceSalesOrderLineId.toString() : null,
       status: order.status,
       remarks: order.remarks,
       totalQtyProduced,

@@ -44,23 +44,6 @@ const getUomOptions = (baseUom: string) => {
     });
 };
 
-/** Normalize UOM aliases to canonical short form */
-const normalizeUom = (uom: string): string => {
-    const u = uom.trim().toLowerCase();
-    if (u === "kilogram" || u === "kilograms") return "kg";
-    if (u === "gram" || u === "grams") return "g";
-    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
-    if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
-    if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
-    if (u === "meter" || u === "meters" || u === "metre" || u === "metres") return "m";
-    if (u === "centimeter" || u === "centimetre" || u === "centimeters" || u === "centimetres") return "cm";
-    if (u === "millimeter" || u === "millimetre" || u === "millimeters" || u === "millimetres") return "mm";
-    if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
-    if (u === "box" || u === "boxes") return "box";
-    if (u === "dozen" || u === "dz") return "dz";
-    return u;
-};
-
 
 const HourlyWorkReportCreate: React.FC = () => {
     const navigate = useNavigate();
@@ -122,11 +105,12 @@ const HourlyWorkReportCreate: React.FC = () => {
     const [newHighDetails, setNewHighDetails] = useState<any>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
+    const [isDirty, setIsDirty] = useState(false);
     const isDirtyRef = useRef(false);
+    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     const saveConfirmOpenRef = useRef(false);
     const lastFocusedRef = useRef<HTMLElement | null>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
-    const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
     const [backConfirmOpen, setBackConfirmOpen] = useState(false);
     const backConfirmOpenRef = useRef(false);
@@ -149,7 +133,6 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     useFormShortcuts({ onSave: () => handleSubmitRef.current() });
 
-    useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
     useEffect(() => { backConfirmOpenRef.current = backConfirmOpen; }, [backConfirmOpen]);
     useEffect(() => {
@@ -165,7 +148,7 @@ const HourlyWorkReportCreate: React.FC = () => {
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-    }, [navigate]);
+    }, []);
 
     // Is the form pre-filled from Daily Planning?
     const isPreFilled = useMemo(() => {
@@ -951,7 +934,8 @@ const HourlyWorkReportCreate: React.FC = () => {
             <form ref={formRef} onSubmit={handleSubmit} onInput={() => setIsDirty(true)} onKeyDown={handleFormKeyDown} data-escape-guarded className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-5 py-3 border-b border-line-soft">
                     <div>
-                        <h2 className="text-base font-bold text-ink m-0">Hourly Production Entry</h2>
+                        <h2 className="text-base font-bold text-ink m-0">Hourly Produc
+                            tion Entry</h2>
                     </div>
                     <div className="flex justify-end">
                         <BackButton text="Back to Planning" onClick={() => setBackConfirmOpen(true)} />
@@ -1531,7 +1515,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setBackConfirmOpen(false); setIsDirty(false); navigate(-1); }}
+            onCancel={() => { setBackConfirmOpen(false); isDirtyRef.current = false; navigate(-1); }}
         />
         </>
     );

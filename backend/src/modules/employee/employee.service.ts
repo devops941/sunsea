@@ -517,12 +517,6 @@ class EmployeeService {
   async delete(id: bigint) {
     await this.findById(id);
 
-    const linkedMachineAssignments = await prisma.machineOperationAssignment.findFirst({ where: { inchargeEmployeeId: id } });
-    if (linkedMachineAssignments) throw new ApiError(400, "Cannot delete employee because they are assigned as Incharge on a Machine.");
-
-    const linkedMachineOperators = await prisma.machineAssignmentOperator.findFirst({ where: { employeeId: id } });
-    if (linkedMachineOperators) throw new ApiError(400, "Cannot delete employee because they are assigned as an Operator on a Machine.");
-
     const linkedStores = await prisma.store.findFirst({ where: { inchargeId: id } });
     if (linkedStores) throw new ApiError(400, "Cannot delete employee because they are assigned as Incharge for a Store.");
 

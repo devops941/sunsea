@@ -96,10 +96,9 @@ class MachineService {
   async delete(machineId: string) {
     await this.findById(machineId);
 
-    const [weeklyPrograms, productionOrders, assignments, dailyPlans, hourlyProds, oeeSnaps, wastages, shiftRecs] = await Promise.all([
+    const [weeklyPrograms, productionOrders, dailyPlans, hourlyProds, oeeSnaps, wastages, shiftRecs] = await Promise.all([
       prisma.weeklyMachineProgram.count({ where: { machineId } }),
       prisma.productionOrder.count({ where: { machineMachineId: machineId } }),
-      prisma.machineOperationAssignment.count({ where: { machineId } }),
       prisma.dailyProductionPlan.count({ where: { machineId } }),
       prisma.hourlyProduction.count({ where: { machineId } }),
       prisma.machineOeeSnapshot.count({ where: { machineId } }),
@@ -107,7 +106,7 @@ class MachineService {
       prisma.productShiftRecord.count({ where: { machineId } }),
     ]);
 
-    if (weeklyPrograms + productionOrders + assignments + dailyPlans + hourlyProds + oeeSnaps + wastages + shiftRecs > 0) {
+    if (weeklyPrograms + productionOrders + dailyPlans + hourlyProds + oeeSnaps + wastages + shiftRecs > 0) {
       throw new ApiError(
         400,
         "Unable to delete this machine because it is linked to other records in the system."

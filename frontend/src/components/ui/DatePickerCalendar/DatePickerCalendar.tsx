@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
@@ -24,8 +24,14 @@ export interface DatePickerCalendarProps {
   required?: boolean;
   error?: string;
   disabled?: boolean;
+  /** Custom predicate to disable specific dates */
+  isDateDisabled?: (date: Date) => boolean;
+  /** Explicit array of disabled dates (YYYY-MM-DD strings or Date objects) */
+  disabledDates?: (string | Date)[];
   /** Place label and input side by side in one row */
   horizontal?: boolean;
+  /** Dates to highlight with a dot (YYYY-MM-DD strings or Date objects) */
+  markedDates?: (string | Date)[];
 }
 
 interface DayCell {
@@ -50,9 +56,16 @@ function stripTime(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-function isDisabled(date: Date, minDate?: Date | null, maxDate?: Date | null): boolean {
-  if (minDate && date < stripTime(minDate)) return true;
-  if (maxDate && date > stripTime(maxDate)) return true;
+function isDisabled(
+  date: Date,
+  minDate?: Date | null,
+  maxDate?: Date | null,
+  isDateDisabled?: ((date: Date) => boolean) | null
+): boolean {
+  const clean = stripTime(date);
+  if (minDate && clean < stripTime(minDate)) return true;
+  if (maxDate && clean > stripTime(maxDate)) return true;
+  if (isDateDisabled && isDateDisabled(clean)) return true;
   return false;
 }
 
@@ -274,13 +287,25 @@ export default function DatePickerCalendar({
   required = false,
   error,
   disabled = false,
+  isDateDisabled,
+  disabledDates,
   horizontal = false,
+  markedDates,
 }: DatePickerCalendarProps) {
   const [open, setOpen] = useState<boolean>(false);
 
   const parsedValue = typeof value === "string" ? parseLocalDate(value) : value;
   const parsedMinDate = typeof minDate === "string" ? parseLocalDate(minDate) : minDate;
   const parsedMaxDate = typeof maxDate === "string" ? parseLocalDate(maxDate) : maxDate;
+
+  const checkDateDisabled = useCallback((date: Date): boolean => {
+    if (isDateDisabled && isDateDisabled(date)) return true;
+    if (disabledDates && disabledDates.length > 0) {
+      const formatted = formatLocalDate(date);
+      return disabledDates.some(d => (typeof d === "string" ? d : formatLocalDate(d)) === formatted);
+    }
+    return false;
+  }, [isDateDisabled, disabledDates]);
 
   const [internalValue, setInternalValue] = useState<Date | null>(parsedValue);
   const today = stripTime(new Date());
@@ -383,7 +408,7 @@ export default function DatePickerCalendar({
   };
 
   const handleSelect = (date: Date): void => {
-    if (isDisabled(date, parsedMinDate, parsedMaxDate)) return;
+    if (isDisabled(date, parsedMinDate, parsedMaxDate, checkDateDisabled)) return;
     const formatted = formatLocalDate(date);
     setInternalValue(date);
     setFocusedDate(date);
@@ -402,7 +427,9 @@ export default function DatePickerCalendar({
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
     setFocusedDate(today);
-    handleSelect(today);
+    if (!isDisabled(today, parsedMinDate, parsedMaxDate, checkDateDisabled)) {
+      handleSelect(today);
+    }
   };
 
   // ─── Keyboard Navigation Handler ──────────────────────────────────────────
@@ -571,7 +598,8 @@ export default function DatePickerCalendar({
         </label>
       )}
 
-      <div ref={triggerRef} className={`relative ${horizontal ? "flex-1" : ""}`}>
+      <div className={horizontal ? "flex-1 min-w-0 flex flex-col" : ""}>
+      <div ref={triggerRef} className="relative">
         {/* Editable text input trigger — Busy-style keyboard entry.
            Operator can:
              • Focus + type "8" / "08" / "8/12" / "08122026" → smart-parse
@@ -587,6 +615,7 @@ export default function DatePickerCalendar({
           ref={inputRef}
           type="text"
           name={name}
+          data-nav
           disabled={disabled}
           required={required}
           placeholder={placeholder}
@@ -654,7 +683,7 @@ export default function DatePickerCalendar({
               e.preventDefault();
               const el = e.currentTarget as HTMLInputElement;
               const parsed = smartParseDate(editingText, selected || today);
-              if (parsed && !isDisabled(parsed, parsedMinDate, parsedMaxDate)) {
+              if (parsed && !isDisabled(parsed, parsedMinDate, parsedMaxDate, checkDateDisabled)) {
                 handleSelect(parsed);
                 setIsEditing(false);
                 // Advance focus to the NEXT tabbable field (Starting Date →
@@ -684,7 +713,7 @@ export default function DatePickerCalendar({
             // Commit on blur: parse if user typed something, else revert.
             if (isEditing && editingText.trim()) {
               const parsed = smartParseDate(editingText, selected || today);
-              if (parsed && !isDisabled(parsed, parsedMinDate, parsedMaxDate)) {
+              if (parsed && !isDisabled(parsed, parsedMinDate, parsedMaxDate, checkDateDisabled)) {
                 handleSelect(parsed);
               }
             }
@@ -700,7 +729,6 @@ export default function DatePickerCalendar({
             ${disabled ? "bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70" : ""}
           `}
           autoComplete="off"
-          data-nav
         />
         <button
           type="button"
@@ -722,8 +750,8 @@ export default function DatePickerCalendar({
         {open && !disabled && popPos && createPortal(
           <div
             ref={popoverRef}
-            style={{ position: "fixed", top: popPos.top, left: popPos.left }}
-            className="z-[1000] w-60 rounded-xl border border-line-soft bg-card p-2 shadow-xl text-ink"
+            style={{ position: "fixed", top: popPos.top, left: popPos.left, zIndex: 99999 }}
+            className="z-[99999] w-60 rounded-xl border border-line-soft bg-card p-2 shadow-xl text-ink animate-in fade-in zoom-in-95 duration-100"
           >
 
             {/* Header: prev arrow | month select | year select | next arrow */}
@@ -794,10 +822,14 @@ export default function DatePickerCalendar({
             {/* Day grid */}
             <div className="grid grid-cols-7 gap-1">
               {cells.map(({ date, inMonth }, i) => {
-                const disabledCell = isDisabled(date, parsedMinDate, parsedMaxDate);
+                const disabledCell = isDisabled(date, parsedMinDate, parsedMaxDate, checkDateDisabled);
                 const isSelected = isSameDay(date, selected);
                 const isFocused = isSameDay(date, focusedDate);
                 const isToday = isSameDay(date, today);
+                const isMarked = markedDates && markedDates.some((md) => {
+                  const mdDate = typeof md === "string" ? parseLocalDate(md) : md;
+                  return isSameDay(mdDate, date);
+                });
 
                 return (
                   <button
@@ -807,21 +839,22 @@ export default function DatePickerCalendar({
                     disabled={disabledCell}
                     onClick={() => handleSelect(date)}
                     onMouseEnter={() => setFocusedDate(date)}
-                    className={`aspect-square rounded-lg text-xs transition flex items-center justify-center
-                      ${disabledCell ? "cursor-not-allowed text-ink-subtle/30" : "cursor-pointer"}
+                    className={`aspect-square rounded-lg text-xs transition flex flex-col items-center justify-center gap-0 relative
+                      ${disabledCell ? "cursor-not-allowed text-ink-subtle/30 opacity-40 bg-zinc-500/5 line-through pointer-events-none select-none" : "cursor-pointer"}
                       ${isSelected
                         ? "bg-primary font-bold text-white shadow-xs"
-                        : isFocused
+                        : isFocused && !disabledCell
                           ? "ring-2 ring-primary ring-offset-1 bg-primary/20 text-primary font-bold z-10"
                           : !disabledCell && inMonth
                             ? "font-semibold text-ink hover:bg-primary/15"
                             : !disabledCell
                               ? "font-normal text-ink-subtle/50 hover:bg-primary/10"
                               : ""}
-                      ${isToday && !isSelected && !isFocused ? "border border-primary font-bold text-primary" : ""}
+                      ${isToday && !isSelected && !isFocused && !disabledCell ? "border border-primary font-bold text-primary" : ""}
                     `}
                   >
                     {date.getDate()}
+                    {isMarked && <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? "bg-white" : "bg-primary"}`} />}
                   </button>
                 );
               })}
@@ -859,10 +892,9 @@ export default function DatePickerCalendar({
         )}
       </div>
       {error && (
-        <div className="text-[#dc3545] text-sm font-medium mt-1">
-          {error}
-        </div>
+        <p className="text-[#dc3545] text-xs font-medium mt-1">{error}</p>
       )}
+      </div>
     </div>
   );
 }

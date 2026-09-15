@@ -1,6 +1,8 @@
 import { formatDate } from "../../../utils/dateUtils";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { usePermission } from "../../../hooks/usePermission";
 import { Container, Row, Col, Card, Modal, Button, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -71,6 +73,7 @@ const formatLocalDateString = (d: Date) => {
 const DailyMachinePlanning: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   // Redux state
   const { data: machines, loading: loadingMachines } = useAppSelector((state) => state.machines);
@@ -98,6 +101,7 @@ const DailyMachinePlanning: React.FC = () => {
   const [programToView, setProgramToView] = useState<any>(null);
   const [hourlyLogs, setHourlyLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const positiveHourLogs = useMemo(() => hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0), [hourlyLogs]);
 
   // Confirmation Modals State
   const [showStopModal, setShowStopModal] = useState(false);
@@ -194,10 +198,13 @@ const DailyMachinePlanning: React.FC = () => {
     onNew: () => handleOpenAddRun(),
   });
 
-  // Filter programs based on Search Term and Status Filter
-  const filteredPrograms = useMemo(() => {
-    return weeklyPrograms;
-  }, [weeklyPrograms]);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+    count: weeklyPrograms.length,
+    onEnter: (i) => { setProgramToView(weeklyPrograms[i]); setShowViewModal(true); },
+    containerRef: tableRef,
+  });
+
 
   // Load active orders for selection
   const loadActiveOrders = async () => {
@@ -227,8 +234,7 @@ const DailyMachinePlanning: React.FC = () => {
     const start = new Date(currentWeekMonday);
     const end = new Date(currentWeekMonday);
     end.setDate(start.getDate() + 6);
-    const options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" };
-    return `${formatDate(new Date())} - ${formatDate(new Date())}`;
+    return `${formatDate(start)} - ${formatDate(end)}`;
   }, [currentWeekMonday]);
 
   // Add Production Run handlers
@@ -437,11 +443,13 @@ const DailyMachinePlanning: React.FC = () => {
                 </div>
 
                 {/* Add Run Button */}
-                <CustomButton 
-                  text="Add Production Run"
-                  icon={FaPlus}
-                  onClick={handleOpenAddRun}
-                />
+                {can("daily-machine-planning.create") && (
+                  <CustomButton
+                    text="Add Production Run"
+                    icon={FaPlus}
+                    onClick={handleOpenAddRun}
+                  />
+                )}
               </div>
             </Col>
           </Row>
@@ -511,8 +519,8 @@ const DailyMachinePlanning: React.FC = () => {
                 <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                 <p className="mt-3 text-muted">Loading production runs...</p>
               </div>
-            ) : filteredPrograms.length > 0 ? (
-              <div className="table-responsive">
+            ) : weeklyPrograms.length > 0 ? (
+              <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none table-responsive">
                  <table className="master-data-table mb-0" style={{ width: "100%" }}>
                   <thead>
                     <tr>
@@ -527,7 +535,7 @@ const DailyMachinePlanning: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPrograms.map((prog, idx) => {
+                    {weeklyPrograms.map((prog, idx) => {
                       const po = prog.productionOrder;
                       // Show PO total target and PO total produced for overall progress
                       const poTarget = Number(po?.targetQty || 0);
@@ -547,7 +555,9 @@ const DailyMachinePlanning: React.FC = () => {
                       return (
                         <tr
                           key={prog.weeklyProgramId}
-                          className="master-data-row"
+                          data-nav-index={idx}
+                          className={`master-data-row${focusedIndex === idx ? " ring-1 ring-inset ring-accent/40 bg-accent/5" : ""}`}
+                          onClick={() => setFocusedIndex(idx)}
                           style={isCarryForward ? {
                             background: "linear-gradient(90deg, #fffbe6 0%, #fff8e1 100%)",
                             borderLeft: "4px solid #f59e0b"
@@ -638,7 +648,7 @@ const DailyMachinePlanning: React.FC = () => {
                                     icon={FaPlay}
                                     onClick={() => handleOpenStart(prog)}
                                   />
-                                  {!isCarryForward && (
+                                  {!isCarryForward && can("daily-machine-planning.delete") && (
                                     <DeleteButton
                                       onClick={() => {
                                         setDeleteProgramId(prog.weeklyProgramId);
@@ -655,7 +665,7 @@ const DailyMachinePlanning: React.FC = () => {
                                     variant="primary"
                                     title="Log Hourly Production"
                                     icon={FaClipboardList}
-                                    onClick={() => navigate("/hourly-work-reports")}
+                                    onClick={() => prog.dailyPlanId ? navigate(`/daily-production-plans/hourly/${prog.dailyPlanId}`) : navigate("/daily-machine-planning")}
                                   />
                                   <IconButton
                                     variant="danger"
@@ -819,7 +829,7 @@ const DailyMachinePlanning: React.FC = () => {
               </h6>
               {loadingLogs ? (
                 <div className="text-center py-3"><div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div> Loading logs...</div>
-              ) : hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).length > 0 ? (
+              ) : positiveHourLogs.length > 0 ? (
                 <div className="rounded-3 border bg-white shadow-sm overflow-hidden">
                   <table className="master-data-table text-center align-middle mb-0" style={{ width: "100%" }}>
                     <thead className="bg-light">
@@ -834,7 +844,7 @@ const DailyMachinePlanning: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).map((h: any) => (
+                      {positiveHourLogs.map((h: any) => (
                         <tr key={h.hourlyProductionId} className="master-data-row border-bottom">
                           <td className="master-data-cell fw-bold text-dark font-monospace">Hour {h.hourIndex}</td>
                           <td className="master-data-cell fw-bold text-success">{h.qtyProduced}</td>
@@ -858,12 +868,12 @@ const DailyMachinePlanning: React.FC = () => {
                     <tfoot className="bg-light fw-bold" style={{ borderTop: "2px solid #dee2e6" }}>
                       <tr>
                         <td className="text-end pe-3">Total:</td>
-                        <td className="text-success">{hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.qtyProduced) || 0), 0)}</td>
-                        <td className="text-danger">{hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.rejectQty) || 0), 0)}</td>
-                        <td className="text-warning">{hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.scrapQty) || 0), 0)}</td>
+                        <td className="text-success">{positiveHourLogs.reduce((sum, h) => sum + (Number(h.qtyProduced) || 0), 0)}</td>
+                        <td className="text-danger">{positiveHourLogs.reduce((sum, h) => sum + (Number(h.rejectQty) || 0), 0)}</td>
+                        <td className="text-warning">{positiveHourLogs.reduce((sum, h) => sum + (Number(h.scrapQty) || 0), 0)}</td>
                         <td className="text-danger">
                           {(() => {
-                            const totalDowntime = hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.downtime) || 0), 0);
+                            const totalDowntime = positiveHourLogs.reduce((sum, h) => sum + (Number(h.downtime) || 0), 0);
                             return totalDowntime > 0 ? `${totalDowntime} Mins` : "-";
                           })()}
                         </td>

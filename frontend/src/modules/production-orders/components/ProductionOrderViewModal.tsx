@@ -1,6 +1,6 @@
 import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState } from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaLock, FaEdit, FaTrash, FaPrint } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
@@ -13,9 +13,12 @@ interface ProductionOrderViewModalProps {
     onHide: () => void;
     order: ProductionOrder | null;
     onSuccess?: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+    onPrint?: () => void;
 }
 
-export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> = ({ show, onHide, order, onSuccess }) => {
+export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> = ({ show, onHide, order, onSuccess, onEdit, onDelete, onPrint }) => {
     const [fullOrder, setFullOrder] = useState<any>(null);
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [selectedProdForIssue, setSelectedProdForIssue] = useState<any>(null);
@@ -70,6 +73,20 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
         }
     }, [show, order]);
 
+    // Keyboard shortcuts: Escape = close, E = edit, P = print
+    useEffect(() => {
+        if (!show) return;
+        const handleKey = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement).tagName;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+            if (e.key === 'Escape') { onHide(); return; }
+            if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey) { onEdit?.(); return; }
+            if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); onPrint?.(); }
+        };
+        document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, [show, onHide, onEdit, onPrint]);
+
     if (!order) return null;
 
     
@@ -108,6 +125,22 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto flex-1">
+                    {/* Edit Restrictions Banner */}
+                    {order._editRestrictions && (!order._editRestrictions.canEditDates || !order._editRestrictions.canEditProductQty) && (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-start gap-2 mb-4 text-sm">
+                            <FaLock className="shrink-0 mt-0.5 text-amber-500" />
+                            <div>
+                                <span className="font-semibold">Edit Restrictions Active — </span>
+                                {order._editRestrictions.reason || "This order is assigned to a Daily Production Plan."}
+                                <div className="flex gap-3 mt-1 text-xs text-amber-700 font-medium">
+                                    {!order._editRestrictions.canEditDates && <span>• Dates locked</span>}
+                                    {!order._editRestrictions.canEditProductQty && <span>• Product / Qty locked</span>}
+                                    {!order._editRestrictions.canDelete && <span>• Delete locked</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {hasInsufficientStock && (
                         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2 mb-4 text-sm font-medium">
                             One or more required raw materials have insufficient stock. Please create a Raw Material Order before proceeding to Weekly Machine Assignment.
@@ -285,7 +318,11 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         if (plan.weeklyProgramId) {
                                             coveredWeeklyProgramIds.add(plan.weeklyProgramId);
                                         }
-                                        const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
+                                        const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => {
+                                            const gross = Number(curr.totalQtyProduced !== undefined ? curr.totalQtyProduced : curr.qtyProduced || 0);
+                                            const rej = Number(curr.totalRejectQty !== undefined ? curr.totalRejectQty : curr.rejectQty || 0);
+                                            return acc + Math.max(0, gross - rej);
+                                        }, 0) || 0;
                                         const producedForPlan = hourlySum > 0 ? hourlySum : (plan.status === 'COMPLETED' ? Number(plan.plannedQty || 0) : 0);
                                         plans.push({
                                             id: plan.dailyPlanId,
@@ -461,14 +498,50 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
-                    <button
-                        type="button"
-                        onClick={onHide}
-                        className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 bg-white hover:bg-slate-50 font-medium transition-colors"
-                    >
-                        Close
-                    </button>
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 rounded-b-xl">
+                    <div className="text-[11px] text-slate-400 hidden sm:block">
+                        {onEdit && <span className="mr-3"><kbd className="font-mono bg-slate-100 border border-slate-300 rounded px-1">E</kbd> Edit</span>}
+                        {onPrint && <span className="mr-3"><kbd className="font-mono bg-slate-100 border border-slate-300 rounded px-1">P</kbd> Print</span>}
+                        <span><kbd className="font-mono bg-slate-100 border border-slate-300 rounded px-1">Esc</kbd> Close</span>
+                    </div>
+                    <div className="flex items-center gap-2 ml-auto">
+                        {onPrint && (
+                            <button
+                                type="button"
+                                onClick={onPrint}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-300 rounded-lg text-slate-600 bg-white hover:bg-slate-50 font-medium transition-colors text-sm"
+                            >
+                                <FaPrint size={13} /> Print
+                            </button>
+                        )}
+                        {onDelete && (
+                            <button
+                                type="button"
+                                onClick={onDelete}
+                                disabled={order._editRestrictions?.canDelete === false}
+                                title={order._editRestrictions?.canDelete === false ? "Cannot delete: has active Daily Production Plans" : "Delete order"}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-200 rounded-lg text-red-600 bg-white hover:bg-red-50 font-medium transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <FaTrash size={12} /> Delete
+                            </button>
+                        )}
+                        {onEdit && (
+                            <button
+                                type="button"
+                                onClick={onEdit}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border border-indigo-300 rounded-lg text-indigo-600 bg-white hover:bg-indigo-50 font-medium transition-colors text-sm"
+                            >
+                                <FaEdit size={13} /> Edit
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={onHide}
+                            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 bg-white hover:bg-slate-50 font-medium transition-colors text-sm"
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
