@@ -17,6 +17,7 @@ import EditButton from '../../../components/ui/EditButton/EditButton';
 import DeleteButton from '../../../components/ui/DeleteButton/DeleteButton';
 import CommonConfirmModal from '../../../components/ui/CommonConfirmModal/CommonConfirmModal';
 import DataTable from '../../../components/ui/table/DataTable';
+import DatePickerCalendar, { formatLocalDate } from '../../../components/ui/DatePickerCalendar/DatePickerCalendar';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll } from '../../../services/payrollService';
 import { usePermission } from '../../../hooks/usePermission';
@@ -42,7 +43,8 @@ const PayrollDashboard: React.FC = () => {
   const canDeleteRun      = can("payroll-run.delete");
   const canViewRun        = can("payroll-run.view");
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth);
+  const [selectedDate,  setSelectedDate]  = useState<string>(() => formatLocalDate(new Date()));
+  const selectedMonth = selectedDate ? selectedDate.slice(0, 7) : '';
   const [runs,          setRuns]          = useState<ApiPayrollRun[]>([]);
   const [employees,     setEmployees]     = useState<ApiEmployeePayroll[]>([]);
   const [loading,       setLoading]       = useState(true);
@@ -301,7 +303,8 @@ const PayrollDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Category Breakdown Cards ── */}
+      {/* ── Category Breakdown Cards (Hidden/Commented Out) ── */}
+      {/*
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Fixed Monthly (Admin)',  count: categoryCounts.FIXED_MONTHLY, color: 'bg-blue-500',    light: 'bg-blue-500/10 border-blue-500/30',    text: 'text-blue-500'    },
@@ -320,20 +323,18 @@ const PayrollDashboard: React.FC = () => {
           </div>
         ))}
       </div>
+      */}
 
-      {/* ── Module Navigation Tabs ── */}
+      {/* ── Module Navigation Tabs (Hidden/Commented Out) ── */}
+      {/*
       <div className="bg-card-2 border border-line-soft p-1.5 rounded-2xl inline-flex flex-wrap items-center gap-1.5 w-full">
         {[
-          // { label: 'Overview',         path: '/payroll/dashboard',        icon: BarChart3,     active: true,  show: true },
           { label: 'Attendance',       path: '/payroll/attendance',       icon: ClipboardList, active: false, show: can("payroll-attendance.view") },
-          // { label: 'Generate Weekly',  path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false, show: canCreateRun },
-          // { label: 'Generate Monthly', path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false, show: canCreateRun },
           { label: 'Bonus Calculation', path: '/payroll/bonus',           icon: Gift,          active: false, show: canViewRun },
           { label: 'Weekly Report',    path: '/payroll/weekly-report',    icon: FileText,      active: false, show: canViewRun },
           { label: 'Monthly Report',   path: '/payroll/monthly-report',   icon: FileText,      active: false, show: canViewRun },
           { label: 'Salary Advance',   path: '/payroll/advance',          icon: Wallet,        active: false, show: can("payroll-advance.view") },
           { label: 'Settings',         path: '/payroll/settings',         icon: Settings,      active: false, show: can("payroll-settings.view") },
-
         ].filter(t => t.show).map(tab => (
           <button
             key={tab.label}
@@ -349,6 +350,7 @@ const PayrollDashboard: React.FC = () => {
           </button>
         ))}
       </div>
+      */}
 
       {/* ── Recent Payroll Runs Table (Full Width 100%) ── */}
       <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
@@ -361,35 +363,34 @@ const PayrollDashboard: React.FC = () => {
             {runsLoading && <Loader2 size={16} className="animate-spin text-primary ml-2" />}
           </div>
 
-          {/* Month Filter controls */}
+          {/* Date / Month Filter controls */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-card-2 border border-line-soft rounded-xl px-3 py-1.5">
-              <Calendar size={14} className="text-ink-subtle" />
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent text-xs font-bold text-ink outline-none cursor-pointer"
+            <div className="w-44">
+              <DatePickerCalendar
+                name="payrollDateFilter"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                placeholder="Filter by date / month"
               />
             </div>
 
-            {selectedMonth !== getCurrentMonth() && (
+            {selectedDate !== formatLocalDate(new Date()) && (
               <button
                 type="button"
-                onClick={() => setSelectedMonth(getCurrentMonth())}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                onClick={() => setSelectedDate(formatLocalDate(new Date()))}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
                 title="Reset to current month"
               >
                 <RotateCcw size={12} />
-                <span>Current Month</span>
+                <span>Today</span>
               </button>
             )}
 
-            {selectedMonth !== '' && (
+            {selectedDate !== '' && (
               <button
                 type="button"
-                onClick={() => setSelectedMonth('')}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 transition-colors"
+                onClick={() => setSelectedDate('')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 transition-colors cursor-pointer"
                 title="Show all payroll runs"
               >
                 All Months
