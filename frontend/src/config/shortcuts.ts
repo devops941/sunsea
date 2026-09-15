@@ -42,7 +42,6 @@ export const SHORTCUTS: ShortcutItem[] = [
   { id: "f7",          keyLabel: "F7",           key: "F7",      label: "Reports",             category: "system", action: "reports" },
   { id: "f10",         keyLabel: "F10",          key: "F10",     label: "Print",               category: "system", action: "print" },
   { id: "f11",         keyLabel: "F11",          key: "F11",     label: "Full Screen",         category: "system", action: "fullscreen" },
-  { id: "edit-record", keyLabel: "E",            key: "e",       label: "Edit Record",         category: "system", action: "edit" },
   { id: "new-record",  keyLabel: "Ins",          key: "Insert",  label: "New Record",          category: "system", action: "new" },
   { id: "export",      keyLabel: "Alt+E",        key: "e", alt: true,  label: "Export / Download", category: "system", action: "export" },
   { id: "calc",        keyLabel: "Alt+C",        key: "c", alt: true, label: "Calculator",     category: "system", action: "calculator" },

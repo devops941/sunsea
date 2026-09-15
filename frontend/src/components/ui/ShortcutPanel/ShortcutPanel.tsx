@@ -109,7 +109,6 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
     if (sc.action === "delete")      { window.dispatchEvent(new CustomEvent("fkey-delete"));      return; }
     if (sc.action === "refresh")     { window.dispatchEvent(new CustomEvent("fkey-refresh"));     return; }
     if (sc.action === "new")         { window.dispatchEvent(new CustomEvent("fkey-new"));         return; }
-    if (sc.action === "edit")        { window.dispatchEvent(new CustomEvent("fkey-edit"));        return; }
     if (sc.action === "export")      { window.dispatchEvent(new CustomEvent("fkey-export"));      return; }
     if (sc.action === "search")      {
       document.querySelector<HTMLElement>("[data-search-input]")?.focus();
