@@ -19,6 +19,7 @@ export const createGoodsDispatchSchema = z.object({
           productItemId: z.number().or(z.string()),
           dispatchQty: z.number().positive("Dispatch quantity must be greater than 0"),
           uom: z.string().min(1, "UOM is required"),
+          bypassGate: z.boolean().optional().default(false),
           remarks: z.string().optional(),
         })
       )

@@ -19,7 +19,7 @@ export class DailyPlanRepository {
         machine: true,
         shift: true,
         hourlyProductions: {
-          select: { qtyProduced: true, hourIndex: true, rejectQty: true, scrapQty: true }
+          select: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true, totalDowntime: true, hourlyEntries: true }
         },
         carryForwardFrom: { select: { dailyPlanId: true } },
         carryForwardTo: { select: { dailyPlanId: true, productionDate: true, shiftId: true, status: true } },
@@ -46,7 +46,7 @@ export class DailyPlanRepository {
         machine: true,
         shift: true,
         hourlyProductions: {
-          select: { qtyProduced: true, hourIndex: true, rejectQty: true, scrapQty: true }
+          select: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true, totalDowntime: true, hourlyEntries: true }
         },
         carryForwardFrom: { select: { dailyPlanId: true } },
         carryForwardTo: { select: { dailyPlanId: true, productionDate: true, shiftId: true, status: true } },
@@ -139,7 +139,7 @@ export class DailyPlanRepository {
         machine: true,
         shift: true,
         hourlyProductions: {
-          select: { qtyProduced: true, hourIndex: true, rejectQty: true, scrapQty: true }
+          select: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true, totalDowntime: true, hourlyEntries: true }
         },
         carryForwardFrom: { select: { dailyPlanId: true } },
         carryForwardTo: { select: { dailyPlanId: true, productionDate: true, shiftId: true, status: true } },
@@ -195,6 +195,18 @@ export class DailyPlanRepository {
       },
     });
     return count > 0;
+  }
+
+  async findWeeklyProgramsByMachineAndWeek(machineId: string, weekStartDate: Date) {
+    return prisma.weeklyMachineProgram.findMany({
+      where: { machineId, weekStartDate },
+      include: {
+        productionOrder: {
+          include: { productItem: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
   async findLatestId(tx?: any): Promise<string | null> {

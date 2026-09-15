@@ -81,7 +81,7 @@ export class GoodsDispatchService {
           select: {
             status: true,
             hourlyProductions: {
-              select: { qtyProduced: true }
+              select: { totalQtyProduced: true }
             }
           }
         }
@@ -89,37 +89,19 @@ export class GoodsDispatchService {
       orderBy: { orderDate: "desc" },
     });
 
-    return orders.map((o) => {
-      const totalDispatched = o.goodsDispatchItems.reduce(
-        (sum, item) => sum + Number(item.dispatchQty),
+    return (orders as any[]).map((o: any) => {
+      const totalDispatched = (o.goodsDispatchItems || []).reduce(
+        (sum: number, item: any) => sum + Number(item.dispatchQty),
         0
       );
 
-      // Net qty after removing scrap and defects
-      const scrapQty = Number(o.scrapQty || 0);
-      const rejectedQty = Number(o.rejectedQty || 0);
-      const netProducedQty = Math.max(0, Number(o.producedQty) - scrapQty - rejectedQty);
+      // Use raw producedQty directly — no scrap/rejected deduction
+      let dispatchableProducedQty = Number(o.producedQty || 0);
 
-      // Calculate dispatchable produced qty (net of scrap/defects)
-      let dispatchableProducedQty = netProducedQty;
-
-      if (["PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
-        const dispatchablePlans = o.dailyProductionPlans.filter((p: any) => {
-          if (p.status === "COMPLETED" || p.status === "SHORT_CLOSED") return true;
-          if (p.status === "STOPPED") {
-            const planProduced = p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced), 0);
-            const planPlanned = Number(p.plannedQty || 0);
-            return planProduced >= planPlanned && planPlanned > 0;
-          }
-          return false;
-        });
-        let planSum = dispatchablePlans.reduce((sum: number, p: any) => {
-          return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
-        }, 0);
-        // Fallback to netProducedQty if no dispatchable plans found
-        if (planSum === 0 && netProducedQty > 0) planSum = netProducedQty;
-        // Safety: never exceed net produced qty
-        dispatchableProducedQty = Math.min(planSum, netProducedQty);
+      // READY_FOR_DISPATCH means production is complete. If producedQty was not synced
+      // (e.g. daily-plan completion path without hourly records), fall back to targetQty.
+      if (dispatchableProducedQty === 0 && o.status === "READY_FOR_DISPATCH") {
+        dispatchableProducedQty = Number(o.targetQty || 0);
       }
 
       const pendingQty = Math.max(0, dispatchableProducedQty - totalDispatched);
@@ -128,7 +110,6 @@ export class GoodsDispatchService {
         orderDate: o.orderDate,
         dueDate: o.dueDate,
         batchNo: o.batchNo,
-        lotNo: o.lotNo,
         uom: o.uom,
         status: o.status,
         producedQty: dispatchableProducedQty, // Provide the dispatchable qty instead of raw producedQty
@@ -136,7 +117,6 @@ export class GoodsDispatchService {
         pendingDispatchQty: pendingQty,
         productItem: o.productItem,
         machine: o.Machine,
-        destinationStoreId: o.destinationStoreId,
       };
     }).filter(o => o.pendingDispatchQty > 0);
   }
@@ -166,18 +146,10 @@ export class GoodsDispatchService {
       }
 
       // ✅ STEP 7–8: IN_PRODUCTION and later statuses can be dispatched
-      if (!['READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
+      if (!['IN_PROGRESS', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
         throw new ApiError(
           400,
-          `Production Order ${item.productionOrderId} is not eligible for dispatch. ` +
-          `Production must be fully completed before dispatch. Current status: ${po.status}`
-        );
-      }
-
-      if (po.destinationStoreId && po.destinationStoreId !== data.destinationStoreId) {
-        throw new ApiError(
-          400,
-          `Production Order ${item.productionOrderId} is assigned to a different destination store. Please select the correct store or remove the order.`
+          `Production Order ${item.productionOrderId} is not eligible for dispatch. Current status: ${po.status}`
         );
       }
 
@@ -185,7 +157,11 @@ export class GoodsDispatchService {
         (sum, d) => sum + Number(d.dispatchQty),
         0
       );
-      const pendingQty = Number(po.producedQty) - totalDispatched;
+      // Fallback: if producedQty was not synced for READY_FOR_DISPATCH orders, use targetQty
+      const effectiveProducedQty = Number(po.producedQty) === 0 && po.status === "READY_FOR_DISPATCH"
+        ? Number(po.targetQty)
+        : Number(po.producedQty);
+      const pendingQty = effectiveProducedQty - totalDispatched;
 
       if (item.dispatchQty > pendingQty) {
         throw new ApiError(
@@ -196,6 +172,10 @@ export class GoodsDispatchService {
     }
 
     const dispatchNumber = await this.getNextDispatchNumber();
+
+    // If every item bypasses gate → whole dispatch is immediately WAREHOUSE_RECEIVED
+    const allBypass = data.items.every((i) => i.bypassGate);
+    const initialStatus = allBypass ? "WAREHOUSE_RECEIVED" : "PENDING_GATE_APPROVAL";
 
     const dispatch = await prisma.goodsDispatch.create({
       data: {
@@ -208,15 +188,21 @@ export class GoodsDispatchService {
         loadingTime: data.loadingTime,
         remarks: data.remarks,
         destinationStoreId: data.destinationStoreId,
-        status: "PENDING_GATE_APPROVAL",
+        status: initialStatus,
         createdBy: userId,
         updatedBy: userId,
+        ...(allBypass && {
+          storeReceivedBy: userId,
+          storeReceivedAt: new Date(),
+          storeRemarks: "Direct inventory — gate bypassed",
+        }),
         items: {
           create: data.items.map((item) => ({
             productionOrderId: item.productionOrderId,
             productItemId: BigInt(item.productItemId),
             dispatchQty: item.dispatchQty,
             uom: item.uom,
+            bypassGate: item.bypassGate ?? false,
             remarks: item.remarks,
           })),
         },
@@ -232,7 +218,157 @@ export class GoodsDispatchService {
       },
     });
 
-    return dispatch;
+    // ── Immediately settle stock for all bypassGate items ─────────────────────
+    const bypassItems = data.items.filter((i) => i.bypassGate);
+    if (bypassItems.length > 0) {
+      const now = new Date();
+      const storeId = data.destinationStoreId;
+
+      await prisma.$transaction(async (tx) => {
+        const createdItems = await tx.goodsDispatchItem.findMany({
+          where: { dispatchId: dispatch.id },
+          include: { productionOrder: true },
+        });
+
+        // Create one StockAdjustment for all bypassed items in this dispatch
+        const adjustmentNumber = await StockAdjustmentService.getNextAdjustmentNumber();
+        const stockAdjustment = storeId
+          ? await tx.stockAdjustment.create({
+              data: {
+                adjustmentNumber,
+                adjustmentDate: now,
+                adjustmentType: "STOCK_INCREASE",
+                reason: `Direct Stock Entry: ${dispatch.dispatchNumber}`,
+                status: "APPROVED",
+                approvedBy: userId,
+                approvedAt: now,
+                createdBy: userId,
+                updatedBy: userId,
+                sourceDocument: "GOODS_DISPATCH",
+                sourceDocId: dispatch.dispatchNumber,
+                autoGenerated: true,
+                productionOrderId: bypassItems[0]?.productionOrderId ?? null,
+              },
+            })
+          : null;
+
+        for (const item of bypassItems) {
+          const createdItem = createdItems.find(
+            (ci) => ci.productionOrderId === item.productionOrderId
+          );
+          if (!createdItem) continue;
+
+          const receivedQty = item.dispatchQty;
+
+          // Mark item as received
+          await tx.goodsDispatchItem.update({
+            where: { id: createdItem.id },
+            data: { receivedQty },
+          });
+
+          if (!storeId) continue;
+
+          // Fetch current stock for the adjustment item record
+          const currentStock = await tx.finishedGoodsStock.findUnique({
+            where: { storeId_productItemId: { storeId, productItemId: createdItem.productItemId } },
+          });
+          const currentQty = currentStock ? Number(currentStock.onHandQty) : 0;
+
+          // StockAdjustmentItem for audit trail
+          if (stockAdjustment) {
+            await tx.stockAdjustmentItem.create({
+              data: {
+                stockAdjustmentId: stockAdjustment.id,
+                itemType: "FINISHED_GOODS",
+                productItemId: createdItem.productItemId,
+                storeId,
+                currentQty,
+                adjustedQty: currentQty + receivedQty,
+                difference: receivedQty,
+                remarks: `Direct via Dispatch: ${dispatch.dispatchNumber}`,
+                batchNo: createdItem.productionOrder?.batchNo ?? null,
+              },
+            });
+          }
+
+          // Upsert FinishedGoodsStock
+          await tx.finishedGoodsStock.upsert({
+            where: { storeId_productItemId: { storeId, productItemId: createdItem.productItemId } },
+            create: { storeId, productItemId: createdItem.productItemId, onHandQty: receivedQty },
+            update: { onHandQty: { increment: receivedQty } },
+          });
+
+          // Create FinishedGoodsTransaction
+          await tx.finishedGoodsTransaction.create({
+            data: {
+              txnDateTime: now,
+              storeId,
+              productItemId: createdItem.productItemId,
+              txnType: "PRODUCTION_RECEIPT",
+              qty: receivedQty,
+              productionOrderId: item.productionOrderId,
+              relatedDocNo: dispatch.dispatchNumber,
+              remarks: `Direct Dispatch (Gate Bypassed): ${dispatch.dispatchNumber}`,
+              createdBy: userId,
+            },
+          });
+
+          // Update Production Order status
+          const poRecord = await tx.productionOrder.findUnique({
+            where: { productionOrderId: item.productionOrderId },
+          });
+          if (poRecord) {
+            const targetQty = Number(poRecord.targetQty || 0);
+            const producedQty = Number(poRecord.producedQty || 0);
+
+            const allDispatches = await tx.goodsDispatchItem.aggregate({
+              where: { productionOrderId: item.productionOrderId },
+              _sum: { dispatchQty: true },
+            });
+            const totalDispatched = Number(allDispatches._sum.dispatchQty || 0);
+
+            const isFullyDispatched =
+              targetQty > 0 &&
+              (totalDispatched >= targetQty || (producedQty > 0 && totalDispatched >= producedQty));
+            const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(poRecord.status);
+            const newPoStatus = isFullyDispatched
+              ? "DISPATCHED"
+              : isShortClosed
+              ? poRecord.status
+              : "PARTIAL_COMPLETED";
+
+            if (poRecord.status !== newPoStatus) {
+              await tx.productionOrder.update({
+                where: { productionOrderId: item.productionOrderId },
+                data: { status: newPoStatus, updatedBy: userId },
+              });
+              await tx.productionOrderHistory.create({
+                data: {
+                  productionOrderId: item.productionOrderId,
+                  fromStatus: poRecord.status,
+                  toStatus: newPoStatus,
+                  changedBy: userId,
+                  remarks: isFullyDispatched
+                    ? `Goods fully dispatched directly to inventory (${totalDispatched}/${targetQty} pcs) via ${dispatch.dispatchNumber}. Gate bypassed.`
+                    : `Partial goods dispatched directly to inventory (${totalDispatched}/${targetQty} pcs) via ${dispatch.dispatchNumber}. Gate bypassed.`,
+                  action: isFullyDispatched ? "DISPATCH_COMPLETE" : "DISPATCH_PARTIAL",
+                  metadata: {
+                    dispatchNumber: dispatch.dispatchNumber,
+                    receivedQty,
+                    totalDispatched,
+                    targetQty,
+                    storeId,
+                    bypassGate: true,
+                  },
+                },
+              });
+            }
+          }
+        }
+      });
+    }
+
+    return this.findById(Number(dispatch.id));
   }
 
   // ── Find All ────────────────────────────────────────────────────────────────
@@ -246,7 +382,10 @@ export class GoodsDispatchService {
   }) {
     const { page = 1, limit = 10 } = filters;
     const skip = (Number(page) - 1) * Number(limit);
-    const where: any = {};
+    const where: any = {
+      // Exclude pure direct-to-stock dispatches (all items bypassed gate)
+      NOT: { items: { every: { bypassGate: true } } },
+    };
 
     if (filters.status) where.status = filters.status;
     if (filters.dateFrom || filters.dateTo) {
@@ -405,9 +544,10 @@ export class GoodsDispatchService {
 
     // ── APPROVE: update stock ──────────────────────────────────────────────────
     const now = new Date();
-    const receivedItemsMap = new Map<number, number>();
+    // Use string keys to avoid BigInt vs Number mismatch when looking up by item ID
+    const receivedItemsMap = new Map<string, number>();
     (data.receivedItems || []).forEach((ri) => {
-      receivedItemsMap.set(ri.itemId, ri.receivedQty);
+      receivedItemsMap.set(String(ri.itemId), ri.receivedQty);
     });
 
     await prisma.$transaction(async (tx) => {
@@ -423,8 +563,11 @@ export class GoodsDispatchService {
         },
       });
 
-      // Create a StockAdjustment for the Dispatch
-      const firstPoId = dispatch.items.find((i) => i.productionOrderId)?.productionOrderId || null;
+      // Only process items that did NOT bypass gate — bypass items were already added to stock on dispatch creation
+      const itemsToProcess = dispatch.items.filter((i: any) => !i.bypassGate);
+
+      // Create a StockAdjustment for the Dispatch (only if there are non-bypass items)
+      const firstPoId = itemsToProcess.find((i) => i.productionOrderId)?.productionOrderId || null;
       const adjustmentNumber = await StockAdjustmentService.getNextAdjustmentNumber();
       const stockAdjustment = await tx.stockAdjustment.create({
         data: {
@@ -444,10 +587,10 @@ export class GoodsDispatchService {
         },
       });
 
-      for (const item of dispatch.items) {
+      for (const item of itemsToProcess) {
         const receivedQty =
           receivedItemsMap.size > 0
-            ? receivedItemsMap.get(Number(item.id)) ?? Number(item.dispatchQty)
+            ? receivedItemsMap.get(String(item.id)) ?? Number(item.dispatchQty)
             : Number(item.dispatchQty);
 
         // Update received qty on item
@@ -456,7 +599,7 @@ export class GoodsDispatchService {
           data: { receivedQty },
         });
 
-        const storeId = dispatch.destinationStoreId || item.productionOrder.destinationStoreId;
+        const storeId = dispatch.destinationStoreId;
         if (!storeId) continue;
 
         // Fetch current stock for StockAdjustmentItem

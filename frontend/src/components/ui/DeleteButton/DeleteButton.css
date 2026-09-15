@@ -17,20 +17,11 @@
   font-size: 18px;
 }
 
-.delete-btn:hover {
-  transform: translateY(-3px);
-  background: rgba(239, 68, 68, 0.22);
-  box-shadow:
-    0 8px 18px rgba(239, 68, 68, 0.18);
-}
-
-.delete-btn:active {
-  transform: scale(0.95);
-}
-
 .delete-btn:disabled, .delete-btn.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Dark Theme Overrides */
@@ -40,8 +31,15 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-:root[data-theme="dark"] .delete-btn:hover {
+:root[data-theme="dark"] .delete-btn:not(:disabled):not(.disabled):hover {
   background: #ef4444;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+.delete-btn:not(:disabled):not(.disabled):hover {
+  transform: translateY(-3px);
+  background: rgba(239, 68, 68, 0.22);
+  box-shadow:
+    0 8px 18px rgba(239, 68, 68, 0.18);
 }

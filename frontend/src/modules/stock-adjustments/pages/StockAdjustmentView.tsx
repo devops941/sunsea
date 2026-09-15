@@ -321,9 +321,14 @@ const StockAdjustmentView: React.FC = () => {
                     const diff = Number(item.difference);
                     const itemUom = getItemUom(item);
 
-                    const isWastage = item.itemType === "WASTAGE" || item.rawMaterial?.itemType === "WASTAGE";
-                    const isRM = (item.itemType === "RAW_MATERIAL" || !!item.rawMaterial) && !isWastage;
-                    const typeLabel = isWastage ? "Wastage Product" : isRM ? "Raw Material" : "Finished Goods";
+                    const isWastage = Boolean(
+                      item.itemType === "WASTAGE" ||
+                      item.rawMaterial?.itemType === "WASTAGE" ||
+                      (item.rawMaterial?.materialName || "").toLowerCase().includes("wastage") ||
+                      (item.rawMaterial?.materialName || "").toLowerCase().includes("scrap")
+                    );
+                    const isRM = (item.itemType === "RAW_MATERIAL" || !!item.rawMaterial || !!item.rawMaterialId) && !isWastage;
+                    const typeLabel = isWastage ? "Production Wastage" : isRM ? "Raw Material Return" : "Finished Goods";
 
                     const itemName = item.rawMaterial?.materialName || item.product?.productName || item.rawMaterialId || item.productItemId || "—";
                     const itemCode = item.rawMaterial?.rawMaterialId || item.product?.productCode || "";

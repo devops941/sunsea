@@ -76,6 +76,11 @@ export function useTableKeyboardNav({
   // Scroll the highlighted row into view
   useEffect(() => {
     if (!containerRef.current || count === 0) return;
+    const targetRow = containerRef.current.querySelector<HTMLElement>(`[data-nav-index="${focusedIndex}"]`);
+    if (targetRow) {
+      targetRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
+    }
     // DataTable: first [role="row"] is the header, data rows start at index 1
     const rows = containerRef.current.querySelectorAll<HTMLElement>('[role="row"]');
     rows[focusedIndex + 1]?.scrollIntoView({ block: "nearest", behavior: "smooth" });

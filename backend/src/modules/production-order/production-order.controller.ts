@@ -29,7 +29,6 @@ class ProductionOrderController {
       toDate: req.query.toDate as string,
       sortBy: this.parseSortBy(req.query.sortBy) ?? "createdAt",
       sortOrder: this.parseSortOrder(req.query.sortOrder) ?? "desc",
-      sourceSalesOrderId: req.query.sourceSalesOrderId as string,
     };
 
     const orders = await productionOrderService.findAll(query);
@@ -142,6 +141,14 @@ class ProductionOrderController {
     );
     return res.status(200).json(
       new ApiResponse("Production order history fetched successfully", history)
+    );
+  });
+
+  getMachinePrograms = asyncHandler(async (req: Request, res: Response) => {
+    const { machineId, weekStartDate } = req.query as { machineId: string; weekStartDate: string };
+    const programs = await productionOrderService.getMachinePrograms(machineId, weekStartDate);
+    return res.status(200).json(
+      new ApiResponse("Machine program list fetched successfully", programs)
     );
   });
 

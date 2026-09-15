@@ -11,7 +11,8 @@ import CustomButton from "../../../components/ui/Button/Button";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createMachine, updateMachine } from "../../../features/machines/machineSlice";
 import { machineService } from "../../../services/machineService";
-import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
+import { roleService } from "../../../services/roleService";
+import { employeeService } from "../../../services/employeeService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -82,7 +83,7 @@ const MachineForm: React.FC = () => {
     });
 
     const fetchRoles = useCallback(() => {
-        machineOperationAssignmentService.getRoles().then(res => {
+        roleService.fetchAll({ limit: 100 }).then(res => {
             const raw = res.data || [];
             setRoles(raw.filter((r: any) =>
                 !r.name?.toLowerCase().includes("super admin") &&
@@ -91,7 +92,7 @@ const MachineForm: React.FC = () => {
                 !r.code?.toLowerCase().includes("superadmin") &&
                 r.code?.toLowerCase() !== "role_admin"
             ));
-        });
+        }).catch(() => { });
     }, []);
 
     const fetchEmployees = useCallback(() => {
@@ -99,8 +100,8 @@ const MachineForm: React.FC = () => {
             setEmployees([]);
             return;
         }
-        machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId))
-            .then(res => setEmployees(res.data || []))
+        employeeService.fetchAll({ roleId: Number(inchargeRoleId), limit: 1000 })
+            .then(res => setEmployees(res.data || res || []))
             .catch(() => { });
     }, [inchargeRoleId]);
 
@@ -117,8 +118,8 @@ const MachineForm: React.FC = () => {
         const detectRole = async () => {
             for (const role of roles) {
                 try {
-                    const res = await machineOperationAssignmentService.getEmployeesByRole(Number(role.id));
-                    const emps: any[] = res.data || [];
+                    const res = await employeeService.fetchAll({ roleId: Number(role.id), limit: 1000 });
+                    const emps: any[] = res.data || res || [];
                     if (emps.some((e: any) => String(e.id) === String(pendingOperatorId))) {
                         if (!cancelled) {
                             setInchargeRoleId(String(role.id));

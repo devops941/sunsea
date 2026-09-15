@@ -7,6 +7,7 @@ import {
   createHourlyProductionSchema,
   updateHourlyProductionSchema,
   hourlyProductionIdSchema,
+  removeHourlyEntriesSchema,
 } from "./hourly-production.validation";
 
 const router = Router();
@@ -20,6 +21,18 @@ router.post(
   requirePermission("hourly_productions.create"),
   validateMiddleware(createHourlyProductionSchema),
   hourlyProductionController.create
+);
+
+/**
+ * Remove specific hour-index entries from a product's shift log
+ * (used when an hour is reassigned from one product to another mid-shift)
+ */
+router.post(
+  "/remove-entries",
+  authMiddleware,
+  requirePermission("hourly_productions.edit"),
+  validateMiddleware(removeHourlyEntriesSchema),
+  hourlyProductionController.removeEntries
 );
 
 /**

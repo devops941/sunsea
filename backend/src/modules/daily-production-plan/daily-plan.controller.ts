@@ -8,7 +8,7 @@ class DailyPlanController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const dailyPlan = await dailyPlanService.create(req.body, userId);
-    const safePlan = JSON.parse(JSON.stringify(dailyPlan, (key, value) =>
+    const safePlan = JSON.parse(JSON.stringify(dailyPlan, (_key, value) =>
       typeof value === "bigint" ? value.toString() : value
     ));
     getIO().emit("dailyPlan:created", safePlan);
@@ -19,7 +19,7 @@ class DailyPlanController {
     const userId = req.user?.userId;
     const { dailyPlanId } = req.params;
     const dailyPlan = await dailyPlanService.update(dailyPlanId as string, req.body, userId);
-    const safePlan = JSON.parse(JSON.stringify(dailyPlan, (key, value) =>
+    const safePlan = JSON.parse(JSON.stringify(dailyPlan, (_key, value) =>
       typeof value === "bigint" ? value.toString() : value
     ));
     getIO().emit("dailyPlan:updated", safePlan);
@@ -37,6 +37,73 @@ class DailyPlanController {
     const { dailyPlanId } = req.params;
     const dailyPlan = await dailyPlanService.findById(dailyPlanId as string);
     return res.status(200).json(new ApiResponse("Daily Production Plan fetched successfully", dailyPlan));
+  });
+
+  bulkCreate = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const plans = await dailyPlanService.bulkCreate(req.body, userId);
+    const safePlans = JSON.parse(JSON.stringify(plans, (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("dailyPlan:bulkCreated", { count: plans.length });
+    return res.status(201).json(new ApiResponse(`${plans.length} Daily Production Plan(s) processed successfully`, safePlans));
+  });
+
+  bulkDelete = asyncHandler(async (req: Request, res: Response) => {
+    const { dailyPlanIds } = req.body;
+    const result = await dailyPlanService.bulkDelete(dailyPlanIds);
+    getIO().emit("dailyPlan:bulkDeleted", { dailyPlanIds: result.deleted });
+    return res.status(200).json(new ApiResponse(`${result.deleted.length} Daily Production Plan(s) deleted successfully`, result));
+  });
+
+
+  getRmIssuedDates = asyncHandler(async (req: Request, res: Response) => {
+    const { weekStart } = req.query;
+    if (!weekStart) {
+      return res.status(400).json({ success: false, message: "weekStart query parameter is required (YYYY-MM-DD)" });
+    }
+    const dates = await dailyPlanService.getRmIssuedDates(weekStart as string);
+    return res.status(200).json(new ApiResponse("RM issued dates fetched", dates));
+  });
+
+  getRmRequirements = asyncHandler(async (req: Request, res: Response) => {
+    const { date, weekStart, shiftId, machineId, productId } = req.query;
+    if (!date && !weekStart) {
+      return res.status(400).json({ success: false, message: "date or weekStart query parameter is required (YYYY-MM-DD)" });
+    }
+    const result = await dailyPlanService.getRawMaterialRequirements({
+      date: date ? String(date) : undefined,
+      weekStart: weekStart ? String(weekStart) : undefined,
+      shiftId: shiftId ? String(shiftId) : undefined,
+      machineId: machineId ? String(machineId) : undefined,
+      productId: productId ? String(productId) : undefined,
+    });
+    return res.status(200).json(new ApiResponse("Raw material requirements fetched", result));
+  });
+
+  issueRawMaterials = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId!;
+    const { date, items } = req.body;
+    const result = await dailyPlanService.issueRawMaterialsForDay(date, items, userId);
+    return res.status(200).json(new ApiResponse("Raw materials issued successfully", result));
+  });
+
+  getWeekProducts = asyncHandler(async (req: Request, res: Response) => {
+    const { machineId, weekStart } = req.query;
+    if (!machineId || !weekStart || typeof weekStart !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+      return res.status(400).json({ success: false, message: "machineId and weekStart (YYYY-MM-DD) query parameters are required" });
+    }
+    const result = await dailyPlanService.getWeekProducts(String(machineId), weekStart);
+    return res.status(200).json(new ApiResponse("Week products fetched successfully", result));
+  });
+
+  checkWeek = asyncHandler(async (req: Request, res: Response) => {
+    const { weekStart } = req.query;
+    if (!weekStart || typeof weekStart !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+      return res.status(400).json({ success: false, message: "weekStart is required (YYYY-MM-DD)" });
+    }
+    const result = await dailyPlanService.checkWeek(weekStart);
+    return res.status(200).json(new ApiResponse("Week check completed", result));
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {

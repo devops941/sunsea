@@ -2,7 +2,7 @@ import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
-import { FaPlus, FaCalendarAlt, FaCheckCircle, FaEye, FaSyncAlt } from "react-icons/fa";
+import { FaPlus, FaEye, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -10,20 +10,52 @@ import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
-import DataTable from "../../../components/ui/table/DataTable";
-import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import IconButton from "../../../components/ui/IconButton/IconButton";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import TextInput from "../../../components/form/TextInput/TextInput";
+import { machineService } from "../../../services/machineService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
-import { salesOrderService } from "../../../services/salesOrderService";
-import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 20;
+const SORT_STORAGE_KEY = "sunsea_production_order_sort";
+
+type SortOrder = "default" | "asc" | "desc";
+
+interface FilterState {
+    status: string;
+    orderType: string;
+    machineId: string;
+    fromDate: string;
+    toDate: string;
+}
+
+const DEFAULT_FILTERS: FilterState = {
+    status: "",
+    orderType: "",
+    machineId: "",
+    fromDate: "",
+    toDate: "",
+};
+
+const statusOptions = [
+    { label: "Draft", value: "DRAFT" },
+    { label: "Weekly Scheduled", value: "WEEKLY_SCHEDULED" },
+    { label: "In Progress", value: "IN_PROGRESS" },
+    { label: "Completed", value: "COMPLETED" },
+];
+
+const orderTypeOptions = [
+    { label: "Weekly Plan", value: "weekly-group" },
+    { label: "Direct Order", value: "standalone" },
+];
 
 const ProductionOrderList: React.FC = () => {
     const navigate = useNavigate();
@@ -34,6 +66,31 @@ const ProductionOrderList: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [draftFilters, setDraftFilters] = useState<FilterState>(DEFAULT_FILTERS);
+    const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            let next: SortOrder = "default";
+            if (prev === "default") next = "desc";
+            else if (prev === "desc") next = "asc";
+            else next = "default";
+            try {
+                localStorage.setItem(SORT_STORAGE_KEY, next);
+            } catch (_) {}
+            return next;
+        });
+    }, []);
+
+    const [machines, setMachines] = useState<any[]>([]);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
@@ -79,335 +136,301 @@ const ProductionOrderList: React.FC = () => {
         }
     }, []);
 
-    const fetchProductionOrdersForExport = useCallback(async () => {
-        const response = await productionOrderService.fetchAll({
-            page: 1,
-            pageSize: 100000,
-        });
-        const list = response?.data || (Array.isArray(response) ? response : []);
-        return Array.isArray(list) ? list : [];
-    }, []);
 
-    const { csvColumns, csvFilename } = useMemo(() => {
-        const columns = [
-            { header: "PO No", accessor: (item: any) => item.productionOrderId || item.orderNo || "" },
-            { header: "Product", accessor: (item: any) => item.productItem?.productName || item.productName || item.salesProductName || "" },
-            { header: "Target Qty", accessor: (item: any) => item.targetQty || item.quantity || 0 },
-            { header: "Produced Qty", accessor: (item: any) => item.producedQty || 0 },
-            { header: "UOM", accessor: (item: any) => item.uom || "Pcs." },
-            { header: "Due Date", accessor: (item: any) => item.dueDate ? formatDate(item.dueDate) : "" },
-            { header: "Status", accessor: (item: any) => item.status || "" },
-        ];
-        return {
-            csvColumns: columns,
-            csvFilename: `Production_Orders_${new Date().toISOString().split("T")[0]}.csv`,
-        };
+    const fetchMachines = useCallback(async () => {
+        try {
+            const res = await machineService.getAll({ limit: 1000 });
+            const list = Array.isArray(res) ? res : (res?.machines || res?.data || []);
+            if (Array.isArray(list)) setMachines(list);
+        } catch {
+            // ignore
+        }
     }, []);
 
     useEffect(() => {
         fetchRawMaterials();
-    }, [fetchRawMaterials]);
+        fetchMachines();
+    }, [fetchRawMaterials, fetchMachines]);
+
+    const machineOptions = useMemo(() => {
+        return machines.map((m: any) => {
+            const id = m.machineId || m.id;
+            const name = m.machineName ? `${m.machineName} (${id})` : String(id);
+            return {
+                label: name,
+                value: String(id),
+            };
+        });
+    }, [machines]);
+
+    const activeFilterCount = useMemo(() => {
+        return Object.values(appliedFilters).filter(Boolean).length;
+    }, [appliedFilters]);
+
+    const hasActiveFilters = activeFilterCount > 0;
+
+    const handleFilterOpen = useCallback(() => {
+        setDraftFilters(appliedFilters);
+    }, [appliedFilters]);
+
+    const handleApplyFilters = useCallback(() => {
+        setAppliedFilters(draftFilters);
+        setCurrentPage(1);
+    }, [draftFilters]);
+
+    const handleClearFilters = useCallback(() => {
+        setDraftFilters(DEFAULT_FILTERS);
+        setAppliedFilters(DEFAULT_FILTERS);
+        setCurrentPage(1);
+    }, []);
+
+    const getBaseId = (poId: string): string | null => {
+        const match = poId.match(/^(.+)-M\d+-\d+$/);
+        return match ? match[1] : null;
+    };
 
     // Fetch and combine Sales Orders and Production Orders
     const fetchCombinedData = useCallback(async () => {
         setLoading(true);
         try {
-            // 1. Fetch Sales Orders (status: IN_PRODUCTION) if allowed
-            let soList: any[] = [];
-            if (can("sales-orders.view")) {
-                try {
-                    const soRes = await salesOrderService.fetchAll({
-                        status: "IN_PRODUCTION"
-                    });
-                    soList = (soRes as any).data || soRes || [];
-                } catch {
-                    // silently ignore
-                }
-            }
-
-            // 2. Fetch Production Orders
+            // Fetch Production Orders
             let poList: any[] = [];
-            if (can("production_orders.view") || can("weekly_programs.view")) {
-                try {
-                    const poRes = await productionOrderService.fetchAll({
-                        pageSize: 1000
-                    });
-                    poList = poRes.data || [];
-                } catch {
-                    // silently ignore
-                }
+            try {
+                const poRes = await productionOrderService.fetchAll({
+                    pageSize: 1000
+                });
+                const rawList = (poRes as any)?.data?.data || (poRes as any)?.data || (Array.isArray(poRes) ? poRes : []);
+                poList = Array.isArray(rawList) ? rawList : [];
+            } catch (err: any) {
+                console.error("Failed to fetch production orders:", err);
+                toast.error(err?.response?.data?.message || "Failed to load production orders");
             }
 
-            // 2.5 Fetch Finished Goods Stock
-            let fgList: any[] = [];
-            if (can("finished_goods_stocks.view")) {
-                try {
-                    const fgRes = await finishedGoodsStockService.fetchAll();
-                    fgList = Array.isArray(fgRes) ? fgRes : (fgRes as any).data || [];
-                } catch {
-                    // silently ignore
-                }
-            }
+            // Group all POs — weekly plan POs by base ID, standalone as-is
+            const directPOs = poList;
 
-            // Create stock map of productItemId -> onHandQty
-            const fgStockMap = new Map<string, number>();
-            fgList.forEach((fg: any) => {
-                const prodId = (fg.productItemId || fg.productId)?.toString();
-                if (prodId) {
-                    const qty = Number(fg.onHandQty || 0);
-                    fgStockMap.set(prodId, (fgStockMap.get(prodId) || 0) + qty);
+            // Group direct POs — weekly plan POs by base ID, standalone as-is
+            const weeklyGroupMap = new Map<string, any[]>();
+            const standalonePOs: any[] = [];
+
+            directPOs.forEach((po: any) => {
+                const baseId = getBaseId(po.productionOrderId);
+                if (baseId) {
+                    if (!weeklyGroupMap.has(baseId)) weeklyGroupMap.set(baseId, []);
+                    weeklyGroupMap.get(baseId)!.push(po);
+                } else {
+                    standalonePOs.push(po);
                 }
             });
 
-            // 3. Map Sales Orders to their production orders
-            const mapped = soList.map((so: any) => {
-                const associatedPOs = poList.filter((po: any) =>
-                    po.sourceSalesOrderId === so.id.toString() ||
-                    po.sourceSalesOrderId === so.orderNo
-                );
+            // Build weekly group entries
+            const weeklyGroupEntries = Array.from(weeklyGroupMap.entries()).map(([baseId, pos]) => {
+                const isAllCompleted = pos.length > 0 && pos.every((p: any) => {
+                    return p.status?.toUpperCase() === 'COMPLETED' || 
+                        (Number(p.producedQty || 0) >= Number(p.targetQty || 0) && Number(p.targetQty || 0) > 0);
+                });
+                const hasAnyInProgress = pos.some((p: any) => {
+                    const st = p.status?.toUpperCase();
+                    return st === 'IN_PROGRESS' || (Number(p.producedQty || 0) > 0 && Number(p.producedQty || 0) < Number(p.targetQty || 0));
+                });
+                const hasAnyDraft = pos.some((p: any) => p.status?.toUpperCase() === 'DRAFT');
 
-                let status = "PENDING_PLANNING";
-                let primaryPO = null;
-
-                if (associatedPOs.length > 0) {
-                    primaryPO = associatedPOs[0];
-                    const hasCreated = associatedPOs.some((po: any) => po.status === "CREATED");
-                    const hasWaiting = associatedPOs.some((po: any) => po.status === "WAITING_FOR_MATERIAL");
-                    const hasReady = associatedPOs.some((po: any) => po.status === "READY_FOR_PLANNING");
-                    const hasWeekly = associatedPOs.some((po: any) => po.status === "WEEKLY_SCHEDULED" || po.status === "SCHEDULED");
-                    const hasDaily = associatedPOs.some((po: any) => po.status === "DAILY_PLANNED");
-                    const hasProgress = associatedPOs.some((po: any) => po.status === "IN_PRODUCTION" || po.status === "IN_PROGRESS");
-                    const hasPostProd = associatedPOs.some((po: any) => po.status === "POST_PRODUCTION");
-                    const hasReadyDispatch = associatedPOs.some((po: any) => po.status === "READY_FOR_DISPATCH" || po.status === "COMPLETED");
-                    const hasDispatched = associatedPOs.every((po: any) => po.status === "DISPATCHED");
-
-                    if (hasDispatched) {
-                        status = "DISPATCHED";
-                    } else if (hasReadyDispatch) {
-                        status = "READY_FOR_DISPATCH";
-                    } else if (hasPostProd) {
-                        status = "POST_PRODUCTION";
-                    } else if (hasProgress) {
-                        status = "IN_PRODUCTION";
-                    } else if (hasDaily) {
-                        status = "DAILY_PLANNED";
-                    } else if (hasWeekly) {
-                        status = "WEEKLY_SCHEDULED";
-                    } else if (hasReady) {
-                        status = "READY_FOR_PLANNING";
-                    } else if (hasWaiting) {
-                        status = "WAITING_FOR_MATERIAL";
-                    } else if (hasCreated) {
-                        status = "CREATED";
-                    } else {
-                        status = associatedPOs[0]?.status || "CREATED";
-                    }
+                let overallStatus = 'WEEKLY_SCHEDULED';
+                if (isAllCompleted) {
+                    overallStatus = 'COMPLETED';
+                } else if (hasAnyInProgress) {
+                    overallStatus = 'IN_PROGRESS';
+                } else if (hasAnyDraft) {
+                    overallStatus = 'DRAFT';
                 } else {
-                    // Check Finished Goods Stock
-                    let isAllAvailable = true;
-                    if (so.items && so.items.length > 0) {
-                        so.items.forEach((item: any) => {
-                            const prodId = (item.productId || item.product?.id)?.toString();
-                            const orderedQty = Number(item.quantity || 0);
-                            const stockQty = fgStockMap.get(prodId) || 0;
-                            if (stockQty < orderedQty) {
-                                isAllAvailable = false;
-                            }
-                        });
-                    } else {
-                        isAllAvailable = false;
-                    }
-                    if (isAllAvailable) {
-                        status = "AVAILABLE";
-                    }
+                    overallStatus = pos[0]?.status || 'WEEKLY_SCHEDULED';
                 }
 
+                const firstPO = pos[0];
                 return {
-                    ...so,
-                    status,
-                    productionOrders: associatedPOs,
-                    primaryPO
+                    id: `group-${baseId}`,
+                    type: 'weekly-group',
+                    baseId,
+                    orderDate: firstPO.orderDate,
+                    weekStart: firstPO.weekStartDate,
+                    weekEnd: firstPO.weekEndDate,
+                    status: overallStatus,
+                    children: pos,
+                    isDirect: true,
+                    primaryPO: firstPO,
                 };
             });
 
-            // 4. Find Production Orders that do not belong to any Sales Order in soList
-            const directPOs = poList.filter((po: any) => {
-                if (!po.sourceSalesOrderId) return true;
-                const matchesSO = soList.some((so: any) =>
-                    so.id.toString() === po.sourceSalesOrderId ||
-                    so.orderNo === po.sourceSalesOrderId
-                );
-                return !matchesSO;
-            });
-
-            const directMapped = directPOs.map((po: any) => {
+            // Build standalone direct PO entries (not weekly plan)
+            const directMapped = standalonePOs.map((po: any) => {
+                const isCompleted = po.status?.toUpperCase() === 'COMPLETED' || 
+                    (Number(po.producedQty || 0) >= Number(po.targetQty || 0) && Number(po.targetQty || 0) > 0);
+                const effectiveStatus = isCompleted ? 'COMPLETED' : po.status;
                 return {
                     id: `direct-${po.productionOrderId}`,
+                    type: 'standalone',
                     orderNo: po.productionOrderId,
                     orderDate: po.orderDate,
                     expectedCompletionDate: po.dueDate,
-                    customer: { firmName: "Direct Production Order" },
-                    status: po.status,
+                    customer: { firmName: 'Direct Production Order' },
+                    status: effectiveStatus,
                     productionOrders: [po],
                     primaryPO: po,
                     isDirect: true,
-                    items: [{
-                        product: po.productItem,
-                        quantity: po.targetQty
-                    }]
+                    items: [{ product: po.productItem, quantity: po.targetQty }]
                 };
             });
 
-            // Combine both mapped and directMapped
-            let combinedList = [...mapped, ...directMapped];
+            // Combine all entries
+            let combinedList = [...weeklyGroupEntries, ...directMapped];
 
-            // Filter out DISPATCHED, CANCELLED, and AVAILABLE items from the active board
-            combinedList = combinedList.filter(item => !["DISPATCHED", "CANCELLED", "CANCELED", "DELETED", "AVAILABLE"].includes(item.status?.toUpperCase()));
+            // Apply status filter
+            if (appliedFilters.status) {
+                combinedList = combinedList.filter(item => item.status?.toUpperCase() === appliedFilters.status.toUpperCase());
+            }
+
+            // Apply order type filter
+            if (appliedFilters.orderType) {
+                combinedList = combinedList.filter(item => item.type === appliedFilters.orderType);
+            }
+
+            // Apply machine filter
+            if (appliedFilters.machineId) {
+                const target = String(appliedFilters.machineId).toLowerCase();
+                combinedList = combinedList.filter((item: any) => {
+                    const pos = item.children || item.productionOrders || (item.primaryPO ? [item.primaryPO] : []);
+                    return pos.some((po: any) => {
+                        const mId = String(po.machineMachineId || po.machineId || po.Machine?.id || po.Machine?.machineId || "").toLowerCase();
+                        const mName = String(po.Machine?.machineName || "").toLowerCase();
+                        return mId === target || mName === target;
+                    });
+                });
+            }
+
+            // Apply date filters (Order Date)
+            if (appliedFilters.fromDate) {
+                combinedList = combinedList.filter((item: any) => {
+                    const dateStr = item.orderDate ? String(item.orderDate).split("T")[0] : "";
+                    return dateStr ? dateStr >= appliedFilters.fromDate : true;
+                });
+            }
+            if (appliedFilters.toDate) {
+                combinedList = combinedList.filter((item: any) => {
+                    const dateStr = item.orderDate ? String(item.orderDate).split("T")[0] : "";
+                    return dateStr ? dateStr <= appliedFilters.toDate : true;
+                });
+            }
+
+            // Apply search filter (PO No, product name)
+            if (searchTerm.trim()) {
+                const q = searchTerm.trim().toLowerCase();
+                combinedList = combinedList.filter((item: any) => {
+                    const poNo = (item.primaryPO?.productionOrderId || item.orderNo || item.baseId || "").toLowerCase();
+                    const products = (item.productionOrders || item.items || item.children || [])
+                        .map((p: any) => (p.productItem?.productName || p.product?.productName || "").toLowerCase())
+                        .join(" ");
+                    return poNo.includes(q) || products.includes(q);
+                });
+            }
+
+            // Apply sort by orderDate
+            if (sortOrder === "asc") {
+                combinedList.sort((a, b) => new Date(a.orderDate || 0).getTime() - new Date(b.orderDate || 0).getTime());
+            } else if (sortOrder === "desc") {
+                combinedList.sort((a, b) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime());
+            }
 
             setTotalItems(combinedList.length);
 
-            // 7. Paginate
+            // Paginate
             const start = (currentPage - 1) * ITEMS_PER_PAGE;
             setCombinedData(combinedList.slice(start, start + ITEMS_PER_PAGE));
         } catch {
-            toast.error("Failed to load dashboard data");
+            toast.error("Failed to load production orders");
         } finally {
             setLoading(false);
         }
-    }, [currentPage]);
+    }, [currentPage, searchTerm, appliedFilters, sortOrder]);
 
     useEffect(() => {
         fetchCombinedData();
     }, [fetchCombinedData]);
 
-    usePageShortcuts({
-        onRefresh: () => fetchCombinedData(),
-        onDelete: () => setShowDeleteModal(true),
-        onNew: () => can("production_orders.create") && navigate("/production-orders/create"),
-        onExport: () => {
-            const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
-            exportBtn?.click();
-        },
-    });
-
     useSocketSync("productionOrder", undefined, fetchCombinedData);
-    useSocketSync("salesOrder", undefined, fetchCombinedData);
 
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
+    const tableRef = useRef<HTMLDivElement>(null);
 
-    const handleCreateProductionOrder = (so: any) => {
-        navigate(`/production-orders/create`, {
-            state: { sourceSalesOrderId: so.id }
-        });
-    };
-
-    // STEP 2 & 3: Auto-check raw material availability when assigning to Weekly Schedule
-    const handleAssignWeekly = async (item: any) => {
-        const po = item.primaryPO;
-        if (!po) return;
-
-        // If status is already READY_FOR_PLANNING / PENDING_PLANNING, navigate directly!
-        const isAlreadyReady = ["READY_FOR_PLANNING", "PENDING_PLANNING"].includes(po.status) || 
-                               ["READY_FOR_PLANNING", "PENDING_PLANNING"].includes(item.status);
-        if (isAlreadyReady) {
-            navigate(`/weekly-machine-schedules/create?po=${po.productionOrderId}`);
-            return;
-        }
-
-        setLoading(true);
-        try {
-            // Check materials directly
-            const result = await productionOrderService.checkMaterialAvailability(po.productionOrderId);
-            if ((result as any).allAvailable) {
-                toast.success(`Raw materials verified. Navigating to Weekly Scheduling for ${po.productionOrderId}.`);
-                navigate(`/weekly-machine-schedules/create?po=${po.productionOrderId}`);
-            } else {
-                const insufficient = (result as any).materialStatus?.filter((m: any) => m.status === "INSUFFICIENT") || [];
-                toast.warning(
-                    `${insufficient.length} material(s) are insufficient for order ${po.productionOrderId}. ` +
-                    `Status set to WAITING FOR MATERIAL. Please create purchase orders for: ${insufficient.map((m: any) => m.materialName).join(", ")}`
-                );
-                fetchCombinedData();
-            }
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || error?.message || "Failed to verify material availability.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleRecheckMaterials = async (item: any) => {
-        const po = item.primaryPO;
-        if (!po) return;
-        setLoading(true);
-        try {
-            const result = await productionOrderService.checkMaterialAvailability(po.productionOrderId);
-            if ((result as any).allAvailable) {
-                toast.success(`Raw materials verified! Order ${po.productionOrderId} is now READY FOR PLANNING.`);
-            } else {
-                const insufficient = (result as any).materialStatus?.filter((m: any) => m.status === "INSUFFICIENT") || [];
-                toast.warning(
-                    `Raw materials still insufficient for order ${po.productionOrderId}. ` +
-                    `Please add stock for: ${insufficient.map((m: any) => m.materialName).join(", ")}`
-                );
-            }
-            fetchCombinedData();
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || error?.message || "Failed to verify material availability.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleOpenEdit = (po: any) => {
-        navigate(`/production-orders/edit/${po.productionOrderId}`);
-    };
-
-    const handleAllocateRM = async (order: any) => {
-        setLoading(true);
-        try {
-            let successCount = 0;
-            const targetPOs = order.productionOrders.filter((po: any) => po.status === "RM_PENDING");
-
-            if (targetPOs.length === 0) {
-                toast.info("No raw materials require allocation.");
-                setLoading(false);
-                return;
-            }
-
-            for (const po of targetPOs) {
-                const fullPo = await productionOrderService.getById(po.productionOrderId);
-                const cleanRawMaterials = ((fullPo as any).draftRawMaterials || []).map((rm: any) => ({
-                    rawMaterialId: rm.rawMaterialId?.toString() || "",
-                    requiredQty: Number(rm.requiredQty),
-                    uom: rm.uom || "KG",
-                    storeId: rm.storeId?.toString() || "STR-001",
-                    remarks: rm.remarks || ""
-                }));
-
-                const updated = await productionOrderService.update(po.productionOrderId, {
-                    status: "PLANNED",
-                    rawMaterials: cleanRawMaterials
-                });
-                if (updated.status === "RM_AVAILABLE" || updated.status === "READY_FOR_PLANNING") {
-                    successCount++;
+    const handleOpenWeeklyPlan = useCallback((item: any) => {
+        navigate(
+            `/production-orders/weekly-plan/${item.baseId}`,
+            {
+                state: {
+                    baseId: item.baseId,
+                    weekStart: item.weekStart,
+                    weekEnd: item.weekEnd,
+                    children: item.children,
                 }
             }
+        );
+    }, [navigate]);
 
-            if (successCount === targetPOs.length) {
-                toast.success(`Raw materials successfully allocated and reserved for Sales Order ${order.orderNo}!`);
-            } else if (successCount > 0) {
-                toast.warning(`Raw materials allocated for ${successCount}/${targetPOs.length} items. Stock is still insufficient for remaining items.`);
-            } else {
-                toast.error(`Raw material stock is still insufficient for Sales Order ${order.orderNo}.`);
+    const handleEditWeeklyPlan = useCallback((item: any) => {
+        navigate(
+            '/production-orders/create',
+            {
+                state: {
+                    editWeeklyPlan: true,
+                    baseId: item.baseId,
+                    children: item.children,
+                    weekStart: item.weekStart,
+                    weekEnd: item.weekEnd,
+                }
             }
-            fetchCombinedData();
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || error?.message || "Failed to allocate raw materials.");
-        } finally {
-            setLoading(false);
+        );
+    }, [navigate]);
+
+    const handleOpenEdit = useCallback((po: any) => {
+        navigate(`/production-orders/edit/${po.productionOrderId}`);
+    }, [navigate]);
+
+    const handleOpenViewItem = useCallback((item: any) => {
+        if (item.type === 'weekly-group') {
+            handleOpenWeeklyPlan(item);
+            return;
         }
-    };
+        if (!item.primaryPO) return;
+        setSelectedItem(item.primaryPO);
+        setFullOrder(null);
+        setShowViewModal(true);
+        fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
+    }, [fetchOrderDetails, handleOpenWeeklyPlan]);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: combinedData.length,
+        onEnter: (i) => {
+            const item = combinedData[i];
+            if (!item) return;
+            if (item.type === 'weekly-group') {
+                handleOpenWeeklyPlan(item);
+            } else {
+                handleOpenViewItem(item);
+            }
+        },
+        onEdit: (i) => {
+            const item = combinedData[i];
+            if (!item) return;
+            if (item.type === 'weekly-group') {
+                const isWeeklyEditable = can('production_orders.edit') && !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(item.status?.toUpperCase());
+                if (isWeeklyEditable) handleEditWeeklyPlan(item);
+            } else if (item.primaryPO && can('production_orders.edit')) {
+                const isStandaloneEditable = !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(item.primaryPO.status?.toUpperCase());
+                if (isStandaloneEditable) handleOpenEdit(item.primaryPO);
+            }
+        },
+        containerRef: tableRef,
+    });
 
     const handleDeleteConfirm = async () => {
         if (!itemToDelete || itemToDelete.length === 0 || isDeleting) return;
@@ -432,137 +455,33 @@ const ProductionOrderList: React.FC = () => {
         setShowDeleteModal(true);
     }, []);
 
-    
-
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-
-    const tableRef = useRef<HTMLDivElement>(null);
-
-    const handleOpenViewItem = useCallback((item: any) => {
-        if (!item.primaryPO) return;
-        setSelectedItem(item.primaryPO);
-        setFullOrder(null);
-        setShowViewModal(true);
-        fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
-    }, [fetchOrderDetails]);
-
-    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
-        count: combinedData.length,
-        onEnter: (i) => { const item = combinedData[i]; if (item) handleOpenViewItem(item); },
-        onEdit: (i) => { const item = combinedData[i]; if (item?.primaryPO && can("production_orders.edit")) handleOpenEdit(item.primaryPO); },
-        containerRef: tableRef,
-    });
-
-    const columns = useMemo(() => [
-        {
-            header: "#",
-            width: "48px",
-            render: (_: any, index: number) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
-        },
-        {
-            header: "PO NO",
-            width: "110px",
-            render: (item: any) => <span className="font-semibold text-ink">{item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}</span>
-        },
-        {
-            header: "ORDER DATE",
-            width: "100px",
-            render: (item: any) => <span className="text-ink-muted">{formatDate(item.orderDate)}</span>
-        },
-        {
-            header: "EXPECTED DATE",
-            width: "110px",
-            render: (item: any) => <span className="text-ink-muted">{item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : "-"}</span>
-        },
-        {
-            header: "PRODUCTS",
-            width: "minmax(0, 1fr)",
-            render: (item: any) => <span className="text-ink-muted">{item.productionOrders && item.productionOrders.length > 0
-                ? item.productionOrders.map((po: any) => po.productItem?.productName || "Unknown Product").join(", ")
-                : item.items?.map((it: any) => it.product?.productName || "Unknown Product").join(", ") || "-"
-            }</span>
-        },
-        {
-            header: "STATUS",
-            width: "165px",
-            render: (item: any) => <StatusBadge status={item.status} />
-        },
-        {
-            header: "ACTIONS",
-            width: "160px",
-            render: (item: any) => (
-                <div className="flex items-center gap-2 justify-start" onClick={(e) => e.stopPropagation()}>
-
-                    {/* PENDING_PLANNING with no PO yet → Create Production Order */}
-                    {item.status === "PENDING_PLANNING" && !item.primaryPO && can("production_orders.create") && (
-                        <IconButton
-                            variant="primary"
-                            title="Create Production Order"
-                            icon={FaPlus}
-                            onClick={() => handleCreateProductionOrder(item)}
-                        />
-                    )}
-
-                    {/* CREATED / PENDING_PLANNING / READY_FOR_PLANNING with PO → Assign to Weekly (NOT for DRAFT) */}
-                    {(item.status === "CREATED" || item.status === "PENDING_PLANNING" || item.status === "READY_FOR_PLANNING") && item.primaryPO && (can("weekly_programs.create") || can("production_orders.edit")) && (
-                        <IconButton
-                            variant="success"
-                            title="Assign to Weekly Scheduling (Verifies Material)"
-                            icon={FaCalendarAlt}
-                            onClick={() => handleAssignWeekly(item)}
-                        />
-                    )}
-
-                    {/* WAITING_FOR_MATERIAL: Re-Check Raw Material + Reserve button */}
-                    {item.status === "WAITING_FOR_MATERIAL" && item.primaryPO && can("production_orders.edit") && (
-                        <>
-                            <IconButton
-                                variant="info"
-                                title="Re-Check Raw Material Stock Availability"
-                                icon={FaSyncAlt}
-                                onClick={() => handleRecheckMaterials(item)}
-                            />
-                        </>
-                    )}
-
-                    {/* RM_PENDING: Reserve Raw Materials + Create Purchase Order */}
-                    {item.status === "RM_PENDING" && can("production_orders.edit") && (
-                        <IconButton
-                            variant="success"
-                            title="Allocate & Reserve Raw Materials"
-                            icon={FaCheckCircle}
-                            onClick={() => handleAllocateRM(item)}
-                        />
-                    )}
-
-                    {/* View Details */}
-                    {item.primaryPO && can("production_orders.view") && (
-                        <IconButton
-                            variant="info"
-                            title="View Details"
-                            icon={FaEye}
-                            onClick={() => {
-                                setSelectedItem(item.primaryPO);
-                                setFullOrder(null);
-                                setShowViewModal(true);
-                                fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
-                            }}
-                        />
-                    )}
-
-                    {/* Edit — only for CREATED / DRAFT orders */}
-                    {item.primaryPO && ["CREATED", "DRAFT"].includes(item.primaryPO.status?.toUpperCase()) && can("production_orders.edit") && (
-                        <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
-                    )}
-
-                    {/* Delete — only for direct draft orders */}
-                    {item.primaryPO && ["CREATED", "DRAFT"].includes(item.primaryPO.status?.toUpperCase()) && item.isDirect && can("production_orders.delete") && (
-                        <DeleteButton onClick={() => triggerDelete(item.productionOrders.map((po: any) => po.productionOrderId))} />
-                    )}
-                </div>
-            )
+    const handleDeleteCurrentRow = useCallback(() => {
+        const item = combinedData[focusedIndex];
+        if (!item) return;
+        if (item.type === 'weekly-group') {
+            if (can('production_orders.delete')) {
+                const canDeleteAll = !item.children?.some((po: any) => po._editRestrictions?.canDelete === false);
+                if (canDeleteAll) {
+                    triggerDelete(item.children.map((po: any) => po.productionOrderId));
+                } else {
+                    toast.error("Cannot delete: one or more orders have active Daily Production Plans. Cancel them in Daily Machine Planning first.");
+                }
+            }
+        } else if (item.primaryPO && can('production_orders.delete')) {
+            if (item.primaryPO._editRestrictions?.canDelete === false) {
+                toast.error("Cannot delete: this order has active Daily Production Plans. Cancel them in Daily Machine Planning first.");
+            } else {
+                triggerDelete(item.productionOrders ? item.productionOrders.map((po: any) => po.productionOrderId) : [item.primaryPO.productionOrderId]);
+            }
         }
-    ], [currentPage, can, handleAssignWeekly, handleRecheckMaterials, handleAllocateRM, handleOpenEdit, triggerDelete, fetchOrderDetails]);
+    }, [combinedData, focusedIndex, can, triggerDelete]);
+
+    usePageShortcuts({
+        onRefresh: () => fetchCombinedData(),
+        onSort: () => toggleSortOrder(),
+        onDelete: handleDeleteCurrentRow,
+        onNew: () => can("production_orders.create") && navigate("/production-orders/create"),
+    });
 
     const hasInsufficientStock = fullOrder?.products?.some((p: any) =>
         p.rawMaterials?.some((rm: any) => {
@@ -691,30 +610,119 @@ const ProductionOrderList: React.FC = () => {
     );
 
     return (
-        <div>
-            <div className="max-w-[1100px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="w-full flex-1 flex flex-col min-h-0">
+            <div className="w-full flex-1 flex flex-col bg-card rounded-2xl shadow-sm border border-line overflow-hidden min-h-[calc(100vh-140px)]">
                 {/* Page Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
+                <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
                         <h2 className="text-base font-bold text-ink">Production Order Management</h2>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                        {can("production_orders.export") && (
-                            <ExportCSVButton
-                                fetchData={fetchProductionOrdersForExport}
-                                columns={csvColumns}
-                                filename={csvFilename}
-                                text="Export"
-                            />
-                        )}
-                        {(can("weekly_programs.create") || can("weekly_programs.view")) && (
-                            <CustomButton
-                                text="Weekly Scheduling"
-                                icon={FaCalendarAlt}
-                                onClick={() => navigate("/weekly-machine-schedules/create")}
-                                variant="secondary"
-                            />
-                        )}
+                    <div className="flex flex-wrap items-center gap-3 relative">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                            placeholder="Search PO / product... ( / )"
+                        />
+                        <FilterPopover
+                            activeFilterCount={activeFilterCount}
+                            hasActiveFilters={hasActiveFilters}
+                            onOpen={handleFilterOpen}
+                            onApply={handleApplyFilters}
+                            onClear={handleClearFilters}
+                        >
+                            <div className="space-y-3">
+                                {/* Status */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Status
+                                    </label>
+                                    <SelectInput
+                                        name="filterStatus"
+                                        value={draftFilters.status}
+                                        options={statusOptions}
+                                        defaultOptionLabel="All Statuses"
+                                        searchable={false}
+                                        noMargin
+                                        onChange={(e) =>
+                                            setDraftFilters((p) => ({ ...p, status: e.target.value }))
+                                        }
+                                    />
+                                </div>
+
+                                {/* Order Type */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Order Type
+                                    </label>
+                                    <SelectInput
+                                        name="filterOrderType"
+                                        value={draftFilters.orderType}
+                                        options={orderTypeOptions}
+                                        defaultOptionLabel="All Types"
+                                        searchable={false}
+                                        noMargin
+                                        onChange={(e) =>
+                                            setDraftFilters((p) => ({ ...p, orderType: e.target.value }))
+                                        }
+                                    />
+                                </div>
+
+                                {/* Machine */}
+                                {machineOptions.length > 0 && (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                            Machine
+                                        </label>
+                                        <SelectInput
+                                            name="filterMachine"
+                                            value={draftFilters.machineId}
+                                            options={machineOptions}
+                                            defaultOptionLabel="All Machines"
+                                            searchable={false}
+                                            noMargin
+                                            onChange={(e) =>
+                                                setDraftFilters((p) => ({ ...p, machineId: e.target.value }))
+                                            }
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Date Range */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Order Date
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span className="block text-[11px] text-ink-subtle mb-1">From</span>
+                                            <TextInput
+                                                name="filterFromDate"
+                                                type="date"
+                                                value={draftFilters.fromDate}
+                                                max={draftFilters.toDate || undefined}
+                                                onChange={(e) =>
+                                                    setDraftFilters((p) => ({ ...p, fromDate: e.target.value }))
+                                                }
+                                                inputClassName="!py-1.5 !text-xs"
+                                            />
+                                        </div>
+                                        <div>
+                                            <span className="block text-[11px] text-ink-subtle mb-1">To</span>
+                                            <TextInput
+                                                name="filterToDate"
+                                                type="date"
+                                                value={draftFilters.toDate}
+                                                min={draftFilters.fromDate || undefined}
+                                                onChange={(e) =>
+                                                    setDraftFilters((p) => ({ ...p, toDate: e.target.value }))
+                                                }
+                                                inputClassName="!py-1.5 !text-xs"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </FilterPopover>
                         {can("production_orders.create") && (
                             <CustomButton
                                 text="Add Production Order"
@@ -725,23 +733,265 @@ const ProductionOrderList: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div className="flex items-center gap-2 px-5 py-2 border-b border-line flex-wrap bg-head/20 shrink-0">
+                        <span className="text-xs text-ink-subtle">Active filters:</span>
+
+                        {appliedFilters.status && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
+                                Status: {statusOptions.find(s => s.value === appliedFilters.status)?.label || appliedFilters.status}
+                                <FaTimes
+                                    className="cursor-pointer hover:opacity-75 ml-0.5"
+                                    onClick={() => { setAppliedFilters((p) => ({ ...p, status: "" })); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {appliedFilters.orderType && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
+                                Type: {orderTypeOptions.find(t => t.value === appliedFilters.orderType)?.label || appliedFilters.orderType}
+                                <FaTimes
+                                    className="cursor-pointer hover:opacity-75 ml-0.5"
+                                    onClick={() => { setAppliedFilters((p) => ({ ...p, orderType: "" })); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {appliedFilters.machineId && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
+                                Machine: {machineOptions.find(m => String(m.value) === String(appliedFilters.machineId))?.label || appliedFilters.machineId}
+                                <FaTimes
+                                    className="cursor-pointer hover:opacity-75 ml-0.5"
+                                    onClick={() => { setAppliedFilters((p) => ({ ...p, machineId: "" })); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {appliedFilters.fromDate && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
+                                From: {formatDate(appliedFilters.fromDate)}
+                                <FaTimes
+                                    className="cursor-pointer hover:opacity-75 ml-0.5"
+                                    onClick={() => { setAppliedFilters((p) => ({ ...p, fromDate: "" })); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        {appliedFilters.toDate && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
+                                To: {formatDate(appliedFilters.toDate)}
+                                <FaTimes
+                                    className="cursor-pointer hover:opacity-75 ml-0.5"
+                                    onClick={() => { setAppliedFilters((p) => ({ ...p, toDate: "" })); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={handleClearFilters}
+                            className="text-xs text-ink-subtle hover:text-danger underline ml-1 cursor-pointer bg-transparent border-none p-0"
+                        >
+                            Clear all
+                        </button>
+                    </div>
+                )}
+
                 {/* Table */}
-                <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
-                    <DataTable
-                        columns={columns}
-                        data={combinedData}
-                        rowKey={(item) => item.id}
-                        loading={loading}
-                        emptyMessage="No orders found."
-                        rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
-                        onRowClick={(item, i) => { setFocusedIndex(i); handleOpenViewItem(item); }}
-                        pagination={{
-                            currentPage,
-                            totalPages,
-                            onPageChange: (page) => setCurrentPage(page)
-                        }}
-                    />
+                <div ref={tableRef} tabIndex={0} data-table-nav className="flex-1 min-h-0 flex flex-col outline-none">
+                    {loading ? (
+                        <div className="flex-1 flex items-center justify-center py-16 text-ink-subtle text-sm">
+                            <div className="animate-spin rounded-full border-b-2 border-primary h-5 w-5 mr-2" /> Loading...
+                        </div>
+                    ) : combinedData.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center py-16 text-ink-subtle text-sm">No orders found.</div>
+                    ) : (
+                        <div className="w-full flex-1 min-h-0 overflow-auto">
+                            <table className="w-full text-left border-collapse text-sm">
+                                <thead className="sticky top-0 z-10 bg-head border-b border-line shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+                                    <tr role="row">
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-10">#</th>
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[160px]">PO No</th>
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[150px]">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleSortOrder();
+                                                }}
+                                                title={`Sort by Date: ${
+                                                    sortOrder === "default"
+                                                        ? "Default Order"
+                                                        : sortOrder === "asc"
+                                                        ? "Oldest First (Ascending)"
+                                                        : "Newest First (Descending)"
+                                                } (Click or press F6)`}
+                                                className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-wider outline-none hover:opacity-90 transition-opacity"
+                                            >
+                                                <span className={sortOrder !== "default" ? "text-primary font-bold" : "group-hover/sort:text-ink transition-colors"}>
+                                                    Order Date
+                                                </span>
+                                                <span
+                                                    className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
+                                                        sortOrder === "asc" || sortOrder === "desc"
+                                                            ? "bg-primary/20 text-primary scale-110"
+                                                            : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+                                                    }`}
+                                                >
+                                                    {sortOrder === "asc" ? (
+                                                        <FaArrowUp size={10} />
+                                                    ) : sortOrder === "desc" ? (
+                                                        <FaArrowDown size={10} />
+                                                    ) : (
+                                                        <FaSort size={10} />
+                                                    )}
+                                                </span>
+                                                {sortOrder !== "default" && (
+                                                    <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                                        {sortOrder === "asc" ? "OLD-NEW" : "NEW-OLD"}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        </th>
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[200px]">Due / Week Date</th>
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Machines / Products</th>
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[180px]">Status</th>
+                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[120px] text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-line">
+                                    {combinedData.map((item: any, idx: number) => {
+                                        if (item.type === 'weekly-group') {
+                                            const isWeeklyEditable = can('production_orders.edit') && !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(item.status?.toUpperCase());
+                                            return (
+                                                <tr
+                                                    key={item.id}
+                                                    role="row"
+                                                    className={`cursor-pointer select-none transition-colors ${
+                                                        idx === focusedIndex
+                                                            ? "bg-primary/15 ring-1 ring-inset ring-primary/40 shadow-xs"
+                                                            : "bg-head/40 hover:bg-head/70"
+                                                    }`}
+                                                    onClick={() => {
+                                                        setFocusedIndex(idx);
+                                                        tableRef.current?.focus({ preventScroll: true });
+                                                        handleOpenWeeklyPlan(item);
+                                                    }}
+                                                >
+                                                    <td className="px-4 py-2.5 text-ink-subtle text-[13px]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
+                                                    <td className="px-4 py-2.5">
+                                                        <span className="font-bold text-ink text-[13px]">{item.baseId}</span>
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-ink-muted text-[13px]">{formatDate(item.orderDate)}</td>
+                                                    <td className="px-4 py-2.5 text-ink-muted text-[13px]">
+                                                        {item.weekStart && item.weekEnd
+                                                            ? `${formatDate(item.weekStart)} – ${formatDate(item.weekEnd)}`
+                                                            : '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-ink-muted text-[13px]">
+                                                        {[...new Set(
+                                                            item.children
+                                                                .map((po: any) => po.Machine?.machineName || po.machineMachineId || '')
+                                                                .filter(Boolean)
+                                                        )].join(', ') || '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
+                                                    <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex items-center gap-2 justify-end">
+                                                            {can('production_orders.view') && (
+                                                                <IconButton variant="info" title="View Weekly Plan" icon={FaEye} onClick={() => handleOpenWeeklyPlan(item)} />
+                                                            )}
+                                                            {isWeeklyEditable && (
+                                                                <EditButton onClick={() => handleEditWeeklyPlan(item)} />
+                                                            )}
+                                                            {can('production_orders.delete') && (
+                                                                <DeleteButton
+                                                                    onClick={() => triggerDelete(item.children.map((po: any) => po.productionOrderId))}
+                                                                    disabled={item.children.some((po: any) => po._editRestrictions?.canDelete === false)}
+                                                                    disabledMessage="Cannot delete: one or more orders have active Daily Production Plans. Cancel them in Daily Machine Planning first."
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        // Standalone / sales-order-linked row
+                                        const isStandaloneEditable = item.primaryPO && can('production_orders.edit') && !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(item.primaryPO.status?.toUpperCase());
+                                        return (
+                                            <tr
+                                                key={item.id}
+                                                role="row"
+                                                className={`cursor-pointer transition-colors ${
+                                                    idx === focusedIndex
+                                                        ? "bg-primary/10 ring-1 ring-inset ring-primary/40 shadow-xs"
+                                                        : "bg-card hover:bg-card-2"
+                                                }`}
+                                                onClick={() => {
+                                                    setFocusedIndex(idx);
+                                                    tableRef.current?.focus({ preventScroll: true });
+                                                    handleOpenViewItem(item);
+                                                }}
+                                            >
+                                                <td className="px-4 py-2.5 text-ink-subtle text-[13px]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
+                                                <td className="px-4 py-2.5 font-semibold text-ink text-[13px]">{item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}</td>
+                                                <td className="px-4 py-2.5 text-ink-muted text-[13px]">{formatDate(item.orderDate)}</td>
+                                                <td className="px-4 py-2.5 text-ink-muted text-[13px]">{item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : '—'}</td>
+                                                <td className="px-4 py-2.5 text-ink-muted text-[13px]">
+                                                    {item.productionOrders && item.productionOrders.length > 0
+                                                        ? item.productionOrders.map((po: any) => po.productItem?.productName || 'Unknown').join(', ')
+                                                        : item.items?.map((it: any) => it.product?.productName || 'Unknown').join(', ') || '—'}
+                                                </td>
+                                                <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
+                                                <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-2 justify-end">
+                                                        {item.primaryPO && can('production_orders.view') && (
+                                                            <IconButton variant="info" title="View" icon={FaEye}
+                                                                onClick={() => { setSelectedItem(item.primaryPO); setFullOrder(null); setShowViewModal(true); fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id); }}
+                                                            />
+                                                        )}
+                                                        {isStandaloneEditable && (
+                                                            <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
+                                                        )}
+                                                        {item.primaryPO && can('production_orders.delete') && (
+                                                            <DeleteButton
+                                                                onClick={() => triggerDelete(item.productionOrders ? item.productionOrders.map((po: any) => po.productionOrderId) : [item.primaryPO.productionOrderId])}
+                                                                disabled={item.primaryPO._editRestrictions?.canDelete === false}
+                                                                disabledMessage="Cannot delete: this order has active Daily Production Plans. Cancel them in Daily Machine Planning first."
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="mt-auto shrink-0 flex items-center justify-between px-5 py-3 border-t border-line text-sm bg-head/20">
+                            <span className="text-ink-subtle text-[13px]">{totalItems} order{totalItems !== 1 ? 's' : ''}</span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1.5 rounded border border-line text-ink-subtle hover:bg-card-2 disabled:opacity-40 text-[13px]"
+                                >Prev</button>
+                                <span className="px-3 py-1.5 text-ink text-[13px]">{currentPage} / {totalPages}</span>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1.5 rounded border border-line text-ink-subtle hover:bg-card-2 disabled:opacity-40 text-[13px]"
+                                >Next</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
+
             </div>
 
             {/* VIEW PO MODAL */}
@@ -767,13 +1017,12 @@ const ProductionOrderList: React.FC = () => {
                 show={showDeleteModal}
                 onHide={() => { setShowDeleteModal(false); setTimeout(() => tableRef.current?.focus(), 100); }}
                 onConfirm={handleDeleteConfirm}
-                title="Delete Draft Production Order"
+                title="Delete Production Order"
                 isDangerous={true}
                 message={
                     <>
                         Are you sure you want to delete the production plan for this order?<br />
-                        This will remove {itemToDelete.length} draft Production Order(s) permanently.<br />
-                        The associated Sales Order will become available again so that a new plan can be created.
+                        This will remove {itemToDelete.length} Production Order(s) permanently.
                     </>
                 }
                 confirmText="Delete"

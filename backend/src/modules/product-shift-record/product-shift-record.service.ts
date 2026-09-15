@@ -52,19 +52,6 @@ class ProductShiftRecordService {
 
     if (data.achievedQty > currentCapacity) {
       await prisma.$transaction(async (tx) => {
-        // Keep max 2 records per product: delete oldest beyond the 1 most recent
-        const existing = await tx.productCapacityHistory.findMany({
-          where: { productId: data.productId },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        });
-        if (existing.length >= 2) {
-          const idsToDelete = existing.slice(1).map(r => r.id);
-          await tx.productCapacityHistory.deleteMany({
-            where: { id: { in: idsToDelete } },
-          });
-        }
-
         await tx.product.update({
           where: { id: data.productId },
           data: { capacityLitres: data.achievedQty },

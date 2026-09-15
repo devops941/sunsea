@@ -41,7 +41,6 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   // ── HR & Organization ───────────────────────────────────────────────────────
   { module: "employees",              actions: ["view","create","edit","delete","export"], description: "Employees" },
   { module: "machines",               actions: ["view","create","edit","delete","export"], description: "Machines" },
-  { module: "machine-assignments",    actions: ["view","create","edit","delete","export"], description: "Machine Assignments" },
   { module: "shifts",                 actions: ["view","create","edit","delete","export"], description: "Shift Management" },
 
   // ── Product Setup ───────────────────────────────────────────────────────────
@@ -77,8 +76,7 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
 
   // ── Production ──────────────────────────────────────────────────────
   { module: "production_orders",      actions: ["view","create","edit","delete","export"], description: "Production Orders" },
-  { module: "weekly_programs",        actions: ["view","create","edit","delete","export"], description: "Weekly Schedules" },
-  { module: "daily-machine-planning", actions: ["view","create","edit","delete","export"], description: "Daily Planning" },
+{ module: "daily-machine-planning", actions: ["view","create","edit","delete","export"], description: "Daily Planning" },
   { module: "hourly_productions",     actions: ["view","create","edit","delete","export"], description: "Hourly Reports" },
   { module: "production-wastages",    actions: ["view","create","edit","delete","export"], description: "Production Wastage" },
   { module: "goods-dispatch",         actions: ["view","create","edit","delete","export"], description: "Goods Dispatch" },

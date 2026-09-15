@@ -20,6 +20,18 @@ class HourlyProductionController {
     );
   });
 
+  removeEntries = asyncHandler(async (req: Request, res: Response) => {
+    const result = await hourlyProductionService.removeHourlyEntries(req.body);
+    const safe = JSON.parse(JSON.stringify(result, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("hourlyProduction:updated", safe);
+
+    return res.status(200).json(
+      new ApiResponse("Hourly production entries removed successfully", result)
+    );
+  });
+
   findAll = asyncHandler(async (req: Request, res: Response) => {
     const { machineId, shiftId, productionDate, productionOrderId, search } = req.query;
     const logs = await hourlyProductionService.findAll({

@@ -436,19 +436,6 @@ class ProductService {
               operators: cleanString(entry.operatorName, 255),
             }
           });
-
-          const existing = await tx.productCapacityHistory.findMany({
-            where: { productId: id, machineId: machineId },
-            orderBy: { createdAt: "desc" },
-            select: { id: true }
-          });
-
-          if (existing.length > 2) {
-            const idsToDelete = existing.slice(2).map(r => r.id);
-            await tx.productCapacityHistory.deleteMany({
-              where: { id: { in: idsToDelete } }
-            });
-          }
         }
       }
     });

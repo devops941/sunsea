@@ -718,9 +718,7 @@ const ProductList: React.FC = () => {
                                                             groups[key] = [];
                                                             machineOrder.push(key);
                                                         }
-                                                        if (groups[key].length < 2) {
-                                                            groups[key].push(r);
-                                                        }
+                                                        groups[key].push(r);
                                                     });
                                                     return machineOrder.map((machineId) => {
                                                         const isInitial = machineId === "INITIAL";
@@ -735,7 +733,7 @@ const ProductList: React.FC = () => {
                                                                     {!isInitial && machineName !== machineId && <span className="font-normal normal-case text-ink-subtle ms-1.5">— {machineName}</span>}
                                                                 </td>
                                                             </tr>
-                                                            {groups[machineId].map((r: any, idx: number) => {
+                                                            {groups[machineId].slice(0, 2).map((r: any, idx: number) => {
                                                                 const isCurrent = idx === 0;
                                                                 return (
                                                                     <tr key={r.id || `${machineId}-${idx}`} className={`hover:bg-card-2/50 transition-colors ${isCurrent ? "bg-primary/10" : ""}`}>

@@ -19,21 +19,38 @@ export class ProductCapacityHistoryService {
       ? (data.actualQty / data.targetQty) * 100
       : 0;
 
-    return prisma.productCapacityHistory.create({
-      data: {
-        productId: data.productId,
-        previousCapacity: data.previousCapacity,
-        newCapacity: data.newCapacity,
-        productionDate: data.productionDate,
-        machineId: data.machineId,
-        shiftId: data.shiftId,
-        productionOrderId: data.productionOrderId,
-        targetQty: data.targetQty,
-        actualQty: data.actualQty,
-        achievementPct,
-        operators: data.operators || null,
-        updatedBy: data.updatedBy || null,
-      },
+    return prisma.$transaction(async (tx) => {
+      const record = await tx.productCapacityHistory.create({
+        data: {
+          productId: data.productId,
+          previousCapacity: data.previousCapacity,
+          newCapacity: data.newCapacity,
+          productionDate: data.productionDate,
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          productionOrderId: data.productionOrderId,
+          targetQty: data.targetQty,
+          actualQty: data.actualQty,
+          achievementPct,
+          operators: data.operators || null,
+          updatedBy: data.updatedBy || null,
+        },
+      });
+
+      // Keep only latest 2 records (CURRENT and 1 PREVIOUS) for this machine
+      const existing = await tx.productCapacityHistory.findMany({
+        where: { productId: data.productId, machineId: data.machineId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (existing.length > 2) {
+        const idsToDelete = existing.slice(2).map((r) => r.id);
+        await tx.productCapacityHistory.deleteMany({
+          where: { id: { in: idsToDelete } },
+        });
+      }
+
+      return record;
     });
   }
 
@@ -54,31 +71,20 @@ export class ProductCapacityHistoryService {
 
     const previousCapacity = Number(product.capacityLitres ?? 0);
 
-    // Keep max 2 records per product AND machine: delete oldest records beyond the 1 most recent
-    const existing = await prisma.productCapacityHistory.findMany({
-      where: { productId: data.productId, machineId: data.machine || "MANUAL" },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-    if (existing.length >= 2) {
-      const idsToDelete = existing.slice(1).map(r => r.id);
-      await prisma.productCapacityHistory.deleteMany({
-        where: { id: { in: idsToDelete } },
-      });
-    }
-
     const targetQty = data.newCapacity;
     const actualQty = data.newCapacity;
     const achievementPct = targetQty > 0 ? 100 : 0;
+    const machineId = (data.machine || "MANUAL").slice(0, 20);
+    const prodDate = new Date(data.date);
 
-    const [history] = await prisma.$transaction([
-      prisma.productCapacityHistory.create({
+    const history = await prisma.$transaction(async (tx) => {
+      const hist = await tx.productCapacityHistory.create({
         data: {
           productId: data.productId,
           previousCapacity,
           newCapacity: data.newCapacity,
-          productionDate: new Date(data.date),
-          machineId: (data.machine || "MANUAL").slice(0, 20),
+          productionDate: prodDate,
+          machineId,
           shiftId: (data.shift || "MANUAL").slice(0, 20),
           productionOrderId: "MANUAL",
           targetQty,
@@ -87,18 +93,61 @@ export class ProductCapacityHistoryService {
           operators: data.operators || null,
           updatedBy: data.updatedBy || null,
         },
-      }),
-      prisma.product.update({
+      });
+
+      // Keep only latest 2 records (CURRENT and 1 PREVIOUS) for this machine
+      const existing = await tx.productCapacityHistory.findMany({
+        where: { productId: data.productId, machineId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (existing.length > 2) {
+        const idsToDelete = existing.slice(2).map((r) => r.id);
+        await tx.productCapacityHistory.deleteMany({
+          where: { id: { in: idsToDelete } },
+        });
+      }
+
+      await tx.product.update({
         where: { id: data.productId },
         data: { capacityLitres: data.newCapacity },
-      }),
-    ]);
+      });
+
+      // Propagate to future unstarted daily plans for this machine and product
+      if (machineId !== "MANUAL") {
+        const unstartedPlans = await tx.dailyProductionPlan.findMany({
+          where: {
+            machineId,
+            productionOrder: { productItemId: data.productId },
+            status: { in: ["PLANNED", "DRAFT"] },
+            productionDate: { gte: prodDate },
+            hourlyProductions: { none: { totalQtyProduced: { gt: 0 } } },
+          },
+        });
+
+        for (const plan of unstartedPlans) {
+          await tx.dailyProductionPlan.update({
+            where: { dailyPlanId: plan.dailyPlanId },
+            data: { plannedQty: data.newCapacity },
+          });
+
+          if (plan.weeklyProgramId) {
+            await tx.weeklyMachineProgram.update({
+              where: { weeklyProgramId: plan.weeklyProgramId },
+              data: { plannedQty: data.newCapacity },
+            }).catch(() => {});
+          }
+        }
+      }
+
+      return hist;
+    });
 
     return history;
   }
 
   async findByProduct(productId: number) {
-    return prisma.productCapacityHistory.findMany({
+    const allRecords = await prisma.productCapacityHistory.findMany({
       where: { productId },
       include: {
         product: {
@@ -107,6 +156,34 @@ export class ProductCapacityHistoryService {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    // Prune so that each machine only retains at most 2 records (1 CURRENT + 1 PREVIOUS)
+    const machineGroups = new Map<string, any[]>();
+    const prunedRecords: any[] = [];
+    const idsToDelete: bigint[] = [];
+
+    allRecords.forEach((rec) => {
+      const key = rec.machineId || "INITIAL";
+      if (!machineGroups.has(key)) {
+        machineGroups.set(key, []);
+      }
+      const group = machineGroups.get(key)!;
+      if (group.length < 2) {
+        group.push(rec);
+        prunedRecords.push(rec);
+      } else {
+        idsToDelete.push(rec.id);
+      }
+    });
+
+    // Asynchronously delete obsolete 3rd+ records from database
+    if (idsToDelete.length > 0) {
+      prisma.productCapacityHistory.deleteMany({
+        where: { id: { in: idsToDelete } },
+      }).catch(() => {});
+    }
+
+    return prunedRecords;
   }
 
   async getLatestByProduct(productId: number) {

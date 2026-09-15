@@ -53,7 +53,7 @@ export function calculateOeeMetrics(params: {
     performance = Math.min(100, (totalProduced / idealProduction) * 100);
   }
 
-  const goodQty = Math.max(0, totalProduced - totalReject - totalScrap);
+  const goodQty = Math.max(0, totalProduced - totalReject);
   const quality = totalProduced > 0 ? Math.min(100, (goodQty / totalProduced) * 100) : 100;
   const oeePercent = (availability * performance * quality) / 10000;
 
@@ -81,16 +81,30 @@ class OeeService {
     const shift = await (prisma as any).shift.findFirst({ where: { shiftCode: shiftId }, select: { startTime: true, endTime: true, breakDuration: true } });
     const shiftMinutes = shift ? shiftDurationMinutes(shift.startTime, shift.endTime) - (Number(shift.breakDuration) || 0) : 480;
 
-    const hourlyAgg = await prisma.hourlyProduction.aggregate({
+    const records = await prisma.hourlyProduction.findMany({
       where: { machineId, shiftId, productionDate: prodDate },
-      _sum: { qtyProduced: true, rejectQty: true, scrapQty: true, downtime: true, runtimeMinutes: true },
     });
 
-    const totalProduced = Number(hourlyAgg._sum.qtyProduced || 0);
-    const totalReject = Number(hourlyAgg._sum.rejectQty || 0);
-    const totalScrap = Number(hourlyAgg._sum.scrapQty || 0);
-    const totalDowntime = Number(hourlyAgg._sum.downtime || 0);
-    const totalRuntime = Number(hourlyAgg._sum.runtimeMinutes || 0);
+    let totalProduced = 0;
+    let totalReject = 0;
+    let totalScrap = 0;
+    let totalDowntime = 0;
+    let totalRuntime = 0;
+
+    for (const rec of records) {
+      totalProduced += Number(rec.totalQtyProduced || 0);
+      totalReject += Number(rec.totalRejectQty || 0);
+      totalScrap += Number(rec.totalScrapQty || 0);
+      totalDowntime += Number(rec.totalDowntime || 0);
+      if (Array.isArray(rec.hourlyEntries) && (rec.hourlyEntries as any[]).length > 0) {
+        for (const entry of rec.hourlyEntries as any[]) {
+          totalRuntime += Number(entry.runtimeMinutes || 60);
+        }
+      } else {
+        totalRuntime += shiftMinutes;
+      }
+    }
+    if (totalRuntime === 0) totalRuntime = shiftMinutes;
 
     const oee = calculateOeeMetrics({
       plannedRunTimeMinutes: shiftMinutes,
@@ -177,7 +191,7 @@ class OeeService {
 
     const downtimeAgg = await prisma.hourlyProduction.aggregate({
       where: { machineId, productionDate: prodDate },
-      _sum: { downtime: true, runtimeMinutes: true },
+      _sum: { totalDowntime: true },
     });
 
     const runningOrdersCount = todayPlans.filter((p: any) => p.status === "IN_PROGRESS" || p.status === "APPROVED").length;
@@ -189,7 +203,7 @@ class OeeService {
       oeeToday: avgOee,
       snapshots,
       todayPlannedHours: Math.round(totalPlannedHours * 100) / 100,
-      downtimeToday: Number(downtimeAgg._sum.downtime || 0),
+      downtimeToday: Number(downtimeAgg._sum.totalDowntime || 0),
       runningOrdersCount,
       todayPlans,
     };
@@ -202,16 +216,27 @@ class OeeService {
     });
     if (!order) throw new ApiError(404, `Production Order ${productionOrderId} not found`);
 
-    const hourlyAgg = await prisma.hourlyProduction.aggregate({
+    const records = await prisma.hourlyProduction.findMany({
       where: { productionOrderId },
-      _sum: { qtyProduced: true, rejectQty: true, scrapQty: true, downtime: true, runtimeMinutes: true },
     });
 
-    const totalProduced = Number(hourlyAgg._sum.qtyProduced || 0);
-    const totalReject = Number(hourlyAgg._sum.rejectQty || 0);
-    const totalScrap = Number(hourlyAgg._sum.scrapQty || 0);
-    const totalDowntime = Number(hourlyAgg._sum.downtime || 0);
-    const totalRuntime = Number(hourlyAgg._sum.runtimeMinutes || 0);
+    let totalProduced = 0;
+    let totalReject = 0;
+    let totalScrap = 0;
+    let totalDowntime = 0;
+    let totalRuntime = 0;
+
+    for (const rec of records) {
+      totalProduced += Number(rec.totalQtyProduced || 0);
+      totalReject += Number(rec.totalRejectQty || 0);
+      totalScrap += Number(rec.totalScrapQty || 0);
+      totalDowntime += Number(rec.totalDowntime || 0);
+      if (Array.isArray(rec.hourlyEntries)) {
+        for (const entry of rec.hourlyEntries as any[]) {
+          totalRuntime += Number(entry.runtimeMinutes || 60);
+        }
+      }
+    }
     const goodQty = Math.max(0, totalProduced - totalReject - totalScrap);
 
     const dailyPlans = await prisma.dailyProductionPlan.findMany({
