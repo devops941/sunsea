@@ -1033,7 +1033,11 @@ class PayrollService {
     }
 
     // 4. Emit start
-    const runCode = `PR-${opts.period}-${Date.now().toString().slice(-5)}`;
+    const baseRunCode = `PR-${opts.period}`;
+    const existingCount = await prisma.payrollRun.count({
+      where: { runCode: { startsWith: baseRunCode } },
+    });
+    const runCode = existingCount === 0 ? baseRunCode : `${baseRunCode}-${existingCount + 1}`;
     io.emit('payroll:computing', { runCode, period: opts.period, total: employees.length });
 
     // 5. Compute per employee with progress

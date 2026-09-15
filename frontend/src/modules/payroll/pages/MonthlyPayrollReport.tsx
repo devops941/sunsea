@@ -245,15 +245,23 @@ const MonthlyPayrollReport: React.FC = () => {
   );
 
   const cashTotals = cashEmployees.reduce(
-    (a, e) => ({
-      grossSalary:         a.grossSalary         + Number(e.grossSalary         || 0),
-      presentDays:         a.presentDays         + Number(e.presentDays         || 0),
-      otPay:               a.otPay               + Number(e.otPay               || 0),
-      salaryAdvance:       a.salaryAdvance        + Number(e.salaryAdvance       || 0),
-      permissionDeduction: a.permissionDeduction  + Number(e.permissionDeduction || 0),
-      netSalary:           a.netSalary            + Number(e.netSalary           || 0),
-    }),
-    { grossSalary: 0, presentDays: 0, otPay: 0, salaryAdvance: 0, permissionDeduction: 0, netSalary: 0 }
+    (a, e) => {
+      const lateDed = Number(e.lateEntryDeduction || 0);
+      const permDed = Number(e.permissionDeduction || 0);
+      const advDed = Number(e.salaryAdvance || 0);
+      const totDed = Number(e.totalDeductions ?? (lateDed + permDed + advDed + Number(e.loanRecovery || 0) + Number(e.otherDeductions || 0)));
+      return {
+        grossSalary:         a.grossSalary         + Number(e.grossSalary         || 0),
+        presentDays:         a.presentDays         + Number(e.presentDays         || 0),
+        otPay:               a.otPay               + Number(e.otPay               || 0),
+        lateEntryDeduction:  a.lateEntryDeduction  + lateDed,
+        salaryAdvance:       a.salaryAdvance       + advDed,
+        permissionDeduction: a.permissionDeduction + permDed,
+        totalDeductions:     a.totalDeductions     + totDed,
+        netSalary:           a.netSalary           + Number(e.netSalary           || 0),
+      };
+    },
+    { grossSalary: 0, presentDays: 0, otPay: 0, lateEntryDeduction: 0, salaryAdvance: 0, permissionDeduction: 0, totalDeductions: 0, netSalary: 0 }
   );
 
   const totalNet          = pfTotals.netSalary + cashTotals.netSalary;
@@ -303,8 +311,10 @@ const MonthlyPayrollReport: React.FC = () => {
     { header: 'Gross (₹)',            accessor: (r: ApiPayrollResult) => r.grossSalary },
     { header: 'Present Days',         accessor: (r: ApiPayrollResult) => r.presentDays },
     { header: 'OT Pay (₹)',           accessor: (r: ApiPayrollResult) => r.otPay },
-    { header: 'Advance (₹)',          accessor: (r: ApiPayrollResult) => r.salaryAdvance },
-    { header: 'Perm. Deduction (₹)',  accessor: (r: ApiPayrollResult) => r.permissionDeduction },
+    { header: 'Late Ded. (₹)',        accessor: (r: ApiPayrollResult) => r.lateEntryDeduction || 0 },
+    { header: 'Perm. Ded. (₹)',       accessor: (r: ApiPayrollResult) => r.permissionDeduction || 0 },
+    { header: 'Advance (₹)',          accessor: (r: ApiPayrollResult) => r.salaryAdvance || 0 },
+    { header: 'Total Ded. (₹)',       accessor: (r: ApiPayrollResult) => r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)) },
     { header: 'Net Salary (₹)',       accessor: (r: ApiPayrollResult) => r.netSalary },
     { header: 'Cash in Hand (₹)',    accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
     { header: 'Payment Mode',         accessor: (r: ApiPayrollResult) => r.paymentMode },
@@ -605,11 +615,11 @@ const MonthlyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: 'ADVANCE (₹)',
+      header: 'LATE DED. (₹)',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-700' : 'text-text-muted'}`}>
-          {Number(r.salaryAdvance) > 0 ? `₹${fmt(r.salaryAdvance)}` : '—'}
+        <span className={`font-mono ${Number(r.lateEntryDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+          {Number(r.lateEntryDeduction) > 0 ? `₹${fmt(r.lateEntryDeduction)}` : '—'}
         </span>
       ),
     },
@@ -621,6 +631,27 @@ const MonthlyPayrollReport: React.FC = () => {
           {Number(r.permissionDeduction) > 0 ? `₹${fmt(r.permissionDeduction)}` : '—'}
         </span>
       ),
+    },
+    {
+      header: 'ADVANCE (₹)',
+      align: 'right',
+      render: (r) => (
+        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-700' : 'text-text-muted'}`}>
+          {Number(r.salaryAdvance) > 0 ? `₹${fmt(r.salaryAdvance)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'TOTAL DED. (₹)',
+      align: 'right',
+      render: (r) => {
+        const tot = Number(r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)));
+        return (
+          <span className={`font-mono font-semibold ${tot > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+            {tot > 0 ? `₹${fmt(tot)}` : '—'}
+          </span>
+        );
+      },
     },
     {
       header: 'NET SALARY (₹)',

@@ -175,218 +175,217 @@ const Step1: React.FC<Step1Props> = ({
   const selectedWeek = weekOptions.find(w => w.weekOfMonth === weekOfMonth) ?? weekOptions[0];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full max-w-2xl mx-auto space-y-6">
       <div className="text-center sm:text-left">
         <h2 className="text-xl font-extrabold text-ink tracking-tight">Select Payroll Period</h2>
-        <p className="text-sm text-ink-muted mt-1">Choose the period type and target employee category for this payroll run.</p>
+        <p className="text-sm text-ink-muted mt-1">Choose the period type and timeline for this payroll run.</p>
       </div>
 
-      {/* 2-Column Responsive Grid for Full-Width Layout (Equal Height Cards) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-        {/* Card 1: Payroll Type & Period */}
-        <div className="bg-card rounded-2xl border border-line-soft shadow-xs hover:shadow-md transition-shadow p-6 space-y-5 h-full flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-line-soft pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                <CalendarRange size={18} />
+      {/* Payroll Type & Period Schedule Card */}
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs hover:shadow-md transition-shadow p-6 space-y-5">
+        <div className="flex items-center justify-between border-b border-line-soft pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <CalendarRange size={18} />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-ink-subtle uppercase tracking-widest">Payroll Schedule</h3>
+              <p className="text-sm font-semibold text-ink">Frequency & Timeline</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Type toggle buttons */}
+        <div className="grid grid-cols-2 gap-3 p-1.5 bg-card-2 rounded-xl border border-line-soft">
+          {(['MONTHLY', 'WEEKLY'] as const).map(t => {
+            const isActive = runType === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setRunType(t)}
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 cursor-pointer ${isActive
+                  ? 'bg-primary text-white shadow-sm shadow-primary/30 scale-[1.01]'
+                  : 'text-ink-muted hover:text-ink hover:bg-card/60'
+                  }`}
+              >
+                {t === 'MONTHLY'
+                  ? <><CalendarRange size={16} /> Monthly Payroll</>
+                  : <><CalendarDays size={16} /> Weekly Payroll</>}
+              </button>
+            );
+          })}
+        </div>
+
+        {runType === 'MONTHLY' ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Select Month</label>
+                <select
+                  value={month}
+                  onChange={e => setMonth(Number(e.target.value))}
+                  className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
+                >
+                  {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                </select>
               </div>
               <div>
-                <h3 className="text-xs font-bold text-ink-subtle uppercase tracking-widest">Payroll Schedule</h3>
-                <p className="text-sm font-semibold text-ink">Frequency & Timeline</p>
+                <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Select Year</label>
+                <select
+                  value={year}
+                  onChange={e => setYear(Number(e.target.value))}
+                  className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
+                >
+                  {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Period status card */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold">
+                  <CalendarDays size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Period</p>
+                  <p className="text-base font-extrabold text-ink">{MONTHS[month - 1]} {year}</p>
+                </div>
+              </div>
+              <div className="text-right border-l border-blue-500/20 pl-5">
+                <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">Calendar Days</p>
+                <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-ink-muted">days</span></p>
               </div>
             </div>
           </div>
-
-          {/* Type toggle buttons */}
-          <div className="grid grid-cols-2 gap-3 p-1.5 bg-card-2 rounded-xl border border-line-soft">
-            {(['MONTHLY', 'WEEKLY'] as const).map(t => {
-              const isActive = runType === t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => setRunType(t)}
-                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 cursor-pointer ${isActive
-                    ? 'bg-primary text-white shadow-sm shadow-primary/30 scale-[1.01]'
-                    : 'text-ink-muted hover:text-ink hover:bg-card/60'
-                    }`}
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Month</label>
+                <select
+                  value={weekMonth}
+                  onChange={e => { setWeekMonth(Number(e.target.value)); setWeekOfMonth(1); }}
+                  className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-card transition-all cursor-pointer"
                 >
-                  {t === 'MONTHLY'
-                    ? <><CalendarRange size={16} /> Monthly Payroll</>
-                    : <><CalendarDays size={16} /> Weekly Payroll</>}
-                </button>
-              );
-            })}
-          </div>
-
-          {runType === 'MONTHLY' ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Select Month</label>
-                  <select
-                    value={month}
-                    onChange={e => setMonth(Number(e.target.value))}
-                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
-                  >
-                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Select Year</label>
-                  <select
-                    value={year}
-                    onChange={e => setYear(Number(e.target.value))}
-                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
-                  >
-                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
+                  {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                </select>
               </div>
-
-              {/* Period status card */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-center justify-between shadow-xs">
+              <div>
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Year</label>
+                <select
+                  value={year}
+                  onChange={e => { setYear(Number(e.target.value)); setWeekOfMonth(1); }}
+                  className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-card transition-all cursor-pointer"
+                >
+                  {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Week</label>
+              <div className="grid grid-cols-1 gap-2.5">
+                {weekOptions.map(opt => {
+                  const isSelected = weekOfMonth === opt.weekOfMonth;
+                  return (
+                    <button
+                      key={opt.weekOfMonth}
+                      onClick={() => setWeekOfMonth(opt.weekOfMonth)}
+                      className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left cursor-pointer ${isSelected
+                        ? 'border-primary bg-blue-50/70 text-ink shadow-xs ring-2 ring-primary/20'
+                        : 'border-line-soft bg-card text-ink-muted hover:border-line hover:bg-card-2'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-ink-subtle'}`} />
+                        <span className="font-bold text-sm">{opt.label}</span>
+                      </div>
+                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-ink-subtle bg-card-2'}`}>
+                        7 days
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {selectedWeek && (
+              <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-card-2 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold">
+                  <div className="h-10 w-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
                     <CalendarDays size={18} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Period</p>
-                    <p className="text-base font-extrabold text-ink">{MONTHS[month - 1]} {year}</p>
+                    <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Weekly Period</p>
+                    <p className="text-base font-extrabold text-ink">
+                      {selectedWeek.label.replace(/^Week \d+\s*/, '')}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right border-l border-blue-500/20 pl-5">
-                  <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">Calendar Days</p>
+                <div className="text-right border-l border-blue-200/60 pl-5">
+                  <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">Days</p>
                   <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-ink-muted">days</span></p>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Month</label>
-                  <select
-                    value={weekMonth}
-                    onChange={e => { setWeekMonth(Number(e.target.value)); setWeekOfMonth(1); }}
-                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-card transition-all cursor-pointer"
-                  >
-                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Year</label>
-                  <select
-                    value={year}
-                    onChange={e => { setYear(Number(e.target.value)); setWeekOfMonth(1); }}
-                    className="w-full bg-card-2 border border-line-soft rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-card transition-all cursor-pointer"
-                  >
-                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Select Week</label>
-                <div className="grid grid-cols-1 gap-2.5">
-                  {weekOptions.map(opt => {
-                    const isSelected = weekOfMonth === opt.weekOfMonth;
-                    return (
-                      <button
-                        key={opt.weekOfMonth}
-                        onClick={() => setWeekOfMonth(opt.weekOfMonth)}
-                        className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left cursor-pointer ${isSelected
-                          ? 'border-primary bg-blue-50/70 text-ink shadow-xs ring-2 ring-primary/20'
-                          : 'border-line-soft bg-card text-ink-muted hover:border-line hover:bg-card-2'
-                          }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-ink-subtle'}`} />
-                          <span className="font-bold text-sm">{opt.label}</span>
-                        </div>
-                        <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-ink-subtle bg-card-2'}`}>
-                          7 days
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {selectedWeek && (
-                <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-card-2 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
-                      <CalendarDays size={18} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Weekly Period</p>
-                      <p className="text-base font-extrabold text-ink">
-                        {selectedWeek.label.replace(/^Week \d+\s*/, '')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right border-l border-blue-200/60 pl-5">
-                    <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-widest">Days</p>
-                    <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-ink-muted">days</span></p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Card 2: Employee Category */}
-        <div className="bg-card rounded-2xl border border-line-soft shadow-xs hover:shadow-md transition-shadow p-6 space-y-4 h-full flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-line-soft pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-card-2 text-ink-muted">
-                <Users size={18} />
-              </div>
-              <div>
-                <h3 className="text-xs font-bold text-ink-subtle uppercase tracking-widest">Target Selection</h3>
-                <p className="text-sm font-semibold text-ink">Employee Category</p>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">
-              {filtered.length} Selected
-            </span>
+            )}
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {CATEGORIES.filter(c => runType === 'WEEKLY' ? c.value === 'DAILY_WEEKLY' || c.value === 'ALL' : true).map(c => {
-              const count = typeFiltered.filter(e =>
-                c.value === 'ALL' || e.payrollConfig?.salaryType === c.value
-              ).length;
-              const isSelected = category === c.value;
-              return (
-                <button
-                  key={c.value}
-                  onClick={() => setCategory(c.value)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${isSelected
-                    ? 'border-primary bg-primary/10 text-ink shadow-xs ring-2 ring-primary/20'
-                    : 'border-line-soft bg-card-2 text-ink-muted hover:border-line hover:bg-card'
-                    }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-primary' : 'bg-ink-subtle/50'}`} />
-                    <span className="text-xs sm:text-sm font-bold text-ink">{c.label}</span>
-                  </div>
-                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-primary/20 text-primary' : 'bg-card text-ink-subtle border border-line-soft'}`}>
-                    {count} emp
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {noConfig > 0 && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center gap-2">
-              <AlertTriangle size={15} className="shrink-0 text-amber-600" />
-              <span>
-                <span className="font-bold">{noConfig}</span> employee{noConfig > 1 ? 's' : ''} skipped — no payroll config set up. Go to <strong>Payroll Settings → Employee Config</strong> to configure them.
-              </span>
-            </p>
-          )}
-        </div>
+        )}
       </div>
+
+      {/* Target Selection / Employee Category (Hidden / Commented Out) */}
+      {/*
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs hover:shadow-md transition-shadow p-6 space-y-4 h-full flex flex-col justify-between">
+        <div className="flex items-center justify-between border-b border-line-soft pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-card-2 text-ink-muted">
+              <Users size={18} />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-ink-subtle uppercase tracking-widest">Target Selection</h3>
+              <p className="text-sm font-semibold text-ink">Employee Category</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">
+            {filtered.length} Selected
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {CATEGORIES.filter(c => runType === 'WEEKLY' ? c.value === 'DAILY_WEEKLY' || c.value === 'ALL' : true).map(c => {
+            const count = typeFiltered.filter(e =>
+              c.value === 'ALL' || e.payrollConfig?.salaryType === c.value
+            ).length;
+            const isSelected = category === c.value;
+            return (
+              <button
+                key={c.value}
+                onClick={() => setCategory(c.value)}
+                className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${isSelected
+                  ? 'border-primary bg-primary/10 text-ink shadow-xs ring-2 ring-primary/20'
+                  : 'border-line-soft bg-card-2 text-ink-muted hover:border-line hover:bg-card'
+                  }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-primary' : 'bg-ink-subtle/50'}`} />
+                  <span className="text-xs sm:text-sm font-bold text-ink">{c.label}</span>
+                </div>
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-primary/20 text-primary' : 'bg-card text-ink-subtle border border-line-soft'}`}>
+                  {count} emp
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {noConfig > 0 && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center gap-2">
+            <AlertTriangle size={15} className="shrink-0 text-amber-600" />
+            <span>
+              <span className="font-bold">{noConfig}</span> employee{noConfig > 1 ? 's' : ''} skipped — no payroll config set up. Go to <strong>Payroll Settings → Employee Config</strong> to configure them.
+            </span>
+          </p>
+        )}
+      </div>
+      */}
 
       {/* Attendance validation error */}
       {attValidationError && (
