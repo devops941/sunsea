@@ -246,6 +246,10 @@ export interface ApiPayslipData {
     loanRecovery:        number;
     otherDeductions:     number;
     totalDeductions:     number;
+    bankTransfer?:       number;
+    cashPayment?:        number;
+    cashPaid?:           number;
+    actualSalary?:       number;
     netSalary:           number;
     cashInHand:          number;
     paymentMode:         string;

@@ -831,9 +831,20 @@ class PayrollService {
   async getRun(id: number) {
     const run = await prisma.payrollRun.findUnique({
       where: { id },
-      include: { results: { orderBy: { employeeCode: 'asc' }, include: { employee: true } } },
+      include: { results: { orderBy: { employeeCode: 'asc' }, include: { employee: { include: { payrollConfig: true } } } } },
     });
     if (!run) throw new ApiError(404, 'Payroll run not found');
+
+    // Enrich results with monthlySalary from employee payroll config
+    // (not stored in PayrollResult table, but needed by frontend for display)
+    run.results = run.results.map(r => {
+      const pc = getEffectivePayrollConfig(r.employee);
+      return {
+        ...r,
+        monthlySalary: Number(pc?.monthlySalary || 0),
+      } as any;
+    });
+
     return run;
   }
 
@@ -1404,6 +1415,10 @@ class PayrollService {
         loanRecovery: Number(result.loanRecovery),
         otherDeductions: Number(result.otherDeductions),
         totalDeductions: Number(result.totalDeductions),
+        bankTransfer: Number(result.bankTransfer),
+        cashPayment: Number(result.cashPayment),
+        cashPaid: Number(result.cashPaid),
+        actualSalary: Number(result.actualSalary),
         netSalary: Number(result.netSalary),
         cashInHand: Number(result.cashInHand),
         paymentMode: result.paymentMode,
@@ -1522,7 +1537,7 @@ class PayrollService {
         experienceYears = Math.max(0, Number((diffMs / (1000 * 60 * 60 * 24 * 365.25)).toFixed(2)));
       }
 
-      const grossSalary = Number(pc?.monthlySalary || emp.grossSalary || emp.basicSalary || 0);
+      const grossSalary = (Number(pc?.monthlySalary || 0) + Number(pc?.cashInHand || 0)) || Number(emp.grossSalary || emp.basicSalary || 0);
       const salaryType = pc?.salaryType || (emp.salaryType === 'weekly' ? 'WEEKLY' : emp.salaryType === 'daily' ? 'DAILY' : 'MONTHLY');
 
       // Month-by-month values

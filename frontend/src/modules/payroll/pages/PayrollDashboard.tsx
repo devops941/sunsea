@@ -20,6 +20,7 @@ import DataTable from '../../../components/ui/table/DataTable';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll } from '../../../services/payrollService';
 import { usePermission } from '../../../hooks/usePermission';
+import { formatPeriod } from '../../../utils/dateUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt   = (n: number) => Number(n).toLocaleString('en-IN');
@@ -115,7 +116,7 @@ const PayrollDashboard: React.FC = () => {
   const runColumns = [
     {
       header: 'Period',
-      render: (r: ApiPayrollRun) => <span className="font-medium text-text-primary">{r.period}</span>,
+      render: (r: ApiPayrollRun) => <span className="font-medium text-text-primary">{formatPeriod(r.period)}</span>,
     },
     {
       header: 'Type',
@@ -197,7 +198,7 @@ const PayrollDashboard: React.FC = () => {
             {currentPeriod !== '—' && (
               <>
                 <span>•</span>
-                <span className="font-bold text-ink bg-card-2 border border-line-soft px-2 py-0.5 rounded-md">{currentPeriod}</span>
+                <span className="font-bold text-ink bg-card-2 border border-line-soft px-2 py-0.5 rounded-md">{formatPeriod(currentPeriod)}</span>
               </>
             )}
           </p>
@@ -278,7 +279,7 @@ const PayrollDashboard: React.FC = () => {
           </div>
           <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted font-medium">
             <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-            <span>{pendingRun ? `${pendingRun.period} ${pendingRun.type} (Draft)` : 'No pending runs'}</span>
+            <span>{pendingRun ? `${formatPeriod(pendingRun.period)} ${pendingRun.type} (Draft)` : 'No pending runs'}</span>
           </div>
         </div>
 

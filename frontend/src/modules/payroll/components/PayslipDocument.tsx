@@ -125,7 +125,6 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
       if (pc.da > 0)             earnRows.push({ label: 'Dearness Allowance (DA)',    amount: Math.round(pc.da     * proration) });
       if (pc.otherAllowance > 0) earnRows.push({ label: 'Other Allowance',    amount: Math.round(pc.otherAllowance * proration) });
       if (result.otPay > 0)      earnRows.push({ label: 'Overtime Pay',       amount: result.otPay });
-      if (result.cashInHand > 0) earnRows.push({ label: 'Cash in Hand',      amount: result.cashInHand });
     } else {
       earnRows.push({ label: 'Daily Wages Earned', amount: result.earnedSalary });
       if (result.otPay > 0) earnRows.push({ label: 'Overtime Pay', amount: result.otPay });
@@ -147,6 +146,9 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
 
     const grossEarnings   = earnRows.reduce((s, r) => s + r.amount, 0);
     const totalDeductions = dedRows.reduce((s, r) => s + r.amount, 0);
+    // PF employees: net salary excludes cash in hand (paid separately off payslip)
+    const isPfWithCash = result.pfApplicable && Number(result.cashInHand || 0) > 0;
+    const netSalaryPayable = isPfWithCash ? Number(result.bankTransfer ?? (grossEarnings - totalDeductions)) : result.netSalary;
 
     // Address for company
     const addr1 = [company?.addressLine1].filter(Boolean).join(', ');
@@ -400,13 +402,13 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
                   <div>
                     <div style={{ fontSize: '9px', color: '#444' }}>Net Salary Payable (in words):</div>
                     <div style={{ fontStyle: 'italic', fontSize: '9.5px', fontWeight: 600, marginTop: '2px' }}>
-                      {numberToWords(result.netSalary)}
+                      {numberToWords(netSalaryPayable)}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '9px', color: '#444' }}>Net Salary Payable</div>
                     <div style={{ fontWeight: 700, fontSize: '16px', marginTop: '1px' }}>
-                      ₹ {fmt(result.netSalary)}
+                      ₹ {fmt(netSalaryPayable)}
                     </div>
                   </div>
                 </div>

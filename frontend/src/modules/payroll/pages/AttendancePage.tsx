@@ -11,6 +11,7 @@ import type { ApiEmployeePayroll, ApiPayrollConfig } from '../../../services/pay
 import { shiftService } from '../../../services/shiftService';
 import type { Shift } from '../../../features/shifts/types';
 import { usePermission } from '../../../hooks/usePermission';
+import { formatDate } from '../../../utils/dateUtils';
 
 // ─── Status Config ────────────────────────────────────────────────────────────
 const STATUSES = ['PRESENT', 'ABSENT', 'HALF_DAY', 'HOLIDAY'] as const;
@@ -190,7 +191,7 @@ const CellEditPanel: React.FC<{
       <div className="flex items-center justify-between">
         <div>
           <p className="font-bold text-ink text-sm">{empName}</p>
-          <p className="text-xs text-ink-muted">{date} · {DAY_FULL[dayOfWeek(date)]}</p>
+          <p className="text-xs text-ink-muted">{formatDate(date)} · {DAY_FULL[dayOfWeek(date)]}</p>
         </div>
         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-lg text-ink-muted hover:text-ink transition-colors cursor-pointer">×</button>
       </div>

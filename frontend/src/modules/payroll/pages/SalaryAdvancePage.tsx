@@ -1,13 +1,12 @@
 import { formatDate } from "../../../utils/dateUtils";
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wallet, Plus, Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Wallet, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { toast } from 'react-toastify';
 import { payrollService } from '../../../services/payrollService';
-import type { ApiSalaryAdvance, ApiEmployeePayroll } from '../../../services/payrollService';
+import type { ApiSalaryAdvance } from '../../../services/payrollService';
 import { usePermission } from '../../../hooks/usePermission';
-import { formatAmountOnBlur } from '../../../utils/pricingUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtRs = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -19,142 +18,6 @@ const STATUS_STYLE: Record<string, string> = {
   CLEARED: 'bg-green-100 text-green-700',
 };
 
-// ─── Add-Advance slide-in panel ────────────────────────────────────────────────
-interface AddPanelProps {
-  employees: ApiEmployeePayroll[];
-  onClose: () => void;
-  onSaved: () => void;
-}
-
-const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
-  const [employeeId, setEmployeeId] = useState('');
-  const [amount, setAmount]         = useState('');
-  const [date, setDate]             = useState(new Date().toISOString().slice(0, 10));
-  const [reason, setReason]         = useState('');
-  const [saving, setSaving]         = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!employeeId || !amount || !date) {
-      toast.error('Employee, amount and date are required.');
-      return;
-    }
-    try {
-      setSaving(true);
-      await payrollService.createAdvance({
-        employeeId: Number(employeeId),
-        amount: Number(amount),
-        disbursedDate: date,
-        reason: reason.trim() || undefined,
-      });
-      toast.success('Salary advance recorded.');
-      onSaved();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to save advance.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* backdrop */}
-      <div className="flex-1 bg-black/40 backdrop-blur-xs transition-opacity" onClick={onClose} />
-      {/* panel */}
-      <div className="w-full max-w-md bg-card border-l border-line-soft shadow-2xl flex flex-col h-full relative z-10">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-line-soft bg-card">
-          <div className="flex items-center gap-2">
-            <Wallet size={18} className="text-primary" />
-            <h2 className="text-base font-bold text-ink">Add Salary Advance</h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-card-2 text-ink-muted">
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-card">
-          {/* Employee */}
-          <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-1">Employee <span className="text-red-500">*</span></label>
-            <select
-              value={employeeId}
-              onChange={e => setEmployeeId(e.target.value)}
-              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
-              required
-            >
-              <option value="">Select employee…</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.empCode} – {emp.fullName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Amount */}
-          <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-1">Amount (₹) <span className="text-red-500">*</span></label>
-            <input
-              type="number"
-              min="1"
-              step="0.01"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              onBlur={formatAmountOnBlur((v) => setAmount(v))}
-              placeholder="0.00"
-              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
-              required
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-1">Disbursed Date <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
-              required
-            />
-          </div>
-
-          {/* Reason */}
-          <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-1">Reason <span className="text-ink-subtle">(optional)</span></label>
-            <input
-              type="text"
-              maxLength={200}
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder="e.g. Medical emergency"
-              className="w-full border border-line-soft rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 bg-card-2"
-            />
-          </div>
-        </form>
-
-        <div className="px-6 py-4 border-t border-line-soft flex gap-3 justify-end bg-card">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-ink-muted hover:bg-card-2 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 disabled:opacity-60 transition-colors"
-          >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-            {saving ? 'Saving…' : 'Save Advance'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 const SalaryAdvancePage: React.FC = () => {
   const navigate = useNavigate();
@@ -162,24 +25,16 @@ const SalaryAdvancePage: React.FC = () => {
   const canCreateAdvance = can("payroll-advance.create");
   const canDeleteAdvance = can("payroll-advance.delete");
 
-  const [advances,  setAdvances]  = useState<ApiSalaryAdvance[]>([]);
-  const [employees, setEmployees] = useState<ApiEmployeePayroll[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [showPanel, setShowPanel] = useState(false);
-  const [deleteId,  setDeleteId]  = useState<number | null>(null);
-  const [deleting,  setDeleting]  = useState(false);
+  const [advances, setAdvances] = useState<ApiSalaryAdvance[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Esc key handler
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      const target = e.target as HTMLElement | null;
-      if (target && target.closest('[data-select-portal]')) return;
-      if (showPanel) {
-        setShowPanel(false);
-        return;
-      }
       if (deleteId != null) {
         setDeleteId(null);
         return;
@@ -188,18 +43,14 @@ const SalaryAdvancePage: React.FC = () => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showPanel, deleteId, navigate]);
+  }, [deleteId, navigate]);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [adv, emps] = await Promise.all([
-        payrollService.listAdvances(),
-        payrollService.listEmployees(),
-      ]);
+      const adv = await payrollService.listAdvances();
       setAdvances(adv);
-      setEmployees(emps);
     } catch (e: any) {
       setError(e?.response?.data?.message ?? 'Failed to load data.');
     } finally {
@@ -239,7 +90,7 @@ const SalaryAdvancePage: React.FC = () => {
         </div>
         {canCreateAdvance && (
           <button
-            onClick={() => setShowPanel(true)}
+            onClick={() => navigate('/payroll/advance/add')}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus size={16} />
@@ -270,12 +121,12 @@ const SalaryAdvancePage: React.FC = () => {
         {loading ? (
           <CommonLoader text="Loading advances…" fullScreen={false} />
         ) : advances.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+          <div className="flex flex-col items-center justify-center py-16 text-ink-muted">
             <Wallet size={36} className="mb-2 opacity-30" />
             <p className="text-sm font-medium">No salary advances recorded yet.</p>
             {canCreateAdvance && (
               <button
-                onClick={() => setShowPanel(true)}
+                onClick={() => navigate('/payroll/advance/add')}
                 className="mt-3 text-xs text-primary font-bold hover:underline"
               >
                 Add the first advance →
@@ -348,15 +199,6 @@ const SalaryAdvancePage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* ── Add panel ── */}
-      {showPanel && (
-        <AddPanel
-          employees={employees}
-          onClose={() => setShowPanel(false)}
-          onSaved={() => { setShowPanel(false); load(); }}
-        />
-      )}
 
       {/* ── Delete confirmation modal ── */}
       {deleteId != null && (
