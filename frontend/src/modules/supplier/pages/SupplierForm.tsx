@@ -22,6 +22,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useSocket } from "../../../providers/SocketProvider";
 import { formatAmountOnBlur } from "../../../utils/pricingUtils";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 const supplierFormSchema = z.object({
     companyId: z.string().optional(),
@@ -112,6 +113,7 @@ const SupplierForm: React.FC = () => {
     const lastFocusedRef = useRef<HTMLElement | null>(null);
 
     const [formData, setFormData] = useState(INITIAL_FORM);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
     const [addresses, setAddresses] = useState<SupplierAddress[]>([
         { address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } }
@@ -234,6 +236,11 @@ const SupplierForm: React.FC = () => {
             status: supplier.status || "Active",
         });
         if (supplier.hasTransactions) setHasTransactions(true);
+        setAuditInfo({
+            createdAt: supplier.createdAt,
+            createdBy: supplier.createdUserName || supplier.createdByUser?.fullName || supplier.createdBy,
+            editHistory: supplier.editHistory,
+        });
 
         if (supplier.addresses && supplier.addresses.length > 0) {
             setAddresses(supplier.addresses);
@@ -492,8 +499,11 @@ const SupplierForm: React.FC = () => {
             <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible">
 
                 {/* Header */}
-                <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
-                    <h2 className="text-base font-bold text-ink">{isEdit ? "Edit Supplier" : "Add New Supplier"}</h2>
+                <div className="px-5 py-3 border-b border-line-soft flex items-start justify-between">
+                    <div className="flex flex-col">
+                        <h2 className="text-base font-bold text-ink">{isEdit ? "Edit Supplier" : "Add New Supplier"}</h2>
+                        {isEdit && <RecordAuditInfo auditData={auditInfo} />}
+                    </div>
                     <BackButton text="Back" />
                 </div>
 
@@ -645,7 +655,6 @@ const SupplierForm: React.FC = () => {
                             </div>
                         </div>
                     </div>
-
                     {/* Footer */}
                     <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2">
                         {!isEdit && (

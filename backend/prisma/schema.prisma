@@ -348,6 +348,7 @@ model Customer {
   status               String                   @default("Active") @db.VarChar(20)
 
   updatedBy            String?
+  editHistory          Json?                    @map("edit_history")
   id                   String                   @id @default(uuid()) @db.Uuid
   openingBalance       Decimal                  @default(0) @db.Decimal(14, 2)
   openingBalanceType   String                   @default("DEBIT") @db.VarChar(10)
@@ -516,6 +517,7 @@ model Supplier {
   supplierCode          String                  @map("supplier_code") @db.VarChar(20)
   updatedAt             DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
   updatedBy             String?                 @map("updated_by")
+  editHistory           Json?                   @map("edit_history")
   whatsapp              String?                 @map("whatsapp") @db.VarChar(15)
   openingBalance        Decimal                 @default(0) @map("opening_balance") @db.Decimal(14, 2)
   openingBalanceType    String                  @default("CREDIT") @map("opening_balance_type") @db.VarChar(10)

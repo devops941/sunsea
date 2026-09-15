@@ -269,6 +269,25 @@ class SupplierService {
       }
     }
 
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray(supplier.editHistory)) {
+      enrichedEditHistory = await Promise.all(supplier.editHistory.map(async (edit: any) => {
+        let name = "Unknown User";
+        if (edit.updatedBy) {
+          if (edit.updatedBy.startsWith('admin_')) {
+            const adminId = BigInt(edit.updatedBy.replace('admin_', ''));
+            const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { fullName: true } });
+            if (admin) name = admin.fullName;
+          } else {
+            const user = await prisma.user.findUnique({ where: { userId: edit.updatedBy }, select: { fullName: true } });
+            if (user) name = user.fullName;
+          }
+        }
+        return { ...edit, updatedByName: name };
+      }));
+    }
+
     // Compute dynamic balance from payable service (same as customer uses receivable)
     // Payable netBalance: positive = we owe supplier (Cr), negative = advance paid (Dr)
     let netBalance = 0;
@@ -313,6 +332,7 @@ class SupplierService {
       balanceAmount,
       balanceType,
       hasTransactions,
+      editHistory: enrichedEditHistory,
     };
   }
 
@@ -368,6 +388,19 @@ class SupplierService {
 
       const mobileData = phones !== undefined ? phones : supplierData.mobile;
 
+      // Handle edit history
+      let newEditHistory: any[] = [];
+      if (Array.isArray((supplier as any).editHistory)) {
+        newEditHistory = [...(supplier as any).editHistory];
+      }
+      
+      if (updatedByUserId) {
+        newEditHistory.push({
+          updatedBy: updatedByUserId,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
       const updateData: Prisma.SupplierUpdateInput = {
         ...supplierData,
         ...(mobileData !== undefined && { mobile: mobileData as any }),
@@ -375,6 +408,7 @@ class SupplierService {
           openingBalance: openingBalance ?? Number(supplier.openingBalance ?? 0),
           openingBalanceType: openingBalanceType ?? supplier.openingBalanceType ?? "CREDIT",
         }),
+        editHistory: newEditHistory,
         updatedBy: updatedByUserId ? updatedByUserId : undefined,
       };
 
