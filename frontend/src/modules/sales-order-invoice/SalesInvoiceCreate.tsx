@@ -48,6 +48,9 @@ interface InvoiceLineItem {
   amount: number;
   taxAmount: number;
   total: number;
+  /** True for rows that came from the linked sales order (or an existing invoice being edited).
+   *  Such rows keep the ordered product read-only; freshly added rows are freely editable. */
+  fromOrder?: boolean;
 }
 
 interface CustomerOption {
@@ -83,6 +86,41 @@ const emptyLine = (): InvoiceLineItem => ({
   taxAmount: 0,
   total: 0,
 });
+
+// ---- Sales-product helpers (invoice items reference SALES products, expanded to components
+//      by the backend). Mirror the Sales Order / Quotation forms so all three are consistent. ----
+const SP_COMPONENTS = (sp: any): any[] =>
+  (sp?.components || []).filter((c: any) => c?.componentProduct?.productType === "SALES_PRODUCTION");
+
+/** Unit price of a sales product = Σ (component rate × per-unit qty). */
+const computeSalesProductUnitPrice = (sp: any): number =>
+  SP_COMPONENTS(sp).reduce((sum: number, c: any) => {
+    const cp = c.componentProduct;
+    const rate = Number(cp?.rate) || Number(cp?.b2b) || Number(cp?.mrp) || 0;
+    return sum + rate * Number(c.quantity || 1);
+  }, 0);
+
+/** Weight (kg) of one unit of a sales product = Σ (component weight × per-unit qty). */
+const computeSalesProductWeightPerUnit = (sp: any): number =>
+  SP_COMPONENTS(sp).reduce((sum: number, c: any) => {
+    const cp = c.componentProduct;
+    const raw = Number(cp?.weightPerPiece || 0);
+    const uom = (cp?.weightUom || "kg").toLowerCase().trim();
+    const kg = uom === "g" ? raw / 1000 : raw;
+    return sum + kg * Number(c.quantity || 1);
+  }, 0);
+
+/** Live sellable stock of a sales product, limited by its scarcest component. */
+const computeSalesProductLiveStock = (sp: any, stockMap: Map<string, number>): number => {
+  const comps = SP_COMPONENTS(sp);
+  if (comps.length === 0) return stockMap.get(String(sp?.id)) ?? 0;
+  const possible = comps.map((c: any) => {
+    const compStock = stockMap.get(String(c.componentProductId)) ?? 0;
+    const perUnit = Number(c.quantity || 1);
+    return perUnit > 0 ? Math.floor(compStock / perUnit) : 0;
+  });
+  return Math.max(0, Math.min(...possible));
+};
 
 // ---- Financial Year and Invoice Number calculations ----
 const getFinancialYearForDate = (dateStr: string, settings: any) => {
@@ -183,6 +221,7 @@ const SalesInvoiceForm: React.FC = () => {
   const [excludedComponents, setExcludedComponents] = useState<Record<string, Set<string>>>({});
   const [discountType, setDiscountType] = useState<string>("PERCENT");
   const [discountValue, setDiscountValue] = useState<string>("0.00");
+  const [originalInvoiceAmount, setOriginalInvoiceAmount] = useState<number>(0);
   const [billingAddress, setBillingAddress] = useState({ line1: "", city: "", state: "", pincode: "" });
   const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
   const [selectedShippingIdx, setSelectedShippingIdx] = useState<number>(0);
@@ -373,6 +412,7 @@ const SalesInvoiceForm: React.FC = () => {
         if (invoice.dueDate) setDueDate(invoice.dueDate.split("T")[0]);
         setNotes(invoice.notes || "");
         setPreviewInvoiceNo(invoice.invoiceNo || "");
+        setOriginalInvoiceAmount(Number(invoice.grandTotal || 0));
 
         if (invoice.items?.length > 0) {
           setLines(invoice.items.map((item: any) => ({
@@ -387,6 +427,7 @@ const SalesInvoiceForm: React.FC = () => {
             amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
             taxAmount: Number(item.taxAmount) || 0,
             total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
+            fromOrder: true,
           })));
         }
         setChargeRows(parseChargeRowsFromNarration((invoice as any).narration));
@@ -589,6 +630,7 @@ const SalesInvoiceForm: React.FC = () => {
         amount,
         taxAmount,
         total: amount + taxAmount,
+        fromOrder: true,
       });
     });
 
@@ -615,6 +657,7 @@ const SalesInvoiceForm: React.FC = () => {
         qty, rate,
         weight: (() => { const rw = Number(item.product?.weightPerPiece || 0); const wu = (item.product?.weightUom || "kg").toLowerCase().trim(); return (wu === "g" ? rw / 1000 : rw) * qty; })(),
         discountAmount: 0, taxPercent, amount, taxAmount, total: amount + taxAmount,
+        fromOrder: true,
       });
     });
 
@@ -821,12 +864,19 @@ const SalesInvoiceForm: React.FC = () => {
     }
 
     const { additions, deductions } = computeChargeTotals(chargeRows);
-    const grandTotal = taxableAmount + taxTotal + additions - deductions;
+    // Bill sundry signed net (Discount (+) adds), folded INTO grandTotal so every consumer —
+    // the displayed amount, the credit-limit check, and the ledger balance — uses one figure.
+    const sundryTotal = sundryRows.reduce((s, r) => {
+      const a = Number(r.amount) || 0;
+      const o = DEFAULT_SUNDRY_OPTIONS.find((x) => x.value === r.type);
+      return s + (o?.sign === -1 ? -a : a);
+    }, 0);
+    const grandTotal = taxableAmount + taxTotal + additions - deductions + sundryTotal;
     const cgst = isInterState ? 0 : taxTotal / 2;
     const sgst = isInterState ? 0 : taxTotal / 2;
     const igst = isInterState ? taxTotal : 0;
-    return { subTotal, totalDiscount, taxTotal, grandTotal, cgst, sgst, igst, additions, deductions, discountLabel: discNum > 0 ? `${discNum}${discountType === "PERCENT" ? "%" : " Flat"}` : "" };
-  }, [lines, isInterState, chargeRows, discountValue, discountType]);
+    return { subTotal, totalDiscount, taxTotal, sundryTotal, grandTotal, cgst, sgst, igst, additions, deductions, discountLabel: discNum > 0 ? `${discNum}${discountType === "PERCENT" ? "%" : " Flat"}` : "" };
+  }, [lines, isInterState, chargeRows, discountValue, discountType, sundryRows]);
 
   // ---- Credit Limit Check ----
   const limitExceeded = useMemo(() => {
@@ -1029,6 +1079,7 @@ const SalesInvoiceForm: React.FC = () => {
                 amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
                 taxAmount: Number(item.taxAmount) || 0,
                 total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
+                fromOrder: true,
               })));
             }
           }
@@ -1098,20 +1149,25 @@ const SalesInvoiceForm: React.FC = () => {
     });
   }, [salesOrders, customerId, isEditMode, editInvoiceSalesOrder]);
 
+  // Product picker lists SALES products (like the Sales Order & Quotation forms), NOT the raw
+  // production/component products. The backend expands the chosen sales product into its
+  // components for stock. Options carry the sales product's live sellable stock.
   const productAutocompleteOptions: AutocompleteOption[] = useMemo(() =>
-    items.map((i) => {
-      const liveStock = stockMap.get(i.id) ?? 0;
-      return {
-        value: i.id,
-        label: i.name,
-        info: (
-          <span className={`text-[11px] font-semibold ${liveStock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
-            {liveStock} pcs
-          </span>
-        ),
-      };
-    }),
-    [items, stockMap]
+    salesProducts
+      .filter((sp: any) => sp.isActive !== false)
+      .map((sp: any) => {
+        const liveStock = computeSalesProductLiveStock(sp, stockMap);
+        return {
+          value: String(sp.id),
+          label: sp.salesProductName || sp.salesProductCode || `Sales Product #${sp.id}`,
+          info: (
+            <span className={`text-[11px] font-semibold ${liveStock > 0 ? "text-emerald-500" : "text-rose-500"}`}>
+              {liveStock} pcs
+            </span>
+          ),
+        };
+      }),
+    [salesProducts, stockMap]
   );
 
   // ---- Derived (non-hook) values ----
@@ -1122,7 +1178,9 @@ const SalesInvoiceForm: React.FC = () => {
       header: selectedSalesOrderId ? "Sales Product" : "Product",
       width: "1fr",
       render: (row: InvoiceLineItem, index: number) => {
-        if (selectedSalesOrderId) {
+        // Only rows that came FROM the sales order stay read-only. Freshly added rows in an
+        // SO-linked invoice fall through to the editable product picker below.
+        if (selectedSalesOrderId && row.fromOrder) {
           // Compute live stock from component products
           const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
           let liveStock = stockMap.get(row.itemId) ?? 0;
@@ -1149,31 +1207,61 @@ const SalesInvoiceForm: React.FC = () => {
             </div>
           );
         }
+        // Disable products already picked in other rows so the same item can't be added twice.
+        const selectedInOtherRows = new Set(
+          lines.filter((l) => l.id !== row.id).map((l) => l.itemId).filter(Boolean)
+        );
+        const rowOptions = productAutocompleteOptions.map((o) => ({
+          ...o,
+          disabled: selectedInOtherRows.has(o.value),
+        }));
         return (
-          <AutocompleteInput
-            inline
-            name={`item-${row.id}`}
-            value={row.itemId}
-            disabled={isLocked}
-            options={productAutocompleteOptions}
-            placeholder="Type to search product..."
-            onChange={(val) => {
-              updateLine(row.id, "itemId", val);
-              const selectedProd = items.find((p) => p.id === val);
-              if (selectedProd) {
-                updateLine(row.id, "rate", getGradeRate(selectedProd));
-                updateLine(row.id, "taxPercent", selectedProd.gstRate);
-              }
-              setTimeout(() => {
-                const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
-                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
-                if (qtyInput) {
-                  qtyInput.focus();
-                  qtyInput.select?.();
-                }
-              }, 50);
-            }}
-          />
+          // Wrapper opts this cell into "Enter opens the options dropdown"; openOnFocus reveals
+          // the list as soon as the cell is focused, so a single keystroke shows the products.
+          <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
+            <AutocompleteInput
+              inline
+              openOnFocus
+              name={`item-${row.id}`}
+              value={row.itemId}
+              disabled={isLocked}
+              options={rowOptions}
+              placeholder="Type to search product..."
+              onChange={(val) => {
+                // A sales product was picked — set up the row from its components (price, weight),
+                // mirroring how an order-linked row is built. itemId = salesProductId.
+                const sp = salesProducts.find((s: any) => String(s.id) === val);
+                setLines((prev) => prev.map((l) => {
+                  if (l.id !== row.id) return l;
+                  const rate = sp ? computeSalesProductUnitPrice(sp) : 0;
+                  const weightPerUnit = sp ? computeSalesProductWeightPerUnit(sp) : 0;
+                  const qty = l.qty || 1;
+                  const amount = qty * rate;
+                  return {
+                    ...l,
+                    itemId: val,
+                    itemName: sp?.salesProductName || sp?.salesProductCode || `Sales Product #${val}`,
+                    rate,
+                    weight: weightPerUnit * qty,
+                    discountAmount: 0,
+                    taxPercent: 0,
+                    amount,
+                    taxAmount: 0,
+                    total: amount,
+                    fromOrder: false,
+                  };
+                }));
+                setTimeout(() => {
+                  const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                  const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                  if (qtyInput) {
+                    qtyInput.focus();
+                    qtyInput.select?.();
+                  }
+                }, 50);
+              }}
+            />
+          </div>
         );
       },
     },
@@ -1245,6 +1333,7 @@ const SalesInvoiceForm: React.FC = () => {
       header: "Total",
       width: "110px",
       align: "right" as const,
+      editable: true,
       render: (row: InvoiceLineItem) => {
         if (!row.itemId) return <span className="text-[13px] text-ink-subtle">—</span>;
         return (
@@ -1259,7 +1348,7 @@ const SalesInvoiceForm: React.FC = () => {
         );
       },
     },
-  ], [selectedSalesOrderId, stockMap, isLocked, productAutocompleteOptions, items, updateLine]);
+  ], [selectedSalesOrderId, stockMap, isLocked, productAutocompleteOptions, items, updateLine, lines]);
 
   // ── Expanded components renderer for BusyItemsTable ──
   const renderExpandedComponents = useCallback((row: InvoiceLineItem, _index: number) => {
@@ -1334,14 +1423,22 @@ const SalesInvoiceForm: React.FC = () => {
         header: "Bill Sundry",
         width: "1fr",
         render: (row: SundryRow, index: number, update: (patch: Partial<SundryRow>) => void) => {
-          const opts: AutocompleteOption[] = DEFAULT_SUNDRY_OPTIONS.map((o) => ({
-            value: o.value,
-            label: o.label,
+          // Hide sundry types already chosen in other rows so each can be added only once.
+          const selectedInOtherRows = new Set(
+            sundryRows.filter((_, i) => i !== index).map((r) => r.type).filter(Boolean)
+          );
+          const opts: AutocompleteOption[] = DEFAULT_SUNDRY_OPTIONS
+            .filter((o) => !selectedInOtherRows.has(o.value))
+            .map((o) => ({
+              value: o.value,
+              label: o.label,
           }));
 
           return (
+            <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
             <AutocompleteInput
               inline
+              openOnFocus
               name={`sundry.${index}.type`}
               value={row.type || ""}
               options={opts}
@@ -1360,6 +1457,7 @@ const SalesInvoiceForm: React.FC = () => {
                 }, 50);
               }}
             />
+            </div>
           );
         },
       },
@@ -1414,7 +1512,7 @@ const SalesInvoiceForm: React.FC = () => {
         },
       },
     ];
-  }, []);
+  }, [sundryRows]);
 
   const sundryEmptyRow: SundryRow = useMemo(() => {
     return { id: `${Date.now()}-${Math.random()}`, type: "", rate: "0.00", amount: "0.00" };
@@ -1612,7 +1710,7 @@ const SalesInvoiceForm: React.FC = () => {
                 rows={lines}
                 onAdd={() => setLines((prev) => [...prev, emptyLine()])}
                 onRemove={(i) => setLines((prev) => prev.length > 1 ? prev.filter((_, j) => j !== i) : prev)}
-                editable={!isEditMode && !selectedSalesOrderId && lines.length > 1}
+                editable={!isEditMode && lines.length > 1}
                 expandable={Boolean(selectedSalesOrderId)}
                 canExpand={(row) => {
                   const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
@@ -1733,14 +1831,7 @@ const SalesInvoiceForm: React.FC = () => {
               <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
                 <div className="text-right">
                   <span className="text-base font-bold text-blue-600">
-                    ₹{(() => {
-                      const sundryTotal = sundryRows.reduce((s, r) => {
-                        const a = Number(r.amount) || 0;
-                        const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
-                        return s + (o?.sign === -1 ? -a : a);
-                      }, 0);
-                      return (totals.grandTotal + sundryTotal).toFixed(2);
-                    })()}
+                    ₹{totals.grandTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -1749,19 +1840,26 @@ const SalesInvoiceForm: React.FC = () => {
               {customerId && (() => {
                 const cust = customersRaw.find((c: any) => String(c.id) === customerId);
                 if (!cust) return null;
-                const openBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
-                const bType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
-                const isDr = bType.startsWith("D");
-                const openLabel = isDr ? "Dr" : bType.startsWith("C") ? "Cr" : "";
-                const sundryTotal = sundryRows.reduce((s, r) => {
-                  const a = Number(r.amount) || 0;
-                  const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
-                  return s + (o?.sign === -1 ? -a : a);
-                }, 0);
-                const invoiceAmt = (totals.grandTotal + sundryTotal) || 0;
-                const closingRaw = isDr ? openBal + invoiceAmt : openBal - invoiceAmt;
-                const closingAbs = Math.abs(closingRaw);
-                const closingType = closingRaw > 0 ? (isDr ? "Dr" : "Cr") : closingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+                const rawOpenBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
+                const rawBType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
+                
+                // Convert to signed balance: Dr is positive, Cr is negative
+                let currentSignedBal = (rawBType.startsWith("C") ? -1 : 1) * rawOpenBal;
+                
+                if (isEditMode) {
+                  // The customer's current balance already includes this invoice (which increased Dr / decreased Cr)
+                  // To find the true opening balance before this invoice, we reverse it.
+                  currentSignedBal -= originalInvoiceAmount;
+                }
+                
+                const isDr = currentSignedBal >= 0;
+                const openBal = Math.abs(currentSignedBal);
+                const openLabel = isDr ? "Dr" : currentSignedBal < 0 ? "Cr" : "";
+                
+                const invoiceAmt = totals.grandTotal || 0;
+                const closingSignedBal = currentSignedBal + invoiceAmt;
+                const closingAbs = Math.abs(closingSignedBal);
+                const closingType = closingSignedBal > 0 ? "Dr" : closingSignedBal < 0 ? "Cr" : "";
 
                 return (
                   <div className="mt-3 border border-line-soft rounded-lg overflow-hidden text-xs">

@@ -6,6 +6,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
+import { DEFAULT_SUNDRY_OPTIONS } from "../../components/form/OrderItemsTable/BusyItemsTable";
 import { useSocketSync } from "../../hooks/useSocketSync";
 import CustomButton from "../../components/ui/Button/Button";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
@@ -245,7 +246,8 @@ const SalesInvoiceView: React.FC = () => {
     const invoiceDiscount = Number(invoice?.totalDiscount || 0);
     const invDiscountValue = Number(invoice?.discountValue || 0);
     const invDiscountType = (invoice as any)?.discountType || "";
-    const grandTotal = Number(invoice?.grandTotal ?? (totalTaxable + totalTax));
+    // grandTotal is recomputed from components below (after viewChargeRows), so it stays
+    // consistent with the Sales Order details page and is immune to a stale stored grandTotal.
 
     // Parse charge rows from narration
     const CHARGE_META: Record<string, { label: string; sign: 1 | -1 }> = {
@@ -269,19 +271,33 @@ const SalesInvoiceView: React.FC = () => {
         const sundry = invoice?.billSundry;
         if (Array.isArray(sundry)) {
             sundry.filter((r: any) => Number(r.amount) > 0).forEach((r: any) => {
-                const typeStr = String(r.type || "").toUpperCase();
-                const isDeduction = typeStr.includes("DISCOUNT") || typeStr.includes("MINUS");
+                // Sign from the canonical DEFAULT_SUNDRY_OPTIONS (Discount (+) = +1), matching the
+                // Sales Order details page — NOT the old string heuristic that mis-signed DISCOUNT_PLUS.
+                const opt = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === r.type);
+                const sign = (opt?.sign ?? 1);
                 const cleanLabel = (r.type || "Sundry")
                     .replace(/_/g, " ")
                     .replace(/\b(MINUS|PLUS|minus|plus)\b/gi, "")
                     .replace(/\s+/g, " ")
                     .trim()
                     .replace(/\b\w/g, (c: string) => c.toUpperCase());
-                rows.push({ label: cleanLabel || "Sundry", sign: isDeduction ? -1 : 1, amount: Number(r.amount) });
+                rows.push({ label: cleanLabel || "Sundry", sign, amount: Number(r.amount) });
             });
         }
         return rows;
     }, [invoice?.narration, invoice?.billSundry]);
+
+    // Signed sum of all sundry + narration charge rows.
+    const signedChargeTotal = useMemo(
+        () => viewChargeRows.reduce((s: number, r: any) => s + (r.sign === -1 ? -r.amount : r.amount), 0),
+        [viewChargeRows]
+    );
+    // Recompute the grand total from components (taxable − discount + tax + signed sundry) rather
+    // than trusting invoice.grandTotal, which may be stale for invoices saved before the sign fix.
+    // Fall back to the stored value only when there are no line items to compute from.
+    const grandTotal = itemsWithTax.length > 0
+        ? Math.max(0, totalTaxable - invoiceDiscount) + totalTax + signedChargeTotal
+        : Number(invoice?.grandTotal ?? 0);
 
     const totalWeight = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + Number(i.weight || 0), 0), [itemsWithTax]);
 

@@ -26,6 +26,9 @@ interface AutocompleteInputProps {
   inline?: boolean;
   dataNavDefault?: boolean;
   autoFocus?: boolean;
+  /** Inline mode: open the options dropdown as soon as the field receives focus,
+   *  so a single keystroke (or landing on the cell) reveals the list. */
+  openOnFocus?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -43,6 +46,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   inline = false,
   dataNavDefault = false,
   autoFocus = false,
+  openOnFocus = false,
   onChange,
 }) => {
   const [search, setSearch] = useState("");
@@ -333,7 +337,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               if (disabled) return;
               setIsFocused(true);
               setSearch("");
-              if (!inline) {
+              if (!inline || openOnFocus) {
                 updatePosition();
                 setOpen(true);
               }

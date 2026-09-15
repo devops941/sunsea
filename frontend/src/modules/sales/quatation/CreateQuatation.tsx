@@ -1087,32 +1087,37 @@ const QuotationForm: React.FC = () => {
                 }));
 
                 return (
-                    <AutocompleteInput
-                        inline
-                        name={`items.${index}.salesProductId`}
-                        value={itemValue?.salesProductId || ""}
-                        options={opts}
-                        placeholder="Type to search..."
-                        error={(errors.items as any)?.[index]?.salesProductId?.message}
-                        onChange={(spId) => {
-                            const sp = salesProducts.find((s: any) => String(s.id) === spId);
-                            setValue(`items.${index}.salesProductId`, spId);
-                            setValue(`items.${index}.orderQuantity`, "1");
-                            setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
-                            const autoPrice = sp ? computeSalesProductUnitPrice(sp, products) : 0;
-                            setValue(`items.${index}.unitPrice`, autoPrice > 0 ? autoPrice.toFixed(2) : "");
-                            setValue(`items.${index}.gstRate`, "");
-                            // Auto-focus Qty cell so user can enter quantity immediately
-                            setTimeout(() => {
-                                const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
-                                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
-                                if (qtyInput) {
-                                    qtyInput.focus();
-                                    qtyInput.select();
-                                }
-                            }, 50);
-                        }}
-                    />
+                    // Wrapper opts this cell into "Enter opens the options dropdown"; openOnFocus reveals
+                    // the list as soon as the cell is focused, so a single keystroke shows the options.
+                    <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
+                        <AutocompleteInput
+                            inline
+                            openOnFocus
+                            name={`items.${index}.salesProductId`}
+                            value={itemValue?.salesProductId || ""}
+                            options={opts}
+                            placeholder="Type to search..."
+                            error={(errors.items as any)?.[index]?.salesProductId?.message}
+                            onChange={(spId) => {
+                                const sp = salesProducts.find((s: any) => String(s.id) === spId);
+                                setValue(`items.${index}.salesProductId`, spId);
+                                setValue(`items.${index}.orderQuantity`, "1");
+                                setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
+                                const autoPrice = sp ? computeSalesProductUnitPrice(sp, products) : 0;
+                                setValue(`items.${index}.unitPrice`, autoPrice > 0 ? autoPrice.toFixed(2) : "");
+                                setValue(`items.${index}.gstRate`, "");
+                                // Auto-focus Qty cell so user can enter quantity immediately
+                                setTimeout(() => {
+                                    const qtyCell = itemsTableRef.current?.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                    const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                    if (qtyInput) {
+                                        qtyInput.focus();
+                                        qtyInput.select();
+                                    }
+                                }, 50);
+                            }}
+                        />
+                    </div>
                 );
             },
         },
@@ -1170,6 +1175,7 @@ const QuotationForm: React.FC = () => {
             header: "Total",
             width: "110px",
             align: "right" as const,
+            editable: true,
             render: (_row: any, index: number) => {
                 const itemValue = watchedItems?.[index];
                 if (!itemValue) return null;
@@ -1211,15 +1217,22 @@ const QuotationForm: React.FC = () => {
                 header: "Bill Sundry",
                 width: "1fr",
                 render: (row: SundryRow, index: number, update: (patch: Partial<SundryRow>) => void) => {
-                    const opts: AutocompleteOption[] = DEFAULT_SUNDRY_OPTIONS.map(o => ({
-                        value: o.value,
-                        label: o.label,
-                    }));
+                    // Hide sundry types already chosen in other rows so each can be added only once.
+                    const selectedInOtherRows = new Set(
+                        sundryRows.filter((_, i) => i !== index).map(r => r.type).filter(Boolean)
+                    );
+                    const opts: AutocompleteOption[] = DEFAULT_SUNDRY_OPTIONS
+                        .filter(o => !selectedInOtherRows.has(o.value))
+                        .map(o => ({
+                            value: o.value,
+                            label: o.label,
+                        }));
 
                     return (
                         <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
                             <AutocompleteInput
                                 inline
+                                openOnFocus
                                 name={`sundry.${index}.type`}
                                 value={row.type || ""}
                                 options={opts}
@@ -1291,7 +1304,7 @@ const QuotationForm: React.FC = () => {
                 },
             },
         ];
-    }, [totals.subtotal]);
+    }, [totals.subtotal, sundryRows]);
 
     const sundryEmptyRow: SundryRow = useMemo(() => {
         return { id: `${Date.now()}-${Math.random()}`, type: "", rate: "", amount: "" };

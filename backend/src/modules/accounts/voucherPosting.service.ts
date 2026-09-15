@@ -472,6 +472,15 @@ class VoucherPostingService {
       },
     });
 
+    // Always rebuild the voucher so the ledger reflects the CURRENT invoice grandTotal/GST.
+    // Editing an invoice (bill sundry, discount, items) changes these; leaving a stale voucher
+    // would keep the customer ledger / receivable on the old amount. Deleting the voucher
+    // cascade-deletes its journal items (JournalItem.voucher onDelete: Cascade).
+    if (voucher) {
+      await db.voucher.delete({ where: { id: voucher.id } });
+      voucher = null;
+    }
+
     if (!voucher) {
       const grandTotalNum = Number(salesInvoice.grandTotal || salesInvoice.subTotal || 0);
       const grandTotal = new Prisma.Decimal(grandTotalNum);

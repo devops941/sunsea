@@ -387,6 +387,7 @@ class SalesOrderService {
                         totalDiscount: true,
                         taxTotal: true,
                         grandTotal: true,
+                        billSundry: true,
                         narration: true,
                         status: true,
                         items: {
@@ -575,7 +576,7 @@ class SalesOrderService {
     private async updateStatus(id: number, newStatus: SalesOrderStatus, _permissions: string[]) {
         const order = await prisma.salesOrder.findUnique({
             where: { id },
-            select: { totalDiscount: true, orderDiscountType: true, orderDiscountValue: true },
+            select: { totalDiscount: true, orderDiscountType: true, orderDiscountValue: true, billSundry: true },
         });
         const items = await prisma.salesOrderItem.findMany({ where: { salesOrderId: id } });
         const subtotal  = items.reduce((s, l) => s.add(l.lineTotal),              ZERO);
@@ -589,13 +590,15 @@ class SalesOrderService {
         const taxable    = subtotal.sub(discount);
         const discRatio  = subtotal.gt(ZERO) ? taxable.div(subtotal) : new Prisma.Decimal(1);
         const adjustedTax = totalTax.mul(discRatio);
+        // Preserve bill sundry in the net — confirming/converting must not silently drop it.
+        const billSundry = calcBillSundryTotal((order as any)?.billSundry);
 
         const updated = await prisma.salesOrder.update({
             where: { id },
             data: {
                 status:    newStatus as any,
                 subtotal,
-                netAmount: taxable.add(adjustedTax),
+                netAmount: taxable.add(adjustedTax).add(billSundry),
                 totalDiscount: discount,
                 totalCgst,
                 totalSgst,

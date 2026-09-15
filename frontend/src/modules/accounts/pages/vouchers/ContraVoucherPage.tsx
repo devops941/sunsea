@@ -357,7 +357,7 @@ const ContraVoucherPage: React.FC = () => {
         </h1>
         <span className="text-[13px] text-ink-subtle italic">
           Series: <b className="text-ink">{applied.voucherSeries}</b> · From{" "}
-          <b className="text-ink">{applied.startDate}</b> to <b className="text-ink">{applied.endDate}</b>
+          <b className="text-ink">{formatDate(applied.startDate)}</b> to <b className="text-ink">{formatDate(applied.endDate)}</b>
         </span>
 
         <div className="flex items-center gap-1.5 ml-auto">

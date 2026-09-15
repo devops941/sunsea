@@ -25,6 +25,7 @@ import { salesProductService } from "../../../services/salesProductService";
 import { ORDER_SOURCE_OPTIONS, ORDER_SOURCE_NEEDS_EMPLOYEE, ORDER_SOURCE_NEEDS_REFERRAL, ORDER_SOURCE_NEEDS_DEALER } from "../../../constants/selectOption";
 import { companyService } from "../../../services/companyService";
 import { usePermission } from "../../../hooks/usePermission";
+import { formatDate } from "../../../utils/dateUtils";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -706,27 +707,32 @@ const SalesOrderForm: React.FC = () => {
                     disabled: selectedInOtherRows.has(o.value),
                 }));
                 return (
-                    <AutocompleteInput
-                        inline
-                        dataNavDefault={isEditMode && index === 0}
-                        name={`items.${index}.salesProductId`}
-                        value={itemValue?.salesProductId || ""}
-                        options={opts}
-                        placeholder="Type to search..."
-                        error={(errors.items as any)?.[index]?.salesProductId?.message}
-                        onChange={(spId) => {
-                            const sp = salesProducts.find(s => String(s.id) === spId);
-                            setValue(`items.${index}.salesProductId`, spId);
-                            setValue(`items.${index}.orderQuantity`, "");
-                            setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
-                            // Auto-focus Qty cell so user can type quantity immediately
-                            setTimeout(() => {
-                                const qtyCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
-                                const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
-                                if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
-                            }, 50);
-                        }}
-                    />
+                    // Wrapper opts this cell into "Enter opens the options dropdown" — without it the
+                    // table intercepts Enter to move to the next cell. display:contents keeps layout intact.
+                    <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
+                        <AutocompleteInput
+                            inline
+                            openOnFocus
+                            dataNavDefault={isEditMode && index === 0}
+                            name={`items.${index}.salesProductId`}
+                            value={itemValue?.salesProductId || ""}
+                            options={opts}
+                            placeholder="Type to search..."
+                            error={(errors.items as any)?.[index]?.salesProductId?.message}
+                            onChange={(spId) => {
+                                const sp = salesProducts.find(s => String(s.id) === spId);
+                                setValue(`items.${index}.salesProductId`, spId);
+                                setValue(`items.${index}.orderQuantity`, "");
+                                setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
+                                // Auto-focus Qty cell so user can type quantity immediately
+                                setTimeout(() => {
+                                    const qtyCell = document.querySelector(`[data-r="${index}"][data-c="1"]`) as HTMLElement | null;
+                                    const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                                    if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                }, 50);
+                            }}
+                        />
+                    </div>
                 );
             },
         },
@@ -884,7 +890,7 @@ const SalesOrderForm: React.FC = () => {
 
                         <div>
                             <Controller name="orderDate" control={control} render={({ field }) => (
-                                <AutocompleteInput horizontal label="Order Date" name={field.name} value={field.value} options={[]} required onChange={() => {}} placeholder={field.value} disabled />
+                                <AutocompleteInput horizontal label="Order Date" name={field.name} value={formatDate(field.value)} options={[]} required onChange={() => {}} placeholder={formatDate(field.value)} disabled />
                             )} />
                         </div>
 
