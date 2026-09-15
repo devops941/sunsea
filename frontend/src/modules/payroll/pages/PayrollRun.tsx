@@ -13,6 +13,7 @@ import Button from '../../../components/ui/Button/Button';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll, AttendanceInput, ApiPayrollResult } from '../../../services/payrollService';
 import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
+import { formatPeriod } from '../../../utils/dateUtils';
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -1034,7 +1035,7 @@ const Step3: React.FC<{
         <div>
           <h2 className="text-lg font-bold text-text-primary">Payroll Preview</h2>
           <p className="text-sm text-text-secondary mt-0.5">
-            {run.period} · {results.length} employees · Run: <span className="font-mono text-xs text-text-muted">{run.runCode}</span>
+            {formatPeriod(run.period)} · {results.length} employees · Run: <span className="font-mono text-xs text-text-muted">{run.runCode}</span>
           </p>
         </div>
         {/* 
@@ -1245,9 +1246,7 @@ const Step4: React.FC<{
   const cashRows = results.filter(r => r.paymentMode === 'CASH');
   const totalCashInHand = results.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
-  const periodLabel = run.period.startsWith('20') && run.period.length === 7
-    ? `${MONTHS[parseInt(run.period.split('-')[1], 10) - 1]} ${run.period.split('-')[0]}`
-    : run.period;
+  const periodLabel = formatPeriod(run.period);
 
   const handleApprove = async () => {
     if (run.status === 'APPROVED') {
@@ -1280,7 +1279,7 @@ const Step4: React.FC<{
             { label: 'Total Employees', value: `${results.length}` },
             { label: 'Net Payroll', value: fmtRs(run.totalNetSalary), bold: true },
             totalCashInHand > 0 ? { label: 'Cash In Hand', value: fmtRs(totalCashInHand) } : null,
-            { label: 'Bank Transfer', value: fmtRs(bankRows.reduce((s, r) => s + Number(r.netSalary), 0)) },
+            { label: 'Bank Transfer', value: fmtRs(bankRows.reduce((s, r) => s + Number(r.bankTransfer ?? 0), 0)) },
             canViewCash ? { label: 'Cash Payment', value: fmtRs(cashRows.reduce((s, r) => s + Number(r.netSalary), 0)) } : null,
             { label: 'Employee PF', value: fmtRs(run.totalPfEmployee) },
             { label: 'Employer PF', value: fmtRs(run.totalPfEmployer) },
@@ -1375,9 +1374,11 @@ const Step5: React.FC<{
   const results = run.results || [];
   const bankRows = results.filter(r => r.paymentMode === 'BANK');
   const cashRows = results.filter(r => r.paymentMode === 'CASH');
-  const bankTotal = bankRows.reduce((s, r) => s + Number(r.netSalary), 0);
+  const bankTotal = bankRows.reduce((s, r) => s + Number(r.bankTransfer ?? 0), 0);
   const cashTotal = cashRows.reduce((s, r) => s + Number(r.netSalary), 0);
   const totalCashInHand = results.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
+  // PF employees who also receive cash in hand
+  const bankCashInHandRows = bankRows.filter(r => Number(r.cashInHand || 0) > 0);
 
   const bankColumns: DataTableColumn<ApiPayrollResult>[] = [
     {
@@ -1408,12 +1409,7 @@ const Step5: React.FC<{
       header: "AMOUNT",
       align: "right",
       render: (r) => (
-        <div className="flex flex-col items-end text-right">
-          <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
-          {Number(r.cashInHand || 0) > 0 && (
-            <div className="text-[9px] text-text-muted font-mono leading-tight">(incl. Cash: {fmtRs(Number(r.cashInHand || 0))})</div>
-          )}
-        </div>
+        <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.bankTransfer ?? 0))}</span>
       ),
     },
   ];
@@ -1442,12 +1438,7 @@ const Step5: React.FC<{
       header: "AMOUNT",
       align: "right",
       render: (r) => (
-        <div className="flex flex-col items-end text-right">
-          <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
-          {Number(r.cashInHand || 0) > 0 && (
-            <div className="text-[9px] text-text-muted font-mono leading-tight">(incl. Cash: {fmtRs(Number(r.cashInHand || 0))})</div>
-          )}
-        </div>
+        <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
       ),
     },
   ];
@@ -1501,7 +1492,7 @@ const Step5: React.FC<{
       (r as any).employee?.bankName || '',
       (r as any).employee?.accountNumber || '',
       (r as any).employee?.ifscCode || '',
-      String(r.netSalary)
+      String(r.bankTransfer ?? 0)
     ]);
     downloadCSV(`NEFT-List-${run.period}.csv`, headers, rows);
   };
@@ -1526,7 +1517,7 @@ const Step5: React.FC<{
         <div>
           <h2 className="text-2xl font-bold text-text-primary">Payroll Locked!</h2>
           <p className="text-text-secondary mt-2 text-sm">
-            {run.period} payroll has been finalised for {results.length} employees.
+            {formatPeriod(run.period)} payroll has been finalised for {results.length} employees.
           </p>
         </div>
         <div className="bg-card-2 rounded-xl border border-border p-5 text-left space-y-2">
@@ -1630,6 +1621,42 @@ const Step5: React.FC<{
         </div>
       )}
 
+      {/* Cash In Hand table for PF/Bank employees who also receive cash */}
+      {bankCashInHandRows.length > 0 && (
+        <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-amber-50/60">
+            <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Wallet size={12} /> Cash In Hand ({bankCashInHandRows.length})
+            </h3>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-card-2 border-b border-line-soft text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                <th className="px-5 py-2.5 text-left">Employee</th>
+                <th className="px-5 py-2.5 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line-soft">
+              {bankCashInHandRows.map(r => (
+                <tr key={r.id} className="hover:bg-card-2/60 transition-colors">
+                  <td className="px-5 py-2.5">
+                    <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
+                    <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
+                  </td>
+                  <td className="px-5 py-2.5 text-right">
+                    <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.cashInHand || 0))}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="bg-card-2 border-t border-line-soft px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
+            <span>TOTAL CASH IN HAND</span>
+            <span className="font-mono text-amber-700 text-sm">{fmtRs(totalCashInHand)}</span>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <AlertTriangle size={15} /> {error}
@@ -1668,7 +1695,7 @@ const Step5: React.FC<{
               <button onClick={() => setShowModal(false)} className="text-text-muted hover:text-text-primary transition-colors"><X size={18} /></button>
             </div>
             <p className="text-sm text-text-secondary bg-amber-50 border border-amber-200 rounded-xl p-4">
-              You are about to <strong>lock {run.period} payroll</strong> for{' '}
+              You are about to <strong>lock {formatPeriod(run.period)} payroll</strong> for{' '}
               <strong>{results.length} employees</strong> totalling <strong>{fmtRs(run.totalNetSalary)}</strong>.
               Once locked, no changes can be made.
             </p>

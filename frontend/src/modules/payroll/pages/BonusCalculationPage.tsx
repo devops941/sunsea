@@ -15,6 +15,7 @@ import type {
   ApiBonusMonthMeta,
 } from '../../../services/payrollService';
 import { toast } from 'react-toastify';
+import { formatDate } from '../../../utils/dateUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number | string | undefined | null) => Number(n || 0).toLocaleString('en-IN');
@@ -327,7 +328,7 @@ const BonusCalculationPage: React.FC = () => {
             <h2 className="text-sm font-extrabold text-ink tracking-tight flex items-center gap-2">
               <span>Bonus & Leave History Matrix</span>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
-                {startDate} to {endDate}
+                {formatDate(startDate)} to {formatDate(endDate)}
               </span>
             </h2>
             <p className="text-[11px] text-ink-muted mt-0.5">

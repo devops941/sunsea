@@ -10,6 +10,7 @@ import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { useSocket } from '../../../providers/SocketProvider';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiPayrollResult } from '../../../services/payrollService';
+import { formatPeriod } from '../../../utils/dateUtils';
 import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
 import PayslipModal from '../components/PayslipModal';
 import FilterPopover from '../../../components/ui/FilterPopover/FilterPopover';
@@ -54,7 +55,7 @@ const fmt = (n: number) => n.toLocaleString('en-IN');
 const STATUS_COLOR: Record<string, string> = {
   DRAFT:    'bg-amber-100 text-amber-700',
   APPROVED: 'bg-blue-100 text-blue-700',
-  LOCKED:   'bg-slate-100 text-slate-600',
+  LOCKED:   'bg-card-2 text-ink-muted',
 };
 
 
@@ -268,11 +269,11 @@ const WeeklyPayrollReport: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-muted font-semibold">
                   Week
                 </label>
                 <select
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink font-medium cursor-pointer"
                   value={draftWeek}
                   onChange={(e) => setDraftWeek(e.target.value)}
                 >
@@ -283,11 +284,11 @@ const WeeklyPayrollReport: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-muted font-semibold">
                   Month
                 </label>
                 <select
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink font-medium cursor-pointer"
                   value={draftMonth}
                   onChange={(e) => setDraftMonth(e.target.value)}
                 >
@@ -298,11 +299,11 @@ const WeeklyPayrollReport: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-muted font-semibold">
                   Year
                 </label>
                 <select
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink font-medium cursor-pointer"
                   value={draftYear}
                   onChange={(e) => setDraftYear(e.target.value)}
                 >
@@ -315,7 +316,7 @@ const WeeklyPayrollReport: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-border p-12 text-center shadow-sm">
+        <div className="bg-card rounded-xl border border-border p-12 text-center shadow-sm">
           <p className="text-text-primary font-semibold text-lg">No weekly payroll runs found</p>
           <p className="text-text-secondary text-sm mt-1">Try selecting a different week, month, or year filter using the Filters button.</p>
         </div>
@@ -488,7 +489,7 @@ const WeeklyPayrollReport: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Weekly Payroll Report</h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            {run.runCode} — {run.period}
+            {run.runCode} — {formatPeriod(run.period)}
             <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLOR[run.status]}`}>
               {run.status}
             </span>
@@ -497,16 +498,16 @@ const WeeklyPayrollReport: React.FC = () => {
         <div className="flex items-center gap-3 flex-wrap justify-end">
           {/* Run Selector if multiple runs exist */}
           {runs.length > 1 && (
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm">
-              <span className="text-slate-500">Run:</span>
+            <div className="flex items-center gap-1.5 bg-card border border-line-soft rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm">
+              <span className="text-ink-muted">Run:</span>
               <select
                 value={runIdx}
                 onChange={(e) => setRunIdx(Number(e.target.value))}
-                className="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer"
+                className="bg-transparent font-semibold text-ink outline-none cursor-pointer"
               >
                 {runs.map((r, i) => (
                   <option key={r.id} value={i}>
-                    {r.runCode} ({r.period})
+                    {r.runCode} ({formatPeriod(r.period)})
                   </option>
                 ))}
               </select>
@@ -521,11 +522,11 @@ const WeeklyPayrollReport: React.FC = () => {
             onOpen={handleOpenFilter}
           >
             <div className="mb-3">
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-muted font-semibold">
                 Week
               </label>
               <select
-                className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink font-medium cursor-pointer"
                 value={draftWeek}
                 onChange={(e) => setDraftWeek(e.target.value)}
               >
@@ -536,11 +537,11 @@ const WeeklyPayrollReport: React.FC = () => {
             </div>
 
             <div className="mb-3">
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-muted font-semibold">
                 Month
               </label>
               <select
-                className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink font-medium cursor-pointer"
                 value={draftMonth}
                 onChange={(e) => setDraftMonth(e.target.value)}
               >
@@ -551,11 +552,11 @@ const WeeklyPayrollReport: React.FC = () => {
             </div>
 
             <div className="mb-3">
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-muted font-semibold">
                 Year
               </label>
               <select
-                className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink font-medium cursor-pointer"
                 value={draftYear}
                 onChange={(e) => setDraftYear(e.target.value)}
               >
@@ -603,7 +604,7 @@ const WeeklyPayrollReport: React.FC = () => {
             className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
               filter === v
                 ? 'bg-primary text-white border-primary'
-                : 'border-border text-text-secondary hover:border-slate-400'
+                : 'border-border text-text-secondary hover:border-primary/50'
             }`}
           >
             {l}
@@ -613,7 +614,7 @@ const WeeklyPayrollReport: React.FC = () => {
       </div>
 
       {/* Table using reusable DataTable component */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <DataTable
           columns={reportColumns}
           data={pagedData}
@@ -626,46 +627,46 @@ const WeeklyPayrollReport: React.FC = () => {
 
         {/* Footer Summary Bar matching PayrollRun design */}
         {filtered.length > 0 && (
-          <div className="bg-white border-t border-slate-200 overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
+          <div className="bg-card border-t border-line-soft overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
 
             {/* Left side: TOTAL EMPLOYEES */}
-            <div className="px-6 py-4 flex items-center xl:border-r border-slate-200 xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
+            <div className="px-6 py-4 flex items-center xl:border-r border-line-soft xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-card-2 text-ink-muted font-bold">
                   <Users size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TOTAL EMPLOYEES</p>
-                  <p className="text-sm font-bold text-slate-800">{filtered.length}</p>
+                  <p className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest">TOTAL EMPLOYEES</p>
+                  <p className="text-sm font-bold text-ink">{filtered.length}</p>
                 </div>
               </div>
             </div>
 
             {/* Middle: EARNED | OT | GROSS | DEDUCTIONS */}
-            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-slate-200">
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-line-soft">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">EARNED</span>
-                <span className="font-mono font-semibold text-slate-700">
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">EARNED</span>
+                <span className="font-mono font-semibold text-ink">
                   ₹{fmt(totals.earnedSalary)}
                 </span>
               </div>
-              <div className="h-7 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">OT</span>
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">OT</span>
                 <span className="font-mono font-semibold text-emerald-600">
                   ₹{fmt(totals.otPay)}
                 </span>
               </div>
-              <div className="h-7 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">GROSS</span>
-                <span className="font-mono font-bold text-slate-900">
+                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">GROSS</span>
+                <span className="font-mono font-bold text-ink">
                   ₹{fmt(totals.earnedSalary + totals.otPay)}
                 </span>
               </div>
-              <div className="h-7 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5">DEDUCTIONS</span>
@@ -676,8 +677,8 @@ const WeeklyPayrollReport: React.FC = () => {
             </div>
 
             {/* Right side: NET PAY & CASH IN HAND */}
-            <div className="flex items-stretch xl:border-l border-slate-200 bg-slate-50 w-full xl:w-auto">
-              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-slate-200 flex-1 xl:flex-none">
+            <div className="flex items-stretch xl:border-l border-line-soft bg-card-2 w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-line-soft flex-1 xl:flex-none">
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">NET PAY</span>
                 <span className="font-mono text-lg font-black text-emerald-700">
                   ₹{fmt(totals.netSalary)}
@@ -729,7 +730,7 @@ const WeeklyPayrollReport: React.FC = () => {
             color: 'text-text-primary',
           },
         ].map((c) => (
-          <div key={c.label} className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <div key={c.label} className="bg-card border border-border rounded-xl p-4 shadow-sm">
             <p className="text-xs text-text-muted uppercase tracking-wider font-semibold">{c.label}</p>
             <p className={`text-xl font-bold mt-1 ${c.color}`}>{c.value}</p>
           </div>
