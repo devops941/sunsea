@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateSalesInvoiceInput } from "./sales-invoice.validation";
@@ -119,7 +120,7 @@ class SalesInvoiceService {
         for (const row of chargeRows) {
           const amt = Number(row.amount) || 0;
           if (amt <= 0) continue;
-          if (String(row.type || "").includes("MINUS")) chargeDeductions += amt;
+          if (String(row.type || "").toUpperCase().includes("MINUS")) chargeDeductions += amt;
           else chargeAdditions += amt;
         }
       } catch { /* ignore bad JSON */ }
@@ -132,7 +133,9 @@ class SalesInvoiceService {
         const amt = Number(row.amount) || 0;
         if (amt <= 0) continue;
         const typeStr = String(row.type || "").toUpperCase();
-        if (typeStr.includes("DISCOUNT") || typeStr.includes("MINUS")) billSundryTotal -= amt;
+        // Sign is driven purely by the _MINUS / _PLUS suffix. Do NOT key off "DISCOUNT":
+        // that wrongly subtracts DISCOUNT_PLUS (Discount (+)), which must add.
+        if (typeStr.includes("MINUS")) billSundryTotal -= amt;
         else billSundryTotal += amt;
       }
     }
@@ -192,7 +195,7 @@ class SalesInvoiceService {
           transport: (data as any).transport || null,
           numberOfBundle: (data as any).numberOfBundle != null ? Number((data as any).numberOfBundle) : null,
           dcNo: (data as any).dcNo || null,
-          billSundry: Array.isArray(billSundryData) && billSundryData.length > 0 ? billSundryData : undefined,
+          billSundry: Array.isArray(billSundryData) && billSundryData.length > 0 ? billSundryData : Prisma.JsonNull,
           shippingAddressLine1: (data as any).shippingAddress?.line1 || null,
           shippingCity: (data as any).shippingAddress?.city || null,
           shippingState: (data as any).shippingAddress?.state || null,
@@ -604,7 +607,7 @@ class SalesInvoiceService {
   }
 
   async updateSalesInvoice(id: string, data: CreateSalesInvoiceInput, currentUser: { userId: string; companyId: string }) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. Fetch existing invoice with items
       const existing = await tx.salesInvoice.findFirst({
         where: { id, companyId: currentUser.companyId },
@@ -748,7 +751,7 @@ class SalesInvoiceService {
           for (const row of chargeRows) {
             const amt = Number(row.amount) || 0;
             if (amt <= 0) continue;
-            if (String(row.type || "").includes("MINUS")) updChargeDeductions += amt;
+            if (String(row.type || "").toUpperCase().includes("MINUS")) updChargeDeductions += amt;
             else updChargeAdditions += amt;
           }
         } catch { /* ignore bad JSON */ }
@@ -761,7 +764,9 @@ class SalesInvoiceService {
           const amt = Number(row.amount) || 0;
           if (amt <= 0) continue;
           const typeStr = String(row.type || "").toUpperCase();
-          if (typeStr.includes("DISCOUNT") || typeStr.includes("MINUS")) updBillSundryTotal -= amt;
+          // Sign is driven purely by the _MINUS / _PLUS suffix. Do NOT key off "DISCOUNT":
+          // that wrongly subtracts DISCOUNT_PLUS (Discount (+)), which must add.
+          if (typeStr.includes("MINUS")) updBillSundryTotal -= amt;
           else updBillSundryTotal += amt;
         }
       }
@@ -804,7 +809,7 @@ class SalesInvoiceService {
           transport: (data as any).transport || null,
           numberOfBundle: (data as any).numberOfBundle != null ? Number((data as any).numberOfBundle) : null,
           dcNo: (data as any).dcNo || null,
-          billSundry: Array.isArray(updBillSundryData) && updBillSundryData.length > 0 ? updBillSundryData : undefined,
+          billSundry: Array.isArray(updBillSundryData) && updBillSundryData.length > 0 ? updBillSundryData : Prisma.JsonNull,
           shippingAddressLine1: (data as any).shippingAddress?.line1 || null,
           shippingCity: (data as any).shippingAddress?.city || null,
           shippingState: (data as any).shippingAddress?.state || null,
@@ -924,6 +929,17 @@ class SalesInvoiceService {
 
       return serializeInvoice(updatedInvoice);
     }, { maxWait: 10000, timeout: 30000 });
+
+    // Re-post the SALES voucher AFTER commit (same pattern as create) so the customer ledger /
+    // receivable reflects the edited invoice's grandTotal (bill sundry, discount, item changes).
+    try {
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postSalesVoucher(id);
+    } catch (vErr) {
+      console.error("[Auto-Post Voucher Error] Failed to re-post Sales Voucher on update:", vErr);
+    }
+
+    return result;
   }
 }
 

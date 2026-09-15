@@ -1052,7 +1052,7 @@ const DashboardPage: React.FC = () => {
           {/* Left 3/4: Alerts (1/3) + Recent Transactions (2/3) */}
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 h-full">
             {/* Alerts (1 of 3 inside 3/4) */}
-            <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-[360px]">
+            <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
               <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
                   <FaBell className="text-amber-400 text-xs" />
@@ -1180,7 +1180,7 @@ const DashboardPage: React.FC = () => {
             </div>
 
             {/* Recent Transactions (2 of 3 inside 3/4) */}
-            <div className="md:col-span-2 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-[360px]">
+            <div className="md:col-span-2 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
               <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink">Recent Transactions</div>
                 <button
@@ -1255,7 +1255,7 @@ const DashboardPage: React.FC = () => {
 
           {/* Right 1/4: Top Products */}
           {showTopProducts && (
-            <div className="lg:col-span-1 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-[360px]">
+            <div className="lg:col-span-1 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
               <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">Top Products</div>

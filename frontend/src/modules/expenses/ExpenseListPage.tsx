@@ -354,7 +354,7 @@ const ExpenseListPage: React.FC = () => {
           {refreshing && <FaSync className="animate-spin text-amber-500 text-[10px]" />}
         </h1>
         <span className="text-[10px] text-ink-subtle italic">
-          From <b className="text-ink">{applied.startDate}</b> to <b className="text-ink">{applied.endDate}</b>
+          From <b className="text-ink">{formatDate(applied.startDate)}</b> to <b className="text-ink">{formatDate(applied.endDate)}</b>
         </span>
 
         <div className="flex items-center gap-1.5 ml-auto">

@@ -416,20 +416,22 @@ const SalesOrderDetail: React.FC = () => {
     const calcSgst = useInvoiceTotals ? invoiceSgst : Number(order?.totalSgst || 0);
     const calcIgst = useInvoiceTotals ? invoiceIgst : Number(order?.totalIgst || 0);
     const calcTotalTax = useInvoiceTotals ? invoiceTotalTax : Number(order?.totalTax || 0);
-    // Recalculate net amount from subtotal to avoid mismatch with component-level rounding
-    const baseNetAmount = useInvoiceTotals
-        ? Number(linkedInvoice.grandTotal || 0)
-        : (taxableAmount + calcTotalTax);
+    // Compute the net from components (subtotal − discount + tax) with correctly-signed bill
+    // sundry below, rather than trusting the stored grandTotal — older invoices may carry a
+    // wrong grandTotal from a past Discount(+) sign bug in the backend.
+    const baseNetAmount = taxableAmount + calcTotalTax;
+    // When invoiced, the bill sundry shown must come from the INVOICE (it may have been
+    // edited independently of the order), not from order.billSundry.
+    const billSundrySource = useInvoiceTotals ? (linkedInvoice as any)?.billSundry : (order as any)?.billSundry;
     const billSundryTotal = useMemo(() => {
-        const raw = (order as any)?.billSundry;
+        const raw = billSundrySource;
         if (!Array.isArray(raw) || raw.length === 0) return 0;
         return raw.reduce((sum: number, r: any) => {
             const amt = Number(r.amount) || 0;
             const opt = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === r.type);
             return sum + ((opt?.sign ?? 1) === -1 ? -amt : amt);
         }, 0);
-    }, [order]);
-    const calcNetAmount = baseNetAmount + billSundryTotal;
+    }, [billSundrySource]);
     const hasGst = calcTotalTax > 0;
 
     // Parse extra charges from narration (use invoice narration if invoiced)
@@ -441,11 +443,26 @@ const SalesOrderDetail: React.FC = () => {
         return parseChargeRowsFromNarration((order as any).narration);
     }, [order, useInvoiceTotals, linkedInvoice]);
 
+    // Signed sum of narration charge rows (same CHARGE_OPTIONS signs used for display below).
+    const chargeTotal = useMemo(
+        () => chargeRows.filter((r: any) => Number(r.amount) > 0).reduce((s: number, r: any) => {
+            const opt = CHARGE_OPTIONS.find(o => o.value === r.type);
+            const amt = Number(r.amount) || 0;
+            return s + ((opt?.sign ?? 1) === -1 ? -amt : amt);
+        }, 0),
+        [chargeRows]
+    );
+
+    // Net = (subtotal − discount + tax) + correctly-signed bill sundry + narration charges, for
+    // both the invoice and order paths. Signs come from DEFAULT_SUNDRY_OPTIONS / CHARGE_OPTIONS
+    // (Discount(+) adds), keeping this in lockstep with the invoice view's grand total.
+    const calcNetAmount = baseNetAmount + billSundryTotal + chargeTotal;
+
     const billSundryRows = useMemo(() => {
-        const raw = (order as any)?.billSundry;
+        const raw = billSundrySource;
         if (!Array.isArray(raw) || raw.length === 0) return [];
         return raw.filter((r: any) => Number(r.amount) > 0);
-    }, [order]);
+    }, [billSundrySource]);
 
     const hasAnyPricing = calcSubtotal > 0 || calcNetAmount > 0;
 
@@ -780,7 +797,7 @@ const SalesOrderDetail: React.FC = () => {
 
                                         {billSundryRows.length > 0 && (
                                             <>
-                                                <div className="text-[10px] font-bold text-ink-subtle uppercase tracking-wide pt-2 border-t border-line-soft mt-2">Bill Sundry</div>
+                                                
                                                 {billSundryRows.map((row: any) => {
                                                     const opt = DEFAULT_SUNDRY_OPTIONS.find(o => o.value === row.type);
                                                     const isAdd = (opt?.sign ?? 1) === 1;

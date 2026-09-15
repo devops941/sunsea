@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useMemo } from "react";
+import React, { useCallback, useRef, useMemo, useState } from "react";
 import DeleteButton from "../../ui/DeleteButton/DeleteButton";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -10,6 +10,9 @@ export interface BusyColumn<T = any> {
   align?: "left" | "center" | "right";
   render?: (row: T, index: number, update: (patch: Partial<T>) => void) => React.ReactNode;
   accessor?: (row: T) => React.ReactNode;
+  /** Explicitly mark a column as (non-)editable for keyboard navigation. Overrides the
+   *  key-name heuristic that otherwise treats "total"/"amount_calc" columns as read-only. */
+  editable?: boolean;
 }
 
 export interface TotalCell {
@@ -61,6 +64,7 @@ export const DEFAULT_SUNDRY_OPTIONS: SundryOption[] = [
   { value: "OTHERS_MINUS", label: "Others (-)", sign: -1 },
   { value: "OTHERS_PLUS", label: "Others (+)", sign: 1 },
   { value: "ROUND_OFF_MINUS", label: "Round Off (-)", sign: -1 },
+  { value: "ROUND_OFF_PLUS", label: "Round Off (+)", sign: 1 },
 ];
 
 const fmtINR = (v: string | number) => {
@@ -168,21 +172,37 @@ function BusyItemsTable<T extends Record<string, any>>({
     if (emptyRow && onChange) onChange([...rows, { ...emptyRow }]);
   }, [rows, onChange, emptyRow, onAdd]);
 
-  const count = Math.max(rows.length, visibleRows);
+  // Extra empty rows appended purely by keyboard navigation: arrowing Down past the last
+  // visible row grows the grid (Busy-style) instead of leaving it. Arrows stay inside the
+  // table; only Tab exits to the next field (e.g. Narration).
+  const [extraRows, setExtraRows] = useState(0);
+  const count = Math.max(rows.length, visibleRows) + extraRows;
   const colCount = columns.length + (expandable ? 1 : 0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 2) doAdd();
-  }, [doAdd]);
+    if (!el) return;
+    // Only auto-append when the real rows already fill the visible window. While the
+    // table is padded with empty placeholder rows (rows.length < visibleRows), scrolling
+    // to the bottom — e.g. when ArrowDown scrolls the last empty row into view — must NOT
+    // spawn a phantom row; the caret should instead move to the next field (Narration).
+    if (rows.length < visibleRows) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 2) doAdd();
+  }, [doAdd, rows.length, visibleRows]);
 
   // Find last column that actually contains user-editable inputs (e.g. not read-only total)
   const lastEditableCol = useMemo(() => {
     for (let i = columns.length - 1; i >= 0; i--) {
-      const k = columns[i].key.toLowerCase();
-      if (!k.includes("total") && !k.includes("amount_calc")) {
+      const col = columns[i];
+      // An explicit `editable` flag wins; otherwise fall back to the key-name heuristic
+      // (columns named like a computed "total"/"amount_calc" are treated as read-only).
+      const k = col.key.toLowerCase();
+      const isEditable = col.editable !== undefined
+        ? col.editable
+        : (!k.includes("total") && !k.includes("amount_calc"));
+      if (isEditable) {
         return i;
       }
     }
@@ -306,8 +326,11 @@ function BusyItemsTable<T extends Record<string, any>>({
         } else if (r < count - 1) {
           focus(r + 1, c);
         } else {
-          const nextField = propGetFieldAfter ? propGetFieldAfter() : getFieldAfterTable(tableRef.current);
-          if (nextField) nextField.focus();
+          // At the last visible row: keep the caret INSIDE the grid and grow it by one
+          // empty row (Busy-style), rather than jumping to the next field. Leaving the
+          // grid for Narration etc. is done with Tab, never with the arrow keys.
+          setExtraRows((x) => x + 1);
+          setTimeout(() => focus(r + 1, c), 30);
         }
       }
     } else if (e.key === "ArrowUp") {
