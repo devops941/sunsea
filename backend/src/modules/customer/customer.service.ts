@@ -49,6 +49,7 @@ class CustomerService {
   }
 
   async createCustomer(data: CreateCustomerInput, currentUser: { userId: string; companyId: string }) {
+    let finalCustomerCode = data.customerCode;
     const existingCustomer = await prisma.customer.findFirst({
       where: {
         companyId: currentUser.companyId,
@@ -57,24 +58,29 @@ class CustomerService {
     });
 
     if (existingCustomer) {
-      throw new Error("Customer code already exists for this company");
+      finalCustomerCode = await this.getNextCustomerCode();
     }
 
     // Also strip `openingBalancePaidThroughLedgerId` — it's a workflow-only field
     // used to route the auto-posted opening voucher to a bank/cash ledger; the
     // Customer table doesn't have (and doesn't need) a column for it.
-    const { phones, addresses, openingBalance, openingBalancePaidThroughLedgerId: _paidThrough, ...restData } = data as any;
+    const { phones, addresses, openingBalance, openingBalancePaidThroughLedgerId: _paidThrough, customerCode: _originalCode, ...restData } = data as any;
     const mobileData = phones || restData.mobile || null;
 
     const newCustomer = await prisma.customer.create({
       data: {
         ...restData,
+        customerCode: finalCustomerCode,
         mobile: mobileData as any,
         companyId: currentUser.companyId,
         createdBy: currentUser.userId,
         // Seed outstanding amount and opening balance (immutable after creation)
         outstandingAmount: openingBalance ?? 0,
         openingBalance: openingBalance ?? 0,
+        editHistory: [{
+          updatedBy: currentUser.userId,
+          updatedAt: new Date().toISOString()
+        }],
         ...(addresses && addresses.length > 0 && {
           addresses: {
             create: addresses.map((addr: any, index: number) => {
@@ -167,12 +173,12 @@ class CustomerService {
     const userIds = creatorIds.filter(id => !id.startsWith('admin_'));
 
     const [admins, users] = await Promise.all([
-      adminIds.length > 0 ? prisma.admin.findMany({ where: { id: { in: adminIds } }, select: { id: true, fullName: true, role: { select: { name: true } } } }) : [],
-      userIds.length > 0 ? prisma.user.findMany({ where: { userId: { in: userIds } }, select: { userId: true, fullName: true, role: { select: { name: true } } } }) : []
+      adminIds.length > 0 ? prisma.admin.findMany({ where: { id: { in: adminIds } }, select: { id: true, username: true, role: { select: { name: true } } } }) : [],
+      userIds.length > 0 ? prisma.user.findMany({ where: { userId: { in: userIds } }, select: { userId: true, username: true, role: { select: { name: true } } } }) : []
     ]);
 
-    const adminMap = new Map(admins.map(a => [`admin_${a.id}`, { name: a.fullName, role: a.role?.name || 'Super Admin' }]));
-    const userMap = new Map(users.map(u => [u.userId, { name: u.fullName, role: u.role?.name || 'User' }]));
+    const adminMap = new Map(admins.map(a => [`admin_${a.id}`, { name: a.username, role: a.role?.name || 'Super Admin' }]));
+    const userMap = new Map(users.map(u => [u.userId, { name: u.username, role: u.role?.name || 'User' }]));
 
     const { receivableService } = require("../accounts/receivable.service");
 
@@ -265,18 +271,37 @@ class CustomerService {
     if (customer.createdBy) {
       if (customer.createdBy.startsWith('admin_')) {
         const adminId = BigInt(customer.createdBy.replace('admin_', ''));
-        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { fullName: true, role: { select: { name: true } } } });
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { username: true, role: { select: { name: true } } } });
         if (admin) {
-          createdUserName = admin.fullName;
+          createdUserName = admin.username;
           createdUserRole = admin.role?.name || 'Super Admin';
         }
       } else {
-        const user = await prisma.user.findUnique({ where: { userId: customer.createdBy }, select: { fullName: true, role: { select: { name: true } } } });
+        const user = await prisma.user.findUnique({ where: { userId: customer.createdBy }, select: { username: true, role: { select: { name: true } } } });
         if (user) {
-          createdUserName = user.fullName;
+          createdUserName = user.username;
           createdUserRole = user.role?.name || 'User';
         }
       }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray(customer.editHistory)) {
+      enrichedEditHistory = await Promise.all(customer.editHistory.map(async (edit: any) => {
+        let name = "Unknown User";
+        if (edit.updatedBy) {
+          if (edit.updatedBy.startsWith('admin_')) {
+            const adminId = BigInt(edit.updatedBy.replace('admin_', ''));
+            const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { username: true } });
+            if (admin) name = admin.username;
+          } else {
+            const user = await prisma.user.findUnique({ where: { userId: edit.updatedBy }, select: { username: true } });
+            if (user) name = user.username;
+          }
+        }
+        return { ...edit, updatedByName: name };
+      }));
     }
 
     let netBalance = 0;
@@ -322,12 +347,14 @@ class CustomerService {
       hasTransactions,
       lastPurchaseDate,
       lastPaymentDate,
+      editHistory: enrichedEditHistory,
     };
   }
 
   async updateCustomer(
     id: string,
-    data: UpdateCustomerInput
+    data: UpdateCustomerInput,
+    userId?: string
   ) {
     const customer = await this.getCustomerById(id);
 
@@ -363,6 +390,24 @@ class CustomerService {
       throw new ApiError(400, "Cannot update opening balance — customer has existing transactions");
     }
 
+    // Handle edit history
+    let newEditHistory: any[] = [];
+    if (Array.isArray(customer.editHistory)) {
+      newEditHistory = [...customer.editHistory];
+    }
+    
+    // Attempt to get name from userId for history, if it's available in frontend or backend easily.
+    // Given the complexity of resolving user names mid-update in this service,
+    // we'll store the ID here. The `getCustomerById` already resolves this for the `createdBy` field,
+    // we can either resolve the `updatedBy` here or let the frontend display the ID for now.
+    // For now we'll just store the userId and timestamp.
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     const updated = await prisma.customer.update({
       where: { id },
       data: {
@@ -373,6 +418,8 @@ class CustomerService {
           openingBalanceType: openingBalanceType ?? customer.openingBalanceType ?? "DEBIT",
           outstandingAmount: openingBalance ?? Number(customer.openingBalance ?? 0),
         }),
+        editHistory: newEditHistory,
+        updatedBy: userId,
 
         ...(addresses && {
           addresses: {

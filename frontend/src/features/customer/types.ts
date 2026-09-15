@@ -72,6 +72,9 @@ export interface Customer {
     fullName: string;
     email?: string | null;
   } | null;
+  createdBy?: string;
+  createdUserName?: string | null;
+  editHistory?: any[] | null;
 }
 
 export interface CreateCustomerDto {
