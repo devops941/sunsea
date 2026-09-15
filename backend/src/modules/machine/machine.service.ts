@@ -3,6 +3,14 @@ import { ApiError } from "../../utils/ApiError";
 import { Prisma } from "@prisma/client";
 import { CreateMachineInput, UpdateMachineInput } from "./machine.validation";
 
+const mapTechType = (val?: string | null) => {
+  if (!val) return undefined;
+  const u = val.toUpperCase().replace(/\s+/g, "_");
+  if (u === "MIXER" || u === "MIXING") return "MIXING";
+  if (u === "GRINDING" || u === "GRANULATION") return "GRANULATION";
+  return u;
+};
+
 class MachineService {
   async create(data: CreateMachineInput) {
     const existing = await prisma.machine.findUnique({
@@ -18,12 +26,12 @@ class MachineService {
         data: {
           machineId: data.machineId,
           machineName: data.machineName,
-          technologyType: data.technologyType as any,
+          technologyType: mapTechType(data.technologyType) as any,
           machineType: data.machineType as any,
           manufacturer: data.manufacturer,
           modelNumber: data.modelNumber,
           cycleTime: data.cycleTime,
-          operatorId: data.operatorId,
+          operatorId: data.operatorId ? data.operatorId : null,
           machineStatus: data.machineStatus as any || "IDLE",
           isActive: data.isActive ?? true,
           description: data.description,
@@ -54,20 +62,21 @@ class MachineService {
       ];
     }
 
-    const [machines, total] = await Promise.all([
+    const [total, data] = await Promise.all([
+      prisma.machine.count({ where }),
       prisma.machine.findMany({
         where,
-        orderBy: { machineId: "asc" },
         skip: (page - 1) * limit,
         take: limit,
+        orderBy: { createdAt: "desc" },
       }),
-      prisma.machine.count({ where }),
     ]);
 
     return {
-      machines,
+      data,
       total,
       page,
+      limit,
       totalPages: Math.ceil(total / limit),
     };
   }
@@ -87,9 +96,17 @@ class MachineService {
   async update(machineId: string, data: UpdateMachineInput) {
     await this.findById(machineId);
 
+    const updatePayload: any = { ...data };
+    if (data.technologyType) {
+      updatePayload.technologyType = mapTechType(data.technologyType);
+    }
+    if (data.operatorId !== undefined) {
+      updatePayload.operatorId = data.operatorId ? data.operatorId : null;
+    }
+
     return prisma.machine.update({
       where: { machineId },
-      data,
+      data: updatePayload,
     });
   }
 

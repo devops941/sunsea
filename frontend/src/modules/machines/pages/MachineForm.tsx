@@ -26,7 +26,7 @@ const machineSchema = z.object({
     technologyType: z.string().min(1, "Technology Type is required"),
     machineType: z.string().min(1, "Machine Type is required"),
     targetTemperature: z.coerce.number().min(0, "Temperature cannot be negative").max(999.99, "Temperature must be less than 1000°C").optional().nullable(),
-    operatorId: z.string().min(1, "Machine Incharge is required").max(20, "Maximum 20 characters allowed"),
+    operatorId: z.string().max(20, "Maximum 20 characters allowed").optional().nullable().or(z.literal("")),
     isActive: z.boolean().optional(),
 });
 
@@ -82,9 +82,19 @@ const MachineForm: React.FC = () => {
         onDelete: () => { if (!isEdit) { setFormData(initialFormState); setErrors({}); setIsDirty(false); } },
     });
 
+    const extractArray = (res: any): any[] => {
+        if (Array.isArray(res)) return res;
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res?.employees)) return res.employees;
+        if (Array.isArray(res?.data?.employees)) return res.data.employees;
+        if (Array.isArray(res?.roles)) return res.roles;
+        if (Array.isArray(res?.data?.roles)) return res.data.roles;
+        return [];
+    };
+
     const fetchRoles = useCallback(() => {
         roleService.fetchAll({ limit: 100 }).then(res => {
-            const raw = res.data || [];
+            const raw = extractArray(res);
             setRoles(raw.filter((r: any) =>
                 !r.name?.toLowerCase().includes("super admin") &&
                 !r.name?.toLowerCase().includes("superadmin") &&
@@ -101,7 +111,7 @@ const MachineForm: React.FC = () => {
             return;
         }
         employeeService.fetchAll({ roleId: Number(inchargeRoleId), limit: 1000 })
-            .then(res => setEmployees(res.data || res || []))
+            .then(res => setEmployees(extractArray(res)))
             .catch(() => { });
     }, [inchargeRoleId]);
 
@@ -119,7 +129,7 @@ const MachineForm: React.FC = () => {
             for (const role of roles) {
                 try {
                     const res = await employeeService.fetchAll({ roleId: Number(role.id), limit: 1000 });
-                    const emps: any[] = res.data || res || [];
+                    const emps: any[] = extractArray(res);
                     if (emps.some((e: any) => String(e.id) === String(pendingOperatorId))) {
                         if (!cancelled) {
                             setInchargeRoleId(String(role.id));
@@ -184,16 +194,11 @@ const MachineForm: React.FC = () => {
         const payload = {
             ...formData,
             targetTemperature: formData.targetTemperature ? Number(formData.targetTemperature) : null,
-            operatorId: formData.operatorId,
+            operatorId: formData.operatorId || null,
         };
 
         let hasError = false;
         let formattedErrors: Record<string, string> = {};
-
-        if (!inchargeRoleId) {
-            formattedErrors["inchargeRoleId"] = "Incharge Role is required";
-            hasError = true;
-        }
 
         try {
             machineSchema.parse(payload);
@@ -358,10 +363,16 @@ const MachineForm: React.FC = () => {
                                 value={formData.technologyType}
                                 defaultOptionLabel="Select Technology"
                                 options={[
-                                    { label: 'Mixer', value: 'Mixer' },
-                                    { label: 'Grinding', value: 'GRINDING' },
                                     { label: 'Injection Moulding', value: 'INJECTION_MOULDING' },
+                                    { label: 'Extrusion', value: 'EXTRUSION' },
+                                    { label: 'Blow Moulding', value: 'BLOW_MOULDING' },
+                                    { label: 'Rotational Moulding', value: 'ROTATIONAL_MOULDING' },
+                                    { label: 'Thermoforming', value: 'THERMOFORMING' },
+                                    { label: 'Compression Moulding', value: 'COMPRESSION_MOULDING' },
                                     { label: 'Printing', value: 'PRINTING' },
+                                    { label: 'Granulation / Grinding', value: 'GRANULATION' },
+                                    { label: 'Mixing / Mixer', value: 'MIXING' },
+                                    { label: 'Recycling', value: 'RECYCLING' },
                                 ]}
                                 required
                                 horizontal
@@ -386,14 +397,13 @@ const MachineForm: React.FC = () => {
                                 label="Incharge Role"
                                 name="inchargeRoleId"
                                 value={inchargeRoleId}
-                                defaultOptionLabel="-- Select Role First --"
+                                defaultOptionLabel="-- Select Role (Optional) --"
                                 options={roles.map(r => ({ label: r.name, value: String(r.id) }))}
                                 onChange={(e) => {
                                     setInchargeRoleId(e.target.value);
                                     setFormData(prev => ({ ...prev, operatorId: "" }));
                                     if (errors.inchargeRoleId) setErrors(prev => ({ ...prev, inchargeRoleId: "" }));
                                 }}
-                                required
                                 horizontal
                                 error={errors.inchargeRoleId}
                             />
@@ -401,17 +411,13 @@ const MachineForm: React.FC = () => {
                                 label="Machine Incharge"
                                 name="operatorId"
                                 value={formData.operatorId}
-                                defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Incharge --"}
-                                required
+                                defaultOptionLabel={!inchargeRoleId ? "Select Role First (Optional)" : "-- Select Incharge --"}
                                 horizontal
                                 disabled={!inchargeRoleId}
-                                options={employees.map(emp => {
-                                    const roleName = emp.user?.role?.name || emp.role?.name;
-                                    return {
-                                        label: `${emp.fullName} (${emp.empCode})${roleName ? ` - ${roleName}` : ""}`,
-                                        value: emp.id,
-                                    };
-                                })}
+                                options={(Array.isArray(employees) ? employees : []).map(emp => ({
+                                    label: emp.fullName || emp.name || "",
+                                    value: emp.id,
+                                }))}
                                 error={errors.operatorId}
                                 onChange={handleChange}
                             />
