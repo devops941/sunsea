@@ -29,17 +29,17 @@ export const createMachineSchema = z.object({
   body: z.object({
     machineId: z.string().min(1).max(20),
     machineName: z.string().min(1).max(100),
-    technologyType: z.nativeEnum(TechnologyType),
-    machineType: z.nativeEnum(MachineType),
+    technologyType: z.string().min(1),
+    machineType: z.string().min(1),
     manufacturer: z.string().max(100).optional().nullable(),
     modelNumber: z.string().max(50).optional().nullable(),
     cycleTime: z.number().optional().nullable(),
-    operatorId: z.string().max(20).optional().nullable(),
+    operatorId: z.string().max(20).optional().nullable().or(z.literal("")),
     machineStatus: z.nativeEnum(MachineStatus).optional(),
     isActive: z.boolean().optional(),
     description: z.string().max(255).optional().nullable(),
-    targetTemperature:z.number().optional().nullable(),
-    targetLoadPercent:z.number().optional().nullable(),
+    targetTemperature: z.number().optional().nullable(),
+    targetLoadPercent: z.number().optional().nullable(),
   }),
 });
 
