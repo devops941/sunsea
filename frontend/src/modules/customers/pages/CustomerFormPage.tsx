@@ -22,6 +22,7 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 const addressSchema = z.object({
   addressLine1: z.string(),
@@ -137,6 +138,7 @@ const CustomerFormPage: React.FC = () => {
   const [hasTransactions, setHasTransactions] = useState(false);
   const [lastPurchaseDate, setLastPurchaseDate] = useState<string | null>(null);
   const [lastPaymentDate, setLastPaymentDate] = useState<string | null>(null);
+  const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
   const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
   const [deleteGradeModalState, setDeleteGradeModalState] = useState<{ isOpen: boolean; idToDelete: number | null }>({ isOpen: false, idToDelete: null });
@@ -277,7 +279,7 @@ const CustomerFormPage: React.FC = () => {
     };
     window.addEventListener("keydown", handleEsc, { capture: true });
     return () => window.removeEventListener("keydown", handleEsc, { capture: true });
-  // Only stable callbacks + navigate here — volatile state is read via refs above.
+    // Only stable callbacks + navigate here — volatile state is read via refs above.
   }, [handleResume, openDiscardModal, navigate]);
 
   const handleRemoveAddress = (index: number) => {
@@ -306,6 +308,11 @@ const CustomerFormPage: React.FC = () => {
           setHasTransactions(Boolean(customer.hasTransactions));
           setLastPurchaseDate(customer.lastPurchaseDate || null);
           setLastPaymentDate(customer.lastPaymentDate || null);
+          setAuditInfo({
+            createdAt: customer.createdAt,
+            createdBy: customer.createdUserName || customer.createdUser?.fullName || customer.createdBy,
+            editHistory: customer.editHistory,
+          });
         } catch (err) {
           toast.error("Failed to load customer details");
         } finally {
@@ -381,6 +388,7 @@ const CustomerFormPage: React.FC = () => {
           await editCustomer(id, payload as any);
         }
         toast.success("Customer updated successfully");
+        reset(data); // Clear isDirty so the nav guard doesn't trigger
         navigate(-1);
       } else {
         await addCustomer(payload as any);
@@ -490,11 +498,14 @@ const CustomerFormPage: React.FC = () => {
   return (
     <div className="max-w-[1400px] xl:mr-auto">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-          <h3 className="text-lg font-bold text-ink flex items-start">
-            {isEditMode ? 'Edit Customer' : 'Create Customer'}
-            <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("customerId")}</span>
-          </h3>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
+          <div className="flex flex-col">
+            <h3 className="text-lg font-bold text-ink flex items-start">
+              {isEditMode ? 'Edit Customer' : 'Create Customer'}
+              <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("customerId")}</span>
+            </h3>
+            {isEditMode && <RecordAuditInfo auditData={auditInfo} />}
+          </div>
           <CustomButton
             text="Back to List"
             icon={FaArrowLeft}
@@ -510,7 +521,7 @@ const CustomerFormPage: React.FC = () => {
               <CtrlText field={field} label="Firm / Legal Name" placeholder="e.g. Murugan Plastics" required error={errors.firmName?.message} />
             )} />
             <Controller name="displayName" control={control} render={({ field }) => (
-              <CtrlText field={field} label="Display Name" placeholder="Murugan" required error={errors.displayName?.message}  />
+              <CtrlText field={field} label="Display Name" placeholder="Murugan" required error={errors.displayName?.message} />
             )} />
             <Controller name="customerGradeId" control={control} render={({ field }) => (
               <CreatableSelectInput
@@ -593,7 +604,7 @@ const CustomerFormPage: React.FC = () => {
               <CtrlText field={field} label="GSTIN (15 CHAR)" placeholder="33AABC1234D1Z5" error={errors.gstin?.message} />
             )} />
             <Controller name="openingBalance" control={control} render={({ field }) => (
-              <CtrlText field={withDecimalFormat(field)} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative  required error={errors.openingBalance?.message} disabled={isEditMode && hasTransactions} />
+              <CtrlText field={withDecimalFormat(field)} label="Opening Balance ₹" type="number" placeholder="0.00" preventNegative required error={errors.openingBalance?.message} disabled={isEditMode && hasTransactions} />
             )} />
             <Controller name="openingBalanceType" control={control} render={({ field }) => (
               <SelectInput
@@ -649,14 +660,14 @@ const CustomerFormPage: React.FC = () => {
           </div>
 
           {/* Transport Details */}
-         
+
 
           {/* Billing Address */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">
                 Billing Address
-          
+
               </h4>
               <CustomButton
                 type="button"

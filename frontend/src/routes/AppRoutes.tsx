@@ -244,6 +244,8 @@ const MonthlyPayrollReport = lazy(() => import("../modules/payroll/pages/Monthly
 const WeeklyPayrollReport = lazy(() => import("../modules/payroll/pages/WeeklyPayrollReport"));
 const BonusCalculationPage = lazy(() => import("../modules/payroll/pages/BonusCalculationPage"));
 
+const RecordAuditHistoryPage = lazy(() => import("../pages/RecordAuditHistoryPage"));
+
 const LoadingFallback = () => <CommonLoader text="Loading..." />;
 
 
@@ -443,6 +445,9 @@ const AppRoutes = () => {
                 <Route path="/accounts/balance-sheet" element={<BalanceSheetPage />} />
                 <Route path="/accounts/profit-loss" element={<ProfitLossPage />} />
               </Route>
+
+              {/* ---------- Audit History ---------- */}
+              <Route path="/audit-history" element={<RecordAuditHistoryPage />} />
 
             </Route>
             {/* ================= end of PageContainer group ==================== */}

@@ -217,17 +217,25 @@ const WeeklyPayrollReport: React.FC = () => {
   const pagedData  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const totals = filtered.reduce(
-    (acc, r) => ({
-      earnedSalary:        acc.earnedSalary        + Number(r.earnedSalary || 0),
-      otPay:               acc.otPay               + Number(r.otPay || 0),
-      salaryAdvance:       acc.salaryAdvance       + Number(r.salaryAdvance || 0),
-      permissionDeduction: acc.permissionDeduction + Number(r.permissionDeduction || 0),
-      netSalary:           acc.netSalary           + Number(r.netSalary || 0),
-      presentDays:         acc.presentDays         + Number(r.presentDays || 0),
-      absentDays:          acc.absentDays          + Number(r.absentDays || 0),
-      halfDays:            acc.halfDays            + Number(r.halfDays || 0),
-    }),
-    { earnedSalary: 0, otPay: 0, salaryAdvance: 0, permissionDeduction: 0, netSalary: 0, presentDays: 0, absentDays: 0, halfDays: 0 }
+    (acc, r) => {
+      const lateDed = Number(r.lateEntryDeduction || 0);
+      const permDed = Number(r.permissionDeduction || 0);
+      const advDed = Number(r.salaryAdvance || 0);
+      const totDed = Number(r.totalDeductions || (lateDed + permDed + advDed + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)));
+      return {
+        earnedSalary:        acc.earnedSalary        + Number(r.earnedSalary || 0),
+        otPay:               acc.otPay               + Number(r.otPay || 0),
+        lateEntryDeduction:  acc.lateEntryDeduction  + lateDed,
+        permissionDeduction: acc.permissionDeduction + permDed,
+        salaryAdvance:       acc.salaryAdvance       + advDed,
+        totalDeductions:     acc.totalDeductions     + totDed,
+        netSalary:           acc.netSalary           + Number(r.netSalary || 0),
+        presentDays:         acc.presentDays         + Number(r.presentDays || 0),
+        absentDays:          acc.absentDays          + Number(r.absentDays || 0),
+        halfDays:            acc.halfDays            + Number(r.halfDays || 0),
+      };
+    },
+    { earnedSalary: 0, otPay: 0, lateEntryDeduction: 0, salaryAdvance: 0, permissionDeduction: 0, totalDeductions: 0, netSalary: 0, presentDays: 0, absentDays: 0, halfDays: 0 }
   );
 
   const totalCashInHand = allResults.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
@@ -338,8 +346,10 @@ const WeeklyPayrollReport: React.FC = () => {
     { header: 'Earned Salary (₹)',   accessor: (r: typeof csvData[0]) => r.earnedSalary },
     { header: 'OT Hours',            accessor: (r: typeof csvData[0]) => r.otHours },
     { header: 'OT Pay (₹)',          accessor: (r: typeof csvData[0]) => r.otPay },
-    { header: 'Advance (₹)',         accessor: (r: typeof csvData[0]) => r.salaryAdvance },
-    { header: 'Perm. Deduction (₹)', accessor: (r: typeof csvData[0]) => r.permissionDeduction },
+    { header: 'Late Ded. (₹)',       accessor: (r: typeof csvData[0]) => r.lateEntryDeduction || 0 },
+    { header: 'Perm. Ded. (₹)',      accessor: (r: typeof csvData[0]) => r.permissionDeduction || 0 },
+    { header: 'Advance (₹)',         accessor: (r: typeof csvData[0]) => r.salaryAdvance || 0 },
+    { header: 'Total Ded. (₹)',      accessor: (r: typeof csvData[0]) => r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)) },
     { header: 'Net Salary (₹)',      accessor: (r: typeof csvData[0]) => r.netSalary },
     { header: 'Cash in Hand (₹)',   accessor: (r: typeof csvData[0]) => r.cashInHand || 0 },
     { header: 'Payment Mode',        accessor: (r: typeof csvData[0]) => r.paymentMode },
@@ -348,19 +358,22 @@ const WeeklyPayrollReport: React.FC = () => {
   const reportColumns: DataTableColumn<ApiPayrollResult>[] = [
     {
       header: 'S.NO',
+      width: '55px',
       align: 'left',
       render: (_, idx) => <span className="text-text-muted">{idx + 1}</span>,
     },
     {
       header: 'EMP CODE',
+      width: '105px',
       align: 'left',
       render: (r) => <span className="font-mono text-xs text-text-secondary">{r.employeeCode}</span>,
     },
     {
       header: 'EMPLOYEE NAME',
+      width: '180px',
       align: 'left',
       render: (r) => (
-        <div className="font-semibold text-text-primary flex items-center gap-1">
+        <div className="font-semibold text-text-primary flex items-center gap-1 whitespace-nowrap">
           {r.hasVariance && <AlertTriangle size={12} className="text-amber-500 shrink-0" />}
           <span>{r.employeeName}</span>
         </div>
@@ -368,21 +381,25 @@ const WeeklyPayrollReport: React.FC = () => {
     },
     {
       header: 'DEPARTMENT',
+      width: '150px',
       align: 'left',
-      render: (r) => <span className="text-text-secondary">{r.department}</span>,
+      render: (r) => <span className="text-text-secondary whitespace-nowrap">{r.department}</span>,
     },
     {
       header: 'SALARY/DAY (₹)',
+      width: '135px',
       align: 'right',
       render: (r) => <span className="font-mono">₹{fmt(Number(r.dailyRate))}</span>,
     },
     {
       header: 'PRESENT',
+      width: '85px',
       align: 'right',
       render: (r) => <span className="font-mono text-emerald-700 font-semibold">{r.presentDays}</span>,
     },
     {
       header: 'ABSENT',
+      width: '80px',
       align: 'right',
       render: (r) => (
         <span className={`font-mono ${Number(r.absentDays) > 0 ? 'text-red-600 font-semibold' : 'text-text-muted'}`}>
@@ -392,6 +409,7 @@ const WeeklyPayrollReport: React.FC = () => {
     },
     {
       header: 'HALF',
+      width: '75px',
       align: 'right',
       render: (r) => (
         <span className={`font-mono ${Number(r.halfDays) > 0 ? 'text-amber-600 font-semibold' : 'text-text-muted'}`}>
@@ -401,11 +419,13 @@ const WeeklyPayrollReport: React.FC = () => {
     },
     {
       header: 'EARNED (₹)',
+      width: '115px',
       align: 'right',
       render: (r) => <span className="font-mono">₹{fmt(Number(r.earnedSalary))}</span>,
     },
     {
       header: 'OT PAY (₹)',
+      width: '105px',
       align: 'right',
       render: (r) => (
         <span className="font-mono text-emerald-700">
@@ -414,25 +434,51 @@ const WeeklyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: 'ADVANCE (₹)',
+      header: 'LATE DED. (₹)',
+      width: '115px',
       align: 'right',
       render: (r) => (
-        <span className="font-mono text-amber-700">
-          {Number(r.salaryAdvance) > 0 ? `₹${fmt(Number(r.salaryAdvance))}` : '—'}
+        <span className={`font-mono ${Number(r.lateEntryDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+          {Number(r.lateEntryDeduction) > 0 ? `₹${fmt(Number(r.lateEntryDeduction))}` : '—'}
         </span>
       ),
     },
     {
       header: 'PERM. DED. (₹)',
+      width: '120px',
       align: 'right',
       render: (r) => (
-        <span className="font-mono text-red-600">
+        <span className={`font-mono ${Number(r.permissionDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
           {Number(r.permissionDeduction) > 0 ? `₹${fmt(Number(r.permissionDeduction))}` : '—'}
         </span>
       ),
     },
     {
+      header: 'ADVANCE (₹)',
+      width: '115px',
+      align: 'right',
+      render: (r) => (
+        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-700' : 'text-text-muted'}`}>
+          {Number(r.salaryAdvance) > 0 ? `₹${fmt(Number(r.salaryAdvance))}` : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'TOTAL DED. (₹)',
+      width: '125px',
+      align: 'right',
+      render: (r) => {
+        const tot = Number(r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)));
+        return (
+          <span className={`font-mono font-semibold ${tot > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+            {tot > 0 ? `₹${fmt(tot)}` : '—'}
+          </span>
+        );
+      },
+    },
+    {
       header: 'NET SALARY (₹)',
+      width: '135px',
       align: 'right',
       render: (r) => {
         const cashAmt = Number(r.cashInHand || 0);
@@ -450,6 +496,7 @@ const WeeklyPayrollReport: React.FC = () => {
     },
     {
       header: 'MODE',
+      width: '90px',
       align: 'center',
       render: (r) => (
         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -461,6 +508,7 @@ const WeeklyPayrollReport: React.FC = () => {
     },
     {
       header: 'ACTIONS',
+      width: '95px',
       align: 'center',
       render: (r) => (
         <div className="flex items-center justify-center gap-1">
@@ -594,24 +642,7 @@ const WeeklyPayrollReport: React.FC = () => {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 print:hidden flex-wrap">
-        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Filter:</span>
-        {([['ALL', 'All Employees'], ['BANK', 'Bank Transfer'], ['CASH', 'Cash']] as const).map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setFilter(v)}
-            className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-              filter === v
-                ? 'bg-primary text-white border-primary'
-                : 'border-border text-text-secondary hover:border-primary/50'
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-text-muted">{filtered.length} employee{filtered.length !== 1 ? 's' : ''}</span>
-      </div>
+
 
       {/* Table using reusable DataTable component */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -671,7 +702,7 @@ const WeeklyPayrollReport: React.FC = () => {
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5">DEDUCTIONS</span>
                 <span className="font-mono font-semibold text-rose-600">
-                  ADV ₹{fmt(totals.salaryAdvance)} · PERM ₹{fmt(totals.permissionDeduction)}
+                  ₹{fmt(totals.totalDeductions)}
                 </span>
               </div>
             </div>
@@ -709,7 +740,7 @@ const WeeklyPayrollReport: React.FC = () => {
           },
           {
             label: 'Total Deductions',
-            value: `₹${fmt(totals.salaryAdvance + totals.permissionDeduction)}`,
+            value: `₹${fmt(totals.totalDeductions)}`,
             color: 'text-red-600',
           },
           {
