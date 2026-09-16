@@ -93,7 +93,7 @@ export function useTableKeyboardNav({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!containerRef.current) return;
       if (countRef.current === 0) return;
-      if (!["ArrowDown", "ArrowUp", "Enter", "e", "E"].includes(e.key)) return;
+      if (!["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
 
       // Only act when focus is within the table container
       // If a dropdown portal is open, let it handle arrow keys
@@ -105,13 +105,6 @@ export function useTableKeyboardNav({
         containerRef.current.contains(active);
       if (!inside) return;
 
-      // Skip E if focus is inside a real input (search, edit field, etc.)
-      const inInput =
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        active instanceof HTMLSelectElement;
-      if ((e.key === "e" || e.key === "E") && inInput) return;
-
       e.preventDefault();
       e.stopPropagation();
 
@@ -121,23 +114,12 @@ export function useTableKeyboardNav({
         setFocusedIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === "Enter") {
         onEnterRef.current(focusedIndexRef.current);
-      } else if (e.key === "e" || e.key === "E") {
-        onEditRef.current?.(focusedIndexRef.current);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [containerRef]);
-
-  // Listen for custom fkey-edit event from ShortcutPanel
-  useEffect(() => {
-    const handleCustomEdit = () => {
-      onEditRef.current?.(focusedIndexRef.current);
-    };
-    window.addEventListener("fkey-edit", handleCustomEdit);
-    return () => window.removeEventListener("fkey-edit", handleCustomEdit);
-  }, []);
 
   return { focusedIndex, setFocusedIndex };
 }

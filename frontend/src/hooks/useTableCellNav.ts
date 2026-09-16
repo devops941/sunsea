@@ -163,13 +163,6 @@ export function useTableCellNav({
             onEnterRef.current(r, c);
           }
           break;
-        case "e":
-        case "E":
-          if (onEditRef.current) {
-            e.preventDefault();
-            onEditRef.current(r);
-          }
-          break;
       }
     };
 
