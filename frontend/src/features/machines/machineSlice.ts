@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+                   import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { machineService } from "../../services/machineService";
 import type { MachineState } from "./types";
 
@@ -70,17 +70,22 @@ const machineSlice = createSlice({
       })
       .addCase(fetchMachines.fulfilled, (state, action) => {
         state.loading = false;
-        // Handle both paginated { machines, total, page, totalPages } and plain array responses
-        if (action.payload && Array.isArray(action.payload)) {
-          state.data = action.payload;
-          state.total = action.payload.length;
+        const payload = action.payload;
+        if (Array.isArray(payload)) {
+          state.data = payload;
+          state.total = payload.length;
           state.totalPages = 1;
           state.page = 1;
-        } else if (action.payload && action.payload.machines) {
-          state.data = action.payload.machines;
-          state.total = action.payload.total ?? 0;
-          state.page = action.payload.page ?? 1;
-          state.totalPages = action.payload.totalPages ?? 1;
+        } else if (payload && Array.isArray(payload.data)) {
+          state.data = payload.data;
+          state.total = payload.total ?? payload.data.length;
+          state.page = payload.page ?? 1;
+          state.totalPages = payload.totalPages ?? 1;
+        } else if (payload && Array.isArray(payload.machines)) {
+          state.data = payload.machines;
+          state.total = payload.total ?? payload.machines.length;
+          state.page = payload.page ?? 1;
+          state.totalPages = payload.totalPages ?? 1;
         }
       })
       .addCase(fetchMachines.rejected, (state, action) => {

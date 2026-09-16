@@ -5,6 +5,7 @@ import { requirePermission } from "../../middleware/permission.middleware";
 import { validateMiddleware } from "../../middleware/validate.middleware";
 import {
   createGoodsDispatchSchema,
+  updateGoodsDispatchSchema,
   gateApproveSchema,
   storeReceiveSchema,
   goodsDispatchQuerySchema,
@@ -53,6 +54,14 @@ router.get(
   authMiddleware,
   requirePermission("production_orders.view"),
   goodsDispatchController.findById
+);
+
+router.put(
+  "/:id",
+  authMiddleware,
+  requirePermission("production_orders.edit"),
+  validateMiddleware(updateGoodsDispatchSchema),
+  goodsDispatchController.update
 );
 
 // ── Approval Endpoints ───────────────────────────────────────────────────────

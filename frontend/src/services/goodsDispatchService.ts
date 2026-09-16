@@ -23,7 +23,7 @@ export interface GoodsDispatch {
   vehicleNumber: string;
   driverName: string;
   driverMobile?: string;
-  transportName?: string;
+  dcNumber?: string;
   loadingTime?: string;
   remarks?: string;
   status: string;
@@ -62,7 +62,7 @@ export interface CreateGoodsDispatchDto {
   vehicleNumber: string;
   driverName: string;
   driverMobile?: string;
-  transportName?: string;
+  dcNumber: string;
   loadingTime?: string;
   remarks?: string;
   destinationStoreId?: string;
@@ -73,6 +73,17 @@ export interface CreateGoodsDispatchDto {
     uom: string;
     remarks?: string;
   }[];
+}
+
+export interface UpdateGoodsDispatchDto {
+  dispatchDate?: string;
+  vehicleNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  dcNumber?: string;
+  loadingTime?: string;
+  remarks?: string;
+  destinationStoreId?: string;
 }
 
 export interface GoodsDispatchQueryParams {
@@ -118,6 +129,11 @@ export const goodsDispatchService = {
 
   create: async (data: CreateGoodsDispatchDto): Promise<GoodsDispatch> => {
     const res = await apiClient.post(config.goodsDispatch.base, data);
+    return res.data?.data || res.data;
+  },
+
+  update: async (id: number | string, data: UpdateGoodsDispatchDto): Promise<GoodsDispatch> => {
+    const res = await apiClient.put(`${config.goodsDispatch.base}/${id}`, data);
     return res.data?.data || res.data;
   },
 

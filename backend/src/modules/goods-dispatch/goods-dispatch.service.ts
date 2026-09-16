@@ -1,6 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
-import { CreateGoodsDispatchInput, GateApproveInput, StoreReceiveInput } from "./goods-dispatch.validation";
+import { CreateGoodsDispatchInput, UpdateGoodsDispatchInput, GateApproveInput, StoreReceiveInput } from "./goods-dispatch.validation";
 import { StockAdjustmentService } from "../stock-adjustment/stock-adjustment.service";
 
 export class GoodsDispatchService {
@@ -184,7 +184,7 @@ export class GoodsDispatchService {
         vehicleNumber: data.vehicleNumber,
         driverName: data.driverName,
         driverMobile: data.driverMobile,
-        transportName: data.transportName,
+        dcNumber: data.dcNumber,
         loadingTime: data.loadingTime,
         remarks: data.remarks,
         destinationStoreId: data.destinationStoreId,
@@ -398,7 +398,7 @@ export class GoodsDispatchService {
         { dispatchNumber: { contains: filters.search, mode: "insensitive" } },
         { vehicleNumber: { contains: filters.search, mode: "insensitive" } },
         { driverName: { contains: filters.search, mode: "insensitive" } },
-        { transportName: { contains: filters.search, mode: "insensitive" } },
+        { dcNumber: { contains: filters.search, mode: "insensitive" } },
       ];
     }
 
@@ -458,6 +458,40 @@ export class GoodsDispatchService {
 
     if (!dispatch) throw new ApiError(404, "Goods Dispatch not found");
     return dispatch;
+  }
+
+  // ── Update Dispatch ────────────────────────────────────────────────────────
+  static async update(id: number, data: UpdateGoodsDispatchInput, userId: string) {
+    const existing = await prisma.goodsDispatch.findUnique({
+      where: { id: BigInt(id) },
+    });
+    if (!existing) throw new ApiError(404, "Goods Dispatch not found");
+
+    const updated = await prisma.goodsDispatch.update({
+      where: { id: BigInt(id) },
+      data: {
+        ...(data.dispatchDate && { dispatchDate: new Date(data.dispatchDate) }),
+        ...(data.vehicleNumber !== undefined && { vehicleNumber: data.vehicleNumber }),
+        ...(data.driverName !== undefined && { driverName: data.driverName }),
+        ...(data.driverMobile !== undefined && { driverMobile: data.driverMobile }),
+        ...(data.dcNumber !== undefined && { dcNumber: data.dcNumber }),
+        ...(data.loadingTime !== undefined && { loadingTime: data.loadingTime }),
+        ...(data.remarks !== undefined && { remarks: data.remarks }),
+        ...(data.destinationStoreId !== undefined && { destinationStoreId: data.destinationStoreId }),
+        updatedBy: userId,
+      },
+      include: {
+        items: {
+          include: {
+            product: { select: { id: true, productName: true, productCode: true } },
+            productionOrder: { select: { productionOrderId: true, batchNo: true } },
+          },
+        },
+        store: { select: { storeName: true, storeId: true } },
+      },
+    });
+
+    return updated;
   }
 
   // ── Gate Approve / Reject ────────────────────────────────────────────────────

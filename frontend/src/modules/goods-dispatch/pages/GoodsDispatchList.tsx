@@ -104,7 +104,7 @@ const GoodsDispatchList: React.FC = () => {
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
     count: displayDispatches.length,
     onEnter: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/view/${item.id}`); },
-    onEdit: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/view/${item.id}`); },
+    onEdit: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/edit/${item.id}`); },
     containerRef: tableRef,
   });
 
@@ -157,7 +157,7 @@ const GoodsDispatchList: React.FC = () => {
             <ViewButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
           )}
           {(item.status === "PENDING_GATE_APPROVAL" || item.status === "PENDING_STORE_RECEIPT") && can("goods-dispatch.edit") && (
-            <EditButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
+            <EditButton onClick={() => navigate(`/production/goods-dispatch/edit/${item.id}`)} />
           )}
         </div>
       ),
@@ -177,7 +177,7 @@ const GoodsDispatchList: React.FC = () => {
             <SearchInput
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by Dispatch No, Vehicle, Driver..."
+              placeholder="Search by Dispatch No, DC No, Vehicle, Driver..."
             />
             <FilterPopover
               activeFilterCount={activeFilterCount}

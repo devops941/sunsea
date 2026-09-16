@@ -4,6 +4,7 @@ import type {
   GoodsDispatch,
   EligibleProductionOrder,
   CreateGoodsDispatchDto,
+  UpdateGoodsDispatchDto,
   GoodsDispatchQueryParams,
   EligibleOrdersQueryParams,
 } from "../../services/goodsDispatchService";
@@ -68,6 +69,21 @@ export const createGoodsDispatch = createAsyncThunk(
       return response;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Failed to create goods dispatch");
+    }
+  }
+);
+
+export const updateGoodsDispatch = createAsyncThunk(
+  "goodsDispatch/update",
+  async (
+    { id, data }: { id: number | string; data: UpdateGoodsDispatchDto },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await goodsDispatchService.update(id, data);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || "Failed to update goods dispatch");
     }
   }
 );

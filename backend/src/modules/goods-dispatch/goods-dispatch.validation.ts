@@ -5,13 +5,13 @@ import { z } from "zod";
 export const createGoodsDispatchSchema = z.object({
   body: z.object({
     dispatchDate: z.string().min(1, "Dispatch date is required"),
-    vehicleNumber: z.string().min(1, "Vehicle number is required").max(30),
-    driverName: z.string().min(1, "Driver name is required").max(100),
+    dcNumber: z.string().min(1, "DC Number is required").max(100, "DC Number cannot exceed 100 characters"),
+    destinationStoreId: z.string().min(1, "Destination store is required"),
+    vehicleNumber: z.string().max(30).optional(),
+    driverName: z.string().max(100).optional(),
     driverMobile: z.string().max(20).optional(),
-    transportName: z.string().max(100).optional(),
     loadingTime: z.string().max(10).optional(),
     remarks: z.string().max(500).optional(),
-    destinationStoreId: z.string().optional(),
     items: z
       .array(
         z.object({
@@ -24,6 +24,24 @@ export const createGoodsDispatchSchema = z.object({
         })
       )
       .min(1, "At least one production order item is required"),
+  }),
+});
+
+// ── Update Dispatch ─────────────────────────────────────────────────────────
+
+export const updateGoodsDispatchSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  body: z.object({
+    dispatchDate: z.string().min(1, "Dispatch date is required").optional(),
+    dcNumber: z.string().min(1, "DC Number is required").max(100).optional(),
+    destinationStoreId: z.string().min(1, "Destination store is required").optional(),
+    vehicleNumber: z.string().max(30).optional().nullable(),
+    driverName: z.string().max(100).optional().nullable(),
+    driverMobile: z.string().max(20).optional().nullable(),
+    loadingTime: z.string().max(10).optional().nullable(),
+    remarks: z.string().max(500).optional().nullable(),
   }),
 });
 
@@ -87,5 +105,6 @@ export const eligibleOrdersQuerySchema = z.object({
 });
 
 export type CreateGoodsDispatchInput = z.infer<typeof createGoodsDispatchSchema>["body"];
+export type UpdateGoodsDispatchInput = z.infer<typeof updateGoodsDispatchSchema>["body"];
 export type GateApproveInput = z.infer<typeof gateApproveSchema>["body"];
 export type StoreReceiveInput = z.infer<typeof storeReceiveSchema>["body"];

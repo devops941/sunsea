@@ -66,6 +66,26 @@ class GoodsDispatchController {
     );
   });
 
+  update = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const dispatch = await GoodsDispatchService.update(
+      Number(req.params.id),
+      req.body,
+      userId!
+    );
+
+    const safeDispatch = JSON.parse(
+      JSON.stringify(dispatch, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
+    getIO().emit("goodsDispatch:updated", safeDispatch);
+
+    return res.status(200).json(
+      new ApiResponse("Goods Dispatch updated successfully", dispatch)
+    );
+  });
+
   gateApprove = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const dispatch = await GoodsDispatchService.gateApprove(
