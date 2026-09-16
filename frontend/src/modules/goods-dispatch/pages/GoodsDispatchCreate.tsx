@@ -2,15 +2,17 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FaSave, FaArrowLeft, FaPlus } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import {
   createGoodsDispatch,
+  updateGoodsDispatch,
   fetchEligibleOrders,
 } from "../../../features/goods-dispatch/goodsDispatchSlice";
+import { goodsDispatchService } from "../../../services/goodsDispatchService";
 import { fetchStores } from "../../../features/stores/storeSlice";
 
 import CustomButton from "../../../components/ui/Button/Button";
@@ -37,6 +39,8 @@ const DISPATCH_ELIGIBLE_STATUSES = ["IN_PROGRESS", "IN_PRODUCTION", "READY_FOR_D
 
 const GoodsDispatchCreate: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
   const dispatch = useAppDispatch();
   const { can } = usePermission();
 
@@ -50,15 +54,14 @@ const GoodsDispatchCreate: React.FC = () => {
     vehicleNumber: "",
     driverName: "",
     driverMobile: "",
-    transportName: "",
+    dcNumber: "",
     loadingTime: "",
     remarks: "",
     destinationStoreId: "",
   });
 
   const [formErrors, setFormErrors] = useState({
-    vehicleNumber: "",
-    driverName: "",
+    dcNumber: "",
     driverMobile: "",
     destinationStoreId: "",
   });
@@ -110,9 +113,50 @@ const GoodsDispatchCreate: React.FC = () => {
     dispatch(fetchStores({ storeCategory: "FINISHED_GOODS", limit: 100 }));
   }, [dispatch]);
 
+  useEffect(() => {
+    if (isEditMode && id) {
+      goodsDispatchService
+        .fetchById(id)
+        .then((dispatchData) => {
+          if (dispatchData) {
+            setFormData({
+              dispatchDate: dispatchData.dispatchDate
+                ? dispatchData.dispatchDate.split("T")[0]
+                : new Date().toISOString().split("T")[0],
+              vehicleNumber: dispatchData.vehicleNumber || "",
+              driverName: dispatchData.driverName || "",
+              driverMobile: dispatchData.driverMobile || "",
+              dcNumber: dispatchData.dcNumber || "",
+              loadingTime: dispatchData.loadingTime || "",
+              remarks: dispatchData.remarks || "",
+              destinationStoreId: dispatchData.destinationStoreId || "",
+            });
+            if (dispatchData.items && dispatchData.items.length > 0) {
+              setSelectedPOs(
+                dispatchData.items.map((item: any) => ({
+                  productionOrderId: item.productionOrderId,
+                  dispatchQty: item.dispatchQty,
+                  uom: item.uom,
+                  remarks: item.remarks || "",
+                  productItem: item.product || item.productionOrder?.productItem || { id: item.productItemId, productName: "Product" },
+                  pendingDispatchQty: item.dispatchQty,
+                }))
+              );
+            }
+          }
+        })
+        .catch(() => {
+          toast.error("Failed to load dispatch data for editing");
+        });
+    }
+  }, [id, isEditMode]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors((prev) => ({ ...prev, [name]: "" }));
+    }
     setIsDirty(true);
   };
 
@@ -177,19 +221,18 @@ const GoodsDispatchCreate: React.FC = () => {
 
   const validateForm = () => {
     const errors = {
-      vehicleNumber: "",
-      driverName: "",
+      dcNumber: "",
       driverMobile: "",
       destinationStoreId: "",
     };
     let isValid = true;
 
-    if (!formData.vehicleNumber.trim()) {
-      errors.vehicleNumber = "Vehicle number is required";
+    if (!formData.dcNumber.trim()) {
+      errors.dcNumber = "DC Number is required";
       isValid = false;
     }
-    if (!formData.driverName.trim()) {
-      errors.driverName = "Driver name is required";
+    if (!formData.destinationStoreId) {
+      errors.destinationStoreId = "Destination store is required";
       isValid = false;
     }
     if (formData.driverMobile) {
@@ -198,10 +241,6 @@ const GoodsDispatchCreate: React.FC = () => {
         errors.driverMobile = mobileErr;
         isValid = false;
       }
-    }
-    if (!formData.destinationStoreId) {
-      errors.destinationStoreId = "Destination store is required";
-      isValid = false;
     }
 
     setFormErrors(errors);
@@ -232,6 +271,28 @@ const GoodsDispatchCreate: React.FC = () => {
     }
 
     try {
+      if (isEditMode && id) {
+        await dispatch(
+          updateGoodsDispatch({
+            id,
+            data: {
+              dispatchDate: formData.dispatchDate,
+              vehicleNumber: formData.vehicleNumber,
+              driverName: formData.driverName,
+              driverMobile: formData.driverMobile || undefined,
+              dcNumber: formData.dcNumber,
+              loadingTime: formData.loadingTime || undefined,
+              remarks: formData.remarks || undefined,
+              destinationStoreId: formData.destinationStoreId || undefined,
+            },
+          })
+        ).unwrap();
+        toast.success("Goods Dispatch updated successfully");
+        setIsDirty(false);
+        navigate("/production/goods-dispatch");
+        return;
+      }
+
       const payload = {
         ...formData,
         items: selectedPOs.map((po) => ({
@@ -251,13 +312,13 @@ const GoodsDispatchCreate: React.FC = () => {
         vehicleNumber: "",
         driverName: "",
         driverMobile: "",
-        transportName: "",
+        dcNumber: "",
         loadingTime: "",
         remarks: "",
         destinationStoreId: "",
       });
       setSelectedPOs([]);
-      setFormErrors({ vehicleNumber: "", driverName: "", driverMobile: "", destinationStoreId: "" });
+      setFormErrors({ dcNumber: "", driverMobile: "", destinationStoreId: "" });
       setIsDirty(false);
       dispatch(fetchEligibleOrders({}));
       setTimeout(() => {
@@ -265,7 +326,7 @@ const GoodsDispatchCreate: React.FC = () => {
         firstInput?.focus();
       }, 50);
     } catch (error: any) {
-      toast.error(error || "Failed to create goods dispatch");
+      toast.error(error || "Failed to save goods dispatch");
     }
   };
 
@@ -382,8 +443,8 @@ const GoodsDispatchCreate: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
         <div>
-          <h2 className="text-base font-bold text-ink">Create Goods Dispatch</h2>
-          <p className="text-xs text-ink-subtle mt-0.5">Select production orders and fill in vehicle details</p>
+          <h2 className="text-base font-bold text-ink">{isEditMode ? "Edit Goods Dispatch" : "Create Goods Dispatch"}</h2>
+          <p className="text-xs text-ink-subtle mt-0.5">{isEditMode ? "Update vehicle and dispatch details" : "Select production orders and fill in vehicle details"}</p>
         </div>
         <BackButton to="/production/goods-dispatch" text="Back to List" />
       </div>
@@ -429,6 +490,12 @@ const GoodsDispatchCreate: React.FC = () => {
                 </label>
                 <DatePickerCalendar name="dispatchDate" value={formData.dispatchDate} onChange={(e) => handleInputChange(e as any)} required />
               </div>
+               <div>
+                <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">
+                  DC Number <span className="text-red-400">*</span>
+                </label>
+                <TextInput name="dcNumber" value={formData.dcNumber} onChange={handleInputChange} placeholder="e.g. DC-2026-001" error={formErrors.dcNumber} />
+              </div>
               <div>
                 <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">
                   Destination Store <span className="text-red-400">*</span>
@@ -442,27 +509,21 @@ const GoodsDispatchCreate: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">
-                  Vehicle Number <span className="text-red-400">*</span>
+                  Vehicle Number
                 </label>
-                <TextInput name="vehicleNumber" value={formData.vehicleNumber} onChange={handleInputChange} placeholder="e.g. TN-XX-XXXX" error={formErrors.vehicleNumber} />
+                <TextInput name="vehicleNumber" value={formData.vehicleNumber} onChange={handleInputChange} placeholder="e.g. TN-XX-XXXX (Optional)" />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">
-                  Driver Name <span className="text-red-400">*</span>
+                  Driver Name
                 </label>
-                <TextInput name="driverName" value={formData.driverName} onChange={handleInputChange} placeholder="Enter driver name" error={formErrors.driverName} />
+                <TextInput name="driverName" value={formData.driverName} onChange={handleInputChange} placeholder="Enter driver name (Optional)" />
               </div>
-            </div>
-            {/* Row 2 */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
               <div>
                 <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Driver Mobile</label>
                 <IndiaPhoneInput name="driverMobile" value={formData.driverMobile} onChange={(e: any) => handleInputChange(e)} required={false} error={formErrors.driverMobile} />
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Transport Name</label>
-                <TextInput name="transportName" value={formData.transportName} onChange={handleInputChange} placeholder="e.g. VRL Logistics" />
-              </div>
+             
               <div>
                 <label className="block text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Loading Time</label>
                 <TimePickerInput name="loadingTime" value={formData.loadingTime} onChange={(val) => setFormData((prev) => ({ ...prev, loadingTime: val }))} />
@@ -472,6 +533,7 @@ const GoodsDispatchCreate: React.FC = () => {
                 <TextInput name="remarks" value={formData.remarks} onChange={handleInputChange} placeholder="Any remarks..." as="textarea" rows={2} />
               </div>
             </div>
+          
           </div>
         </div>
 
@@ -481,8 +543,13 @@ const GoodsDispatchCreate: React.FC = () => {
       <div className="flex justify-end items-center px-6 py-5 border-t border-line shrink-0">
         <div className="flex items-center gap-3">
           <CustomButton text="Cancel" icon={FaArrowLeft} onClick={() => navigate("/production/goods-dispatch")} disabled={loading} variant="secondary" />
-          {can("goods-dispatch.create") && (
-            <CustomButton text={loading ? "Creating..." : "Create Dispatch"} icon={FaSave} onClick={handleSubmit} disabled={loading || selectedPOs.length === 0} />
+          {(isEditMode ? can("goods-dispatch.edit") : can("goods-dispatch.create")) && (
+            <CustomButton
+              text={loading ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update Dispatch" : "Create Dispatch")}
+              icon={FaSave}
+              onClick={handleSubmit}
+              disabled={loading || selectedPOs.length === 0}
+            />
           )}
         </div>
       </div>

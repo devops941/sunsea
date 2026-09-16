@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FaCheck, FaTimes } from "react-icons/fa";
 
@@ -12,6 +12,7 @@ import {
 
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import EditButton from "../../../components/ui/EditButton/EditButton";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import { formatDate, formatDateTime } from "../../../utils/dateUtils";
 import { usePermission } from "../../../hooks/usePermission";
@@ -32,6 +33,7 @@ const formatUOM = (code: string | null | undefined) => {
 const GoodsDispatchView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { can } = usePermission();
 
@@ -149,7 +151,12 @@ const GoodsDispatchView: React.FC = () => {
             Dispatch Date: {formatDate(dispatchData.dispatchDate)}
           </p>
         </div>
-        <BackButton text="Back to List" to="/production/goods-dispatch" />
+        <div className="flex items-center gap-3">
+          {(dispatchData.status === "PENDING_GATE_APPROVAL" || dispatchData.status === "PENDING_STORE_RECEIPT") && can("goods-dispatch.edit") && (
+            <EditButton onClick={() => navigate(`/production/goods-dispatch/edit/${dispatchData.id}`)} />
+          )}
+          <BackButton text="Back to List" to="/production/goods-dispatch" />
+        </div>
       </div>
 
       <div className="p-6">
@@ -251,7 +258,7 @@ const GoodsDispatchView: React.FC = () => {
                 <InfoField label="Vehicle Number" value={dispatchData.vehicleNumber} />
                 <InfoField label="Driver Name" value={dispatchData.driverName} />
                 <InfoField label="Driver Mobile" value={dispatchData.driverMobile} />
-                <InfoField label="Transport Name" value={dispatchData.transportName} />
+                <InfoField label="DC Number" value={dispatchData.dcNumber} />
                 <InfoField label="Loading Time" value={dispatchData.loadingTime} />
                 <div className="col-span-2 md:col-span-3">
                   <InfoField label="Remarks" value={dispatchData.remarks} />

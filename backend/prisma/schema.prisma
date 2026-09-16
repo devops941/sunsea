@@ -967,10 +967,10 @@ model GoodsDispatch {
   id                 BigInt              @id @default(autoincrement())
   dispatchNumber     String              @unique @map("dispatch_number") @db.VarChar(30)
   dispatchDate       DateTime            @map("dispatch_date") @db.Date
-  vehicleNumber      String              @map("vehicle_number") @db.VarChar(30)
-  driverName         String              @map("driver_name") @db.VarChar(100)
+  vehicleNumber      String?             @map("vehicle_number") @db.VarChar(30)
+  driverName         String?             @map("driver_name") @db.VarChar(100)
   driverMobile       String?             @map("driver_mobile") @db.VarChar(20)
-  transportName      String?             @map("transport_name") @db.VarChar(100)
+  dcNumber           String?             @map("dc_number") @db.VarChar(100)
   loadingTime        String?             @map("loading_time") @db.VarChar(10)
   remarks            String?             @db.VarChar(500)
   status             String              @default("PENDING_GATE_APPROVAL") @db.VarChar(30)

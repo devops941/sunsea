@@ -221,7 +221,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   // ── Data loading ──────────────────────────────────────────
   useEffect(() => {
-    dispatch(fetchMachines());
+    dispatch(fetchMachines({ limit: 1000 }));
     dispatch(fetchShifts());
   }, [dispatch]);
 
