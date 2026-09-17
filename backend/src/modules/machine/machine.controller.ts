@@ -7,7 +7,8 @@ import { getIO } from "../../socket/socket";
 class MachineController {
   
   create = asyncHandler(async (req: Request, res: Response) => {
-    const machine = await machineService.create(req.body);
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+    const machine = await machineService.create({ ...req.body, userId });
 
     try {
       getIO().emit("machine:created", machine);
@@ -42,7 +43,8 @@ class MachineController {
   });
 
   update = asyncHandler(async (req: Request, res: Response) => {
-    const machine = await machineService.update(String(req.params.machineId), req.body);
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+    const machine = await machineService.update(String(req.params.machineId), { ...req.body, userId });
 
     try {
       getIO().emit("machine:updated", machine);

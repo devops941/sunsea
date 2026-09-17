@@ -7,7 +7,8 @@ import { getIO } from "../../socket/socket";
 class ShiftController {
   create = asyncHandler(
     async (req: Request, res: Response) => {
-      const shift = await shiftService.create(req.body);
+      const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+      const shift = await shiftService.create({ ...req.body, userId });
       
       getIO().emit("shift:created", shift);
       
@@ -39,7 +40,8 @@ class ShiftController {
   update = asyncHandler(
     async (req: Request, res: Response) => {
       const id = Number(String(req.params.id));
-      const shift = await shiftService.update(id, req.body);
+      const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+      const shift = await shiftService.update(id, { ...req.body, userId });
       
       getIO().emit("shift:updated", shift);
       

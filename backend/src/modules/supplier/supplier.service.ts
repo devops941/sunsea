@@ -356,9 +356,12 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, phones, openingBalance, openingBalanceType, ...supplierData } = data as any;
 
-    // Handle opening balance update — only if supplier has no real transactions
-    const wantsOpeningBalanceUpdate = openingBalance !== undefined || openingBalanceType !== undefined;
-    if (wantsOpeningBalanceUpdate && supplier.hasTransactions) {
+    // Handle opening balance update — only if opening balance is actually changed and supplier has no real transactions
+    const isOpeningBalanceChanged =
+      (openingBalance !== undefined && Number(openingBalance) !== Number(supplier.openingBalance ?? 0)) ||
+      (openingBalanceType !== undefined && String(openingBalanceType).toUpperCase() !== String(supplier.openingBalanceType ?? "CREDIT").toUpperCase());
+
+    if (isOpeningBalanceChanged && supplier.hasTransactions) {
       throw new ApiError(400, "Cannot update opening balance — supplier has existing transactions");
     }
 
@@ -390,8 +393,25 @@ class SupplierService {
 
       // Handle edit history
       let newEditHistory: any[] = [];
-      if (Array.isArray((supplier as any).editHistory)) {
-        newEditHistory = [...(supplier as any).editHistory];
+      let rawHistory = (supplier as any).editHistory;
+      if (typeof rawHistory === "string") {
+        try {
+          rawHistory = JSON.parse(rawHistory);
+        } catch (e) {
+          rawHistory = [];
+        }
+      }
+
+      if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+        newEditHistory = rawHistory.map((item: any) => ({
+          updatedBy: item.updatedBy,
+          updatedAt: item.updatedAt,
+        }));
+      } else if (supplier.createdBy || supplier.createdAt) {
+        newEditHistory.push({
+          updatedBy: supplier.createdBy || "System",
+          updatedAt: supplier.createdAt ? new Date(supplier.createdAt).toISOString() : new Date().toISOString(),
+        });
       }
       
       if (updatedByUserId) {
@@ -404,9 +424,9 @@ class SupplierService {
       const updateData: Prisma.SupplierUpdateInput = {
         ...supplierData,
         ...(mobileData !== undefined && { mobile: mobileData as any }),
-        ...(wantsOpeningBalanceUpdate && {
-          openingBalance: openingBalance ?? Number(supplier.openingBalance ?? 0),
-          openingBalanceType: openingBalanceType ?? supplier.openingBalanceType ?? "CREDIT",
+        ...(isOpeningBalanceChanged && !supplier.hasTransactions && {
+          openingBalance: openingBalance !== undefined ? Number(openingBalance) : Number(supplier.openingBalance ?? 0),
+          openingBalanceType: openingBalanceType !== undefined ? openingBalanceType : (supplier.openingBalanceType ?? "CREDIT"),
         }),
         editHistory: newEditHistory,
         updatedBy: updatedByUserId ? updatedByUserId : undefined,
@@ -423,14 +443,14 @@ class SupplierService {
     });
 
     // Re-post opening balance voucher if opening balance was changed
-    if (wantsOpeningBalanceUpdate) {
+    if (isOpeningBalanceChanged && !supplier.hasTransactions) {
       try {
         await prisma.voucher.deleteMany({
           where: { refDocType: "SUPPLIER_OPENING_BALANCE", refDocId: String(id) },
         });
       } catch { /* no existing voucher — that's fine */ }
 
-      const newBalance = openingBalance ?? Number(supplier.openingBalance ?? 0);
+      const newBalance = openingBalance !== undefined ? Number(openingBalance) : Number(supplier.openingBalance ?? 0);
       if (newBalance > 0) {
         const newType = ((openingBalanceType ?? supplier.openingBalanceType ?? "CREDIT") as string).toUpperCase() as "DEBIT" | "CREDIT";
         await voucherPostingService.postSupplierOpeningBalanceVoucher(

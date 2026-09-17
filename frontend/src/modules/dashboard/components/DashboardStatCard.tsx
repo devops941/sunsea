@@ -70,11 +70,17 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
   const isAmountLoading = loading || amount === undefined || amount === null;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      disabled={loading}
-      className={`relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1 w-full ${className}`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={`relative text-left rounded-2xl overflow-hidden cursor-pointer group transition-all duration-300 hover:-translate-y-1 w-full outline-hidden select-none ${className}`}
       style={{
         background: backgroundGradient,
         border: `1px solid ${borderColor}`,
@@ -95,8 +101,8 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
       />
       <div className="relative z-10 p-4">
         {/* Header (Title + Trend) */}
-        <div className="flex items-center justify-between mb-3">
-          <span className={`text-[11px] uppercase tracking-wider font-extrabold ${titleColorClass}`}>
+        <div className="flex items-center justify-between mb-3 gap-1 relative z-20">
+          <span className={`text-[11px] uppercase tracking-wider font-extrabold truncate ${titleColorClass}`}>
             {title}
           </span>
           {trend !== "neutral" && !loading && (
@@ -142,7 +148,7 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 };
 

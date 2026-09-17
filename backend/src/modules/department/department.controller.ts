@@ -21,11 +21,13 @@ export const createDepartment =
       req: Request,
       res: Response
     ) => {
+      const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
 
       const department =
-        await createDepartmentService(
-          req.body
-        );
+        await createDepartmentService({
+          ...req.body,
+          userId,
+        });
 
       getIO().emit("department:created", department);
 
@@ -106,11 +108,15 @@ export const updateDepartment =
         Number(
           String(req.params.id)
         );
+      const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
 
       const department =
         await updateDepartmentService(
           departmentId,
-          req.body
+          {
+            ...req.body,
+            userId,
+          }
         );
 
       getIO().emit("department:updated", department);

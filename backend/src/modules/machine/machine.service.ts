@@ -12,7 +12,7 @@ const mapTechType = (val?: string | null) => {
 };
 
 class MachineService {
-  async create(data: CreateMachineInput) {
+  async create(data: CreateMachineInput & { userId?: string }) {
     const existing = await prisma.machine.findUnique({
       where: { machineId: data.machineId },
     });
@@ -21,23 +21,31 @@ class MachineService {
       throw new ApiError(409, `Machine with ID ${data.machineId} already exists`);
     }
 
+    const { userId, ...machineData } = data as any;
+    const initialEditHistory = userId
+      ? [{ updatedBy: userId, updatedAt: new Date().toISOString() }]
+      : [];
+
     try {
       return await prisma.machine.create({
         data: {
-          machineId: data.machineId,
-          machineName: data.machineName,
-          technologyType: mapTechType(data.technologyType) as any,
-          machineType: data.machineType as any,
-          manufacturer: data.manufacturer,
-          modelNumber: data.modelNumber,
-          cycleTime: data.cycleTime,
-          operatorId: data.operatorId ? data.operatorId : null,
-          machineStatus: data.machineStatus as any || "IDLE",
-          isActive: data.isActive ?? true,
-          description: data.description,
-          targetTemperature: data.targetTemperature,
-          targetLoadPercent: data.targetLoadPercent,
-        },
+          machineId: machineData.machineId,
+          machineName: machineData.machineName,
+          technologyType: mapTechType(machineData.technologyType) as any,
+          machineType: machineData.machineType as any,
+          manufacturer: machineData.manufacturer,
+          modelNumber: machineData.modelNumber,
+          cycleTime: machineData.cycleTime,
+          operatorId: machineData.operatorId ? machineData.operatorId : null,
+          machineStatus: machineData.machineStatus as any || "IDLE",
+          isActive: machineData.isActive ?? true,
+          description: machineData.description,
+          targetTemperature: machineData.targetTemperature,
+          targetLoadPercent: machineData.targetLoadPercent,
+          createdBy: userId || undefined,
+          updatedBy: userId || undefined,
+          editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
+        } as any,
       });
     } catch (error: any) {
       if (
@@ -90,23 +98,134 @@ class MachineService {
       throw new ApiError(404, `Machine with ID ${machineId} not found`);
     }
 
-    return machine;
+    let createdUserName = "Unknown User";
+    let createdUserRole = "Unknown Role";
+    const machineWithAudit = machine as any;
+
+    if (machineWithAudit.createdBy) {
+      if (machineWithAudit.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(machineWithAudit.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.fullName || admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        } else {
+          createdUserName = machineWithAudit.createdBy;
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: machineWithAudit.createdBy },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.fullName || user.username;
+          createdUserRole = user.role?.name || "User";
+        } else {
+          createdUserName = machineWithAudit.createdBy;
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    let rawHistory = machineWithAudit.editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory)) {
+      enrichedEditHistory = await Promise.all(
+        rawHistory.map(async (edit: any) => {
+          let name = edit.updatedByName || edit.updatedBy || "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true, fullName: true },
+              });
+              if (admin) name = admin.fullName || admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true, fullName: true },
+              });
+              if (user) name = user.fullName || user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    return {
+      ...machine,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
-  async update(machineId: string, data: UpdateMachineInput) {
-    await this.findById(machineId);
+  async update(machineId: string, data: UpdateMachineInput & { userId?: string }) {
+    const currentMachine = await prisma.machine.findUnique({
+      where: { machineId },
+    });
 
-    const updatePayload: any = { ...data };
-    if (data.technologyType) {
-      updatePayload.technologyType = mapTechType(data.technologyType);
+    if (!currentMachine) {
+      throw new ApiError(404, `Machine with ID ${machineId} not found`);
     }
-    if (data.operatorId !== undefined) {
-      updatePayload.operatorId = data.operatorId ? data.operatorId : null;
+
+    const { userId, ...machineData } = data as any;
+    const updatePayload: any = { ...machineData };
+    if (machineData.technologyType) {
+      updatePayload.technologyType = mapTechType(machineData.technologyType);
     }
+    if (machineData.operatorId !== undefined) {
+      updatePayload.operatorId = machineData.operatorId ? machineData.operatorId : null;
+    }
+
+    let newEditHistory: any[] = [];
+    let rawHistory = (currentMachine as any).editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+      newEditHistory = rawHistory.map((item: any) => ({
+        updatedBy: item.updatedBy,
+        updatedAt: item.updatedAt,
+      }));
+    } else if (currentMachine.createdBy || currentMachine.createdAt) {
+      newEditHistory.push({
+        updatedBy: currentMachine.createdBy || "System",
+        updatedAt: currentMachine.createdAt ? new Date(currentMachine.createdAt).toISOString() : new Date().toISOString(),
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    updatePayload.updatedBy = userId || undefined;
+    updatePayload.editHistory = newEditHistory.length > 0 ? newEditHistory : undefined;
 
     return prisma.machine.update({
       where: { machineId },
-      data: updatePayload,
+      data: updatePayload as any,
     });
   }
 

@@ -261,21 +261,35 @@ const dashboardController = {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // ─── Period filter ────────────────────────────────────────────
-      const period = (req.query.period as string) || "year";
+      // ─── Period filter (independent for sales & purchase) ───────────
+      const defaultPeriod = (req.query.period as string) || "year";
+      const salesPeriod = (req.query.salesPeriod as string) || defaultPeriod;
+      const purchasePeriod = (req.query.purchasePeriod as string) || defaultPeriod;
       const now = new Date();
-      let periodStart: Date;
-      if (period === "day") {
-        periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      } else if (period === "week") {
-        periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (period === "month") {
-        periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      } else {
-        // year — current financial/calendar year from Jan 1
-        periodStart = new Date(now.getFullYear(), 0, 1);
-      }
-      const periodEnd = now;
+
+      const getPeriodBounds = (p: string) => {
+        let pStart: Date;
+        let pEnd: Date;
+        if (p === "day") {
+          pStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+          pEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        } else if (p === "week") {
+          pStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          pStart.setHours(0, 0, 0, 0);
+          pEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        } else if (p === "month") {
+          pStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+          pEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        } else {
+          // year — current financial/calendar year from Jan 1
+          pStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+          pEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        }
+        return { pStart, pEnd };
+      };
+
+      const { pStart: salesStart, pEnd: salesEnd } = getPeriodBounds(salesPeriod);
+      const { pStart: purchaseStart, pEnd: purchaseEnd } = getPeriodBounds(purchasePeriod);
 
       const bankGroups = ["Cash & Bank", "Bank Accounts", "Cash in Hand", "BANK ACCOUNTS", "CASH IN HAND"];
 
@@ -309,12 +323,17 @@ const dashboardController = {
             select: { id: true, grandTotal: true, payments: true, status: true, invoiceDate: true, createdAt: true },
             where: {
               status: { not: "CANCELLED" },
-              invoiceDate: { gte: periodStart, lte: periodEnd },
+              invoiceDate: { gte: salesStart, lte: salesEnd },
             },
           }),
           (tx as any).grnInvoice.findMany({
-            select: { id: true, netAmount: true, subtotal: true, payments: true, createdAt: true },
-            where: { createdAt: { gte: periodStart, lte: periodEnd } },
+            select: { id: true, netAmount: true, subtotal: true, payments: true, createdAt: true, grnDate: true },
+            where: {
+              OR: [
+                { grnDate: { gte: purchaseStart, lte: purchaseEnd } },
+                { createdAt: { gte: purchaseStart, lte: purchaseEnd } },
+              ],
+            },
           }),
           tx.finishedGoodsStock.findMany({
             select: { onHandQty: true, product: { select: { rate: true } } },

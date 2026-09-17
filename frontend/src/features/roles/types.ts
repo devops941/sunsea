@@ -6,6 +6,15 @@ export interface Role {
   isSystem: boolean;
   status: string;
   createdAt: string;
+  updatedAt?: string;
+  createdBy?: string | null;
+  createdUserName?: string;
+  updatedBy?: string | null;
+  editHistory?: Array<{
+    updatedBy?: string;
+    updatedByName?: string;
+    updatedAt: string;
+  }>;
   _count?: {
     users: number;
   };

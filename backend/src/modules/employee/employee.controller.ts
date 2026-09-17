@@ -136,6 +136,7 @@ function parseEmployeeBody(body: Record<string, any>) {
 class EmployeeController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const data = parseEmployeeBody(req.body);
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
 
     // Upload profile photo to ImageKit if provided
     if (req.file?.buffer) {
@@ -152,7 +153,7 @@ class EmployeeController {
       }
     }
 
-    const employee = await employeeService.create(data);
+    const employee = await employeeService.create({ ...data, userId });
 
     getIO().emit("employee:created", employee);
 
@@ -235,6 +236,7 @@ class EmployeeController {
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(String(req.params.id));
     const data = parseEmployeeBody(req.body);
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
 
     // Upload new profile photo to ImageKit if provided
     if (req.file?.buffer) {
@@ -250,7 +252,7 @@ class EmployeeController {
       }
     }
 
-    const employee = await employeeService.update(id, data);
+    const employee = await employeeService.update(id, { ...data, userId });
 
     getIO().emit("employee:updated", employee);
 

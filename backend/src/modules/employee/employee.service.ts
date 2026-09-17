@@ -7,11 +7,17 @@ import bcrypt from "bcrypt";
 
 class EmployeeService {
   async create(data: any) {
-    const { createLoginAccount, loginAccount, da, hra, otherAllowance, cashInHand, ...employeeData } = data;
+    const { createLoginAccount, loginAccount, da, hra, otherAllowance, cashInHand, userId, ...employeeData } = data;
 
-    if (employeeData.createdBy && employeeData.createdBy.startsWith("admin_")) {
-      employeeData.createdBy = null;
-    }
+    const actualUserId = userId || employeeData.createdBy;
+    const initialEditHistory = actualUserId
+      ? [{ updatedBy: actualUserId, updatedAt: new Date().toISOString() }]
+      : [];
+
+    const dbCreatedBy = (actualUserId && !actualUserId.startsWith("admin_")) ? actualUserId : null;
+    employeeData.createdBy = dbCreatedBy;
+    employeeData.updatedBy = dbCreatedBy;
+    employeeData.editHistory = initialEditHistory.length > 0 ? initialEditHistory : undefined;
 
     const createdEmployee = (await prisma.$transaction(async (tx) => {
       // Check if email already exists (skip for drafts)
@@ -83,6 +89,9 @@ class EmployeeService {
           if (existing) throw new ApiError(400, "ESI number already exists");
         }
       }
+
+      // Track initial status change timestamp
+      employeeData.statusChangedAt = new Date();
 
       // Create employee
       const employee = await tx.employee.create({
@@ -294,18 +303,132 @@ class EmployeeService {
       }
     }
 
-    return empObj;
+    // Resolve Audit Information
+    let rawHistory = (employee as any).editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    const initialCreator = Array.isArray(rawHistory) && rawHistory.length > 0 ? rawHistory[0]?.updatedBy : (employee.createdBy || null);
+
+    let createdUserName = "Unknown User";
+    let createdUserRole = "Unknown Role";
+
+    if (initialCreator) {
+      if (initialCreator.startsWith("admin_")) {
+        const adminId = BigInt(initialCreator.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.fullName || admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        } else {
+          createdUserName = initialCreator;
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: initialCreator },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.fullName || user.username;
+          createdUserRole = user.role?.name || "User";
+        } else {
+          createdUserName = initialCreator;
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray(rawHistory)) {
+      enrichedEditHistory = await Promise.all(
+        rawHistory.map(async (edit: any) => {
+          let name = edit.updatedByName || edit.updatedBy || "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true, fullName: true },
+              });
+              if (admin) name = admin.fullName || admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true, fullName: true },
+              });
+              if (user) name = user.fullName || user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    return {
+      ...empObj,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
   async update(id: bigint, data: any) {
     // Check if employee exists
-    await this.findById(id);
+    const currentEmployee = await prisma.employee.findUnique({
+      where: { id },
+    });
 
-    const { createLoginAccount, loginAccount, da, hra, otherAllowance, cashInHand, ...employeeData } = data;
-
-    if (employeeData.updatedBy && employeeData.updatedBy.startsWith("admin_")) {
-      employeeData.updatedBy = null;
+    if (!currentEmployee) {
+      throw new ApiError(404, "Employee not found");
     }
+
+    const { createLoginAccount, loginAccount, da, hra, otherAllowance, cashInHand, userId, ...employeeData } = data;
+
+    let newEditHistory: any[] = [];
+    let rawHistory = (currentEmployee as any).editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+      newEditHistory = rawHistory.map((item: any) => ({
+        updatedBy: item.updatedBy,
+        updatedAt: item.updatedAt,
+      }));
+    } else if (currentEmployee.createdBy || currentEmployee.createdAt) {
+      newEditHistory.push({
+        updatedBy: currentEmployee.createdBy || "System",
+        updatedAt: currentEmployee.createdAt ? new Date(currentEmployee.createdAt).toISOString() : new Date().toISOString(),
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    // Track status change timestamp if status is updated
+    if (employeeData.status && employeeData.status !== currentEmployee.status) {
+      employeeData.statusChangedAt = new Date();
+    }
+
+    const dbUpdatedBy = (userId && !userId.startsWith("admin_")) ? userId : (employeeData.updatedBy && !employeeData.updatedBy.startsWith("admin_") ? employeeData.updatedBy : null);
+    employeeData.updatedBy = dbUpdatedBy;
+    employeeData.editHistory = newEditHistory.length > 0 ? newEditHistory : undefined;
 
     const updatedEmployee = (await prisma.$transaction(async (tx) => {
       // Check unique identity fields against OTHER employees

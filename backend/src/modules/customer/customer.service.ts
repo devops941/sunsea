@@ -185,7 +185,7 @@ class CustomerService {
     const customersWithCreatorsAndBalance = await Promise.all(
       customers.map(async (customer) => {
         const creatorInfo = adminMap.get(customer.createdBy) || userMap.get(customer.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
-        
+
         let netBalance = 0;
         try {
           const summaries = await receivableService.getReceivableSummaries({ customerId: customer.id });
@@ -395,7 +395,7 @@ class CustomerService {
     if (Array.isArray(customer.editHistory)) {
       newEditHistory = [...customer.editHistory];
     }
-    
+
     // Attempt to get name from userId for history, if it's available in frontend or backend easily.
     // Given the complexity of resolving user names mid-update in this service,
     // we'll store the ID here. The `getCustomerById` already resolves this for the `createdBy` field,

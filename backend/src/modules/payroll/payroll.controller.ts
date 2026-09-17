@@ -26,8 +26,12 @@ class PayrollController {
   // ── Employee Payroll ─────────────────────────────────────────────────────────
 
   listEmployees = asyncHandler(async (req: Request, res: Response) => {
-    const { category } = req.query as { category?: string };
-    const employees = await payrollService.listEmployeesWithPayroll(category);
+    const { category, includeInactive, period } = req.query as { category?: string; includeInactive?: string; period?: string };
+    const employees = await payrollService.listEmployeesWithPayroll(
+      category,
+      includeInactive === 'true',
+      period
+    );
     res.json(new ApiResponse('Employees fetched', employees));
   });
 

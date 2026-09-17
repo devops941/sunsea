@@ -11,6 +11,11 @@ export const departmentService = {
     };
   },
 
+  getById: async (id: number): Promise<Department> => {
+    const response = await apiClient.get(`${config.department.base}/${id}`);
+    return response.data?.data || response.data;
+  },
+
   create: async (data: CreateDepartmentDto): Promise<Department> => {
     const response = await apiClient.post(config.department.base, data);
     return response.data?.data || response.data;

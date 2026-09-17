@@ -6,13 +6,18 @@ export const createDepartmentService =
     payload: {
       name: string;
       description?: string | null;
+      userId?: string;
     }
   ) => {
+    const { userId, ...departmentData } = payload;
+    const initialEditHistory = userId
+      ? [{ updatedBy: userId, updatedAt: new Date().toISOString() }]
+      : [];
 
     const exists =
       await prisma.department.findFirst({
         where: {
-          name: payload.name
+          name: departmentData.name
         },
       });
 
@@ -24,7 +29,12 @@ export const createDepartmentService =
     }
 
     return prisma.department.create({
-      data: payload,
+      data: {
+        ...departmentData,
+        createdBy: userId || undefined,
+        updatedBy: userId || undefined,
+        editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
+      } as any,
     });
   };
 
@@ -97,21 +107,27 @@ export const deleteDepartmentService =
     return prisma.department.delete({
       where: { id },
     });
-  }
+  };
 
-// Editand update department
+// Edit and update department
 export const updateDepartmentService =
   async (
     id: number,
     payload: {
       name?: string;
       description?: string | null;
+      userId?: string;
     }
   ) => {
+    const currentDepartment = await prisma.department.findUnique({
+      where: { id },
+    });
 
-    await getDepartmentByIdService(id);
+    if (!currentDepartment) {
+      throw new ApiError(404, "Department not found");
+    }
 
-
+    const { userId, ...departmentData } = payload;
 
     const existingDepartment =
       await prisma.department.findFirst({
@@ -122,7 +138,7 @@ export const updateDepartmentService =
                 not: id,
               },
             },
-            payload.name ? { name: payload.name } : {}
+            departmentData.name ? { name: departmentData.name } : {}
           ],
         },
       });
@@ -134,9 +150,44 @@ export const updateDepartmentService =
       );
     }
 
+    let newEditHistory: any[] = [];
+    let rawHistory = (currentDepartment as any).editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+      newEditHistory = rawHistory.map((item: any) => ({
+        updatedBy: item.updatedBy,
+        updatedAt: item.updatedAt,
+      }));
+    } else if ((currentDepartment as any).createdBy || currentDepartment.createdAt) {
+      newEditHistory.push({
+        updatedBy: (currentDepartment as any).createdBy || "System",
+        updatedAt: currentDepartment.createdAt ? new Date(currentDepartment.createdAt).toISOString() : new Date().toISOString(),
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    const updatePayload: any = {
+      ...departmentData,
+      updatedBy: userId || undefined,
+      editHistory: newEditHistory.length > 0 ? newEditHistory : undefined,
+    };
+
     return prisma.department.update({
       where: { id },
-      data: payload,
+      data: updatePayload,
     });
   };
 
@@ -154,5 +205,77 @@ export const getDepartmentByIdService =
       );
     }
 
-    return department;
+    let createdUserName = "Unknown User";
+    let createdUserRole = "Unknown Role";
+    const deptWithAudit = department as any;
+
+    if (deptWithAudit.createdBy) {
+      if (deptWithAudit.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(deptWithAudit.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.fullName || admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        } else {
+          createdUserName = deptWithAudit.createdBy;
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: deptWithAudit.createdBy },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.fullName || user.username;
+          createdUserRole = user.role?.name || "User";
+        } else {
+          createdUserName = deptWithAudit.createdBy;
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    let rawHistory = deptWithAudit.editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory)) {
+      enrichedEditHistory = await Promise.all(
+        rawHistory.map(async (edit: any) => {
+          let name = edit.updatedByName || edit.updatedBy || "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true, fullName: true },
+              });
+              if (admin) name = admin.fullName || admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true, fullName: true },
+              });
+              if (user) name = user.fullName || user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    return {
+      ...department,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   };

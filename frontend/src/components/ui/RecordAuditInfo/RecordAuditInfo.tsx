@@ -54,8 +54,13 @@ const RecordAuditInfo: React.FC<RecordAuditInfoProps> = ({ auditData, title = "R
                (lastEdit.updatedBy && !lastEdit.updatedBy.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? lastEdit.updatedBy : "Unknown User")} on {lastEdit.updatedAt ? formatDateTime(lastEdit.updatedAt) : "N/A"}
             </span>
             <button
-              onClick={handleViewHistory}
-              className="ml-2 flex items-center justify-center text-primary hover:text-primary-hover transition-colors p-1 rounded-md hover:bg-primary/10"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleViewHistory();
+              }}
+              className="ml-2 flex items-center justify-center text-primary hover:text-primary-hover transition-colors p-1 rounded-md hover:bg-primary/10 cursor-pointer"
               title="View full edit history"
             >
               <Eye size={14} />

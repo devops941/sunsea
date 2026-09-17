@@ -21,6 +21,7 @@ import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVBut
 import { departmentService } from "../../../services/departmentService";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 const ITEMS_PER_PAGE = 15;
 type SortOrder = "default" | "asc" | "desc";
@@ -43,6 +44,7 @@ const DepartmentList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedDept, setSelectedDept] = useState<any>(null);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -173,6 +175,7 @@ const DepartmentList: React.FC = () => {
         setFormData(initialData);
         setOriginalFormData(initialData);
         setFormErrors({});
+        setAuditInfo(null);
         setShowFormModal(true);
     };
 
@@ -196,7 +199,22 @@ const DepartmentList: React.FC = () => {
         setFormData(editData);
         setOriginalFormData(editData);
         setFormErrors({});
+        setAuditInfo({
+            createdAt: dept.createdAt,
+            createdBy: dept.createdUserName || dept.createdBy,
+            editHistory: dept.editHistory,
+        });
         setShowFormModal(true);
+
+        departmentService.getById(Number(dept.id)).then((fullDept: any) => {
+            if (fullDept) {
+                setAuditInfo({
+                    createdAt: fullDept.createdAt,
+                    createdBy: fullDept.createdUserName || fullDept.createdBy,
+                    editHistory: fullDept.editHistory,
+                });
+            }
+        }).catch(() => {});
     }, []);
 
     const handleOpenView = useCallback((dept: any) => {
@@ -590,7 +608,17 @@ const DepartmentList: React.FC = () => {
                 <CommonModal
                     show={showFormModal}
                     onHide={handleRequestCloseFormModal}
-                    title={editMode ? "Edit Department" : "Add New Department"}
+                    title={
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                                <span>{editMode ? "Edit Department" : "Add New Department"}</span>
+                                {editMode && formData.name && (
+                                    <span className="text-purple-400 text-sm leading-none font-mono">*{formData.name}</span>
+                                )}
+                            </div>
+                            {editMode && <RecordAuditInfo auditData={auditInfo} title="Department" />}
+                        </div>
+                    }
                     overflowVisible={true}
                     footer={
                         <div className="flex items-center justify-end gap-2 w-full">

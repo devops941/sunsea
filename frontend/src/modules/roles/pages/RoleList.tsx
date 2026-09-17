@@ -23,6 +23,7 @@ import { useSearchParams } from "react-router-dom";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 const ITEMS_PER_PAGE = 5;
 type SortOrder = "default" | "asc" | "desc";
@@ -46,6 +47,7 @@ const RoleList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedRole, setSelectedRole] = useState<any>(null);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
     const [formErrors, setFormErrors] = useState<{
         code?: string;
         name?: string;
@@ -194,6 +196,7 @@ const RoleList: React.FC = () => {
         setFormData(initialData);
         setOriginalFormData(initialData);
         setFormErrors({});
+        setAuditInfo(null);
         setShowFormModal(true);
     }, [roles]);
 
@@ -209,7 +212,22 @@ const RoleList: React.FC = () => {
         setFormData(editData);
         setOriginalFormData(editData);
         setFormErrors({});
+        setAuditInfo({
+            createdAt: role.createdAt,
+            createdBy: role.createdUserName || role.createdBy,
+            editHistory: role.editHistory,
+        });
         setShowFormModal(true);
+
+        roleService.getById(Number(role.id)).then((fullRole: any) => {
+            if (fullRole) {
+                setAuditInfo({
+                    createdAt: fullRole.createdAt,
+                    createdBy: fullRole.createdUserName || fullRole.createdBy,
+                    editHistory: fullRole.editHistory,
+                });
+            }
+        }).catch(() => {});
     }, []);
 
     const handleOpenView = useCallback((role: any) => {
@@ -619,7 +637,17 @@ const RoleList: React.FC = () => {
                 <CommonModal
                     show={showFormModal}
                     onHide={handleRequestCloseFormModal}
-                    title={editMode ? "Edit Role" : "Add New Role"}
+                    title={
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                                <span>{editMode ? "Edit Role" : "Add New Role"}</span>
+                                {editMode && formData.code && (
+                                    <span className="text-purple-400 text-sm leading-none font-mono">*{formData.code}</span>
+                                )}
+                            </div>
+                            {editMode && <RecordAuditInfo auditData={auditInfo} title="Role" />}
+                        </div>
+                    }
                     overflowVisible={true}
                     footer={
                         <div className="flex items-center justify-end gap-2 w-full">

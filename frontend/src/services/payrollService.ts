@@ -273,9 +273,9 @@ export const payrollService = {
   },
 
   // Employees
-  listEmployees: async (category?: string): Promise<ApiEmployeePayroll[]> => {
-    const params = category ? { category } : {};
-    const { data } = await apiClient.get(`${BASE}/employees`, { params });
+  listEmployees: async (params?: { category?: string; includeInactive?: boolean; period?: string } | string): Promise<ApiEmployeePayroll[]> => {
+    const query = typeof params === 'string' ? { category: params } : (params ?? {});
+    const { data } = await apiClient.get(`${BASE}/employees`, { params: query });
     return data.data;
   },
 

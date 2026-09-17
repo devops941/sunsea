@@ -20,10 +20,13 @@ import { departmentService } from "../../../services/departmentService";
 import { roleService } from "../../../services/roleService";
 import { employeeService } from "../../../services/employeeService";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 15;
-const SORT_STORAGE_KEY = "sunsea_employee_sort_name";
+const SORT_FIELD_KEY = "sunsea_employee_sort_field";
+const SORT_ORDER_KEY = "sunsea_employee_sort_order";
 
+type SortField = "fullName" | "empCode" | null;
 type SortOrder = "default" | "asc" | "desc";
 
 const STATUS_OPTIONS = [
@@ -47,39 +50,69 @@ const Employeelist: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ── Alphabetical sort with localStorage persistence ───────────────────────
+  // ── Sort state with localStorage persistence ─────────────────────────────
+  const [sortField, setSortField] = useState<SortField>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_FIELD_KEY);
+      if (saved === "fullName" || saved === "empCode") return saved;
+    } catch (_) {}
+    return null;
+  });
+
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
     try {
-      const saved = localStorage.getItem(SORT_STORAGE_KEY);
+      const saved = localStorage.getItem(SORT_ORDER_KEY);
       if (saved === "asc" || saved === "desc") return saved;
+      // Backward compatibility for old name-only key
+      const oldSaved = localStorage.getItem("sunsea_employee_sort_name");
+      if (oldSaved === "asc" || oldSaved === "desc") return oldSaved;
     } catch (_) {}
     return "default";
   });
 
-  const toggleSortOrder = useCallback(() => {
-    setSortOrder((prev) => {
+  const toggleSort = useCallback((field: "fullName" | "empCode") => {
+    if (sortField !== field) {
+      setSortField(field);
+      setSortOrder("asc");
+      try {
+        localStorage.setItem(SORT_FIELD_KEY, field);
+        localStorage.setItem(SORT_ORDER_KEY, "asc");
+      } catch (_) {}
+    } else {
       let next: SortOrder = "default";
-      if (prev === "default") next = "asc";
-      else if (prev === "asc") next = "desc";
+      if (sortOrder === "default") next = "asc";
+      else if (sortOrder === "asc") next = "desc";
       else next = "default";
-      try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
-      return next;
-    });
-  }, []);
 
-  // F6 / Alt+S direct listener
+      setSortOrder(next);
+      if (next === "default") {
+        setSortField(null);
+        try {
+          localStorage.removeItem(SORT_FIELD_KEY);
+          localStorage.removeItem(SORT_ORDER_KEY);
+        } catch (_) {}
+      } else {
+        try {
+          localStorage.setItem(SORT_FIELD_KEY, field);
+          localStorage.setItem(SORT_ORDER_KEY, next);
+        } catch (_) {}
+      }
+    }
+  }, [sortField, sortOrder]);
+
+  // F6 / Alt+S direct listener for Name sort shortcut
   useEffect(() => {
     const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
         e.preventDefault();
-        toggleSortOrder();
+        toggleSort("fullName");
       }
     };
     window.addEventListener("keydown", handleSortShortcut);
     return () => window.removeEventListener("keydown", handleSortShortcut);
-  }, [toggleSortOrder]);
+  }, [toggleSort]);
 
   // Draft filter state (inside popover)
   const [draftRoleId, setDraftRoleId] = useState("");
@@ -134,7 +167,7 @@ const Employeelist: React.FC = () => {
 
   usePageShortcuts({
     onRefresh: () => refresh(),
-    onSort: () => toggleSortOrder(),
+    onSort: () => toggleSort("fullName"),
     onDelete: () => setShowDeleteModal(true),
     onNew: () => canCreate && navigate("/employees/create"),
     onExport: () => {
@@ -159,15 +192,23 @@ const Employeelist: React.FC = () => {
 
   // Client-side sorted employees
   const sortedEmployees = useMemo(() => {
-    if (sortOrder === "default") return filteredEmployees;
+    if (sortOrder === "default" || !sortField) return filteredEmployees;
     return [...filteredEmployees].sort((a: any, b: any) => {
-      const nameA = (a.fullName || "").trim().toLowerCase();
-      const nameB = (b.fullName || "").trim().toLowerCase();
-      return sortOrder === "asc"
-        ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
-        : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+      if (sortField === "empCode") {
+        const codeA = (a.empCode || "").trim();
+        const codeB = (b.empCode || "").trim();
+        return sortOrder === "asc"
+          ? codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: "base" })
+          : codeB.localeCompare(codeA, undefined, { numeric: true, sensitivity: "base" });
+      } else {
+        const nameA = (a.fullName || "").trim().toLowerCase();
+        const nameB = (b.fullName || "").trim().toLowerCase();
+        return sortOrder === "asc"
+          ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
+          : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+      }
     });
-  }, [filteredEmployees, sortOrder]);
+  }, [filteredEmployees, sortField, sortOrder]);
 
   const totalPages = Math.ceil(sortedEmployees.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -247,6 +288,15 @@ const Employeelist: React.FC = () => {
           emp.user ? (emp.user.status === "active" ? "Enabled" : emp.user.status?.toUpperCase() || "Disabled") : "No Login",
       },
       { header: "Status", accessor: (emp: any) => (emp.status ? emp.status.toUpperCase() : "—") },
+      {
+        header: "Status Date",
+        accessor: (emp: any) => {
+          const rawStatus = (emp.status || "").toLowerCase();
+          if (rawStatus === "active") return "—";
+          const d = emp.statusChangedAt || emp.updatedAt || emp.createdAt;
+          return d ? formatDate(d) : "—";
+        },
+      },
     ];
     return {
       csvColumns: columns,
@@ -263,24 +313,49 @@ const Employeelist: React.FC = () => {
         <span className="text-ink-subtle font-mono text-xs">{String(startIndex + index + 1).padStart(2, '0')}</span>
       ),
     },
-    { header: "Employee Code", accessor: "empCode", width: "120px" },
     {
-      header: "Employee Name",
-      accessor: "fullName",
+      header: "Employee Code",
+      accessor: "empCode",
+      width: "150px",
       headerNode: (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+          onClick={(e) => { e.stopPropagation(); toggleSort("empCode"); }}
+          title="Sort by Employee Code"
+          className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+        >
+          <span className={sortField === "empCode" && sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+            Employee Code
+          </span>
+          <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortField === "empCode" && (sortOrder === "asc" || sortOrder === "desc") ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+            {sortField === "empCode" && sortOrder === "asc" ? <FaArrowUp size={10} /> : sortField === "empCode" && sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+          </span>
+          {sortField === "empCode" && sortOrder !== "default" && (
+            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+              {sortOrder === "asc" ? "0-9" : "9-0"}
+            </span>
+          )}
+        </button>
+      ),
+    },
+    {
+      header: "Employee Name",
+      accessor: "fullName",
+      width: "180px",
+      headerNode: (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); toggleSort("fullName"); }}
           title="Sort Alphabetically (F6)"
           className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
         >
-          <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+          <span className={sortField === "fullName" && sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
             Employee Name
           </span>
-          <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
-            {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+          <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortField === "fullName" && (sortOrder === "asc" || sortOrder === "desc") ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+            {sortField === "fullName" && sortOrder === "asc" ? <FaArrowUp size={10} /> : sortField === "fullName" && sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
           </span>
-          {sortOrder !== "default" && (
+          {sortField === "fullName" && sortOrder !== "default" && (
             <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
               {sortOrder === "asc" ? "A-Z" : "Z-A"}
             </span>
@@ -318,14 +393,26 @@ const Employeelist: React.FC = () => {
       },
     },
     {
-      header: "Status",
-      width: "110px",
+      header: "Status",   
+      width: "115px",
       align: "center",
       render: (emp) => {
+        const rawStatus = (emp.status || "").toLowerCase();
+        const isNonActive = rawStatus !== "active";
         const statusMap: Record<string, string> = {
           draft: "DRAFT", active: "ACTIVE", inactive: "INACTIVE", resigned: "RESIGNED", terminated: "TERMINATED",
         };
-        return <StatusBadge status={statusMap[emp.status] ?? emp.status?.toUpperCase() ?? "INACTIVE"} />;
+        const statusDate = emp.statusChangedAt || emp.updatedAt || emp.createdAt;
+        return (
+          <div className="flex flex-col items-center justify-center gap-0.5">
+            <StatusBadge status={statusMap[emp.status] ?? emp.status?.toUpperCase() ?? "INACTIVE"} />
+            {isNonActive && statusDate && (
+              <span className="text-[10px] text-ink-subtle font-medium leading-tight whitespace-nowrap">
+                {formatDate(statusDate)}
+              </span>
+            )}
+          </div>
+        );
       },
     },
     {

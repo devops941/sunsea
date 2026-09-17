@@ -26,6 +26,7 @@ import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
 import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -260,6 +261,7 @@ const EmployeeForm: React.FC = () => {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(isEdit);
+  const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
   const [isOriginallyDraft, setIsOriginallyDraft] = useState(false);
   const [shifts, setShifts] = useState<any[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -431,6 +433,11 @@ const EmployeeForm: React.FC = () => {
           createdAt: emp.createdAt ? new Date(emp.createdAt).toLocaleString() : "",
           updatedBy: emp.updatedByUser?.username || emp.updatedBy || "",
           updatedAt: emp.updatedAt ? new Date(emp.updatedAt).toLocaleString() : "",
+        });
+        setAuditInfo({
+          createdAt: emp.createdAt,
+          createdBy: emp.createdUserName || emp.createdBy,
+          editHistory: emp.editHistory,
         });
       }).catch(() => {
         toast.error("Failed to load employee data");
@@ -1411,15 +1418,17 @@ const EmployeeForm: React.FC = () => {
     <div className="w-full">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-          <div>
-            <h2 className="text-lg font-bold text-ink">{isEdit ? "Edit Employee" : "Create Employee"}</h2>
-            {isEdit && (form.empCode || form.fullName) && (
-              <p className="text-xs text-ink-muted mt-0.5">
-                {form.empCode && <span className="font-semibold text-primary">{form.empCode}</span>}
-                {form.fullName && <span> — {form.fullName}</span>}
-              </p>
-            )}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
+          <div className="flex flex-col">
+            <h2 className="text-xl font-bold text-ink flex items-start">
+              {isEdit ? "Edit Employee" : "Create Employee"}
+              {isEdit && (form.empCode || form.fullName) && (
+                <span className="text-purple-400 text-sm ml-1.5 mt-0.5 leading-none font-mono">
+                  *{form.empCode}
+                </span>
+              )}
+            </h2>
+            {isEdit && <RecordAuditInfo auditData={auditInfo} title="Employee" />}
           </div>
           <div className="flex items-center gap-3">
             <BackButton />

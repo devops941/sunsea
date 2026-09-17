@@ -12,8 +12,13 @@ export interface Employee {
   designationId: number | null;
   employeeCategory: EmployeeCategory | null;
   status: EmployeeStatus;
+  statusChangedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  createdUserName?: string;
+  updatedBy?: string;
+  editHistory?: Array<{ updatedBy?: string; updatedByName?: string; updatedAt?: string | Date }>;
   department?: {
     id: number;
     code: string;

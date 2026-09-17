@@ -161,7 +161,7 @@ const SupplierList: React.FC = () => {
     }, []);
 
     const handleEdit = useCallback((sup: any) => {
-        navigate(`/suppliers/edit/${sup.id}`, { state: sup });
+        navigate(`/suppliers/edit/${sup.id}`);
     }, [navigate]);
 
     const triggerDelete = useCallback((id: string) => {

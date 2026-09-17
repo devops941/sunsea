@@ -1,8 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatDateTime } from "../utils/dateUtils";
-import { ArrowLeft, History } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
+import { ArrowLeft, History, User as UserIcon, Calendar } from "lucide-react";
 
 export const RecordAuditHistoryPage: React.FC = () => {
   const location = useLocation();
@@ -12,7 +11,7 @@ export const RecordAuditHistoryPage: React.FC = () => {
     title?: string;
   };
 
-  if (!state || !state.editHistory) {
+  if (!state || !state.editHistory || state.editHistory.length === 0) {
     return (
       <div className="w-full min-w-0 my-3">
         <div className="p-6">
@@ -33,7 +32,8 @@ export const RecordAuditHistoryPage: React.FC = () => {
       <div className="flex items-center gap-4 mb-6 shrink-0">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 -ml-2 rounded-lg hover:bg-card-2 text-ink-subtle hover:text-ink transition-colors"
+          className="p-2 -ml-2 rounded-lg hover:bg-card-2 text-ink-subtle hover:text-ink transition-colors cursor-pointer"
+          title="Go Back"
         >
           <ArrowLeft size={20} />
         </button>
@@ -79,15 +79,6 @@ export const RecordAuditHistoryPage: React.FC = () => {
                   </tr>
                 );
               })}
-              {/* Empty rows to fill remaining space if needed and allow scroll testing */}
-              {Array.from({ length: Math.max(0, 15 - editHistory.length) }).map((_, i) => (
-                <tr key={`empty-${i}`} className="bg-transparent">
-                  <td className="py-3 px-4 text-transparent select-none">&nbsp;</td>
-                  <td className="py-3 px-4 text-transparent select-none">&nbsp;</td>
-                  <td className="py-3 px-4 text-transparent select-none">&nbsp;</td>
-                  <td className="py-3 px-4 text-transparent select-none">&nbsp;</td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
