@@ -167,7 +167,6 @@ const StorageStoreList: React.FC = () => {
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
         count: paginatedStores.length,
         onEnter: (i) => { const item = paginatedStores[i]; if (item) handleOpenView(item); },
-        onEdit: (i) => { const item = paginatedStores[i]; if (item && can("stores.edit")) handleOpenEdit(item); },
         containerRef: tableRef,
     });
 
@@ -220,7 +219,12 @@ const StorageStoreList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Store Management</h2>
+                        <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+                            Store Management
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {sortedStores.length}
+                            </span>
+                        </h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <SearchInput

@@ -11,6 +11,13 @@ export interface Category {
   updatedAt: string;
   createdBy: string | null;
   updatedBy: string | null;
+  createdUserName?: string;
+  createdUserRole?: string;
+  editHistory?: Array<{
+    updatedBy?: string;
+    updatedByName?: string;
+    updatedAt?: string | Date;
+  }> | null;
   _count?: {
     rawMaterials: number;
     products: number;

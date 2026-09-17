@@ -2,6 +2,8 @@ import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
+import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { FaPlus, FaCog, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -124,7 +126,7 @@ const ProductList: React.FC = () => {
     const [capProduct, setCapProduct] = useState<any>(null);
     const [capDate, setCapDate] = useState(new Date().toISOString().split("T")[0]);
     const [capShift, setCapShift] = useState("");
-    const [capRoleId, setCapRoleId] = useState("");
+    const [capRoleIds, setCapRoleIds] = useState<string[]>([]);
     const [capOps, setCapOps] = useState<string[]>([]);
     const [capMachine, setCapMachine] = useState("");
     const [capQty, setCapQty] = useState("");
@@ -221,12 +223,14 @@ const ProductList: React.FC = () => {
     }, [navigate]);
 
     const tableRef = useRef<HTMLDivElement>(null);
+    const capFormRef = useRef<HTMLDivElement>(null);
+    const handleCapFormKeyDown = useFormKeyboardNav(capFormRef);
 
     const openCapModal = useCallback((product: any) => {
         setCapProduct(product);
         setCapDate(new Date().toISOString().split("T")[0]);
         setCapShift("");
-        setCapRoleId("");
+        setCapRoleIds([]);
         setCapOps([]);
         setCapMachine("");
         setCapQty("");
@@ -253,7 +257,7 @@ const ProductList: React.FC = () => {
         const errs: Record<string, string> = {};
         if (!capDate) errs.capDate = "Date is required";
         if (!capShift) errs.capShift = "Shift is required";
-        if (!capRoleId) errs.capRoleId = "Role is required";
+        if (!capRoleIds.length) errs.capRoleIds = "Select at least one role";
         if (!capOps.length) errs.capOps = "Select at least one operator";
         if (!capQty || Number(capQty) <= 0) {
             errs.capQty = "Valid quantity required";
@@ -280,6 +284,7 @@ const ProductList: React.FC = () => {
             });
             toast.success("Capacity updated successfully!");
             setShowCapModal(false);
+            setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 50);
             refresh();
         } catch (err: any) {
             toast.error(err.message || "Failed to update capacity");
@@ -287,6 +292,41 @@ const ProductList: React.FC = () => {
             setSavingCap(false);
         }
     };
+
+    useFormShortcuts({
+        onSave: showCapModal ? handleCapSave : undefined,
+    });
+
+    useEffect(() => {
+        if (showCapModal) {
+            const timer = setTimeout(() => {
+                const firstInput = capFormRef.current?.querySelector<HTMLElement>(
+                    "[data-nav]:not([disabled]), input[name='capDate']"
+                );
+                if (firstInput) {
+                    firstInput.focus();
+                    if (firstInput instanceof HTMLInputElement) {
+                        try { firstInput.select(); } catch {}
+                    }
+                }
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [showCapModal]);
+
+    useEffect(() => {
+        if (!showCapModal) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowCapModal(false);
+                setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 50);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [showCapModal]);
 
     const triggerDelete = useCallback((id: string) => {
         setProductToDelete(id);
@@ -364,7 +404,6 @@ const ProductList: React.FC = () => {
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
         count: paginatedProducts.length,
         onEnter: (i) => { const item = paginatedProducts[i]; if (item) handleView(item); },
-        onEdit: (i) => { const item = paginatedProducts[i]; if (item && can("products.edit")) handleEdit(item); },
         containerRef: tableRef,
     });
 
@@ -454,7 +493,12 @@ const ProductList: React.FC = () => {
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>
-                            <h2 className="text-2xl font-bold text-ink">Production Product</h2>
+                            <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+                                Production Product
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                    {filteredProducts.length}
+                                </span>
+                            </h2>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                             <div className="w-full md:w-64">
@@ -557,7 +601,7 @@ const ProductList: React.FC = () => {
                             loading={loading}
                             emptyMessage="No products found."
                             rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
-                            onRowClick={(item, i) => { setFocusedIndex(i); handleView(item); }}
+                            onRowClick={(item, i) => { setFocusedIndex(i); tableRef.current?.focus({ preventScroll: true }); handleView(item); }}
                             pagination={totalPages > 1 ? {
                                 currentPage: safeCurrentPage,
                                 totalPages,
@@ -785,7 +829,7 @@ const ProductList: React.FC = () => {
                                 <h3 className="text-lg font-bold text-ink">Change Capacity</h3>
                                 <button onClick={() => setShowCapModal(false)} className="text-ink-subtle hover:text-ink-muted text-xl leading-none">&times;</button>
                             </div>
-                            <div className="p-6 space-y-4">
+                            <div ref={capFormRef} onKeyDown={handleCapFormKeyDown} className="p-6 space-y-4">
                                 <div className="flex items-center gap-3 mb-2">
                                     <span className="text-sm font-semibold text-ink-muted">Product:</span>
                                     <span className="text-sm text-ink-muted">{capProduct.productName}</span>
@@ -832,16 +876,28 @@ const ProductList: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <SelectInput
+                                        <MultiSelect
                                             label="Role"
-                                            name="capRoleId"
-                                            value={capRoleId}
-                                            options={[
-                                                { value: "", label: "-- Role --" },
-                                                ...roles.map(r => ({ value: String(r.id || r.roleId || r.code), label: r.name || r.roleName || r.code || r.roleId }))
-                                            ]}
-                                            onChange={(e) => { setCapRoleId(e.target.value); setCapOps([]); setCapErrors(prev => ({ ...prev, capRoleId: "", capOps: "" })); }}
-                                            error={capErrors.capRoleId}
+                                            name="capRoleIds"
+                                            options={roles.map(r => ({ value: String(r.id || r.roleId || r.code), label: r.name || r.roleName || r.code || r.roleId }))}
+                                            value={capRoleIds}
+                                            onChange={(_, vals) => {
+                                                setCapRoleIds(vals);
+                                                setCapOps(prevOps => {
+                                                    if (vals.length === 0) return prevOps;
+                                                    return prevOps.filter(opId => {
+                                                        const emp = employees.find(e => String(e.id) === opId);
+                                                        if (!emp) return false;
+                                                        const empRoleId = String(emp.roleId || emp.role?.id || emp.designationId || "");
+                                                        if (vals.includes(empRoleId)) return true;
+                                                        const matchedSelectedRoles = roles.filter(r => vals.includes(String(r.id || r.roleId || r.code)));
+                                                        return matchedSelectedRoles.some(r => emp.role?.name === r.name || emp.roleName === r.name || emp.designation?.name === r.name);
+                                                    });
+                                                });
+                                                setCapErrors(prev => ({ ...prev, capRoleIds: "", capRoleId: "", capOps: "" }));
+                                            }}
+                                            placeholder="Select role(s)"
+                                            error={capErrors.capRoleIds || capErrors.capRoleId}
                                             required
                                         />
                                     </div>
@@ -851,17 +907,17 @@ const ProductList: React.FC = () => {
                                             name="capOps"
                                             options={employees
                                                 .filter(emp => {
-                                                    if (!capRoleId) return true;
-                                                    const empRoleId = emp.roleId || emp.role?.id || emp.designationId;
-                                                    if (empRoleId && String(empRoleId) === capRoleId) return true;
-                                                    const matchedRole = roles.find(r => String(r.id || r.roleId || r.code) === capRoleId);
-                                                    if (matchedRole && (emp.role?.name === matchedRole.name || emp.roleName === matchedRole.name || emp.designation?.name === matchedRole.name)) return true;
+                                                    if (!capRoleIds || capRoleIds.length === 0) return true;
+                                                    const empRoleId = String(emp.roleId || emp.role?.id || emp.designationId || "");
+                                                    if (capRoleIds.includes(empRoleId)) return true;
+                                                    const matchedSelectedRoles = roles.filter(r => capRoleIds.includes(String(r.id || r.roleId || r.code)));
+                                                    if (matchedSelectedRoles.some(r => emp.role?.name === r.name || emp.roleName === r.name || emp.designation?.name === r.name)) return true;
                                                     return false;
                                                 })
                                                 .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
                                             value={capOps}
                                             onChange={(_, vals) => { setCapOps(vals); setCapErrors(prev => ({ ...prev, capOps: "" })); }}
-                                            placeholder={capRoleId ? "Select operators" : "Select role first"}
+                                            placeholder={capRoleIds && capRoleIds.length > 0 ? "Select operators" : "Select role(s) first"}
                                             error={capErrors.capOps}
                                         />
                                     </div>

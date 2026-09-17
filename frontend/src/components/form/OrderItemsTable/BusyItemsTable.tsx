@@ -78,7 +78,7 @@ const fmtINR = (v: string | number) => {
 // ─── Shared cell / border style ──────────────────────────────────────────────
 
 const B = "1px solid var(--color-line-soft, rgba(148,163,184,.25))";
-const B2 = "2px solid var(--color-line, rgba(148,163,184,.4))";
+const B2 = "1px solid var(--color-line-soft, rgba(148,163,184,.25))";
 
 const cellStyle: React.CSSProperties = {
   display: "flex", alignItems: "center", padding: "0 6px",
@@ -220,7 +220,7 @@ function BusyItemsTable<T extends Record<string, any>>({
       const cell = t.querySelector(`[data-r="${r}"][data-c="${c}"]`) as HTMLElement | null;
       if (!cell) return false;
       // Try to focus an input/select inside the cell first, otherwise focus the cell itself
-      const el = cell.querySelector("input:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+      const el = cell.querySelector("[data-nav]:not([disabled]), input:not([disabled]), select:not([disabled]), [role='combobox']:not([disabled]), [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
       if (el) {
         el.focus();
         if (el instanceof HTMLInputElement && el.type !== "button" && el.type !== "checkbox") {
@@ -246,8 +246,19 @@ function BusyItemsTable<T extends Record<string, any>>({
     // If inside a cell explicitly marked to let Enter/ArrowDown open the autocomplete dropdown, skip handling
     if (tgt.closest("[data-enter-opens-autocomplete]") && (e.key === "Enter" || e.key === "ArrowDown" || (e.altKey && e.key === "ArrowDown"))) return;
 
-    // If target is a standard HTML <select>, let native select handle Space / ArrowDown / ArrowUp when opened, but let Left/Right navigate
-    if (tgt.tagName === "SELECT" && (e.key === " " || ((e.key === "ArrowDown" || e.key === "ArrowUp") && (tgt as any).size > 1))) return;
+    // If target is a standard HTML <select>, let native select handle Space / ArrowDown / ArrowUp / Enter, but let Left/Right navigate
+    if (tgt.tagName === "SELECT" && (e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter")) return;
+
+    // If target is a MultiSelect or combobox or if a dropdown portal is open, let MultiSelect handle navigation keys
+    if (
+      tgt.closest("[role='combobox']") ||
+      tgt.closest("[aria-expanded='true']") ||
+      document.querySelector("[data-select-portal]")
+    ) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " " || e.key === "Escape") {
+        return;
+      }
+    }
 
     const cell = tgt.closest("[data-r][data-c]") as HTMLElement | null;
     if (!cell) return;
@@ -473,7 +484,7 @@ function BusyItemsTable<T extends Record<string, any>>({
 
   return (
     <div className={className}>
-      <div ref={tableRef} data-busy-table="true" onKeyDownCapture={onKey} style={{ border: B2, overflow: "hidden" }}>
+      <div ref={tableRef} data-busy-table="true" onKeyDownCapture={onKey} style={{ border: B2, borderRadius: "0.75rem", overflow: "hidden" }}>
 
         {/* Header */}
         <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: B2, background: "var(--color-card-2, #1e293b)" }}>

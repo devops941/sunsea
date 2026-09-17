@@ -37,6 +37,13 @@ export interface RawMaterial {
 
   createdBy?: string | null;
   updatedBy?: string | null;
+  createdUserName?: string;
+  createdUserRole?: string;
+  editHistory?: Array<{
+    updatedBy?: string;
+    updatedByName?: string;
+    updatedAt?: string | Date;
+  }> | null;
 
   categoryId?: number | null;
   category?: Category | null;

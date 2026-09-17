@@ -34,7 +34,15 @@ class CategoryService {
         type: data.type as any,
         isActive: data.isActive ?? true,
         createdBy: userId,
-      },
+        editHistory: userId
+          ? [
+              {
+                updatedBy: userId,
+                updatedAt: new Date().toISOString(),
+              },
+            ]
+          : [],
+      } as any,
     });
   }
 
@@ -126,7 +134,73 @@ class CategoryService {
       throw new ApiError(404, `Category with ID ${id} not found`);
     }
 
-    return category;
+    // Resolve createdBy user (matches customer.service.ts logic)
+    let createdUserName = "Unknown User";
+    let createdUserRole = "User";
+    if (category.createdBy) {
+      if (category.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(category.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: category.createdBy },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.username;
+          createdUserRole = user.role?.name || "User";
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray((category as any).editHistory)) {
+      enrichedEditHistory = await Promise.all(
+        ((category as any).editHistory as any[]).map(async (edit: any) => {
+          let name = "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true },
+              });
+              if (admin) name = admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true },
+              });
+              if (user) name = user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    if (enrichedEditHistory.length === 0 && category.createdAt) {
+      enrichedEditHistory.push({
+        updatedBy: category.createdBy,
+        updatedByName: createdUserName,
+        updatedAt: category.createdAt,
+      });
+    }
+
+    return {
+      ...category,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
   async update(id: number, data: UpdateCategoryInput, userId?: string) {
@@ -150,7 +224,27 @@ class CategoryService {
       }
     }
 
-    return prisma.category.update({
+    let newEditHistory: any[] = [];
+    if (Array.isArray((current as any).editHistory)) {
+      newEditHistory = [...(current as any).editHistory].map((e: any) => {
+        const { updatedByName, ...raw } = e;
+        return raw;
+      });
+    } else if (current.createdAt) {
+      newEditHistory.push({
+        updatedBy: current.createdBy,
+        updatedAt: current.createdAt instanceof Date ? current.createdAt.toISOString() : current.createdAt,
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    await prisma.category.update({
       where: { id },
       data: {
         name: data.name,
@@ -158,8 +252,19 @@ class CategoryService {
         type: data.type as any,
         isActive: data.isActive,
         updatedBy: userId,
+        editHistory: newEditHistory as any,
+      } as any,
+      include: {
+        _count: {
+          select: {
+            rawMaterials: true,
+            products: true,
+          },
+        },
       },
     });
+
+    return this.findById(id);
   }
 
   async delete(id: number) {

@@ -41,19 +41,28 @@ class SalesProductService {
     }
   }
 
-  async create(data: any) {
+  async create(data: any, userId?: string) {
     const components = Array.isArray(data.components) ? data.components : [];
     await this.validateComponents(components);
 
     const salesProductCode = await this.getNextSalesProductId();
 
-    return prisma.salesProduct.create({
+    return (prisma.salesProduct.create as any)({
       data: {
         salesProductCode,
         salesProductName: cleanString(data.salesProductName, 160)!,
         description: cleanString(data.description, 255),
         rate: toNumberOrNull(data.rate),
         isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+        createdBy: userId,
+        editHistory: userId
+          ? [
+              {
+                updatedBy: userId,
+                updatedAt: new Date().toISOString(),
+              },
+            ]
+          : [],
 
         components: {
           create: components.map((c: any) => ({
@@ -108,11 +117,77 @@ class SalesProductService {
       throw new ApiError(404, "Sales Product not found");
     }
 
-    return salesProduct;
+    // Resolve createdBy user
+    let createdUserName = "Unknown User";
+    let createdUserRole = "User";
+    if (salesProduct.createdBy) {
+      if (salesProduct.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(salesProduct.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: salesProduct.createdBy },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.username;
+          createdUserRole = user.role?.name || "User";
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray((salesProduct as any).editHistory)) {
+      enrichedEditHistory = await Promise.all(
+        ((salesProduct as any).editHistory as any[]).map(async (edit: any) => {
+          let name = "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true },
+              });
+              if (admin) name = admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true },
+              });
+              if (user) name = user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    if (enrichedEditHistory.length === 0 && salesProduct.createdAt) {
+      enrichedEditHistory.push({
+        updatedBy: salesProduct.createdBy,
+        updatedByName: createdUserName,
+        updatedAt: salesProduct.createdAt,
+      });
+    }
+
+    return {
+      ...salesProduct,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
-  async update(id: bigint, data: any) {
-    await this.findById(id);
+  async update(id: bigint, data: any, userId?: string) {
+    const current = await this.findById(id);
 
     let components: any[] | null = null;
     if (data.components !== undefined) {
@@ -154,16 +229,39 @@ class SalesProductService {
       }
     });
 
-    return prisma.salesProduct.update({
+    let newEditHistory: any[] = [];
+    if (Array.isArray((current as any).editHistory)) {
+      newEditHistory = [...(current as any).editHistory].map((e: any) => {
+        const { updatedByName, ...raw } = e;
+        return raw;
+      });
+    } else if (current.createdAt) {
+      newEditHistory.push({
+        updatedBy: current.createdBy,
+        updatedAt: current.createdAt instanceof Date ? current.createdAt.toISOString() : current.createdAt,
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    await (prisma.salesProduct.update as any)({
       where: { id },
       data: {
         salesProductName: data.salesProductName !== undefined ? cleanString(data.salesProductName, 160)! : undefined,
         description: data.description !== undefined ? cleanString(data.description, 255) : undefined,
         rate: data.rate !== undefined ? toNumberOrNull(data.rate) : undefined,
         isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined,
+        modifiedBy: userId,
+        editHistory: newEditHistory,
       },
-      include: includeDefaults,
     });
+
+    return this.findById(id);
   }
 
   async delete(id: bigint) {

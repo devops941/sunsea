@@ -8,10 +8,12 @@ import { getIO } from "../../socket/socket";
 class ProductController {
   create = asyncHandler(
     async (req: Request, res: Response) => {
+      const userId = req.user?.userId;
       const product =
         await productService.create(
           req.body,
-          req.files as Express.Multer.File[] | undefined
+          req.files as Express.Multer.File[] | undefined,
+          userId
         );
 
       getIO().emit("product:created", product);
@@ -69,12 +71,14 @@ class ProductController {
       const id = BigInt(
         String(req.params.id)
       );
+      const userId = req.user?.userId;
 
       const product =
         await productService.update(
           id,
           req.body,
-          req.files as Express.Multer.File[] | undefined
+          req.files as Express.Multer.File[] | undefined,
+          userId
         );
 
       getIO().emit("product:updated", product);

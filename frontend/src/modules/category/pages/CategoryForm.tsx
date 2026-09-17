@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef ,useCallback} from "react";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
@@ -18,6 +18,8 @@ import { createCategory, updateCategory } from "../../../features/categories/cat
 import { categoryService } from "../../../services/categoryService";
 import type { AppDispatch } from "../../../app/store";
 import type { CategoryType } from "../../../features/categories/types";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 const categorySchema = z.object({
   type: z.enum(["PRODUCT", "RAW_MATERIAL", "WASTAGE"], {
@@ -79,6 +81,7 @@ const CategoryForm: React.FC = () => {
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
   const handleSubmitRef = useRef<() => void>(() => {});
@@ -102,38 +105,31 @@ const CategoryForm: React.FC = () => {
 
   // ── Load existing data in edit mode ────────────────────────────────────────
   useEffect(() => {
-    if (!isEditMode) return;
+    if (!isEditMode || !idParam) return;
 
-    const stateData = location.state as any;
-
-    if (stateData && stateData.id) {
-      setFormData({
-        code: stateData.code ?? "",
-        name: stateData.name ?? "",
-        description: stateData.description ?? "",
-        type: stateData.type ?? "",
-        isActive: stateData.isActive ?? true,
-      });
-    } else {
-      setIsFetchingData(true);
-      categoryService
-        .fetchById(Number(idParam))
-        .then((data) => {
-          setFormData({
-            code: data.code ?? "",
-            name: data.name ?? "",
-            description: data.description ?? "",
-            type: data.type ?? "",
-            isActive: data.isActive ?? true,
-          });
-        })
-        .catch(() => {
-          toast.error("Failed to load category data");
-          navigate("/categories");
-        })
-        .finally(() => setIsFetchingData(false));
-    }
-  }, [isEditMode, idParam, location.state, navigate]);
+    setIsFetchingData(true);
+    categoryService
+      .fetchById(Number(idParam))
+      .then((data: any) => {
+        setFormData({
+          code: data.code ?? "",
+          name: data.name ?? "",
+          description: data.description ?? "",
+          type: data.type ?? "",
+          isActive: data.isActive ?? true,
+        });
+        setAuditInfo({
+          createdAt: data.createdAt,
+          createdBy: data.createdUserName || data.createdBy,
+          editHistory: data.editHistory,
+        });
+      })
+      .catch(() => {
+        toast.error("Failed to load category data");
+        navigate("/categories");
+      })
+      .finally(() => setIsFetchingData(false));
+  }, [isEditMode, idParam, navigate]);
 
   // ── Auto-generate code in create mode when type changes ───────────────────
   useEffect(() => {
@@ -202,8 +198,104 @@ const CategoryForm: React.FC = () => {
     return true;
   };
 
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+    if (resetRef.current) {
+      const r = resetRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      r();
+    }
+    setTimeout(() => {
+      lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+    }, 50);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    setIsDirty(false);
+    if (proceedRef.current) {
+      const p = proceedRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      p();
+      return;
+    }
+    navigate("/categories");
+  }, [navigate]);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (isSubmitting) return;
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    try {
+      if (isEditMode) {
+        const updated: any = await dispatch(
+          updateCategory({
+            id: Number(idParam),
+            data: {
+              name: formData.name.trim(),
+              description: formData.description.trim() || null,
+              type: formData.type as CategoryType,
+              isActive: formData.isActive,
+            },
+          })
+        ).unwrap();
+        invalidateCacheByPrefix("categories");
+        toast.success("Category updated successfully!");
+
+        if (updated) {
+          setFormData((prev) => ({
+            ...prev,
+            name: updated.name ?? prev.name,
+            description: updated.description ?? "",
+            type: updated.type ?? prev.type,
+            isActive: updated.isActive ?? prev.isActive,
+          }));
+          setAuditInfo({
+            createdAt: updated.createdAt,
+            createdBy: updated.createdUserName || updated.createdBy,
+            editHistory: updated.editHistory,
+          });
+        }
+        setIsDirty(false);
+      } else {
+        await dispatch(
+          createCategory({
+            code: formData.code,
+            name: formData.name.trim(),
+            description: formData.description.trim() || null,
+            type: formData.type as CategoryType,
+            isActive: formData.isActive,
+          })
+        ).unwrap();
+        invalidateCacheByPrefix("categories");
+        toast.success("Category created successfully!");
+        setIsDirty(false);
+        setFormData(initialFormState);
+        setErrors({});
+        setTimeout(() => {
+          formRef.current?.querySelector<HTMLElement>("select[name='type'], input[name='name']")?.focus();
+        }, 0);
+      }
+    } catch (err: any) {
+      toast.error(err || "Failed to save category");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveFromModal = useCallback(async () => {
+    setSaveConfirmOpen(false);
+    setTimeout(() => {
+      handleSubmitRef.current();
+    }, 50);
+  }, []);
+
   // Sync handleSubmit ref so shortcuts always call latest version
-  handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+  handleSubmitRef.current = () => handleSubmit();
 
   useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
   useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
@@ -215,80 +307,17 @@ const CategoryForm: React.FC = () => {
       e.preventDefault();
       e.stopPropagation();
       if (saveConfirmOpenRef.current) {
-        setSaveConfirmOpen(false);
-        setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+        handleResume();
       } else if (isDirtyRef.current) {
         lastFocusedRef.current = document.activeElement as HTMLElement;
         setSaveConfirmOpen(true);
       } else {
-        // Walk back to whichever page opened this form (Dashboard when the
-        // operator hit the sidebar's "Add Category" link directly; the List
-        // page when they clicked Edit on a row). Hardcoding "/categories"
-        // forced everyone onto the list — which is wrong for the sidebar-
-        // menu case and produced an Esc loop.
-        navigate(-1);
+        navigate("/categories");
       }
     };
     window.addEventListener("keydown", handleEscape, { capture: true });
     return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-  }, [navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-    if (!validate()) return;
-
-    setIsSubmitting(true);
-    try {
-      if (isEditMode) {
-        await dispatch(
-          updateCategory({
-            id: Number(idParam),
-            data: {
-              name: formData.name.trim(),
-              description: formData.description.trim() || null,
-              type: formData.type as CategoryType,
-              isActive: formData.isActive,
-            },
-          })
-        ).unwrap();
-        toast.success("Category updated successfully!");
-      } else {
-        await dispatch(
-          createCategory({
-            code: formData.code,
-            name: formData.name.trim(),
-            description: formData.description.trim() || null,
-            type: formData.type as CategoryType,
-            isActive: formData.isActive,
-          })
-        ).unwrap();
-        toast.success("Category created successfully!");
-      }
-      setIsDirty(false);
-      // Add mode: reset the form and stay on this page so the operator can
-      // punch in the next category without leaving. Edit mode goes back to
-      // where they came from (usually the list they clicked Edit from).
-      // Previously both modes navigated to /categories, which pushed an
-      // extra history entry and broke Esc-back to Dashboard from the
-      // sidebar's "Add Category" link.
-      if (isEditMode) {
-        navigate(-1);
-      } else {
-        setFormData(initialFormState);
-        setErrors({});
-        // Refocus the first field (Type dropdown drives auto-code) so the
-        // next entry starts without a click.
-        setTimeout(() => {
-          formRef.current?.querySelector<HTMLElement>("select[name='type'], input[name='name']")?.focus();
-        }, 0);
-      }
-    } catch (err: any) {
-      toast.error(err || "Failed to save category");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [handleResume, navigate]);
 
   if (isFetchingData) {
     return (
@@ -302,11 +331,24 @@ const CategoryForm: React.FC = () => {
     <div>
       <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-          <h2 className="text-xl font-bold text-ink">
-            {isEditMode ? "Edit Category" : "Create Category"}
-          </h2>
-          <BackButton text="Back to List" to="/categories" />
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
+          <div className="flex flex-col">
+            <h2 className="text-xl font-bold text-ink">
+              {isEditMode ? "Edit Category" : "Create Category"}
+            </h2>
+            {isEditMode && <RecordAuditInfo auditData={auditInfo} title="Category" />}
+          </div>
+          <BackButton
+            text="Back to List"
+            onClick={() => {
+              if (isDirty) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+              } else {
+                navigate("/categories");
+              }
+            }}
+          />
         </div>
 
         <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="p-5 lg:p-6 space-y-4" noValidate>
@@ -398,22 +440,20 @@ const CategoryForm: React.FC = () => {
       </div>
 
       <CommonConfirmModal
-        show={saveConfirmOpen}
-        onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-        onConfirm={() => {
-          setSaveConfirmOpen(false);
-          setTimeout(() => {
-            handleSubmitRef.current();
-            setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-          }, 150);
-        }}
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
         title="Unsaved Changes"
         message="You have unsaved changes. Do you want to save before leaving?"
+        warningText="Save to keep your changes, or Discard to leave."
         confirmText="Save"
         cancelText="Discard"
+        cancelVariant="danger"
         confirmVariant="primary"
         confirmIcon={FaCheck}
-        onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } navigate(-1); }}
+        isDangerous={false}
+        defaultFocusCancel={false}
       />
     </div>
   );

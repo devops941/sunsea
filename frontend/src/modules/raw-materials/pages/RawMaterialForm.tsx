@@ -21,6 +21,8 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { categoryService } from "../../../services/categoryService";
 import { convertToPrimaryUom } from "../../../utils/uomConversion";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 const initialFormState = {
     rawMaterialId: "",
@@ -147,6 +149,7 @@ const RawMaterialForm: React.FC = () => {
     const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
@@ -210,23 +213,23 @@ const RawMaterialForm: React.FC = () => {
         fetchStoresData();
 
         if (isEditMode && id) {
-            const stateData = (location.state as any);
-            if (stateData && stateData.rawMaterialId === id) {
-                populateFormData(stateData);
-            } else {
-                setIsLoadingData(true);
-                rawMaterialService.fetchById(id)
-                    .then(data => {
-                        populateFormData(data);
-                    })
-                    .catch(err => {
-                        toast.error(err?.message || "Failed to load raw material data");
-                        navigate("/raw-materials");
-                    })
-                    .finally(() => {
-                        setIsLoadingData(false);
+            setIsLoadingData(true);
+            rawMaterialService.fetchById(id)
+                .then((data: any) => {
+                    populateFormData(data);
+                    setAuditInfo({
+                        createdAt: data.createdAt,
+                        createdBy: data.createdUserName || data.createdBy,
+                        editHistory: data.editHistory,
                     });
-            }
+                })
+                .catch(err => {
+                    toast.error(err?.message || "Failed to load raw material data");
+                    navigate("/raw-materials");
+                })
+                .finally(() => {
+                    setIsLoadingData(false);
+                });
         } else {
             rawMaterialService.fetchNextId()
                 .then(nextId => {
@@ -234,7 +237,7 @@ const RawMaterialForm: React.FC = () => {
                 })
                 .catch(() => {});
         }
-    }, [isEditMode, id, location.state, fetchStoresData, populateFormData, navigate]);
+    }, [isEditMode, id, fetchStoresData, populateFormData, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -259,7 +262,40 @@ const RawMaterialForm: React.FC = () => {
         setReorderLevelUom("");
     };
 
-    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (resetRef.current) {
+            const r = resetRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            r();
+        }
+        setTimeout(() => {
+            lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setIsDirty(false);
+        if (proceedRef.current) {
+            const p = proceedRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            p();
+            return;
+        }
+        navigate("/raw-materials");
+    }, [navigate]);
+
+    const handleSaveFromModal = useCallback(async () => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            handleSubmitRef.current();
+        }, 50);
+    }, []);
+
+    handleSubmitRef.current = () => handleSubmit();
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
@@ -281,21 +317,20 @@ const RawMaterialForm: React.FC = () => {
             e.preventDefault();
             e.stopPropagation();
             if (saveConfirmOpenRef.current) {
-                setSaveConfirmOpen(false);
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+                handleResume();
             } else if (isDirtyRef.current) {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate(-1);
+                navigate("/raw-materials");
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-    }, [navigate]);
+    }, [handleResume, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e?.preventDefault) e.preventDefault();
         if (isSubmitting) return;
 
         try {
@@ -354,12 +389,21 @@ const RawMaterialForm: React.FC = () => {
             };
 
             if (isEditMode && id) {
-                await dispatch(updateRawMaterial({ id, data: payload })).unwrap();
+                const updated: any = await dispatch(updateRawMaterial({ id, data: payload })).unwrap();
+                invalidateCacheByPrefix("rawMaterials");
                 toast.success("Raw material updated successfully!");
+                if (updated) {
+                    populateFormData(updated);
+                    setAuditInfo({
+                        createdAt: updated.createdAt,
+                        createdBy: updated.createdUserName || updated.createdBy,
+                        editHistory: updated.editHistory,
+                    });
+                }
                 setIsDirty(false);
-                navigate(-1);
             } else {
                 await dispatch(createRawMaterial(payload)).unwrap();
+                invalidateCacheByPrefix("rawMaterials");
                 toast.success("Raw material created successfully!");
                 setFormData({ ...initialFormState });
                 setErrors({});
@@ -367,7 +411,6 @@ const RawMaterialForm: React.FC = () => {
                 setMinimumStockUom("");
                 setReorderLevelUom("");
                 setIsDirty(false);
-                setIsSubmitting(false);
                 rawMaterialService.fetchNextId()
                     .then(nextId => {
                         setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
@@ -377,6 +420,7 @@ const RawMaterialForm: React.FC = () => {
             }
         } catch (err: any) {
             toast.error(typeof err === 'string' ? err : err?.message || (isEditMode ? "Failed to update raw material" : "Failed to create raw material"));
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -392,11 +436,24 @@ const RawMaterialForm: React.FC = () => {
     return (
         <div className="w-full max-w-[1024px] xl:mr-auto h-full flex flex-col">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft flex flex-col flex-1 h-full">
-                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="text-xl font-bold text-ink">
-                        {isEditMode ? "Edit Raw Material" : "Create Raw Material"}
-                    </h2>
-                    <BackButton text="Back to List" />
+                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-ink">
+                            {isEditMode ? "Edit Raw Material" : "Create Raw Material"}
+                        </h2>
+                        {isEditMode && <RecordAuditInfo auditData={auditInfo} title="Raw Material" />}
+                    </div>
+                    <BackButton
+                        text="Back to List"
+                        onClick={() => {
+                            if (isDirty) {
+                                lastFocusedRef.current = document.activeElement as HTMLElement;
+                                setSaveConfirmOpen(true);
+                            } else {
+                                navigate("/raw-materials");
+                            }
+                        }}
+                    />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex flex-col flex-1" noValidate>
@@ -559,22 +616,20 @@ const RawMaterialForm: React.FC = () => {
             </div>
 
             <CommonConfirmModal
-                show={saveConfirmOpen}
-                onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-                onConfirm={() => {
-                    setSaveConfirmOpen(false);
-                    setTimeout(() => {
-                        handleSubmitRef.current();
-                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-                    }, 150);
-                }}
+                isOpen={saveConfirmOpen}
+                onClose={handleResume}
+                onCancel={handleDiscard}
+                onConfirm={handleSaveFromModal}
                 title="Unsaved Changes"
                 message="You have unsaved changes. Do you want to save before leaving?"
+                warningText="Save to keep your changes, or Discard to leave."
                 confirmText="Save"
                 cancelText="Discard"
+                cancelVariant="danger"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } setIsDirty(false); navigate(-1); }}
+                isDangerous={false}
+                defaultFocusCancel={false}
             />
         </div>
     );

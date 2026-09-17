@@ -12,6 +12,8 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
 import AutocompleteInput, { type AutocompleteOption } from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 import { salesProductService } from "../../../services/salesProductService";
 import { productService } from "../../../services/productService";
@@ -43,6 +45,7 @@ const SalesProductForm: React.FC = () => {
 
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
@@ -83,21 +86,23 @@ const SalesProductForm: React.FC = () => {
 
     useEffect(() => {
         if (isEditMode && id) {
-            const stateData = location.state as any;
-            if (stateData && String(stateData.id) === String(id)) {
-                populateForm(stateData);
-            } else {
-                setIsLoadingData(true);
-                salesProductService.fetchById(id)
-                    .then(populateForm)
-                    .catch(() => {
-                        toast.error("Failed to load Sales Product");
-                        navigate("/sales-products");
-                    })
-                    .finally(() => setIsLoadingData(false));
-            }
+            setIsLoadingData(true);
+            salesProductService.fetchById(id)
+                .then((data: any) => {
+                    populateForm(data);
+                    setAuditInfo({
+                        createdAt: data.createdAt,
+                        createdBy: data.createdUserName || data.createdBy,
+                        editHistory: data.editHistory,
+                    });
+                })
+                .catch(() => {
+                    toast.error("Failed to load Sales Product");
+                    navigate("/sales-products");
+                })
+                .finally(() => setIsLoadingData(false));
         }
-    }, [isEditMode, id, location.state, navigate, populateForm]);
+    }, [isEditMode, id, navigate, populateForm]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -166,30 +171,43 @@ const SalesProductForm: React.FC = () => {
         setErrors({});
     };
 
-    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (resetRef.current) {
+            const r = resetRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            r();
+        }
+        setTimeout(() => {
+            lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setIsDirty(false);
+        if (proceedRef.current) {
+            const p = proceedRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            p();
+            return;
+        }
+        navigate("/sales-products");
+    }, [navigate]);
+
+    const handleSaveFromModal = useCallback(async () => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            handleSubmitRef.current();
+        }, 50);
+    }, []);
+
+    handleSubmitRef.current = () => handleSubmit();
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
-
-    useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
-            e.preventDefault();
-            e.stopPropagation();
-            if (saveConfirmOpenRef.current) {
-                setSaveConfirmOpen(false);
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
-            } else if (isDirtyRef.current) {
-                lastFocusedRef.current = document.activeElement as HTMLElement;
-                setSaveConfirmOpen(true);
-            } else {
-                navigate(-1);
-            }
-        };
-        window.addEventListener("keydown", handleEscape, { capture: true });
-        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-    }, [navigate]);
 
     // Ref to remember blocker's proceed()/reset() from the current block-attempt
     // so the existing discard modal can drive them from its buttons.
@@ -201,8 +219,27 @@ const SalesProductForm: React.FC = () => {
         setSaveConfirmOpen(true);
     });
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (saveConfirmOpenRef.current) {
+                handleResume();
+            } else if (isDirtyRef.current) {
+                lastFocusedRef.current = document.activeElement as HTMLElement;
+                setSaveConfirmOpen(true);
+            } else {
+                navigate("/sales-products");
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [handleResume, navigate]);
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e?.preventDefault) e.preventDefault();
         if (isSubmitting) return;
         if (!canSave) {
             toast.error("You do not have permission to perform this action.");
@@ -222,16 +259,23 @@ const SalesProductForm: React.FC = () => {
         setIsSubmitting(true);
         try {
             if (isEditMode && id) {
-                await salesProductService.update(id, payload);
+                const updated: any = await salesProductService.update(id, payload);
+                invalidateCacheByPrefix("salesProducts");
                 toast.success("Sales Product updated successfully!");
+                if (updated) {
+                    populateForm(updated);
+                    setAuditInfo({
+                        createdAt: updated.createdAt,
+                        createdBy: updated.createdUserName || updated.createdBy,
+                        editHistory: updated.editHistory,
+                    });
+                }
+                setIsDirty(false);
             } else {
                 await salesProductService.create(payload);
+                invalidateCacheByPrefix("salesProducts");
                 toast.success("Sales Product created successfully!");
-            }
-            setIsDirty(false);
-            if (isEditMode) {
-                navigate(-1);
-            } else {
+                setIsDirty(false);
                 handleClear();
                 setTimeout(() => {
                     formRef.current?.querySelector<HTMLInputElement>("input[name='salesProductName']")?.focus();
@@ -346,9 +390,22 @@ const SalesProductForm: React.FC = () => {
         <>
         <div className="w-full max-w-[1024px] xl:mr-auto">
             <div className="bg-card rounded-xl border border-line-soft shadow-xs">
-                <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Sales Product" : "Create Sales Product"}</h2>
-                    <BackButton text="Back to List" to="/sales-products" />
+                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-ink">{isEditMode ? "Edit Sales Product" : "Create Sales Product"}</h2>
+                        {isEditMode && <RecordAuditInfo auditData={auditInfo} title="Sales Product" />}
+                    </div>
+                    <BackButton
+                        text="Back to List"
+                        onClick={() => {
+                            if (isDirty) {
+                                lastFocusedRef.current = document.activeElement as HTMLElement;
+                                setSaveConfirmOpen(true);
+                            } else {
+                                navigate("/sales-products");
+                            }
+                        }}
+                    />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-6 py-4 space-y-4" noValidate>
@@ -411,22 +468,20 @@ const SalesProductForm: React.FC = () => {
             </div>
         </div>
         <CommonConfirmModal
-            show={saveConfirmOpen}
-            onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-            onConfirm={() => {
-                setSaveConfirmOpen(false);
-                setTimeout(() => {
-                    handleSubmitRef.current();
-                    setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-                }, 150);
-            }}
+            isOpen={saveConfirmOpen}
+            onClose={handleResume}
+            onCancel={handleDiscard}
+            onConfirm={handleSaveFromModal}
             title="Unsaved Changes"
             message="You have unsaved changes. Do you want to save before leaving?"
+            warningText="Save to keep your changes, or Discard to leave."
             confirmText="Save"
             cancelText="Discard"
+            cancelVariant="danger"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } setIsDirty(false); navigate(-1); }}
+            isDangerous={false}
+            defaultFocusCancel={false}
         />
         </>
     );

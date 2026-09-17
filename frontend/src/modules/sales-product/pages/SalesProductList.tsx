@@ -133,8 +133,7 @@ const SalesProductList: React.FC = () => {
 
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
         count: paginatedData.length,
-        onEnter: (i) => { const item = paginatedData[i]; if (item && can("sales_products.edit")) handleOpenEdit(item); },
-        onEdit: (i) => { const item = paginatedData[i]; if (item && can("sales_products.edit")) handleOpenEdit(item); },
+        onEnter: () => {},
         containerRef: tableRef,
     });
 
@@ -211,10 +210,7 @@ const SalesProductList: React.FC = () => {
                 </button>
             ),
             render: (item) => (
-                <div>
-                    <div className="font-semibold text-ink">{item.salesProductName}</div>
-                    <span className="text-xs text-ink-subtle">Code: {item.salesProductCode}</span>
-                </div>
+                <div className="font-semibold text-ink">{item.salesProductName}</div>
             ),
         },
         {
@@ -256,8 +252,12 @@ const SalesProductList: React.FC = () => {
             <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Sales Product</h2>
-                        
+                        <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+                            Sales Product
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {sortedSalesProducts.length}
+                            </span>
+                        </h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <div className="w-full md:w-64">
@@ -337,7 +337,7 @@ const SalesProductList: React.FC = () => {
                         loading={loading}
                         emptyMessage="No sales products found."
                         rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
-                        onRowClick={(item, i) => { setFocusedIndex(i); if (can("sales_products.edit")) handleOpenEdit(item); }}
+                        onRowClick={(_, i) => setFocusedIndex(i)}
                         pagination={totalPages > 1 ? {
                             currentPage,
                             totalPages,

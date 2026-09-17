@@ -21,6 +21,7 @@ import { fetchRawMaterialStocks } from "../../../features/raw-materials/rawMater
 import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
+import { convertUomQty, getUomOptions } from "../../../utils/uomConversion";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
@@ -608,49 +609,83 @@ const StockAdjustmentForm: React.FC = () => {
       width: "90px",
       align: "center" as const,
       render: (row: any) => {
-        const baseUom = getPrimaryUom(row.uom || "pcs");
+        const primaryUom = getPrimaryUom(row.uom || "pcs");
         return (
           <span className="font-semibold text-ink text-[13px]">
-            {row.name ? `${row.currentQty ?? 0} ${baseUom}` : ""}
+            {row.name ? `${row.currentQty ?? 0} ${primaryUom}` : ""}
           </span>
         );
       },
     },
     {
       key: "difference",
-      header: "Adjust",
-      width: "110px",
+      header: "Adjust & UOM",
+      width: "150px",
       align: "center" as const,
       render: (row: any, index: number, update: (patch: any) => void) => {
         const currentInputVal = row.adjustInputValue !== undefined ? row.adjustInputValue : (row.difference === 0 ? "" : row.difference);
+        const uomOptions = getUomOptions(row.uom);
+        const primaryUom = getPrimaryUom(row.uom || "pcs");
+        const activeUom = row.selectedUom || uomOptions[0] || primaryUom;
+
         return (
-          <input
-            type="text"
-            inputMode="decimal"
-            data-nav
-            value={currentInputVal ?? ""}
-            placeholder="0.00"
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val !== "" && val !== "-" && val !== "+" && isNaN(Number(val))) return;
-              const numVal = Number(val || 0);
-              const current = Number(row.currentQty || 0);
-              update({
-                adjustInputValue: val,
-                difference: numVal,
-                adjustedQty: current + numVal,
-              });
-              setIsDirty(true);
-              setErrors(prev => {
-                if (!prev[`items.${index}.adjustedQty`] && !prev.items) return prev;
-                const next = { ...prev };
-                delete next[`items.${index}.adjustedQty`];
-                delete next.items;
-                return next;
-              });
-            }}
-            className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 font-semibold"
-          />
+          <div className="flex items-center w-full h-full gap-0.5 px-0.5">
+            <input
+              type="text"
+              inputMode="decimal"
+              data-nav
+              value={currentInputVal ?? ""}
+              placeholder="0.00"
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val !== "" && val !== "-" && val !== "+" && isNaN(Number(val))) return;
+                const numVal = Number(val || 0);
+                const current = Number(row.currentQty || 0);
+                const diffInPrimary = convertUomQty(numVal, activeUom, primaryUom);
+                update({
+                  adjustInputValue: val,
+                  difference: diffInPrimary,
+                  adjustedQty: current + diffInPrimary,
+                });
+                setIsDirty(true);
+                setErrors(prev => {
+                  if (!prev[`items.${index}.adjustedQty`] && !prev.items) return prev;
+                  const next = { ...prev };
+                  delete next[`items.${index}.adjustedQty`];
+                  delete next.items;
+                  return next;
+                });
+              }}
+              className="flex-1 min-w-0 bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 font-semibold"
+            />
+            {uomOptions.length > 1 ? (
+              <select
+                data-nav
+                value={activeUom}
+                onChange={(e) => {
+                  const newUom = e.target.value;
+                  const numVal = Number(currentInputVal || 0);
+                  const current = Number(row.currentQty || 0);
+                  const diffInPrimary = convertUomQty(numVal, newUom, primaryUom);
+                  update({
+                    selectedUom: newUom,
+                    difference: diffInPrimary,
+                    adjustedQty: current + diffInPrimary,
+                  });
+                  setIsDirty(true);
+                }}
+                className="bg-transparent text-[11px] font-semibold text-ink-subtle border border-line-soft/40 hover:border-line-soft rounded px-1 py-0.5 outline-none cursor-pointer shrink-0"
+              >
+                {uomOptions.map((u: string) => (
+                  <option key={u} value={u} className="bg-card text-ink">
+                    {u}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[11px] font-semibold text-ink-subtle px-1 shrink-0">{activeUom}</span>
+            )}
+          </div>
         );
       },
     },
@@ -664,15 +699,15 @@ const StockAdjustmentForm: React.FC = () => {
         const diff = Number(row.difference || 0);
         const current = Number(row.currentQty || 0);
         const newTotal = current + diff;
-        const baseUom = getPrimaryUom(row.uom || "pcs");
+        const primaryUom = getPrimaryUom(row.uom || "pcs");
         return (
           <div className="flex flex-col items-center leading-tight">
             <span className="font-bold text-ink text-[13px]">
-              {formatCleanNumber(newTotal)} {baseUom}
+              {formatCleanNumber(newTotal)} {primaryUom}
             </span>
             {diff !== 0 && (
               <span className={`text-[10px] font-bold ${diff > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                {diff > 0 ? `+${diff}` : diff}
+                {diff > 0 ? `+${formatCleanNumber(diff)}` : formatCleanNumber(diff)}
               </span>
             )}
           </div>

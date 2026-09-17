@@ -22,6 +22,8 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
+import RecordAuditInfo from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 const initialFormState = {
     storeId: "",
@@ -90,6 +92,11 @@ const StorageStoreForm: React.FC = () => {
     const [dbStoreTypes, setDbStoreTypes] = useState<Array<{ label: string; value: string }>>([]);
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [auditInfo, setAuditInfo] = useState<{
+        createdAt?: string | Date;
+        createdBy?: string;
+        editHistory?: any[];
+    } | null>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
@@ -131,6 +138,57 @@ const StorageStoreForm: React.FC = () => {
         }
     }, [dispatch, loadRoles]);
 
+    const populateFormData = useCallback((storeData: any) => {
+        let addressLine = "";
+        let city = "";
+        let state = "";
+        let country = "India";
+        let zipcode = "";
+
+        if (storeData.locationDesc) {
+            try {
+                const parsed = JSON.parse(storeData.locationDesc);
+                if (typeof parsed === "object" && parsed !== null) {
+                    addressLine = parsed.addressLine || "";
+                    city = parsed.city || "";
+                    state = parsed.state || "";
+                    country = parsed.country || "India";
+                    zipcode = parsed.zipcode || "";
+                } else {
+                    addressLine = storeData.locationDesc;
+                }
+            } catch {
+                addressLine = storeData.locationDesc;
+            }
+        }
+
+        setFormData({
+            storeId: storeData.storeId,
+            storeName: storeData.storeName || "",
+            storeCategory: storeData.storeCategory || "",
+            inchargeId: storeData.inchargeId ? storeData.inchargeId.toString() : "",
+            addressLine,
+            city,
+            state,
+            country,
+            zipcode,
+            locationDesc: storeData.locationDesc || "",
+            gstPlace: storeData.gstPlace || "",
+            isActive: storeData.isActive ?? true,
+        });
+
+        const inchargeRoleId = (storeData.incharge as any)?.roleId || (storeData.incharge as any)?.user?.roleId;
+        if (inchargeRoleId) {
+            setSelectedRoleId(String(inchargeRoleId));
+        }
+
+        setAuditInfo({
+            createdAt: storeData.createdAt,
+            createdBy: storeData.createdUserName || storeData.createdBy,
+            editHistory: storeData.editHistory,
+        });
+    }, []);
+
     // Load initial data (Create mode vs Edit mode)
     useEffect(() => {
         let isMounted = true;
@@ -142,48 +200,7 @@ const StorageStoreForm: React.FC = () => {
                 try {
                     const storeData = await storeService.fetchById(id);
                     if (isMounted && storeData) {
-                        let addressLine = "";
-                        let city = "";
-                        let state = "";
-                        let country = "India";
-                        let zipcode = "";
-
-                        if (storeData.locationDesc) {
-                            try {
-                                const parsed = JSON.parse(storeData.locationDesc);
-                                if (typeof parsed === "object" && parsed !== null) {
-                                    addressLine = parsed.addressLine || "";
-                                    city = parsed.city || "";
-                                    state = parsed.state || "";
-                                    country = parsed.country || "India";
-                                    zipcode = parsed.zipcode || "";
-                                } else {
-                                    addressLine = storeData.locationDesc;
-                                }
-                            } catch {
-                                addressLine = storeData.locationDesc;
-                            }
-                        }
-
-                        setFormData({
-                            storeId: storeData.storeId,
-                            storeName: storeData.storeName || "",
-                            storeCategory: storeData.storeCategory || "",
-                            inchargeId: storeData.inchargeId ? storeData.inchargeId.toString() : "",
-                            addressLine,
-                            city,
-                            state,
-                            country,
-                            zipcode,
-                            locationDesc: storeData.locationDesc || "",
-                            gstPlace: storeData.gstPlace || "",
-                            isActive: storeData.isActive ?? true,
-                        });
-
-                        const inchargeRoleId = (storeData.incharge as any)?.roleId || (storeData.incharge as any)?.user?.roleId;
-                        if (inchargeRoleId) {
-                            setSelectedRoleId(String(inchargeRoleId));
-                        }
+                        populateFormData(storeData);
                     }
                 } catch (err: any) {
                     toast.error(err?.message || "Failed to load store details");
@@ -205,7 +222,7 @@ const StorageStoreForm: React.FC = () => {
 
         initializeForm();
         return () => { isMounted = false; };
-    }, [id, isEditMode, fetchDependencies, navigate]);
+    }, [id, isEditMode, fetchDependencies, navigate, populateFormData]);
 
     // Auto-detect role for the incharge employee in edit mode
     useEffect(() => {
@@ -245,6 +262,39 @@ const StorageStoreForm: React.FC = () => {
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
 
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (resetRef.current) {
+            const r = resetRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            r();
+        }
+        setTimeout(() => {
+            lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setIsDirty(false);
+        if (proceedRef.current) {
+            const p = proceedRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            p();
+            return;
+        }
+        navigate("/storage-stores");
+    }, [navigate]);
+
+    const handleSaveFromModal = useCallback(async () => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            handleSubmitRef.current();
+        }, 50);
+    }, []);
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
@@ -252,21 +302,21 @@ const StorageStoreForm: React.FC = () => {
             e.preventDefault();
             e.stopPropagation();
             if (saveConfirmOpenRef.current) {
-                setSaveConfirmOpen(false);
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+                handleResume();
             } else if (isDirtyRef.current) {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate(-1);
+                navigate("/storage-stores");
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-    }, [navigate]);
+    }, [handleResume, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e?.preventDefault) e.preventDefault();
+        if (isSubmitting) return;
 
         try {
             storeSchema.parse(formData);
@@ -314,13 +364,16 @@ const StorageStoreForm: React.FC = () => {
             };
 
             if (isEditMode) {
-                await dispatch(updateStore({ id: formData.storeId, data: payload as any })).unwrap();
+                const updated: any = await dispatch(updateStore({ id: formData.storeId, data: payload as any })).unwrap();
+                invalidateCacheByPrefix("stores");
                 toast.success("Store updated successfully!");
+                if (updated) {
+                    populateFormData(updated);
+                }
                 setIsDirty(false);
-                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
-                navigate(-1);
             } else {
                 await dispatch(createStore(payload as any)).unwrap();
+                invalidateCacheByPrefix("stores");
                 toast.success("Store created successfully!");
                 setIsDirty(false);
                 let nextId = "";
@@ -356,18 +409,24 @@ const StorageStoreForm: React.FC = () => {
         <div className="w-full max-w-[1024px] xl:mr-auto flex-1 flex flex-col">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible flex-1 flex flex-col">
                 {/* Page Header */}
-                <div className="px-6 py-5 border-b border-line-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-xl font-bold text-ink">
-                                {isEditMode ? "Edit Storage Store" : "Create Storage Store"}
-                            </h2>
-                            <p className="text-sm text-ink-subtle mt-1">
-                                {isEditMode ? `Editing details for Store ID: ${formData.storeId}` : "Enter details to create a new storage store location."}
-                            </p>
-                        </div>
-                        <BackButton to="/storage-stores" />
+                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-ink">
+                            {isEditMode ? "Edit Storage Store" : "Create Storage Store"}
+                        </h2>
+                        {isEditMode && <RecordAuditInfo auditData={auditInfo} title="Storage Store" />}
                     </div>
+                    <BackButton
+                        text="Back to List"
+                        onClick={() => {
+                            if (isDirty) {
+                                lastFocusedRef.current = document.activeElement as HTMLElement;
+                                setSaveConfirmOpen(true);
+                            } else {
+                                navigate("/storage-stores");
+                            }
+                        }}
+                    />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-6 py-5 space-y-8 flex-1 flex flex-col" noValidate>
@@ -498,7 +557,7 @@ const StorageStoreForm: React.FC = () => {
                             text="Cancel"
                             icon={FaArrowLeft}
                             variant="secondary"
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate("/storage-stores")}
                             disabled={isSubmitting}
                         />
                         <Button
@@ -514,30 +573,15 @@ const StorageStoreForm: React.FC = () => {
 
             <CommonConfirmModal
                 show={saveConfirmOpen}
-                onHide={() => {
-                    setSaveConfirmOpen(false);
-                    if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
-                    setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
-                }}
-                onConfirm={() => {
-                    setSaveConfirmOpen(false);
-                    setTimeout(() => {
-                        handleSubmitRef.current();
-                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-                    }, 150);
-                }}
+                onHide={handleResume}
+                onConfirm={handleSaveFromModal}
                 title="Unsaved Changes"
                 message="You have unsaved changes. Do you want to save before leaving?"
                 confirmText="Save"
                 cancelText="Discard"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => {
-                    setSaveConfirmOpen(false);
-                    if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
-                    setIsDirty(false);
-                    navigate(-1);
-                }}
+                onCancel={handleDiscard}
             />
         </div>
     );

@@ -2,10 +2,11 @@ import { formatDate } from "../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
-import { FaPlus, FaEye, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
+import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
+import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -17,6 +18,7 @@ import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { machineService } from "../../../services/machineService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
@@ -24,7 +26,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 15;
 const SORT_STORAGE_KEY = "sunsea_production_order_sort";
 
 type SortOrder = "default" | "asc" | "desc";
@@ -455,6 +457,184 @@ const ProductionOrderList: React.FC = () => {
         setShowDeleteModal(true);
     }, []);
 
+    const columns: DataTableColumn<any>[] = useMemo(() => [
+        {
+            header: "#",
+            width: "50px",
+            align: "center",
+            render: (_item, idx) => (
+                <span className="text-ink-subtle text-xs">
+                    {(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                </span>
+            ),
+        },
+        {
+            header: "PO NO",
+            width: "160px",
+            render: (item) => {
+                if (item.type === "weekly-group") {
+                    return <span className="font-bold text-ink text-xs">{item.baseId}</span>;
+                }
+                return (
+                    <span className="font-semibold text-ink text-xs">
+                        {item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}
+                    </span>
+                );
+            },
+        },
+        {
+            header: "ORDER DATE",
+            width: "160px",
+            headerNode: (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSortOrder();
+                    }}
+                    title={`Sort by Date: ${
+                        sortOrder === "default"
+                            ? "Default Order"
+                            : sortOrder === "asc"
+                            ? "Oldest First (Ascending)"
+                            : "Newest First (Descending)"
+                    } (Click or press F6)`}
+                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-wider outline-none hover:opacity-90 transition-opacity"
+                >
+                    <span className={sortOrder !== "default" ? "text-primary font-bold" : "group-hover/sort:text-ink transition-colors"}>
+                        Order Date
+                    </span>
+                    <span
+                        className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
+                            sortOrder === "asc" || sortOrder === "desc"
+                                ? "bg-primary/20 text-primary scale-110"
+                                : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+                        }`}
+                    >
+                        {sortOrder === "asc" ? (
+                            <FaArrowUp size={10} />
+                        ) : sortOrder === "desc" ? (
+                            <FaArrowDown size={10} />
+                        ) : (
+                            <FaSort size={10} />
+                        )}
+                    </span>
+                    {sortOrder !== "default" && (
+                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                            {sortOrder === "asc" ? "OLD-NEW" : "NEW-OLD"}
+                        </span>
+                    )}
+                </button>
+            ),
+            render: (item) => <span className="text-ink-muted text-xs">{formatDate(item.orderDate)}</span>,
+        },
+        {
+            header: "DUE / WEEK DATE",
+            width: "200px",
+            render: (item) => {
+                if (item.type === "weekly-group") {
+                    return (
+                        <span className="text-ink-muted text-xs">
+                            {item.weekStart && item.weekEnd
+                                ? `${formatDate(item.weekStart)} – ${formatDate(item.weekEnd)}`
+                                : "—"}
+                        </span>
+                    );
+                }
+                return (
+                    <span className="text-ink-muted text-xs">
+                        {item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : "—"}
+                    </span>
+                );
+            },
+        },
+        {
+            header: "MACHINES / PRODUCTS",
+            render: (item) => {
+                if (item.type === "weekly-group") {
+                    const machinesList = [...new Set(
+                        item.children
+                            ?.map((po: any) => po.Machine?.machineName || po.machineMachineId || "")
+                            ?.filter(Boolean) || []
+                    )].join(", ");
+                    return <span className="text-ink-muted text-xs">{machinesList || "—"}</span>;
+                }
+                const productsList = item.productionOrders && item.productionOrders.length > 0
+                    ? item.productionOrders.map((po: any) => po.productItem?.productName || "Unknown").join(", ")
+                    : item.items?.map((it: any) => it.product?.productName || "Unknown").join(", ") || "—";
+                return <span className="text-ink-muted text-xs">{productsList}</span>;
+            },
+        },
+        {
+            header: "STATUS",
+            width: "180px",
+            render: (item) => <StatusBadge status={item.status} />,
+        },
+        {
+            header: "ACTIONS",
+            width: "140px",
+            align: "center",
+            render: (item) => {
+                if (item.type === "weekly-group") {
+                    const isWeeklyEditable = can("production_orders.edit") && !["IN_PRODUCTION", "POST_PRODUCTION", "COMPLETED", "CLOSED", "DISPATCHED"].includes(item.status?.toUpperCase());
+                    return (
+                        <div className="flex items-center gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                            {can("production_orders.view") && (
+                                <ViewButton onClick={() => handleOpenWeeklyPlan(item)} />
+                            )}
+                            {isWeeklyEditable && (
+                                <EditButton onClick={() => handleEditWeeklyPlan(item)} />
+                            )}
+                            {can("production_orders.delete") && (
+                                <DeleteButton
+                                    onClick={() => triggerDelete(item.children.map((po: any) => po.productionOrderId))}
+                                    disabled={item.children?.some((po: any) => po._editRestrictions?.canDelete === false)}
+                                    disabledMessage="Cannot delete: one or more orders have active Daily Production Plans. Cancel them in Daily Machine Planning first."
+                                />
+                            )}
+                        </div>
+                    );
+                }
+
+                const isStandaloneEditable = item.primaryPO && can("production_orders.edit") && !["IN_PRODUCTION", "POST_PRODUCTION", "COMPLETED", "CLOSED", "DISPATCHED"].includes(item.primaryPO.status?.toUpperCase());
+                return (
+                    <div className="flex items-center gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                        {item.primaryPO && can("production_orders.view") && (
+                            <ViewButton
+                                onClick={() => {
+                                    setSelectedItem(item.primaryPO);
+                                    setFullOrder(null);
+                                    setShowViewModal(true);
+                                    fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
+                                }}
+                            />
+                        )}
+                        {isStandaloneEditable && (
+                            <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
+                        )}
+                        {item.primaryPO && can("production_orders.delete") && (
+                            <DeleteButton
+                                onClick={() => triggerDelete(item.productionOrders ? item.productionOrders.map((po: any) => po.productionOrderId) : [item.primaryPO.productionOrderId])}
+                                disabled={item.primaryPO._editRestrictions?.canDelete === false}
+                                disabledMessage="Cannot delete: this order has active Daily Production Plans. Cancel them in Daily Machine Planning first."
+                            />
+                        )}
+                    </div>
+                );
+            },
+        },
+    ], [
+        currentPage,
+        sortOrder,
+        toggleSortOrder,
+        can,
+        handleOpenWeeklyPlan,
+        handleEditWeeklyPlan,
+        triggerDelete,
+        handleOpenEdit,
+        fetchOrderDetails,
+    ]);
+
     const handleDeleteCurrentRow = useCallback(() => {
         const item = combinedData[focusedIndex];
         if (!item) return;
@@ -800,196 +980,34 @@ const ProductionOrderList: React.FC = () => {
 
                 {/* Table */}
                 <div ref={tableRef} tabIndex={0} data-table-nav className="flex-1 min-h-0 flex flex-col outline-none">
-                    {loading ? (
-                        <div className="flex-1 flex items-center justify-center py-16 text-ink-subtle text-sm">
-                            <div className="animate-spin rounded-full border-b-2 border-primary h-5 w-5 mr-2" /> Loading...
-                        </div>
-                    ) : combinedData.length === 0 ? (
-                        <div className="flex-1 flex items-center justify-center py-16 text-ink-subtle text-sm">No orders found.</div>
-                    ) : (
-                        <div className="w-full flex-1 min-h-0 overflow-auto">
-                            <table className="w-full text-left border-collapse text-sm">
-                                <thead className="sticky top-0 z-10 bg-head border-b border-line shadow-[0_1px_0_rgba(0,0,0,0.06)]">
-                                    <tr role="row">
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-10">#</th>
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[160px]">PO No</th>
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[150px]">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleSortOrder();
-                                                }}
-                                                title={`Sort by Date: ${
-                                                    sortOrder === "default"
-                                                        ? "Default Order"
-                                                        : sortOrder === "asc"
-                                                        ? "Oldest First (Ascending)"
-                                                        : "Newest First (Descending)"
-                                                } (Click or press F6)`}
-                                                className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-wider outline-none hover:opacity-90 transition-opacity"
-                                            >
-                                                <span className={sortOrder !== "default" ? "text-primary font-bold" : "group-hover/sort:text-ink transition-colors"}>
-                                                    Order Date
-                                                </span>
-                                                <span
-                                                    className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
-                                                        sortOrder === "asc" || sortOrder === "desc"
-                                                            ? "bg-primary/20 text-primary scale-110"
-                                                            : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
-                                                    }`}
-                                                >
-                                                    {sortOrder === "asc" ? (
-                                                        <FaArrowUp size={10} />
-                                                    ) : sortOrder === "desc" ? (
-                                                        <FaArrowDown size={10} />
-                                                    ) : (
-                                                        <FaSort size={10} />
-                                                    )}
-                                                </span>
-                                                {sortOrder !== "default" && (
-                                                    <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
-                                                        {sortOrder === "asc" ? "OLD-NEW" : "NEW-OLD"}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        </th>
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[200px]">Due / Week Date</th>
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Machines / Products</th>
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[180px]">Status</th>
-                                        <th className="sticky top-0 z-10 bg-head px-4 py-2.5 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[120px] text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-line">
-                                    {combinedData.map((item: any, idx: number) => {
-                                        if (item.type === 'weekly-group') {
-                                            const isWeeklyEditable = can('production_orders.edit') && !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(item.status?.toUpperCase());
-                                            return (
-                                                <tr
-                                                    key={item.id}
-                                                    role="row"
-                                                    className={`cursor-pointer select-none transition-colors ${
-                                                        idx === focusedIndex
-                                                            ? "bg-primary/15 ring-1 ring-inset ring-primary/40 shadow-xs"
-                                                            : "bg-head/40 hover:bg-head/70"
-                                                    }`}
-                                                    onClick={() => {
-                                                        setFocusedIndex(idx);
-                                                        tableRef.current?.focus({ preventScroll: true });
-                                                        handleOpenWeeklyPlan(item);
-                                                    }}
-                                                >
-                                                    <td className="px-4 py-2.5 text-ink-subtle text-[13px]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
-                                                    <td className="px-4 py-2.5">
-                                                        <span className="font-bold text-ink text-[13px]">{item.baseId}</span>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-ink-muted text-[13px]">{formatDate(item.orderDate)}</td>
-                                                    <td className="px-4 py-2.5 text-ink-muted text-[13px]">
-                                                        {item.weekStart && item.weekEnd
-                                                            ? `${formatDate(item.weekStart)} – ${formatDate(item.weekEnd)}`
-                                                            : '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-ink-muted text-[13px]">
-                                                        {[...new Set(
-                                                            item.children
-                                                                .map((po: any) => po.Machine?.machineName || po.machineMachineId || '')
-                                                                .filter(Boolean)
-                                                        )].join(', ') || '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
-                                                    <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                                                        <div className="flex items-center gap-2 justify-end">
-                                                            {can('production_orders.view') && (
-                                                                <IconButton variant="info" title="View Weekly Plan" icon={FaEye} onClick={() => handleOpenWeeklyPlan(item)} />
-                                                            )}
-                                                            {isWeeklyEditable && (
-                                                                <EditButton onClick={() => handleEditWeeklyPlan(item)} />
-                                                            )}
-                                                            {can('production_orders.delete') && (
-                                                                <DeleteButton
-                                                                    onClick={() => triggerDelete(item.children.map((po: any) => po.productionOrderId))}
-                                                                    disabled={item.children.some((po: any) => po._editRestrictions?.canDelete === false)}
-                                                                    disabledMessage="Cannot delete: one or more orders have active Daily Production Plans. Cancel them in Daily Machine Planning first."
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }
-
-                                        // Standalone / sales-order-linked row
-                                        const isStandaloneEditable = item.primaryPO && can('production_orders.edit') && !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(item.primaryPO.status?.toUpperCase());
-                                        return (
-                                            <tr
-                                                key={item.id}
-                                                role="row"
-                                                className={`cursor-pointer transition-colors ${
-                                                    idx === focusedIndex
-                                                        ? "bg-primary/10 ring-1 ring-inset ring-primary/40 shadow-xs"
-                                                        : "bg-card hover:bg-card-2"
-                                                }`}
-                                                onClick={() => {
-                                                    setFocusedIndex(idx);
-                                                    tableRef.current?.focus({ preventScroll: true });
-                                                    handleOpenViewItem(item);
-                                                }}
-                                            >
-                                                <td className="px-4 py-2.5 text-ink-subtle text-[13px]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
-                                                <td className="px-4 py-2.5 font-semibold text-ink text-[13px]">{item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}</td>
-                                                <td className="px-4 py-2.5 text-ink-muted text-[13px]">{formatDate(item.orderDate)}</td>
-                                                <td className="px-4 py-2.5 text-ink-muted text-[13px]">{item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : '—'}</td>
-                                                <td className="px-4 py-2.5 text-ink-muted text-[13px]">
-                                                    {item.productionOrders && item.productionOrders.length > 0
-                                                        ? item.productionOrders.map((po: any) => po.productItem?.productName || 'Unknown').join(', ')
-                                                        : item.items?.map((it: any) => it.product?.productName || 'Unknown').join(', ') || '—'}
-                                                </td>
-                                                <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
-                                                <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                                                    <div className="flex items-center gap-2 justify-end">
-                                                        {item.primaryPO && can('production_orders.view') && (
-                                                            <IconButton variant="info" title="View" icon={FaEye}
-                                                                onClick={() => { setSelectedItem(item.primaryPO); setFullOrder(null); setShowViewModal(true); fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id); }}
-                                                            />
-                                                        )}
-                                                        {isStandaloneEditable && (
-                                                            <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
-                                                        )}
-                                                        {item.primaryPO && can('production_orders.delete') && (
-                                                            <DeleteButton
-                                                                onClick={() => triggerDelete(item.productionOrders ? item.productionOrders.map((po: any) => po.productionOrderId) : [item.primaryPO.productionOrderId])}
-                                                                disabled={item.primaryPO._editRestrictions?.canDelete === false}
-                                                                disabledMessage="Cannot delete: this order has active Daily Production Plans. Cancel them in Daily Machine Planning first."
-                                                            />
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="mt-auto shrink-0 flex items-center justify-between px-5 py-3 border-t border-line text-sm bg-head/20">
-                            <span className="text-ink-subtle text-[13px]">{totalItems} order{totalItems !== 1 ? 's' : ''}</span>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1.5 rounded border border-line text-ink-subtle hover:bg-card-2 disabled:opacity-40 text-[13px]"
-                                >Prev</button>
-                                <span className="px-3 py-1.5 text-ink text-[13px]">{currentPage} / {totalPages}</span>
-                                <button
-                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1.5 rounded border border-line text-ink-subtle hover:bg-card-2 disabled:opacity-40 text-[13px]"
-                                >Next</button>
-                            </div>
-                        </div>
-                    )}
+                    <DataTable
+                        columns={columns}
+                        data={combinedData}
+                        rowKey={(item) => item.id}
+                        loading={loading}
+                        emptyMessage="No production orders found."
+                        className="border-0 rounded-none shadow-none flex-1 flex flex-col min-h-0"
+                        minHeightClassName="min-h-0 flex-1"
+                        rowClassName={(_, idx) => (idx === focusedIndex ? "bg-primary/8 font-medium" : "")}
+                        onRowClick={(item, idx) => {
+                            setFocusedIndex(idx);
+                            tableRef.current?.focus({ preventScroll: true });
+                            if (item.type === "weekly-group") {
+                                handleOpenWeeklyPlan(item);
+                            } else {
+                                handleOpenViewItem(item);
+                            }
+                        }}
+                        pagination={
+                            totalPages > 1
+                                ? {
+                                      currentPage,
+                                      totalPages,
+                                      onPageChange: (page) => setCurrentPage(page),
+                                  }
+                                : undefined
+                        }
+                    />
                 </div>
 
             </div>

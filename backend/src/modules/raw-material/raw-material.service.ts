@@ -28,6 +28,14 @@ class RawMaterialService {
           ...(data.storeId ? { store: { connect: { storeId: data.storeId } } } : {}),
           isActive: data.isActive ?? true,
           createdBy: userId,
+          editHistory: userId
+            ? [
+                {
+                  updatedBy: userId,
+                  updatedAt: new Date().toISOString(),
+                },
+              ]
+            : [],
           ...(data.locationId ? { storeLocation: { connect: { id: data.locationId } } } : {}),
           batchNo: data.batchNo ?? null,
           onHandQty: data.onHandQty ?? 0,
@@ -38,7 +46,7 @@ class RawMaterialService {
             : null,
           status: data.status ?? "Active",
           itemType: data.itemType ?? "RAW_MATERIAL",
-        }
+        } as any
       });
 
 
@@ -152,18 +160,104 @@ class RawMaterialService {
       throw new ApiError(404, `Raw Material with ID ${rawMaterialId} not found`);
     }
 
-    return rawMaterial;
+    // Resolve createdBy user
+    let createdUserName = "Unknown User";
+    let createdUserRole = "User";
+    if (rawMaterial.createdBy) {
+      if (rawMaterial.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(rawMaterial.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: rawMaterial.createdBy },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.username;
+          createdUserRole = user.role?.name || "User";
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray((rawMaterial as any).editHistory)) {
+      enrichedEditHistory = await Promise.all(
+        ((rawMaterial as any).editHistory as any[]).map(async (edit: any) => {
+          let name = "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true },
+              });
+              if (admin) name = admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true },
+              });
+              if (user) name = user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    if (enrichedEditHistory.length === 0 && rawMaterial.createdAt) {
+      enrichedEditHistory.push({
+        updatedBy: rawMaterial.createdBy,
+        updatedByName: createdUserName,
+        updatedAt: rawMaterial.createdAt,
+      });
+    }
+
+    return {
+      ...rawMaterial,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
   async update(rawMaterialId: string, data: UpdateRawMaterialInput, userId?: string) {
-    await this.findById(rawMaterialId);
-
+    const current = await this.findById(rawMaterialId);
 
     const { categoryId, storeId, locationId, ...restData } = data;
+
+    let newEditHistory: any[] = [];
+    if (Array.isArray((current as any).editHistory)) {
+      newEditHistory = [...(current as any).editHistory].map((e: any) => {
+        const { updatedByName, ...raw } = e;
+        return raw;
+      });
+    } else if (current.createdAt) {
+      newEditHistory.push({
+        updatedBy: current.createdBy,
+        updatedAt: current.createdAt instanceof Date ? current.createdAt.toISOString() : current.createdAt,
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     const updateData: any = {
       ...restData,
       updatedBy: userId,
+      editHistory: newEditHistory,
     };
 
     if (locationId !== undefined) {
@@ -190,10 +284,12 @@ class RawMaterialService {
       }
     }
 
-    return prisma.rawMaterial.update({
+    await prisma.rawMaterial.update({
       where: { rawMaterialId },
       data: updateData,
     });
+
+    return this.findById(rawMaterialId);
   }
 
   async delete(rawMaterialId: string, userId?: string) {

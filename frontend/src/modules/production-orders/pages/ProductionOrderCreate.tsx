@@ -3,8 +3,9 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { usePermission } from "../../../hooks/usePermission";
-import { FaSave, FaEraser, FaCheck } from "react-icons/fa";
+import { FaSave, FaEraser, FaCheck, FaArrowLeft } from "react-icons/fa";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, Controller, useFieldArray, useWatch, useController } from "react-hook-form";
@@ -505,11 +506,15 @@ const ProductionOrderCreate: React.FC = () => {
     const [rowRmStates, setRowRmStates] = useState<Record<string, RowRawMaterialState>>({});
     const storeRmCacheRef = useRef<Record<string, { options: any[]; loading: boolean; promise?: Promise<any> }>>({});
 
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
+    const initialWeeklySnapshotRef = useRef<string>("");
+
     const formRef = useRef<HTMLFormElement>(null);
     const isDirtyRef = useRef(false);
     const saveConfirmOpenRef = useRef(false);
     const lastFocusedRef = useRef<HTMLElement | null>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
+    const handleWeeklySubmitRef = useRef<(status?: "WEEKLY_SCHEDULED" | "DRAFT") => void>(() => {});
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
     handleSubmitRef.current = () => {
@@ -522,21 +527,49 @@ const ProductionOrderCreate: React.FC = () => {
     const handleFormKeyDown = useFormKeyboardNav(formRef);
 
     useFormShortcuts({
-        onSave: () => handleSubmitRef.current(),
+        onSave: () => {
+            if (!isEditMode && !isWeeklyEditMode) {
+                handleWeeklySubmitRef.current("WEEKLY_SCHEDULED");
+            } else if (isWeeklyEditMode) {
+                handleWeeklySubmitRef.current("WEEKLY_SCHEDULED");
+            } else {
+                handleSubmitRef.current();
+            }
+        },
         onDelete: () => {
-            if (!isEditMode) {
+            if (!isEditMode && !isWeeklyEditMode) {
                 reset(defaultValues);
                 setRowRmStates({});
                 if (machines.length > 0) {
-                    setWeeklyGroups(
-                        machines.map((m) => ({
-                            uid: crypto.randomUUID(),
-                            machineId: m.machineId,
-                            items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                    const initial = machines.map((m) => ({
+                        uid: crypto.randomUUID(),
+                        machineId: m.machineId,
+                        items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
+                    }));
+                    setWeeklyGroups(initial);
+                    initialWeeklySnapshotRef.current = JSON.stringify(
+                        initial.map((g) => ({
+                            machineId: g.machineId,
+                            items: g.items.map((it) => ({
+                                productItemId: it.productItemId,
+                                targetQty: it.targetQty,
+                                narration: it.narration,
+                            })),
                         }))
                     );
                 } else {
-                    setWeeklyGroups([newWeeklyGroup()]);
+                    const initial = [newWeeklyGroup()];
+                    setWeeklyGroups(initial);
+                    initialWeeklySnapshotRef.current = JSON.stringify(
+                        initial.map((g) => ({
+                            machineId: g.machineId,
+                            items: g.items.map((it) => ({
+                                productItemId: it.productItemId,
+                                targetQty: it.targetQty,
+                                narration: it.narration,
+                            })),
+                        }))
+                    );
                 }
                 productionOrderService
                     .fetchNextId()
@@ -581,9 +614,36 @@ const ProductionOrderCreate: React.FC = () => {
     // so the existing discard modal can drive them from its buttons.
     const proceedRef = useRef<(() => void) | null>(null);
     const resetRef = useRef<(() => void) | null>(null);
-    useDirtyNavGuard(rhfIsDirty, (proceed, reset) => {
+
+    const isWeeklyDirty = useMemo(() => {
+        if (!initialWeeklySnapshotRef.current) return false;
+        const currentSnapshot = JSON.stringify(
+            weeklyGroups.map((g) => ({
+                machineId: g.machineId,
+                items: g.items.map((it) => ({
+                    productItemId: it.productItemId,
+                    targetQty: it.targetQty,
+                    narration: it.narration,
+                })),
+            }))
+        );
+        return currentSnapshot !== initialWeeklySnapshotRef.current;
+    }, [weeklyGroups]);
+
+    const isDirty = rhfIsDirty || isWeeklyDirty;
+
+    useEffect(() => {
+        isDirtyRef.current = isDirty;
+    }, [isDirty]);
+
+    useEffect(() => {
+        saveConfirmOpenRef.current = saveConfirmOpen;
+    }, [saveConfirmOpen]);
+
+    useDirtyNavGuard(isDirty, (proceed, reset) => {
         proceedRef.current = proceed;
         resetRef.current = reset;
+        lastFocusedRef.current = document.activeElement as HTMLElement | null;
         setSaveConfirmOpen(true);
     });
 
@@ -827,11 +887,24 @@ const ProductionOrderCreate: React.FC = () => {
                         !prev[0].machineId &&
                         prev[0].items.every((it) => !it.productItemId && !it.targetQty));
                 if (isInitial) {
-                    return machines.map((m) => ({
+                    const initial = machines.map((m) => ({
                         uid: crypto.randomUUID(),
                         machineId: m.machineId,
                         items: [{ uid: crypto.randomUUID(), productItemId: "", targetQty: 0, narration: "" }],
                     }));
+                    if (!initialWeeklySnapshotRef.current) {
+                        initialWeeklySnapshotRef.current = JSON.stringify(
+                            initial.map((g) => ({
+                                machineId: g.machineId,
+                                items: g.items.map((it) => ({
+                                    productItemId: it.productItemId,
+                                    targetQty: it.targetQty,
+                                    narration: it.narration,
+                                })),
+                            }))
+                        );
+                    }
+                    return initial;
                 }
 
                 // If in weekly mode and some machines are missing, append missing machines as empty groups
@@ -1015,6 +1088,11 @@ const ProductionOrderCreate: React.FC = () => {
             setOrderId(id);
             productionOrderService.getById(id)
                 .then((fullOrder) => {
+                    setAuditInfo({
+                        createdAt: fullOrder.createdAt,
+                        createdBy: (fullOrder as any).createdUserName || (fullOrder as any).createdUser?.fullName || (fullOrder as any).createdBy,
+                        editHistory: (fullOrder as any).editHistory || (fullOrder as any).statusHistory,
+                    });
                     let rmRows: any[];
                     const nonEditableStatuses = ["DAILY_PLANNED", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "CANCELLED"];
                     if (!nonEditableStatuses.includes(fullOrder.status) && (fullOrder as any).draftRawMaterials) {
@@ -1092,6 +1170,7 @@ const ProductionOrderCreate: React.FC = () => {
             setIsEditMode(false);
             setOrderId(null);
             setRowRmStates({});
+            setAuditInfo(null);
 
             reset({
                 ...defaultValues,
@@ -1158,6 +1237,33 @@ const ProductionOrderCreate: React.FC = () => {
                 });
 
                 setWeeklyGroups(sortedGroups);
+                initialWeeklySnapshotRef.current = JSON.stringify(
+                    sortedGroups.map((g) => ({
+                        machineId: g.machineId,
+                        items: g.items.map((it) => ({
+                            productItemId: it.productItemId,
+                            targetQty: it.targetQty,
+                            narration: it.narration,
+                        })),
+                    }))
+                );
+
+                const firstChildPo = locState.children[0];
+                if (firstChildPo?.productionOrderId) {
+                    productionOrderService.getById(firstChildPo.productionOrderId).then((fullOrder) => {
+                        setAuditInfo({
+                            createdAt: fullOrder.createdAt,
+                            createdBy: (fullOrder as any).createdUserName || (fullOrder as any).createdUser?.fullName || (fullOrder as any).createdBy,
+                            editHistory: (fullOrder as any).editHistory || (fullOrder as any).statusHistory,
+                        });
+                    }).catch(() => {
+                        setAuditInfo({
+                            createdAt: firstChildPo.createdAt,
+                            createdBy: firstChildPo.createdUserName || firstChildPo.createdBy,
+                            editHistory: firstChildPo.editHistory || firstChildPo.statusHistory,
+                        });
+                    });
+                }
 
                 // Live check against daily plans API to ensure all assigned items are locked
                 dailyPlanService.getAll().then((plansRes: any) => {
@@ -1320,27 +1426,77 @@ const ProductionOrderCreate: React.FC = () => {
         window.addEventListener("fkey-refresh", handleRefresh);
         return () => window.removeEventListener("fkey-refresh", handleRefresh);
     }, [id, isEditMode, reset, setValue]);
-    useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
-            e.preventDefault(); e.stopPropagation();
-            if (saveConfirmOpenRef.current) { setSaveConfirmOpen(false); return; }
-            if (isDirtyRef.current) { lastFocusedRef.current = document.activeElement as HTMLElement; setSaveConfirmOpen(true); }
-            else { navigate("/production-orders"); }
-        };
-        window.addEventListener("keydown", handleEscape, { capture: true });
-        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    const openDiscardModal = useCallback(() => {
+        lastFocusedRef.current = document.activeElement as HTMLElement | null;
+        setSaveConfirmOpen(true);
+    }, []);
+
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (resetRef.current) {
+            const r = resetRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            r();
+        }
+        setTimeout(() => {
+            if (lastFocusedRef.current && typeof lastFocusedRef.current.focus === "function") {
+                lastFocusedRef.current.focus();
+            } else {
+                formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+            }
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (proceedRef.current) {
+            const p = proceedRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            p();
+            return;
+        }
+        navigate(-1);
     }, [navigate]);
 
     const handleBack = useCallback(() => {
         if (isDirtyRef.current) {
-            lastFocusedRef.current = document.activeElement as HTMLElement;
-            setSaveConfirmOpen(true);
+            openDiscardModal();
         } else {
-            navigate("/production-orders");
+            navigate(-1);
         }
-    }, [navigate]);
+    }, [openDiscardModal, navigate]);
+
+    const handleConfirmSave = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (!isEditMode && !isWeeklyEditMode) {
+            handleWeeklySubmitRef.current("WEEKLY_SCHEDULED");
+        } else if (isWeeklyEditMode) {
+            handleWeeklySubmitRef.current("WEEKLY_SCHEDULED");
+        } else {
+            setTimeout(() => handleSubmitRef.current(), 150);
+        }
+    }, [isEditMode, isWeeklyEditMode]);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (document.querySelector("[data-select-portal], [aria-expanded='true'][data-nav]")) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (saveConfirmOpenRef.current) {
+                handleResume();
+            } else if (isDirtyRef.current) {
+                openDiscardModal();
+            } else {
+                navigate(-1);
+            }
+        };
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [handleResume, openDiscardModal, navigate]);
 
     // Auto-focus the first navigable field on mount
     useEffect(() => {
@@ -1617,18 +1773,28 @@ const ProductionOrderCreate: React.FC = () => {
         }
     };
 
+    handleWeeklySubmitRef.current = onWeeklySubmit;
+
     return (
         <>
         <div className="w-full">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b border-line">
-                    <h2 className="text-base font-bold text-ink flex items-start">
-                        {isWeeklyEditMode ? "Edit Weekly Plan" : isEditMode && !isDraftEdit ? "Edit Production Order" : "Create Production Order"}
-                        <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("productionOrderId")}</span>
-                    </h2>
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
+                    <div className="flex flex-col">
+                        <h3 className="text-lg font-bold text-ink flex items-start">
+                            {isWeeklyEditMode ? "Edit Weekly Plan" : isEditMode && !isDraftEdit ? "Edit Production Order" : "Create Production Order"}
+                            <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{watch("productionOrderId")}</span>
+                        </h3>
+                        {(isEditMode || isWeeklyEditMode) && <RecordAuditInfo auditData={auditInfo} title="Production Order" />}
+                    </div>
                     <div className="flex items-center gap-2">
-                        <BackButton text="Back" onClick={handleBack} />
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            variant="secondary"
+                            onClick={handleBack}
+                        />
                     </div>
                 </div>
 
@@ -1808,6 +1974,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                         return (
                                                             <input
                                                                 type="text"
+                                                                data-nav
                                                                 inputMode="numeric"
                                                                 value={row.targetQty || ""}
                                                                 disabled={isRowLocked}
@@ -1839,6 +2006,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                         return (
                                                             <input
                                                                 type="text"
+                                                                data-nav
                                                                 value={row.narration || ""}
                                                                 disabled={isRowLocked}
                                                                 onChange={(e) => {
@@ -1979,23 +2147,15 @@ const ProductionOrderCreate: React.FC = () => {
 
         <CommonConfirmModal
             show={saveConfirmOpen}
-            onHide={() => {
-                setSaveConfirmOpen(false);
-                if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
-            }}
-            onConfirm={() => { setSaveConfirmOpen(false); setTimeout(() => handleSubmitRef.current(), 150); }}
+            onHide={handleResume}
+            onConfirm={handleConfirmSave}
             title="Unsaved Changes"
             message="You have unsaved changes. Do you want to save before leaving?"
             confirmText="Save"
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => {
-                setSaveConfirmOpen(false);
-                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
-                navigate(-1);
-            }}
+            onCancel={handleDiscard}
         />
     </>
     );

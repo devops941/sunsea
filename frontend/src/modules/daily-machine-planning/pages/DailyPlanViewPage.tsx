@@ -1,4 +1,5 @@
 import { formatDate } from "../../../utils/dateUtils";
+import { getPlanStatusInfo } from "../../../utils/planningUtils";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaArrowLeft, FaIndustry, FaChartBar, FaCheckCircle, FaBoxOpen, FaTruck, FaArrowRight, FaShare, FaClipboardList } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -537,19 +538,7 @@ const DailyPlanViewPage: React.FC = () => {
                     const effNum = capacity > 0 ? Math.round((totalProduced / capacity) * 100) : 0;
                     const efficiency = `${effNum}%`;
                     
-                    let statusText = "Low";
-                    let customColor = { bg: "rgba(239,68,68,0.15)", text: "#f87171" };
-
-                    if (capacity > 0 && totalProduced >= capacity) {
-                      statusText = "High";
-                      customColor = { bg: "rgba(16,185,129,0.15)", text: "#34d399" };
-                    } else if (capacity > 0 && totalProduced >= capacity * 0.85) {
-                      statusText = "Medium";
-                      customColor = { bg: "rgba(245,158,11,0.15)", text: "#fbbf24" };
-                    } else {
-                      statusText = "Low";
-                      customColor = { bg: "rgba(239,68,68,0.15)", text: "#f87171" };
-                    }
+                    const { statusText, customColor } = getPlanStatusInfo(capacity, totalProduced);
                     
                     return (
                       <tr>

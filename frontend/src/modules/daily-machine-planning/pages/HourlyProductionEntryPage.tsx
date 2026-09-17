@@ -30,6 +30,7 @@ import { employeeService } from "../../../services/employeeService";
 import { productionWastageService } from "../../../services/productionWastageService";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { productShiftRecordService } from "../../../services/productShiftRecordService";
+import { productService } from "../../../services/productService";
 
 // ── Dropdown Constants ──────────────────────────────────────────
 const DOWNTIME_REASONS = [
@@ -384,48 +385,84 @@ export const HourlyProductionEntryPage: React.FC = () => {
         });
       });
 
-      // If no saved wastages yet, pre-populate from issued raw materials for this date
-      if (extractedWastages.length === 0) {
-        const prodDate = plan.productionDate?.split("T")[0];
-        if (prodDate) {
-          try {
-            const rmIssued = await dailyPlanService.getRmRequirements({ date: prodDate });
-            const rmData = rmIssued?.data ?? rmIssued;
-            const consolidated: any[] = rmData?.dailyConsolidated || [];
-            if (rmData?.alreadyIssued && consolidated.length > 0) {
-              const defaultStoreId = Array.isArray(storeRes) && storeRes.length > 0 ? storeRes[0].storeId : "";
-              consolidated.forEach((rm: any) => {
-                if (rm.rawMaterialId) {
-                  extractedWastages.push({
-                    targetWastageProductId: String(rm.rawMaterialId),
-                    storeId: defaultStoreId,
-                    quantity: "",   // user fills in if there was wastage
-                    narration: "",
-                    uom: rm.uom || "kg",
-                    selectedUom: rm.uom || "kg",
-                  });
-                }
-              });
+      // Only keep existing saved wastages that have actual data (quantity entered or narration)
+      const savedWithData = extractedWastages.filter(
+        (w) => (w.quantity !== "" && Number(w.quantity) > 0) || (Boolean(w.narration) && String(w.narration).trim().length > 0)
+      );
+
+      const defaultStoreId = Array.isArray(storeRes) && storeRes.length > 0 ? storeRes[0].storeId : "";
+
+      // Determine the product(s) selected for this production / daily plan
+      const productIdsInShift = new Set<string>();
+      const mainProdId = plan.productionOrder?.productItemId || plan.productionOrder?.productItem?.id;
+      if (mainProdId) {
+        productIdsInShift.add(String(mainProdId));
+      }
+
+      // Collect any other product IDs if multiple products were produced in this shift
+      existingLogs.forEach((hp: any) => {
+        if (Array.isArray(hp.hourlyEntries)) {
+          hp.hourlyEntries.forEach((entry: any) => {
+            const pOpt = weekProducts.find((wp) => wp.productionOrderId === entry.productionOrderId);
+            if (pOpt?.product?.id) {
+              productIdsInShift.add(String(pOpt.product.id));
             }
-          } catch (_) {
-            // Silently ignore — table stays empty for manual entry
+          });
+        }
+      });
+
+      // Fetch BOM for the product(s) selected in this production
+      const bomRawMaterials: any[] = [];
+      const planProductItem = plan.productionOrder?.productItem;
+
+      if (Array.isArray(planProductItem?.billOfMaterials) && planProductItem.billOfMaterials.length > 0) {
+        bomRawMaterials.push(...planProductItem.billOfMaterials);
+      }
+
+      // If BOM wasn't already included or we have other products in the shift, fetch from productService
+      for (const pId of Array.from(productIdsInShift)) {
+        if (bomRawMaterials.some((b: any) => String(b.productId) === String(pId))) continue;
+        try {
+          const fullProd: any = await productService.fetchById(String(pId));
+          if (Array.isArray(fullProd?.billOfMaterials) && fullProd.billOfMaterials.length > 0) {
+            bomRawMaterials.push(...fullProd.billOfMaterials);
           }
+        } catch (e) {
+          console.error("Failed to fetch BOM for product", pId, e);
         }
       }
 
+      const finalWastages: WastageItem[] = [...savedWithData];
+      const seenRmIds = new Set<string>(finalWastages.map((w) => String(w.targetWastageProductId)).filter(Boolean));
+
+      // Pre-populate with BOM raw materials of the selected product
+      bomRawMaterials.forEach((b: any) => {
+        const rmId = String(b.rawMaterialId || b.rawMaterial?.rawMaterialId || "");
+        if (rmId && !seenRmIds.has(rmId)) {
+          seenRmIds.add(rmId);
+          finalWastages.push({
+            targetWastageProductId: rmId,
+            storeId: b.rawMaterial?.storeId || defaultStoreId,
+            quantity: "",   // user fills in if there was wastage
+            narration: "",
+            uom: b.rawMaterial?.uom || b.uom || "kg",
+            selectedUom: b.rawMaterial?.uom || b.uom || "kg",
+          });
+        }
+      });
+
       // Pad with empty rows to ensure at least 5 default rows
-      const paddedWastages = [...extractedWastages];
-      while (paddedWastages.length < 5) {
-        paddedWastages.push({
+      while (finalWastages.length < 5) {
+        finalWastages.push({
           targetWastageProductId: "",
-          storeId: Array.isArray(storeRes) && storeRes.length > 0 ? storeRes[0].storeId : "",
+          storeId: defaultStoreId,
           quantity: "",
           narration: "",
           uom: "kg",
           selectedUom: "kg",
         });
       }
-      setWastages(paddedWastages);
+      setWastages(finalWastages);
 
       // Generate 12 hourly rows based on shift timing:
       // Day Shift (Shift 1 / Morning) = 9:00 AM to 9:00 PM (starts at 09:00)
@@ -638,10 +675,17 @@ export const HourlyProductionEntryPage: React.FC = () => {
 
   // ── Downtime Reason Autocomplete Options ──────────────────────
   const downtimeReasonOptions: AutocompleteOption[] = useMemo(() => {
-    return DOWNTIME_REASONS.map((r) => ({
-      value: r,
-      label: r,
-    }));
+    return [
+      {
+        value: "",
+        label: "— Select Downtime —",
+        selectedLabel: "— Select Downtime — none clear",
+      },
+      ...DOWNTIME_REASONS.map((r) => ({
+        value: r,
+        label: r,
+      })),
+    ];
   }, []);
 
   // ── Product Autocomplete Options (week-assigned products for this machine) ────
@@ -894,7 +938,6 @@ export const HourlyProductionEntryPage: React.FC = () => {
         const numDt = Number(row.downtime || 0);
         const numQ = Number(row.qtyProduced || 0);
         const isReasonMissing = hasAttemptedSubmit && ((numDt > 0 && !row.downtimeReason) || (numQ <= 0 && numDt <= 0 && !row.downtimeReason));
-        const isOtherEmpty = hasAttemptedSubmit && row.downtimeReason === "Other" && (!row.reasonDescription || !row.reasonDescription.trim());
 
         return (
           <div className="flex flex-col w-full justify-center">
@@ -910,22 +953,13 @@ export const HourlyProductionEntryPage: React.FC = () => {
                   onChange={(val) => {
                     const hasQty = Number(row.qtyProduced || 0) > 0;
                     const currentDt = row.downtime !== "" ? Number(row.downtime) : 0;
-                    const newDt = val && currentDt === 0 ? 60 : row.downtime;
+                    const newDt = val ? (currentDt === 0 ? 60 : row.downtime) : 0;
                     update({
                       downtimeReason: val,
                       downtime: newDt,
                       status: val || Number(newDt || 0) > 0 ? "DOWNTIME" : hasQty ? "PRODUCTION" : "PENDING",
-                      ...(val !== "Other" ? { reasonDescription: "" } : {}),
                     });
                     setTimeout(() => {
-                      if (val === "Other") {
-                        const descInput = document.querySelector(`[data-r="${idx}"][data-c="7"] input[placeholder*="Reason description"]`) as HTMLInputElement | null;
-                        if (descInput) {
-                          descInput.focus();
-                          descInput.select();
-                          return;
-                        }
-                      }
                       const remCell = document.querySelector(`[data-r="${idx}"][data-c="8"]`) as HTMLElement | null;
                       const remInput = remCell?.querySelector("input") as HTMLInputElement | null;
                       if (remInput) {
@@ -943,25 +977,6 @@ export const HourlyProductionEntryPage: React.FC = () => {
               <span className="text-[9px] text-rose-400 font-bold leading-none mt-0.5">
                 {numDt > 0 ? "Reason Required!" : "Prod or DT Required!"}
               </span>
-            )}
-            {row.downtimeReason === "Other" && (
-              <div className="w-full">
-                <input
-                  type="text"
-                  value={row.reasonDescription || ""}
-                  disabled={isLocked}
-                  onChange={(e) => update({ reasonDescription: e.target.value })}
-                  placeholder="Reason description *..."
-                  className={`w-full bg-card-2 border rounded px-1.5 py-0.5 text-[10px] text-ink outline-none mt-0.5 ${
-                    isOtherEmpty ? "border-rose-500 bg-rose-500/10" : "border-line-soft"
-                  }`}
-                />
-                {isOtherEmpty && (
-                  <span className="text-[9px] text-rose-400 font-bold leading-none block mt-0.5">
-                    Description required!
-                  </span>
-                )}
-              </div>
             )}
           </div>
         );
@@ -1284,14 +1299,6 @@ export const HourlyProductionEntryPage: React.FC = () => {
         });
       }
 
-      if (r.downtimeReason === "Other" && (!r.reasonDescription || !r.reasonDescription.trim())) {
-        errors.push({
-          id: `slot-${r.hourIndex}-dt-other-desc`,
-          location: `Slot ${r.timeSlot}`,
-          message: "Reason description required when Downtime Reason is 'Other'.",
-          type: "warning",
-        });
-      }
     });
 
     // 3. Check Wastages Table — only block on negatives (qty=0 is allowed)

@@ -142,7 +142,12 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-base font-bold text-ink">Finished Goods Stock</h2>
+                        <h2 className="text-base font-bold text-ink flex items-center gap-2">
+                            Finished Goods Stock
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {total ?? 0}
+                            </span>
+                        </h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">

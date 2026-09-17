@@ -160,7 +160,6 @@ const RawMaterialList: React.FC = () => {
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
         count: paginatedData.length,
         onEnter: (i) => { const item = paginatedData[i]; if (item) handleOpenView(item); },
-        onEdit: (i) => { const item = paginatedData[i]; if (item && can("raw_materials.edit")) handleOpenEdit(item); },
         containerRef: tableRef,
     });
 
@@ -213,21 +212,20 @@ const RawMaterialList: React.FC = () => {
             { header: "Store", accessor: (item: any) => item.store?.storeName || item.storeId || "—" },
             {
                 header: "Physical Stock",
-                accessor: (item: any) =>
-                    item.onHandQty != null ? `${item.onHandQty} ${item.baseUom || ""}`.trim() : "0",
+                accessor: (item: any) => formatStockQty(item.onHandQty, item.baseUom),
             },
-            {
-                header: "Reserved",
-                accessor: (item: any) =>
-                    item.reservedQty != null ? `${item.reservedQty} ${item.baseUom || ""}`.trim() : "0",
-            },
-            {
-                header: "Available",
-                accessor: (item: any) => {
-                    const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
-                    return `${available} ${item.baseUom || ""}`.trim();
-                },
-            },
+            // {
+            //     header: "Reserved",
+            //     accessor: (item: any) =>
+            //         item.reservedQty != null ? `${item.reservedQty} ${item.baseUom || ""}`.trim() : "0",
+            // },
+            // {
+            //     header: "Available",
+            //     accessor: (item: any) => {
+            //         const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
+            //         return `${available} ${item.baseUom || ""}`.trim();
+            //     },
+            // },
             { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
         ];
         return {
@@ -264,10 +262,7 @@ const RawMaterialList: React.FC = () => {
                 </button>
             ),
             render: (item) => (
-                <div>
-                    <div className="font-semibold text-ink">{item.materialName}</div>
-                    <span className="text-xs text-ink-subtle">ID: {item.rawMaterialId}</span>
-                </div>
+                <div className="font-semibold text-ink">{item.materialName}</div>
             ),
         },
         { header: "CATEGORY", render: (item) => item.category?.name || "-" },
@@ -283,26 +278,26 @@ const RawMaterialList: React.FC = () => {
                 </div>
             ),
         },
-        {
-            header: "RESERVED",
-            render: (item) => formatStockQty(item.reservedQty, item.baseUom),
-        },
-        {
-            header: "AVAILABLE",
-            render: (item) => {
-                const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
-                const minStock = Number(item.minimumStock ?? 0);
-                const reorder = Number(item.reorderLevel ?? 0);
-                let color = "#2b8a3e";
-                if (available <= minStock) color = "#dc3545";
-                else if (available <= reorder) color = "#d97706";
-                return (
-                    <span style={{ color, fontWeight: 600 }}>
-                        {formatStockQty(available, item.baseUom)}
-                    </span>
-                );
-            },
-        },
+        // {
+        //     header: "RESERVED",
+        //     render: (item) => formatStockQty(item.reservedQty, item.baseUom),
+        // },
+        // {
+        //     header: "AVAILABLE",
+        //     render: (item) => {
+        //         const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
+        //         const minStock = Number(item.minimumStock ?? 0);
+        //         const reorder = Number(item.reorderLevel ?? 0);
+        //         let color = "#2b8a3e";
+        //         if (available <= minStock) color = "#dc3545";
+        //         else if (available <= reorder) color = "#d97706";
+        //         return (
+        //             <span style={{ color, fontWeight: 600 }}>
+        //                 {formatStockQty(available, item.baseUom)}
+        //             </span>
+        //         );
+        //     },
+        // },
         {
             header: "STATUS",
             align: "center",
@@ -331,7 +326,12 @@ const RawMaterialList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Raw Materials Management</h2>
+                        <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+                            Raw Materials Management
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {sortedData.length}
+                            </span>
+                        </h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <SearchInput
@@ -490,14 +490,14 @@ const RawMaterialList: React.FC = () => {
                                     },
                                     { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
                                     { label: "Physical Stock", value: formatStockQty(selectedItem.onHandQty, selectedItem.baseUom) },
-                                    { label: "Reserved Stock", value: formatStockQty(selectedItem.reservedQty, selectedItem.baseUom) },
-                                    {
-                                        label: "Available Stock",
-                                        value: formatStockQty(
-                                            Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0),
-                                            selectedItem.baseUom
-                                        ),
-                                    },
+                                    // { label: "Reserved Stock", value: formatStockQty(selectedItem.reservedQty, selectedItem.baseUom) },
+                                    // {
+                                    //     label: "Available Stock",
+                                    //     value: formatStockQty(
+                                    //         Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0),
+                                    //         selectedItem.baseUom
+                                    //     ),
+                                    // },
                                     { label: "Narration", value: selectedItem.narration || selectedItem.remarks || "N/A" },
                                     { label: "Status", value: selectedItem.isActive ? "Active" : "Inactive" },
                                     {

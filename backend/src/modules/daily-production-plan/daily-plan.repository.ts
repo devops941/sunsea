@@ -70,7 +70,8 @@ export class DailyPlanRepository {
           include: {
             productItem: {
               include: {
-                productionSteps: { orderBy: { stepOrder: 'asc' } }
+                productionSteps: { orderBy: { stepOrder: 'asc' } },
+                billOfMaterials: { include: { rawMaterial: true } },
               }
             },
           },

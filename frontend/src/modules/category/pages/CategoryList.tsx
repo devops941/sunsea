@@ -42,7 +42,7 @@ const TYPE_COLORS: Record<CategoryType, string> = {
 };
 
 const TypeBadge: React.FC<{ type: CategoryType }> = ({ type }) => (
-  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${TYPE_COLORS[type] || "bg-zinc-500/15 text-zinc-400"}`}>
+  <span className="text-ink text-[13px] font-medium">
     {TYPE_LABELS[type] || type}
   </span>
 );
@@ -199,7 +199,6 @@ const CategoryList: React.FC = () => {
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
     count: paginatedCategories.length,
     onEnter: (i) => { const item = paginatedCategories[i]; if (item) handleOpenView(item); },
-    onEdit: (i) => { const item = paginatedCategories[i]; if (item && canEdit) handleOpenEdit(item); },
     containerRef: tableRef,
   });
 
@@ -228,7 +227,12 @@ const CategoryList: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
           <div>
-            <h2 className="text-base font-bold text-ink">Categories</h2>
+            <h2 className="text-base font-bold text-ink flex items-center gap-2">
+              Categories
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                {sortedCategories.length}
+              </span>
+            </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {/* Search */}

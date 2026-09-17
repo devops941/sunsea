@@ -53,7 +53,7 @@ class ProductService {
     return existingUom.id;
   }
 
-  async create(data: any, files?: Express.Multer.File[]) {
+  async create(data: any, files?: Express.Multer.File[], userId?: string) {
     const uploadedImages: any[] = [];
     if (files && files.length > 0) {
       for (let index = 0; index < files.length; index++) {
@@ -101,6 +101,16 @@ class ProductService {
       gradeRates: data.gradeRates
         ? (typeof data.gradeRates === "string" ? JSON.parse(data.gradeRates) : data.gradeRates)
         : undefined,
+
+      createdBy: userId,
+      editHistory: userId
+        ? [
+            {
+              updatedBy: userId,
+              updatedAt: new Date().toISOString(),
+            },
+          ]
+        : [],
 
       ...(uploadedImages.length
         ? {
@@ -264,11 +274,97 @@ class ProductService {
       throw new ApiError(404, "Product not found");
     }
 
-    return product;
+    // Resolve createdBy user
+    let createdUserName = "Unknown User";
+    let createdUserRole = "User";
+    if (product.createdBy) {
+      if (product.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(product.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: product.createdBy },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.username;
+          createdUserRole = user.role?.name || "User";
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray((product as any).editHistory)) {
+      enrichedEditHistory = await Promise.all(
+        ((product as any).editHistory as any[]).map(async (edit: any) => {
+          let name = "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true },
+              });
+              if (admin) name = admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true },
+              });
+              if (user) name = user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    if (enrichedEditHistory.length === 0 && product.createdAt) {
+      enrichedEditHistory.push({
+        updatedBy: product.createdBy,
+        updatedByName: createdUserName,
+        updatedAt: product.createdAt,
+      });
+    }
+
+    return {
+      ...product,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
-  async update(id: bigint, data: any, files?: Express.Multer.File[]) {
-    await this.findById(id);
+  async update(id: bigint, data: any, files?: Express.Multer.File[], userId?: string) {
+    const current = await this.findById(id);
+
+    let newEditHistory: any[] = [];
+    if (Array.isArray((current as any).editHistory)) {
+      newEditHistory = [...(current as any).editHistory].map((e: any) => {
+        const { updatedByName, ...raw } = e;
+        return raw;
+      });
+    } else if (current.createdAt) {
+      newEditHistory.push({
+        updatedBy: current.createdBy,
+        updatedAt: current.createdAt instanceof Date ? current.createdAt.toISOString() : current.createdAt,
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     let isStockChanged = false;
     let qtyDiff = 0;
@@ -440,7 +536,7 @@ class ProductService {
       }
     });
 
-    const payload: Prisma.ProductUncheckedUpdateInput & { gradeRates?: any } = {
+    const payload: any = {
       productCode: data.productCode !== undefined ? cleanRequiredString(data.productCode, 20) : undefined,
       productName: data.productName !== undefined ? cleanRequiredString(data.productName, 160) : undefined,
       description: data.description !== undefined ? cleanString(data.description, 255) : undefined,
@@ -496,18 +592,15 @@ class ProductService {
         : {}),
     };
 
-    return prisma.product.update({
+    payload.modifiedBy = userId;
+    payload.editHistory = newEditHistory;
+
+    await (prisma.product.update as any)({
       where: { id },
       data: payload,
-      include: {
-        category: true,
-        uom: true,
-        images: true,
-        finishedGoodsStocks: { include: { store: true } },
-        billOfMaterials: { include: { rawMaterial: true } },
-        capacityHistories: { orderBy: { createdAt: "desc" } },
-      },
     });
+
+    return this.findById(id);
   }
 
   async delete(id: bigint) {

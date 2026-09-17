@@ -7,6 +7,7 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import AutocompleteInput from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -412,11 +413,11 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
         const primaryUomStock  = normUnit(rmStock?.baseUom?.split(",")[0]?.trim()) || normUnit(row.unit) || "kg";
         const selectedUomStock = normUnit(row.unit) || primaryUomStock;
         const convertedForCheck = convertToBaseUom(row.issuedQty, selectedUomStock, primaryUomStock);
-        const insufficient = row.rawMaterialId && convertedForCheck > row.currentStock;
+        const insufficient = row.rawMaterialId && row.issuedQty > 0 && convertedForCheck > row.currentStock;
         // Show dynamic unit with the stock value — e.g. "1730 kg", "100 pcs"
         const stockUnit = normUnit(row.unit) || "kg";
         return (
-          <span className={`font-semibold text-xs ${insufficient ? "text-rose-400" : row.rawMaterialId ? "text-emerald-400" : "text-ink-subtle"}`}>
+          <span className={`font-semibold text-xs ${insufficient ? "text-rose-500 font-bold" : row.rawMaterialId ? "text-emerald-500 font-medium" : "text-ink-subtle"}`}>
             {row.rawMaterialId ? `${fmtQty(row.currentStock)} ${stockUnit}` : "—"}
           </span>
         );
@@ -480,14 +481,16 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  const hasInsufficientStock = issueRows.some((r) => {
-    if (!r.rawMaterialId) return false;
-    const rm = allRawMaterials.find((m) => m.rawMaterialId === r.rawMaterialId);
-    const primaryUom  = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(r.unit) || "kg";
-    const selectedUom = normUnit(r.unit) || primaryUom;
-    const convertedIssuedQty = convertToBaseUom(r.issuedQty, selectedUom, primaryUom);
-    return convertedIssuedQty > r.currentStock;
-  });
+  const hasInsufficientStock = useMemo(() => {
+    return issueRows.some((r) => {
+      if (!r.rawMaterialId || r.issuedQty <= 0) return false;
+      const rm = allRawMaterials.find((m) => m.rawMaterialId === r.rawMaterialId);
+      const primaryUom  = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(r.unit) || "kg";
+      const selectedUom = normUnit(r.unit) || primaryUom;
+      const convertedIssuedQty = convertToBaseUom(r.issuedQty, selectedUom, primaryUom);
+      return convertedIssuedQty > r.currentStock;
+    });
+  }, [issueRows, allRawMaterials]);
 
   // Step 1 — validate and open confirm dialog
   const handleIssue = () => {
@@ -499,9 +502,14 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
       toast.error("Please select a raw material for all added rows, or remove empty rows.");
       return;
     }
-    const invalidQty = filledRows.find((r) => r.issuedQty <= 0);
-    if (invalidQty) {
-      toast.error("Issue quantity must be greater than 0 for all materials.");
+    const positiveRows = filledRows.filter((r) => r.issuedQty > 0);
+    if (positiveRows.length === 0) {
+      toast.error("Please enter an issue quantity greater than 0 for at least one material.");
+      return;
+    }
+
+    if (hasInsufficientStock) {
+      toast.error("Some materials have insufficient stock. Reduce issue quantity or replenish stock before issuing.");
       return;
     }
 
@@ -511,13 +519,14 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
   // Step 2 — actually call the API after user confirms
   const executeIssue = async () => {
     const filledRows = issueRows.filter((r) => r.rawMaterialId && r.issuedQty > 0 && r.storeId);
+    if (filledRows.length === 0) {
+      toast.error("No valid items to issue. Quantity must be greater than zero.");
+      return;
+    }
+
     setIssuing(true);
     try {
       const items = filledRows.map((r) => {
-        // Stock is always stored in the raw material's primary (base) UOM.
-        // Convert the user-entered qty from the selected UOM to the primary UOM
-        // so that the backend deducts the correct amount.
-        // e.g. user enters 100 in "g" → convert to 0.1 kg before sending.
         const rm = allRawMaterials.find((m) => m.rawMaterialId === r.rawMaterialId);
         const primaryUom  = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(r.unit) || "kg";
         const selectedUom = normUnit(r.unit) || primaryUom;
@@ -645,15 +654,60 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     return { ...prod, plans, bomItems };
   });
 
+  const confirmColumns: DataTableColumn<IssueRow>[] = useMemo(() => [
+    {
+      header: "#",
+      width: "48px",
+      align: "center",
+      render: (_, idx) => <span className="text-xs font-semibold text-ink-subtle">{idx + 1}</span>,
+    },
+    {
+      header: "RAW MATERIAL",
+      accessor: "materialName",
+      render: (row) => (
+        <div>
+          <div className="text-xs font-bold text-ink">{row.materialName}</div>
+          <div className="text-[10px] font-mono text-ink-subtle">{row.rawMaterialId}</div>
+        </div>
+      ),
+    },
+    {
+      header: "STORE",
+      accessor: "storeName",
+      render: (row) => <span className="text-xs text-ink-subtle">{row.storeName || row.storeId || "—"}</span>,
+    },
+    {
+      header: "ISSUE QTY",
+      align: "right",
+      render: (row) => {
+        const rm = allRawMaterials.find((m) => m.rawMaterialId === row.rawMaterialId);
+        const primaryUom = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(row.unit) || "kg";
+        const selectedUom = normUnit(row.unit) || primaryUom;
+        const converted = parseFloat(convertToBaseUom(row.issuedQty, selectedUom, primaryUom).toFixed(6));
+        const showConverted = selectedUom !== primaryUom;
+        return (
+          <div className="flex flex-col items-end">
+            <span className="text-xs font-bold text-primary">
+              {row.issuedQty} {selectedUom}
+            </span>
+            {showConverted && (
+              <span className="text-[10px] text-ink-subtle">
+                = {converted} {primaryUom}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [allRawMaterials]);
+
   return (
     <CommonModal
       show={show}
       onHide={onHide}
       title={
         <div className="flex items-center gap-2.5">
-          <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <FaBoxOpen size={12} />
-          </span>
+          
           <span className="text-base font-bold text-ink">Issue Raw Materials — Daily Production</span>
         </div>
       }
@@ -714,36 +768,36 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             {activeTab === "detail" && (
               <div className="flex flex-col gap-4">
                 {/* Day & Night summary badges together side by side */}
-                <div className="flex items-center justify-between gap-3 flex-wrap bg-card-2/60 border border-line-soft rounded-xl p-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap bg-card-2 p-3.5 rounded-xl border border-line">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     {dayTotalQty > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold shadow-xs">
-                        <FaSun size={12} className="text-amber-400" />
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-bold shadow-xs">
+                        <FaSun size={12} className="text-amber-500" />
                         <span>Day Shift</span>
-                        <span className="font-mono text-[11px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200">
+                        <span className="font-mono text-[11px] font-extrabold bg-amber-500/20 px-2 py-0.5 rounded text-amber-900 dark:text-amber-200">
                           {dayTotalQty.toLocaleString()} pcs
                         </span>
                       </div>
                     )}
                     {nightTotalQty > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold shadow-xs">
-                        <FaMoon size={12} className="text-indigo-400" />
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-300 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-300 text-xs font-bold shadow-xs">
+                        <FaMoon size={12} className="text-indigo-500" />
                         <span>Night Shift</span>
-                        <span className="font-mono text-[11px] bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-200">
+                        <span className="font-mono text-[11px] font-extrabold bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-900 dark:text-indigo-200">
                           {nightTotalQty.toLocaleString()} pcs
                         </span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line-soft text-xs font-semibold text-ink-subtle">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line text-xs font-semibold text-ink-subtle shadow-xs">
                       <span>Total Planned:</span>
-                      <span className="font-mono text-[11px] font-bold text-ink">
+                      <span className="font-mono text-[11px] font-extrabold text-ink">
                         {grandTotalQty.toLocaleString()} pcs
                       </span>
                     </div>
                   </div>
 
                   {uniqueShifts.length > 1 && (
-                    <div className="flex items-center bg-card border border-line-soft rounded-lg p-0.5 text-[11px] font-semibold">
+                    <div className="flex items-center bg-card border border-line rounded-lg p-0.5 text-[11px] font-semibold">
                       <button
                         type="button"
                         onClick={() => setShiftFilter("ALL")}
@@ -769,8 +823,6 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                   )}
                 </div>
 
-             
-
                 {/* Product BOM tables with Day & Night side-by-side */}
                 {displayedProducts.length === 0 ? (
                   <div className="text-xs text-ink-subtle py-4 pl-2">
@@ -789,36 +841,36 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                         .reduce((s, p) => s + p.plannedQty, 0);
 
                       return (
-                        <div key={prod.productCode || prod.productName} className="bg-card/40 rounded-xl p-3 border border-line-soft/60">
-                          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-md bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-[10px] font-black">
+                        <div key={prod.productCode || prod.productName} className="bg-card rounded-2xl p-4 border border-line shadow-xs">
+                          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/25 flex items-center justify-center text-primary text-xs font-black">
                                 {prod.productName.charAt(0)}
                               </span>
                               <span className="text-sm font-bold text-ink">{prod.productName}</span>
                               {prod.productCode && (
-                                <span className="text-[10px] font-mono text-ink-subtle bg-card-2 border border-line-soft px-1.5 py-0.5 rounded">
+                                <span className="text-[10px] font-mono font-semibold text-ink-subtle bg-card-2 border border-line px-2 py-0.5 rounded">
                                   {prod.productCode}
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2.5 flex-wrap">
                               {prod.weightPerPiece > 0 && (
-                                <span className="text-[10px] text-ink-subtle font-semibold">
-                                  {prod.weightPerPiece}g/pcs
+                                <span className="text-[11px] text-ink-subtle font-semibold">
+                                  {prod.weightPerPiece}g / pcs
                                 </span>
                               )}
                               {prodDayQty > 0 && (
-                                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded flex items-center gap-1">
-                                  <FaSun size={9} /> Day: {prodDayQty.toLocaleString()} pcs
+                                <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                                  <FaSun size={10} className="text-amber-500" /> Day: {prodDayQty.toLocaleString()} pcs
                                 </span>
                               )}
                               {prodNightQty > 0 && (
-                                <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded flex items-center gap-1">
-                                  <FaMoon size={9} /> Night: {prodNightQty.toLocaleString()} pcs
+                                <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-300 dark:border-indigo-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                                  <FaMoon size={10} className="text-indigo-500" /> Night: {prodNightQty.toLocaleString()} pcs
                                 </span>
                               )}
-                              <span className="text-[11px] font-black text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded">
+                              <span className="text-xs font-black text-primary bg-primary/10 border border-primary/25 px-3 py-1 rounded-lg">
                                 Total: {prodPlannedQty.toLocaleString()} pcs
                               </span>
                             </div>
@@ -847,23 +899,21 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             {/* ── TAB: Issue Summary — single unified table (BOM + manual rows) ── */}
             {activeTab === "issue" && (
               <div className="flex flex-col gap-3">
-                <div className="border border-line-soft rounded-xl overflow-hidden bg-card/40">
-                  <BusyItemsTable
-                    columns={issueRowColumns}
-                    rows={issueRows}
-                    onChange={(newRows) => setIssueRows(newRows)}
-                    onAdd={addManualRow}
-                    onRemove={(i) => setIssueRows((prev) => prev.filter((_, j) => j !== i))}
-                    isRowDeletable={(row) => row.isManual}
-                    editable
-                    visibleRows={Math.max(issueRows.length, 10)}
-                    rowHeight={44}
-                  />
-                </div>
+                <BusyItemsTable
+                  columns={issueRowColumns}
+                  rows={issueRows}
+                  onChange={(newRows) => setIssueRows(newRows)}
+                  onAdd={addManualRow}
+                  onRemove={(i) => setIssueRows((prev) => prev.filter((_, j) => j !== i))}
+                  isRowDeletable={() => true}
+                  editable
+                  visibleRows={issueRows.length || 1}
+                  rowHeight={44}
+                />
 
                 {hasInsufficientStock && !alreadyIssued && (
-                  <div className="flex items-center gap-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-300">
-                    <FaExclamationTriangle size={12} className="shrink-0" />
+                  <div className="flex items-center gap-2.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-500/30 rounded-xl p-3 text-xs text-rose-800 dark:text-rose-300">
+                    <FaExclamationTriangle size={12} className="shrink-0 text-rose-500" />
                     Some materials have insufficient stock. Reduce issue quantity or replenish stock before issuing.
                   </div>
                 )}
@@ -875,64 +925,13 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
 
       {/* ── Confirmation Dialog ── */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 z-[200000] flex items-center justify-center">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => !issuing && setShowConfirmDialog(false)}
-          />
-          {/* Dialog box */}
-          <div className="relative z-10 bg-card border border-line-soft rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-line-soft bg-card-2/60">
-              <span className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                <FaBoxOpen size={14} />
-              </span>
-              <div>
-                <div className="text-sm font-bold text-ink">Confirm Raw Material Issue</div>
-                <div className="text-[11px] text-ink-subtle mt-0.5">{date}</div>
-              </div>
-            </div>
-
-            {/* Summary list */}
-            <div className="px-5 py-4 flex flex-col gap-2 max-h-64 overflow-y-auto">
-              <div className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider mb-1">
-                Materials to be issued
-              </div>
-              {issueRows
-                .filter((r) => r.rawMaterialId && r.issuedQty > 0)
-                .map((r) => {
-                  const rm = allRawMaterials.find((m) => m.rawMaterialId === r.rawMaterialId);
-                  const primaryUom  = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(r.unit) || "kg";
-                  const selectedUom = normUnit(r.unit) || primaryUom;
-                  const converted = parseFloat(convertToBaseUom(r.issuedQty, selectedUom, primaryUom).toFixed(6));
-                  const showConverted = selectedUom !== primaryUom;
-                  return (
-                    <div key={r._id} className="flex items-center justify-between gap-3 bg-card-2 rounded-lg px-3 py-2 border border-line-soft/60">
-                      <span className="text-xs font-semibold text-ink truncate">{r.materialName}</span>
-                      <div className="flex flex-col items-end shrink-0">
-                        <span className="text-xs font-bold text-amber-400">
-                          {r.issuedQty} {selectedUom}
-                        </span>
-                        {showConverted && (
-                          <span className="text-[10px] text-ink-subtle">= {converted} {primaryUom}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            {/* Warning */}
-            <div className="px-5 pb-3">
-              <div className="flex items-start gap-2 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-300">
-                <FaExclamationTriangle size={12} className="shrink-0 mt-0.5" />
-                <span>This action will deduct the above quantities from stock. This cannot be undone.</span>
-              </div>
-            </div>
-
-            {/* Footer buttons */}
-            <div className="flex items-center justify-end gap-2.5 px-5 py-3 border-t border-line-soft bg-card-2/40">
+        <CommonModal
+          show={showConfirmDialog}
+          onHide={() => !issuing && setShowConfirmDialog(false)}
+          title="Confirm Raw Material Issue"
+          maxWidth="lg"
+          footer={
+            <div className="flex items-center justify-end gap-2.5">
               <CustomButton
                 text="Cancel"
                 variant="secondary"
@@ -945,8 +944,24 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                 disabled={issuing}
               />
             </div>
+          }
+        >
+          <div className="flex flex-col gap-4 py-1">
+            <div className="border border-line-soft rounded-xl overflow-hidden">
+              <DataTable
+                columns={confirmColumns}
+                data={issueRows.filter((r) => r.rawMaterialId && r.issuedQty > 0)}
+                rowKey={(row) => row._id || row.rawMaterialId}
+                density="compact"
+                minHeightClassName="min-h-0"
+              />
+            </div>
+
+            <div className="text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-500/30 rounded-xl p-3">
+              This action will deduct the above quantities from stock. This cannot be undone.
+            </div>
           </div>
-        </div>
+        </CommonModal>
       )}
     </CommonModal>
   );

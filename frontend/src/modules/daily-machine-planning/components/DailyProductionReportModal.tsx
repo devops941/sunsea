@@ -3,6 +3,8 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import CustomButton from "../../../components/ui/Button/Button";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import { getPlanStatusInfo } from "../../../utils/planningUtils";
 import { FaPrint, FaIndustry, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 
 interface DailyProductionReportModalProps {
@@ -86,12 +88,8 @@ export const DailyProductionReportModal: React.FC<DailyProductionReportModalProp
       
       const efficiency = plannedCapacity > 0 ? (actualProduction / plannedCapacity) * 100 : 0;
       
-      let status = "Low";
-      if (actualProduction >= plannedCapacity) {
-        status = "Highest";
-      } else if (efficiency >= 90) {
-        status = "Medium";
-      }
+      const { statusText, customColor } = getPlanStatusInfo(plannedCapacity, actualProduction);
+      const status = statusText;
       
       totalPlannedCapacity += plannedCapacity;
       totalActualProduction += actualProduction;
@@ -134,6 +132,7 @@ export const DailyProductionReportModal: React.FC<DailyProductionReportModalProp
         pendingQty,
         efficiency: efficiency.toFixed(1),
         status,
+        statusColor: customColor,
         planStatus: plan.status
       });
     });
@@ -181,17 +180,15 @@ export const DailyProductionReportModal: React.FC<DailyProductionReportModalProp
     },
     { 
       header: "STATUS", 
+      align: "center",
       render: (item) => {
-        let badgeClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
-        if (item.status === 'Highest') {
-          badgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-        } else if (item.status === 'Medium') {
-          badgeClass = "bg-blue-500/10 text-blue-400 border border-blue-500/20";
-        }
+        const { statusText, customColor } = getPlanStatusInfo(item.plannedCapacity, item.actualProduction);
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>
-            {item.status}
-          </span>
+          <StatusBadge
+            status="CUSTOM"
+            customText={item.status || statusText}
+            customColor={item.statusColor || customColor}
+          />
         );
       }
     }

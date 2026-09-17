@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 import { toast } from "react-toastify";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 
 import { useListCache } from "../../../hooks/useListCache";
 import { rawMaterialStockService } from "../../../services/rawMaterialStockService";
@@ -118,10 +119,19 @@ const WastageStockList: React.FC = () => {
         setCurrentPage(1);
     }, []);
 
+    const tableRef = useRef<HTMLDivElement>(null);
+
     const handleOpenView = useCallback((item: any) => {
         setSelectedItem(item);
         setShowView(true);
+        setTimeout(() => tableRef.current?.focus(), 50);
     }, []);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: (data || []).length,
+        onEnter: (i) => { const item = (data || [])[i]; if (item) handleOpenView(item); },
+        containerRef: tableRef,
+    });
 
     const formatExportQty = (qty: any, uom: string) => {
         const num = Number(qty) || 0;
@@ -161,7 +171,12 @@ const WastageStockList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-base font-bold text-ink">Wastage Stock Ledger</h2>
+                        <h2 className="text-base font-bold text-ink flex items-center gap-2">
+                            Wastage Stock Ledger
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {total ?? 0}
+                            </span>
+                        </h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -225,12 +240,14 @@ const WastageStockList: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <div className="p-0 overflow-hidden rounded-b-2xl">
+                <div ref={tableRef} tabIndex={0} data-table-nav className="p-0 overflow-hidden rounded-b-2xl outline-none">
                 <DataTable
                     data={data || []}
                     rowKey={(item) => item.rawMaterialId || item.id}
                     loading={loading}
                     emptyMessage="No wastage stock records found."
+                    rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                    onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item); }}
                     pagination={
                         totalPages > 1
                             ? { currentPage, totalPages, onPageChange: setCurrentPage }
