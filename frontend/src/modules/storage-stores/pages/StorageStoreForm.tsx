@@ -32,7 +32,7 @@ const initialFormState = {
     inchargeId: "",
     addressLine: "",
     city: "",
-    state: "",
+    state: "Tamil Nadu",
     country: "India",
     zipcode: "",
     locationDesc: "",

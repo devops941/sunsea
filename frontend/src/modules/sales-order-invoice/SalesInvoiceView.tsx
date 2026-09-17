@@ -6,6 +6,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
+import { customerService } from "../../services/customerService";
 import { DEFAULT_SUNDRY_OPTIONS } from "../../components/form/OrderItemsTable/BusyItemsTable";
 import { useSocketSync } from "../../hooks/useSocketSync";
 import CustomButton from "../../components/ui/Button/Button";
@@ -105,6 +106,14 @@ const SalesInvoiceView: React.FC = () => {
         setLoading(true);
         try {
             const data = await salesInvoiceService.fetchById(idToLoad);
+            if (data?.customerId) {
+                try {
+                    const custData = await customerService.fetchById(data.customerId);
+                    data.customer = { ...data.customer, ...custData };
+                } catch (e) {
+                    console.error("Failed to fetch live customer data", e);
+                }
+            }
             setInvoice(data);
         } catch (error: any) {
             const status = error?.response?.status;
@@ -703,15 +712,25 @@ const SalesInvoiceView: React.FC = () => {
                                 </div>
 
                                 {/* Customer Balance */}
-                                {(invoice.openingBalance != null || invoice.closingBalance != null) && (
+                                {invoice.customer && (
                                     <div className="border-t border-black">
                                         {(() => {
-                                            const ob = Number(invoice.openingBalance ?? 0);
-                                            const cb = Number(invoice.closingBalance ?? 0);
+                                            const cust = invoice.customer;
+                                            const rawOpenBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
+                                            const rawBType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
+                                            
+                                            let currentSignedBal = (rawBType.startsWith("C") ? -1 : 1) * rawOpenBal;
+                                            
+                                            // Reverse this invoice's amount from current balance to get true opening balance
+                                            currentSignedBal -= Number(invoice.grandTotal || 0);
+                                            
+                                            const ob = currentSignedBal;
+                                            const cb = currentSignedBal + grandTotal;
+
                                             const obAbs = Math.abs(ob);
-                                            const obType = ob > 0 ? "Dr" : ob < 0 ? "Cr" : "";
+                                            const obType = ob > 0 ? "Dr" : ob < 0 ? "Cr" : ob === 0 ? "" : "";
                                             const cbAbs = Math.abs(cb);
-                                            const cbType = cb > 0 ? "Dr" : cb < 0 ? "Cr" : "";
+                                            const cbType = cb > 0 ? "Dr" : cb < 0 ? "Cr" : cb === 0 ? "" : "";
                                             return (
                                                 <table className="w-full text-[13px]">
                                                     <tbody>
