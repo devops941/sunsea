@@ -313,7 +313,7 @@ const dashboardController = {
           }),
           tx.accountLedger.findMany({
             where: { customerId: { not: null } },
-            select: { id: true, customer: { select: { firmName: true, displayName: true, openingBalance: true, openingBalanceType: true } } },
+            select: { id: true, customerId: true, customer: { select: { firmName: true, displayName: true, openingBalance: true, openingBalanceType: true } } },
           }),
           tx.accountLedger.findMany({
             where: { supplierId: { not: null } },
@@ -429,7 +429,7 @@ const dashboardController = {
       let totalCustomerAdvances = 0;
       let receivableCustomerCount = 0;
       let customerAdvanceCount = 0;
-      const receivableDetails: Array<{ name: string; amount: number }> = [];
+      const receivableDetails: Array<{ name: string; amount: number; customerId: string }> = [];
       for (const cl of customerLedgers) {
         const netDr = (debitMap.get(cl.id) || 0) - (creditMap.get(cl.id) || 0);
         if (netDr > 0.005) {
@@ -438,6 +438,7 @@ const dashboardController = {
           receivableDetails.push({
             name: cl.customer?.displayName || cl.customer?.firmName || "Unknown",
             amount: netDr,
+            customerId: cl.customerId || "",
           });
         } else if (netDr < -0.005) {
           totalCustomerAdvances += -netDr;
@@ -518,13 +519,13 @@ const dashboardController = {
 
       // ─── Alerts — each item is a scrollable clickable row ───
       const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const alerts: Array<{ level: "info" | "warn" | "danger"; message: string; link?: string; details?: Array<{ name: string; amount: string }> }> = [];
+      const alerts: Array<{ level: "info" | "warn" | "danger"; message: string; link?: string; details?: Array<{ name: string; amount: string; customerId?: string }> }> = [];
       if (totalReceivable > 0) {
         alerts.push({
           level: "danger",
           message: `Total outstanding receivable: ${fmtINR(totalReceivable)} (${receivableCustomerCount} customer${receivableCustomerCount > 1 ? "s" : ""})`,
           link: "/accounts/receivable",
-          details: receivableDetails.map((d) => ({ name: d.name, amount: fmtINR(d.amount) })),
+          details: receivableDetails.map((d) => ({ name: d.name, amount: fmtINR(d.amount), customerId: d.customerId })),
         });
       }
       if (totalPayable > 0) {

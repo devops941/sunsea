@@ -21,7 +21,7 @@ import {
   FaShoppingCart, FaTruck, FaChartLine, FaClock,
   FaMoneyBillWave, FaCalendarAlt, FaHourglassHalf, FaUserFriends,
   FaArrowUp, FaArrowDown, FaHandHoldingUsd, FaFileInvoiceDollar,
-  FaUniversity, FaWarehouse, FaCheckCircle, FaTimesCircle, FaSync, FaMapMarkerAlt, FaTimes,FaTv,
+  FaUniversity, FaWarehouse, FaCheckCircle, FaTimesCircle, FaSync, FaMapMarkerAlt, FaTimes, FaTv,
   FaChartBar, FaChartPie, FaListUl, FaArrowLeft, FaArrowRight, FaPlus, FaSearch, FaBox,
   FaBell, FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaChevronRight,
 } from "react-icons/fa";
@@ -88,7 +88,7 @@ const DashboardPage: React.FC = () => {
       if (saved && ["list", "bar", "pie"].includes(saved)) {
         return saved as "list" | "bar" | "pie";
       }
-    } catch (e) {}
+    } catch (e) { }
     return "list";
   });
 
@@ -99,30 +99,30 @@ const DashboardPage: React.FC = () => {
       if (saved && ["day", "week", "month"].includes(saved)) {
         return saved as TaskPeriod;
       }
-    } catch (e) {}
+    } catch (e) { }
     return "day";
   });
 
   const handleTaskPeriodChange = (p: TaskPeriod) => {
     setTaskPeriod(p);
-    try { localStorage.setItem("dashboard_tasks_period", p); } catch (e) {}
+    try { localStorage.setItem("dashboard_tasks_period", p); } catch (e) { }
   };
 
   const handleTopProductsChartTypeChange = (newType: "list" | "bar" | "pie") => {
     setTopProductsChartType(newType);
     try {
       localStorage.setItem("dashboard_top_products_chart_type", newType);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Dashboard widget visibility — super admin always sees everything
-  const showOverview     = isSuperAdmin || can("dash-overview.view");
-  const showTrend        = isSuperAdmin || can("dash-trend.view");
-  const showTasks        = isSuperAdmin || can("dash-tasks.view");
-  const showInventory    = isSuperAdmin || can("dash-inventory.view");
-  const showMachines     = isSuperAdmin || can("dash-machines.view");
-  const showTopProducts  = isSuperAdmin || can("dash-top-products.view");
-  const showRecentSales  = isSuperAdmin || can("dash-recent-sales.view");
+  const showOverview = isSuperAdmin || can("dash-overview.view");
+  const showTrend = isSuperAdmin || can("dash-trend.view");
+  const showTasks = isSuperAdmin || can("dash-tasks.view");
+  const showInventory = isSuperAdmin || can("dash-inventory.view");
+  const showMachines = isSuperAdmin || can("dash-machines.view");
+  const showTopProducts = isSuperAdmin || can("dash-top-products.view");
+  const showRecentSales = isSuperAdmin || can("dash-recent-sales.view");
 
   // ─────────────────────────────────────────────────────────────
   //  DASHBOARD SUMMARY — cache-first (no full-page Loading spinner)
@@ -215,8 +215,8 @@ const DashboardPage: React.FC = () => {
 
     const cashTrend: "up" | "down" | "neutral" =
       accountsSummary.todayReceipts > accountsSummary.todayPayments ? "up"
-      : accountsSummary.todayReceipts < accountsSummary.todayPayments ? "down"
-      : "neutral";
+        : accountsSummary.todayReceipts < accountsSummary.todayPayments ? "down"
+          : "neutral";
 
     return {
       sales: getTrend("SALES"),
@@ -241,7 +241,7 @@ const DashboardPage: React.FC = () => {
     const totalFinished = po.reduce((a: number, o: any) => a + (Number(o.producedQty) || 0), 0);
 
     const totalRevenue = so.reduce((acc: number, s: any) => acc + (Number(s.netAmount) || 0), 0);
-    
+
     // Calculate last month revenue
     const now = new Date();
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -384,7 +384,7 @@ const DashboardPage: React.FC = () => {
       const productName = item.materialName || item.rawMaterial?.materialName || "Unknown RM";
       const uom = formatUom(item.baseUom || item.rawMaterial?.baseUom);
       const key = `${storeName}::${productName}`;
-      
+
       if (!itemMap[key]) {
         itemMap[key] = { qty: 0, storeName, productName, uom };
       }
@@ -432,7 +432,7 @@ const DashboardPage: React.FC = () => {
 
   const topProducts = useMemo(() => {
     const fg = safe(finishedGoodsStocks);
-    
+
     // Group stocks by product name
     const grouped = fg.reduce((acc: Record<string, number>, curr: any) => {
       const name = curr.product?.productName || curr.productItem?.productName || "Unknown";
@@ -619,7 +619,7 @@ const DashboardPage: React.FC = () => {
                 <FaSync className="animate-spin text-[10px]" /> Syncing…
               </span>
             )}
-              
+
             <button
               type="button"
               onClick={() => navigate("/tv-dashboard")}
@@ -774,11 +774,11 @@ const DashboardPage: React.FC = () => {
                       {taskPeriod === "day"
                         ? "Today's Tasks & Production"
                         : taskPeriod === "week"
-                        ? "This Week's Tasks & Production"
-                        : "This Month's Tasks & Production"}
+                          ? "This Week's Tasks & Production"
+                          : "This Month's Tasks & Production"}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Day / Week / Month Filter Tabs */}
                     <div className="flex items-center gap-0.5 bg-card-2 p-0.5 rounded-lg border border-line-soft">
@@ -787,11 +787,10 @@ const DashboardPage: React.FC = () => {
                           key={p}
                           type="button"
                           onClick={() => handleTaskPeriodChange(p)}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold capitalize transition-all duration-200 cursor-pointer ${
-                            taskPeriod === p
-                              ? "bg-emerald-500 text-white shadow-xs font-black"
-                              : "text-ink-muted hover:text-ink hover:bg-card/50"
-                          }`}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold capitalize transition-all duration-200 cursor-pointer ${taskPeriod === p
+                            ? "bg-emerald-500 text-white shadow-xs font-black"
+                            : "text-ink-muted hover:text-ink hover:bg-card/50"
+                            }`}
                         >
                           {p === "day" ? "Day" : p === "week" ? "Week" : "Month"}
                         </button>
@@ -837,7 +836,7 @@ const DashboardPage: React.FC = () => {
                       const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
                       const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || task.weeklyMachineProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
                       const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || task.weeklyMachineProgram?.shift?.shiftName || "General Shift";
-                      
+
                       const rawDate = task.productionDate || task.date || task.createdAt;
                       const dateObj = rawDate ? new Date(rawDate) : null;
                       const dateText = dateObj && !isNaN(dateObj.getTime()) ? (
@@ -911,7 +910,7 @@ const DashboardPage: React.FC = () => {
                       Recent Sales Orders
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 shrink-0">
                     {isDashboardLoading ? (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-muted border border-line-soft uppercase">
@@ -993,13 +992,12 @@ const DashboardPage: React.FC = () => {
                               ₹{so.displayAmount.toLocaleString("en-IN")}
                             </span>
                             <span
-                              className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${
-                                isCompleted
-                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                                  : isCancelled
+                              className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${isCompleted
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                : isCancelled
                                   ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
                                   : "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                              }`}
+                                }`}
                             >
                               {status.replace(/_/g, " ")}
                             </span>
@@ -1022,6 +1020,7 @@ const DashboardPage: React.FC = () => {
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 h-full">
             {/* Alerts (1 of 3 inside 3/4) */}
             <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
+              {/* Header */}
               <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
                   <FaBell className="text-amber-400 text-xs" />
@@ -1043,21 +1042,15 @@ const DashboardPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {isAccountsLoading ? (
-                  <div className="p-1 space-y-2.5 animate-pulse">
-                    <div className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
-                      <div className="h-3.5 bg-white/15 rounded w-4/5" />
-                      <div className="h-2.5 bg-white/10 rounded w-1/2" />
-                    </div>
-                    <div className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
-                      <div className="h-3.5 bg-white/15 rounded w-3/4" />
-                      <div className="h-2.5 bg-white/10 rounded w-2/5" />
-                    </div>
-                    <div className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
-                      <div className="h-3.5 bg-white/15 rounded w-2/3" />
-                      <div className="h-2.5 bg-white/10 rounded w-1/3" />
-                    </div>
+                  <div className="p-2.5 space-y-2.5 animate-pulse">
+                    {[1, 2, 3].map((n) => (
+                      <div key={n} className="p-3 rounded-lg bg-card-2 border border-line-soft space-y-2">
+                        <div className="h-3.5 bg-white/15 rounded w-4/5" />
+                        <div className="h-2.5 bg-white/10 rounded w-1/2" />
+                      </div>
+                    ))}
                   </div>
                 ) : !accountsSummary || accountsSummary.alerts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full py-8 text-center">
@@ -1072,65 +1065,66 @@ const DashboardPage: React.FC = () => {
                     const isDanger = a.level === "danger";
                     const isWarn = a.level === "warn";
 
-                    const borderAccent = isDanger
-                      ? "border-l-rose-500"
-                      : isWarn
-                      ? "border-l-amber-500"
-                      : "border-l-blue-500";
+                    const accentBg = isDanger ? "bg-rose-500/10" : isWarn ? "bg-amber-500/10" : "bg-blue-500/10";
+                    const accentText = isDanger ? "text-rose-400" : isWarn ? "text-amber-400" : "text-blue-400";
+                    const accentBdr = isDanger ? "border-rose-500/30" : isWarn ? "border-amber-500/30" : "border-blue-500/30";
+                    const IconComponent = isDanger ? FaExclamationCircle : isWarn ? FaExclamationTriangle : FaInfoCircle;
 
-                    const iconColor = isDanger
-                      ? "text-rose-400"
-                      : isWarn
-                      ? "text-amber-400"
-                      : "text-blue-400";
+                    const hasTable = a.details && a.details.length > 0;
 
-                    const IconComponent = isDanger
-                      ? FaExclamationCircle
-                      : isWarn
-                      ? FaExclamationTriangle
-                      : FaInfoCircle;
+                    return (
+                      <div key={i} className="border-b border-line-soft/60 last:border-0">
 
-                    const content = (
-                      <div className="w-full">
-                        <div className="flex items-center justify-between gap-2.5">
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <IconComponent className={`text-xs mt-0.5 shrink-0 ${iconColor}`} />
-                            <p className="text-[11px] font-semibold text-ink leading-snug break-words">
-                              {a.message}
-                            </p>
-                          </div>
-                          {a.link && (
-                            <FaChevronRight className="text-[9px] text-ink-subtle group-hover:text-ink group-hover:translate-x-0.5 transition-all shrink-0" />
-                          )}
+                        {/* ── Alert summary row ── */}
+                        <div
+                          role={a.link ? "button" : undefined}
+                          tabIndex={a.link ? 0 : undefined}
+                          onClick={a.link ? () => navigate(a.link!) : undefined}
+                          onKeyDown={a.link ? (e) => { if (e.key === "Enter" || e.key === " ") navigate(a.link!); } : undefined}
+                          className={`flex items-center gap-2.5 px-3 py-2 ${accentBg} border-l-[3px] ${accentBdr} ${a.link ? "cursor-pointer hover:bg-white/5" : ""} transition-colors`}
+                        >
+                          <IconComponent className={`text-[11px] shrink-0 ${accentText}`} />
+                          <p className={`flex-1 text-[11px] font-semibold ${accentText} leading-snug`}>{a.message}</p>
+                          {a.link && <FaChevronRight className="text-[9px] text-ink-subtle shrink-0" />}
                         </div>
-                        {a.details && a.details.length > 0 && (
-                          <div className="ml-5 mt-1.5 space-y-1">
-                            {a.details.map((d, di) => (
-                              <div key={di} className="flex items-center justify-between text-[10px] text-ink-subtle">
-                                <span className="truncate mr-2">{d.name}</span>
-                                <span className="font-semibold text-ink whitespace-nowrap">{d.amount}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
 
-                    return a.link ? (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => navigate(a.link!)}
-                        className={`w-full text-left rounded-md p-2.5 bg-card-2 border border-line-soft hover:bg-card border-l-[3px] ${borderAccent} transition-all duration-150 cursor-pointer shadow-sm group`}
-                      >
-                        {content}
-                      </button>
-                    ) : (
-                      <div
-                        key={i}
-                        className={`w-full text-left rounded-md p-2.5 bg-card-2 border border-line-soft border-l-[3px] ${borderAccent} shadow-sm`}
-                      >
-                        {content}
+                        {/* ── Table of customer details ── */}
+                        {hasTable && (
+                          <table className="w-full text-[11px] border-collapse">
+                            <thead className="sticky top-0 z-10">
+                              <tr className="bg-card-2 border-b border-line-soft">
+                                <th className="text-left px-3 py-1 text-ink-muted font-semibold uppercase tracking-wider text-[9px] w-full border-r border-line-soft">Customer</th>
+                                <th className="text-right px-3 py-1 text-ink-muted font-semibold uppercase tracking-wider text-[9px] whitespace-nowrap">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {a.details!.map((d, di) => (
+                                <tr
+                                  key={di}
+                                  role={d.customerId ? "button" : undefined}
+                                  tabIndex={d.customerId ? 0 : undefined}
+                                  onClick={d.customerId ? (e) => {
+                                    e.stopPropagation();
+                                    navigate("/accounts/receivable", { state: { highlightCustomerId: d.customerId } });
+                                  } : undefined}
+                                  onKeyDown={d.customerId ? (e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.stopPropagation();
+                                      navigate("/accounts/receivable", { state: { highlightCustomerId: d.customerId } });
+                                    }
+                                  } : undefined}
+                                  title={d.customerId ? `View ${d.name} in Amount Receivable` : undefined}
+                                  className={`border-b border-line-soft/30 last:border-0 ${di % 2 === 0 ? "bg-transparent" : "bg-white/[0.02]"} ${d.customerId ? "cursor-pointer hover:bg-white/5 hover:text-ink" : ""} transition-colors`}
+                                >
+                                  <td className="px-3 py-[5px] text-ink-subtle truncate max-w-0 w-full border-r border-line">
+                                    <span className="block truncate">{d.name}</span>
+                                  </td>
+                                  <td className="px-3 py-[5px] text-right font-semibold text-ink whitespace-nowrap">{d.amount}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </div>
                     );
                   })
@@ -1140,13 +1134,14 @@ const DashboardPage: React.FC = () => {
               {!isAccountsLoading && accountsSummary && accountsSummary.alerts.length > 0 && (
                 <div className="shrink-0 px-3 py-1.5 bg-card-2/50 border-t border-line-soft flex items-center justify-between text-[10px] text-ink-subtle">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     Active Alerts
                   </span>
                   <span className="text-[9px] text-ink-muted">Click to view</span>
                 </div>
               )}
             </div>
+
 
             {/* Recent Transactions (2 of 3 inside 3/4) */}
             <div className="md:col-span-2 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
@@ -1176,13 +1171,13 @@ const DashboardPage: React.FC = () => {
                 ) : !accountsSummary || accountsSummary.recentTransactions.length === 0 ? (
                   <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
                 ) : (
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
                       <tr>
-                        <th className="px-3 py-2 bg-card-2">Voucher No</th>
-                        <th className="px-2 py-2 bg-card-2">Type</th>
-                        <th className="px-3 py-2 bg-card-2">Party / Account</th>
-                        <th className="px-2 py-2 bg-card-2">Date</th>
+                        <th className="px-3 py-2 bg-card-2 border-r border-line-soft">Voucher No</th>
+                        <th className="px-2 py-2 bg-card-2 border-r border-line-soft">Type</th>
+                        <th className="px-3 py-2 bg-card-2 border-r border-line-soft">Party / Account</th>
+                        <th className="px-2 py-2 bg-card-2 border-r border-line-soft">Date</th>
                         <th className="px-3 py-2 bg-card-2 text-right">Amount</th>
                       </tr>
                     </thead>
@@ -1198,15 +1193,15 @@ const DashboardPage: React.FC = () => {
                         };
                         const party = t.debitLedger || t.creditLedger || t.narration || "-";
                         return (
-                          <tr key={t.id} className="hover:bg-card-2 transition-colors">
-                            <td className="px-3 py-2 font-mono font-semibold text-blue-400 whitespace-nowrap text-[11px]">{t.voucherNo}</td>
-                            <td className="px-2 py-2">
+                          <tr key={t.id} className="hover:bg-card-2 transition-colors border-b border-line-soft last:border-0">
+                            <td className="px-3 py-2 font-mono font-semibold text-blue-400 whitespace-nowrap text-[11px] border-r border-line-soft">{t.voucherNo}</td>
+                            <td className="px-2 py-2 border-r border-line-soft">
                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
                                 {t.type}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-ink truncate max-w-[160px] text-[11px] font-medium">{party}</td>
-                            <td className="px-2 py-2 font-mono text-[10px] text-ink-muted whitespace-nowrap">
+                            <td className="px-3 py-2 text-ink truncate max-w-[160px] text-[11px] font-medium border-r border-line-soft">{party}</td>
+                            <td className="px-2 py-2 font-mono text-[10px] text-ink-muted whitespace-nowrap border-r border-line-soft">
                               {formatDate(t.date)}
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
@@ -1236,11 +1231,10 @@ const DashboardPage: React.FC = () => {
                     type="button"
                     onClick={() => handleTopProductsChartTypeChange("list")}
                     title="Horizontal Ranking Bars"
-                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${
-                      topProductsChartType === "list"
-                        ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
-                        : "text-ink-muted hover:text-ink hover:bg-card"
-                    }`}
+                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${topProductsChartType === "list"
+                      ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
+                      : "text-ink-muted hover:text-ink hover:bg-card"
+                      }`}
                   >
                     <FaListUl className="text-xs" />
                   </button>
@@ -1248,11 +1242,10 @@ const DashboardPage: React.FC = () => {
                     type="button"
                     onClick={() => handleTopProductsChartTypeChange("bar")}
                     title="Vertical Column Chart"
-                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${
-                      topProductsChartType === "bar"
-                        ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
-                        : "text-ink-muted hover:text-ink hover:bg-card"
-                    }`}
+                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${topProductsChartType === "bar"
+                      ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
+                      : "text-ink-muted hover:text-ink hover:bg-card"
+                      }`}
                   >
                     <FaChartBar className="text-xs" />
                   </button>
@@ -1260,11 +1253,10 @@ const DashboardPage: React.FC = () => {
                     type="button"
                     onClick={() => handleTopProductsChartTypeChange("pie")}
                     title="Donut Distribution Chart"
-                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${
-                      topProductsChartType === "pie"
-                        ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
-                        : "text-ink-muted hover:text-ink hover:bg-card"
-                    }`}
+                    className={`p-1.5 rounded transition-all flex items-center justify-center cursor-pointer ${topProductsChartType === "pie"
+                      ? "bg-teal-500 text-white shadow-md shadow-teal-500/40 font-bold"
+                      : "text-ink-muted hover:text-ink hover:bg-card"
+                      }`}
                   >
                     <FaChartPie className="text-xs" />
                   </button>
@@ -1485,11 +1477,10 @@ const DashboardPage: React.FC = () => {
                   <FaShoppingCart className="text-amber-400 text-xs" />
                   <span>Purchase Overdue</span>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                  accountsSummary.purchaseOverdue.length > 0
-                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                }`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${accountsSummary.purchaseOverdue.length > 0
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  }`}>
                   {accountsSummary.purchaseOverdue.length} Customer{accountsSummary.purchaseOverdue.length !== 1 ? "s" : ""}
                 </span>
               </div>
@@ -1550,11 +1541,10 @@ const DashboardPage: React.FC = () => {
                   <FaMoneyBillWave className="text-rose-400 text-xs" />
                   <span>Payment Overdue</span>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                  accountsSummary.paymentOverdue.length > 0
-                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                }`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${accountsSummary.paymentOverdue.length > 0
+                  ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  }`}>
                   {accountsSummary.paymentOverdue.length} Customer{accountsSummary.paymentOverdue.length !== 1 ? "s" : ""}
                 </span>
               </div>
@@ -1651,11 +1641,10 @@ const DashboardPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setSelectedCustomerReport({ customer: selectedCustomerReport.customer, type: "purchased" })}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                              selectedCustomerReport.type === "purchased"
-                                ? "bg-emerald-600 text-white shadow-sm"
-                                : "text-ink-muted hover:text-ink hover:bg-card"
-                            }`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${selectedCustomerReport.type === "purchased"
+                              ? "bg-emerald-600 text-white shadow-sm"
+                              : "text-ink-muted hover:text-ink hover:bg-card"
+                              }`}
                           >
                             <FaCheckCircle className="text-[9px]" />
                             <span>Purchased (≤3 Mo) ({purchasedCount})</span>
@@ -1663,11 +1652,10 @@ const DashboardPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setSelectedCustomerReport({ customer: selectedCustomerReport.customer, type: "notPurchased" })}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                              selectedCustomerReport.type === "notPurchased"
-                                ? "bg-rose-600 text-white shadow-sm"
-                                : "text-ink-muted hover:text-ink hover:bg-card"
-                            }`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${selectedCustomerReport.type === "notPurchased"
+                              ? "bg-rose-600 text-white shadow-sm"
+                              : "text-ink-muted hover:text-ink hover:bg-card"
+                              }`}
                           >
                             <FaTimesCircle className="text-[9px]" />
                             <span>Not Purchased ({notPurchasedCount})</span>
@@ -1744,11 +1732,10 @@ const DashboardPage: React.FC = () => {
                         )}
                       </div>
                       <span
-                        className={`text-[9px] font-bold px-2 py-1 rounded-md border shrink-0 ${
-                          isPurchased
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                        }`}
+                        className={`text-[9px] font-bold px-2 py-1 rounded-md border shrink-0 ${isPurchased
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                          }`}
                       >
                         {rawList.length} of {customerPurchaseReport.totalProducts} products
                       </span>
@@ -1777,13 +1764,12 @@ const DashboardPage: React.FC = () => {
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <span
-                                  className={`w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold shrink-0 ${
-                                    isPurchased
-                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                      : isInactive
+                                  className={`w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold shrink-0 ${isPurchased
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : isInactive
                                       ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                       : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                                  }`}
+                                    }`}
                                 >
                                   {idx + 1}
                                 </span>
@@ -1813,13 +1799,12 @@ const DashboardPage: React.FC = () => {
                                 </div>
                               </div>
                               <span
-                                className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${
-                                  isPurchased
-                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                    : isInactive
+                                className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${isPurchased
+                                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                  : isInactive
                                     ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
                                     : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                                }`}
+                                  }`}
                               >
                                 {isPurchased ? "Active (≤3 Mo)" : isInactive ? "Inactive (>3 Mo)" : "Never Bought"}
                               </span>

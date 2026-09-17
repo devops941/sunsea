@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FaUserFriends,
   FaSync,
@@ -68,6 +68,10 @@ const getDaysElapsed = (txnDateStr?: string | null, targetDateStr?: string): str
 
 const AmountReceivablePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Deep-link support: Dashboard alert row click passes { highlightCustomerId }
+  // in location state so we can auto-select the matching row on arrival.
+  const highlightCustomerId = (location.state as any)?.highlightCustomerId as string | undefined;
 
   // ─── Committed state ───────────────────────────────────────────
   const [asOnDate, setAsOnDate] = useState<string>(isoToday());
@@ -80,8 +84,11 @@ const AmountReceivablePage: React.FC = () => {
   // ─── Options dialog — persisted view (see BalanceSheetPage for docs).
   // Re-entering after a previous commit lands on the table, not a fresh
   // modal. Esc walks table → options → close (if data) or navigate back.
+  // When deep-linked from Dashboard (highlightCustomerId present), always
+  // skip straight to the table view.
   const VIEW_KEY = "sunsea:receivable:view";
   const [showOptionsDialog, setShowOptionsDialog] = useState<boolean>(() => {
+    if (highlightCustomerId) return false; // skip dialog when deep-linked
     try { return sessionStorage.getItem(VIEW_KEY) !== "table"; } catch { return true; }
   });
   useEffect(() => {
@@ -329,6 +336,27 @@ const AmountReceivablePage: React.FC = () => {
     if (rowIdx < 0) return;
     document.querySelector<HTMLElement>(`[data-ar-row="${rowIdx}"]`)?.scrollIntoView({ block: "nearest" });
   }, [rowIdx]);
+
+  // ─── Deep-link auto-highlight ───────────────────────────────────
+  // When arriving via Dashboard alert click (highlightCustomerId in state),
+  // find the customer in the sorted rows and select it once data is ready.
+  // Runs only once per navigation (guarded by `highlightCustomerId` being stable).
+  const highlightAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!highlightCustomerId || highlightAppliedRef.current) return;
+    if (!rows.length) return; // data not yet loaded
+    const idx = rows.findIndex((r) => r.customerId === highlightCustomerId);
+    if (idx >= 0) {
+      highlightAppliedRef.current = true;
+      setRowIdx(idx);
+      // Give DOM a tick to render the row before scrolling
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(`[data-ar-row="${idx}"]`)?.scrollIntoView({ block: "center" });
+      });
+      // Clear state from history so refresh doesn't re-trigger
+      window.history.replaceState({ ...window.history.state, usr: {} }, "");
+    }
+  }, [highlightCustomerId, rows, setRowIdx]);
 
   // ─── Print / Export ────────────────────────────────────────────
   const handlePrint = () => window.print();

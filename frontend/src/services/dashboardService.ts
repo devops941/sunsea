@@ -20,7 +20,7 @@ export interface AccountsSummaryAlert {
   level: "info" | "warn" | "danger";
   message: string;
   link?: string;
-  details?: Array<{ name: string; amount: string }>;
+  details?: Array<{ name: string; amount: string; customerId?: string }>;
 }
 
 export interface AccountsSummaryTxn {
