@@ -1918,12 +1918,12 @@ const DashboardPage: React.FC = () => {
         {/* ══════════════════════════════════════════════════════
            ROW 5  –  WORKFORCE & SHIFT ATTENDANCE SNAPSHOT
            ══════════════════════════════════════════════════════ */}
-        <WorkforceShiftAttendance
+        {/* <WorkforceShiftAttendance
           employeesCount={employeesCount}
           dailyPlans={dailyPlans}
           weeklyPrograms={weeklyPrograms}
           isParentLoading={isDashboardLoading}
-        />
+        /> */}
       </div>
 
     </div>

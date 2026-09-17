@@ -504,7 +504,7 @@ class ProductionOrderService {
             },
           },
         },
-        goodsDispatchItems: { include: { dispatch: true } },
+        goodsDispatchItems: { include: { dispatch: true, product: true } },
         productionOrderHistories: {
           orderBy: { changedAt: "asc" },
         },
@@ -608,11 +608,106 @@ class ProductionOrderService {
 
     const restrictions = await this.computeEditRestrictions(productionOrderId);
 
+    // Resolve user names for audit info
+    let createdUserName = "Unknown User";
+    let createdUserRole = "Unknown Role";
+    if (order.createdBy) {
+      if (order.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(order.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { username: true, role: { select: { name: true } } } });
+        if (admin) {
+          createdUserName = admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        }
+      } else {
+        const user = await prisma.user.findUnique({ where: { userId: order.createdBy }, select: { username: true, role: { select: { name: true } } } });
+        if (user) {
+          createdUserName = user.username;
+          createdUserRole = user.role?.name || "User";
+        }
+      }
+    }
+
+    let updatedUserName = "Unknown User";
+    if (order.updatedBy) {
+      if (order.updatedBy.startsWith("admin_")) {
+        const adminId = BigInt(order.updatedBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { username: true } });
+        if (admin) {
+          updatedUserName = admin.username;
+        }
+      } else {
+        const user = await prisma.user.findUnique({ where: { userId: order.updatedBy }, select: { username: true } });
+        if (user) {
+          updatedUserName = user.username;
+        }
+      }
+    }
+
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray(order.productionOrderHistories)) {
+      enrichedEditHistory = await Promise.all(
+        order.productionOrderHistories.map(async (hist: any) => {
+          let name = "Unknown User";
+          if (hist.changedBy) {
+            if (hist.changedBy.startsWith("admin_")) {
+              const adminId = BigInt(hist.changedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { username: true } });
+              if (admin) name = admin.username;
+            } else {
+              const user = await prisma.user.findUnique({ where: { userId: hist.changedBy }, select: { username: true } });
+              if (user) name = user.username;
+            }
+          }
+          return {
+            ...hist,
+            id: hist.id ? hist.id.toString() : undefined,
+            updatedBy: hist.changedBy,
+            updatedByName: name,
+            updatedAt: hist.changedAt,
+            action: hist.action,
+            remarks: hist.remarks,
+          };
+        })
+      );
+    }
+
+    // Ensure there is at least a creation record in editHistory
+    if (enrichedEditHistory.length === 0 && order.createdAt) {
+      enrichedEditHistory.push({
+        updatedBy: order.createdBy,
+        updatedByName: createdUserName,
+        updatedAt: order.createdAt,
+        action: "ORDER_CREATED",
+        remarks: "Production Order created",
+      });
+    }
+
+    // If order was updated and no history recorded the update yet, ensure last update is in history
+    if (
+      order.updatedBy &&
+      enrichedEditHistory.length === 1 &&
+      order.updatedAt &&
+      new Date(order.updatedAt).getTime() > new Date(order.createdAt).getTime() + 1000
+    ) {
+      enrichedEditHistory.push({
+        updatedBy: order.updatedBy,
+        updatedByName: updatedUserName,
+        updatedAt: order.updatedAt,
+        action: "ORDER_UPDATE",
+        remarks: "Order updated",
+      });
+    }
+
     return {
       ...order,
       productItemId: order.productItemId.toString(),
       products,
-      statusHistory: order.productionOrderHistories || [],
+      createdUserName,
+      createdUserRole,
+      updatedUserName,
+      editHistory: enrichedEditHistory,
+      statusHistory: enrichedEditHistory,
       _editRestrictions: {
         canEditDates: restrictions.canEditDates,
         canEditProductQty: restrictions.canEditProductQty,
@@ -775,7 +870,7 @@ class ProductionOrderService {
         }
       }
 
-      // Log status change in history
+      // Log status change or update in history
       if (calculatedStatus !== existing.status) {
         await this.addHistory(
           tx,
@@ -785,6 +880,16 @@ class ProductionOrderService {
           userId,
           data.remarks || `Status changed to ${calculatedStatus}`,
           "STATUS_CHANGE"
+        );
+      } else {
+        await this.addHistory(
+          tx,
+          productionOrderId,
+          existing.status,
+          calculatedStatus,
+          userId,
+          data.remarks || "Order updated",
+          "ORDER_UPDATE"
         );
       }
 

@@ -386,9 +386,10 @@ const ProductionReportsCenter: React.FC = () => {
           header: "STATUS", 
           render: (item: any) => {
             let customColor = { bg: "", text: "" };
-            if (item.status === 'Highest') customColor = { bg: '#d1fae5', text: '#065f46' };
-            else if (item.status === 'Medium') customColor = { bg: '#dbeafe', text: '#1d4ed8' };
-            else customColor = { bg: '#fee2e2', text: '#b91c1c' };
+            if (item.status === 'High' || item.status === 'Highest') customColor = { bg: 'rgba(16,185,129,0.15)', text: '#34d399' };
+            else if (item.status === 'Medium') customColor = { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24' };
+            else if (item.status === 'Low') customColor = { bg: 'rgba(249,115,22,0.15)', text: '#fb923c' };
+            else customColor = { bg: 'rgba(239,68,68,0.15)', text: '#f87171' };
             return <StatusBadge status="CUSTOM" customText={item.status} customColor={customColor} />;
           }
         }

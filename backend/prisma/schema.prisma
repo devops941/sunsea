@@ -608,6 +608,7 @@ model Product {
   modifiedBy                String?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
+  editHistory               Json?                      @map("edit_history")
   rate                      Decimal?                   @db.Decimal(12, 2)
   gradeRates                Json?                      @map("grade_rates")
   minimumQty                String                     @default("0") @map("minimum_qty")
@@ -652,6 +653,7 @@ model SalesProduct {
   modifiedBy       String?  @map("modified_by")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+  editHistory      Json?    @map("edit_history")
 
   components     SalesProductComponent[]
   stocks         SalesProductStock[]
@@ -784,6 +786,7 @@ model Store {
   updatedAt                 DateTime                   @updatedAt @map("updated_at")
   createdBy                 String?                    @map("created_by") @db.VarChar(36)
   updatedBy                 String?                    @map("updated_by") @db.VarChar(36)
+  editHistory               Json?                      @map("edit_history")
   allowNegative             Boolean                    @default(false) @map("allow_negative")
   costMethod                String                     @default("WAVG") @map("cost_method") @db.VarChar(10)
   gstPlace                  String?                    @map("gst_place") @db.VarChar(50)
@@ -842,6 +845,7 @@ model RawMaterial {
   updatedAt               DateTime                 @updatedAt @map("updated_at")
   createdBy               String?                  @map("created_by") @db.VarChar(36)
   updatedBy               String?                  @map("updated_by") @db.VarChar(36)
+  editHistory             Json?                    @map("edit_history")
   storeId                 String?                  @map("store_id") @db.VarChar(20)
   minimumStock            Decimal?                 @map("minimum_stock") @db.Decimal(14, 3)
   status                  String                   @default("Active") @map("status") @db.VarChar(20)
@@ -2021,6 +2025,7 @@ model Category {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   createdBy   String?      @map("created_by") @db.VarChar(36)
   updatedBy   String?      @map("updated_by") @db.VarChar(36)
+  editHistory Json?        @map("edit_history")
 
   rawMaterials       RawMaterial[]
   products           Product[]

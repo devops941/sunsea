@@ -1,7 +1,7 @@
 import { formatDate } from "../../../utils/dateUtils";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
     FaInfoCircle,
     FaIndustry,
@@ -22,6 +22,8 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
+import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 
 const PRODUCTION_STARTED_STATUSES = [
     "WEEKLY_SCHEDULED", "DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION",
@@ -522,96 +524,100 @@ const ProductionOrderHistoryView: React.FC = () => {
     }, [extractHourlyEntriesFromRecords, fullOrder, id]);
 
     // ── Shift table columns ───────────────────────────────────────────────────
-    const shiftColumns: DataTableColumn<any>[] = useMemo(() => {
-        return [
-            {
-                header: "#",
-                width: "50px",
-                align: "center",
-                render: (_plan, idx) => <span className="text-xs font-semibold text-ink-subtle">{idx + 1}</span>,
-            },
-            {
-                header: "DATE",
-                width: "110px",
-                render: (plan) => <span className="font-medium text-ink">{plan.date}</span>,
-            },
-            {
-                header: "SHIFT",
-                width: "120px",
-                render: (plan) => <span className="text-ink-muted">{plan.shiftName}</span>,
-            },
-            {
-                header: "PRODUCT",
-                render: (plan) => (
-                    <div>
-                        <span className="font-semibold text-ink text-xs block">{plan.productName || "-"}</span>
-                        {plan.productCode && (
-                            <span className="text-[11px] text-ink-subtle font-mono">{plan.productCode}</span>
-                        )}
-                    </div>
-                ),
-            },
-            {
-                header: "PLANNED QTY",
-                align: "right",
-                width: "120px",
-                render: (plan) => <span className="font-semibold text-ink-muted">{Number(plan.plannedQty || 0).toLocaleString("en-IN")}</span>,
-            },
-            {
-                header: "PRODUCED QTY",
-                align: "right",
-                width: "120px",
-                render: (plan) => <span className="font-bold text-green-600">{Number(plan.producedQty || 0).toLocaleString("en-IN")}</span>,
-            },
-            {
-                header: "PRODUCTION STATUS",
-                width: "180px",
-                render: (plan) => (
-                    <div className="flex items-center gap-1.5">
-                        <StatusBadge status={plan.status} />
+    const shiftColumns: DataTableColumn<any>[] = useMemo(() => [
+        {
+            header: "#",
+            width: "50px",
+            align: "center",
+            render: (_plan, idx) => <span className="text-xs font-semibold text-ink-subtle">{idx + 1}</span>,
+        },
+        {
+            header: "DATE",
+            width: "110px",
+            render: (plan) => <span className="font-medium text-ink text-xs">{plan.date}</span>,
+        },
+        {
+            header: "SHIFT",
+            width: "120px",
+            render: (plan) => <span className="text-ink-muted text-xs font-medium">{plan.shiftName}</span>,
+        },
+        {
+            header: "PRODUCT",
+            render: (plan) => (
+                <div>
+                    <span className="font-semibold text-ink text-xs block">{plan.productName || "-"}</span>
+                    {plan.productCode && (
+                        <span className="text-[11px] text-ink-subtle font-mono">{plan.productCode}</span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            header: "PLANNED QTY",
+            align: "right",
+            width: "120px",
+            render: (plan) => <span className="font-semibold text-ink-muted text-xs">{Number(plan.plannedQty || 0).toLocaleString("en-IN")}</span>,
+        },
+        {
+            header: "PRODUCED QTY",
+            align: "right",
+            width: "120px",
+            render: (plan) => <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">{Number(plan.producedQty || 0).toLocaleString("en-IN")}</span>,
+        },
+        {
+            header: "PRODUCTION STATUS",
+            width: "170px",
+            align: "center",
+            render: (plan) => {
+                const isCompleted = plan.status === "COMPLETED" || (Number(plan.producedQty || 0) >= Number(plan.plannedQty || 0) && Number(plan.plannedQty || 0) > 0);
+                const statusDisplay = isCompleted ? "COMPLETED" : (plan.status || "PENDING");
+                return (
+                    <div className="flex items-center justify-center gap-1.5">
+                        <StatusBadge status={statusDisplay} />
                         {plan.stopReason && plan.status !== "COMPLETED" && (
                             <div className="group relative flex items-center cursor-pointer">
                                 <FaInfoCircle className="text-rose-400 text-[13px]" />
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-xl pointer-events-none">
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-900 dark:bg-slate-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-xl pointer-events-none border border-line/30">
                                     <span className="font-bold text-amber-400 block mb-1">Stop Reason:</span>
                                     <div className="leading-relaxed">{plan.stopReason}</div>
                                 </div>
                             </div>
                         )}
                     </div>
-                ),
+                );
             },
-            {
-                header: "DISPATCH STATUS",
-                align: "center",
-                width: "150px",
-                render: (plan) => {
-                    if (plan.dispatchStatus === "no_production") {
-                        return <span className="inline-flex items-center px-2.5 py-1 bg-card-2 text-ink-subtle rounded-full text-xs font-semibold whitespace-nowrap">No Production</span>;
-                    }
-                    if (plan.dispatchStatus === "dispatched") {
-                        return <span className="inline-flex items-center px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold whitespace-nowrap">Dispatched</span>;
-                    }
-                    if (plan.dispatchStatus === "ready") {
-                        return <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold whitespace-nowrap">Ready for Dispatch</span>;
-                    }
-                    return <span className="inline-flex items-center px-2.5 py-1 bg-card-2 text-ink-muted rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>;
-                },
+        },
+        {
+            header: "DISPATCH STATUS",
+            align: "center",
+            width: "160px",
+            render: (plan) => {
+                const ds = plan.dispatchStatus || plan._dispatchStatus;
+                if (ds === "dispatched" || ds === "DISPATCHED") {
+                    return <StatusBadge status="DISPATCHED" />;
+                }
+                if (ds === "ready" || ds === "READY_FOR_DISPATCH") {
+                    return <StatusBadge status="READY_FOR_DISPATCH" />;
+                }
+                if (ds === "no_production") {
+                    return <StatusBadge status="CLOSED" customText="No Production" />;
+                }
+                return <StatusBadge status="PENDING" customText="Not Dispatched" />;
             },
-            {
-                header: "ACTIONS",
-                align: "center",
-                width: "90px",
-                render: (plan) => (
-                    <div className="flex items-center justify-center">
-                        <ViewButton
-                            onClick={() => handleOpenHourlyModal(plan)}
-                        />
-                    </div>
-                ),
-            },
-        ];
-    }, [handleOpenHourlyModal]);
+        },
+        {
+            header: "ACTIONS",
+            align: "center",
+            width: "90px",
+            render: (plan) => (
+                <div className="flex items-center justify-center">
+                    <ViewButton
+                        onClick={() => handleOpenHourlyModal(plan)}
+                    />
+                </div>
+            ),
+        },
+    ], [handleOpenHourlyModal]);
 
     // Fallback single-row for when no shift plans exist yet
     const fallbackShiftData = useMemo(() => {
@@ -635,51 +641,6 @@ const ProductionOrderHistoryView: React.FC = () => {
             hourlyProductions: [],
         }];
     }, [plans, displayOrder, fullOrder]);
-
-    const fallbackShiftColumns: DataTableColumn<any>[] = useMemo(() => [
-        {
-            header: "#",
-            width: "50px",
-            align: "center",
-            render: (_r, idx) => <span className="text-xs font-semibold text-ink-subtle">{idx + 1}</span>,
-        },
-        { header: "DATE", width: "110px", render: (r) => <span className="font-medium text-ink">{r.date}</span> },
-        { header: "SHIFT", width: "120px", render: (r) => <span className="text-ink-muted">{r.shiftName}</span> },
-        {
-            header: "PRODUCT",
-            render: (r) => (
-                <div>
-                    <span className="font-semibold text-ink text-xs block">{r.productName || "-"}</span>
-                    {r.productCode && (
-                        <span className="text-[11px] text-ink-subtle font-mono">{r.productCode}</span>
-                    )}
-                </div>
-            ),
-        },
-        { header: "PLANNED QTY", align: "right", width: "110px", render: (r) => <span className="font-semibold text-ink-muted">{Number(r.plannedQty || 0).toLocaleString("en-IN")}</span> },
-        { header: "PRODUCED QTY", align: "right", width: "120px", render: (r) => <span className="font-bold text-green-600">{Number(r.producedQty || 0).toLocaleString("en-IN")}</span> },
-        { header: "PRODUCTION STATUS", width: "160px", render: (r) => <StatusBadge status={r.status} /> },
-        {
-            header: "DISPATCH STATUS",
-            align: "center",
-            width: "150px",
-            render: (r) => {
-                if (r._dispatchStatus === "dispatched") return <span className="inline-flex items-center px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold whitespace-nowrap">Dispatched</span>;
-                if (r._dispatchStatus === "ready") return <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold whitespace-nowrap">Ready for Dispatch</span>;
-                return <span className="inline-flex items-center px-2.5 py-1 bg-card-2 text-ink-muted rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>;
-            },
-        },
-        {
-            header: "ACTIONS",
-            align: "center",
-            width: "90px",
-            render: (r) => (
-                <div className="flex items-center justify-center">
-                    <ViewButton onClick={() => handleOpenHourlyModal(r)} />
-                </div>
-            ),
-        },
-    ], [handleOpenHourlyModal]);
 
     // Group shift plans by machine, preserving order
     const machineShiftGroups = useMemo(() => {
@@ -708,35 +669,59 @@ const ProductionOrderHistoryView: React.FC = () => {
     // ── Dispatch history columns ──────────────────────────────────────────────
     const dispatchColumns: DataTableColumn<any>[] = useMemo(() => [
         {
+            header: "#",
+            width: "50px",
+            align: "center",
+            render: (_item, idx) => <span className="text-xs font-semibold text-ink-subtle">{idx + 1}</span>,
+        },
+        {
             header: "DISPATCH NO",
             width: "140px",
-            render: (item) => <span className="font-semibold text-ink">{item.dispatch?.dispatchNumber || "-"}</span>,
+            render: (item) => <span className="font-semibold text-ink text-xs">{item.dispatch?.dispatchNumber || "-"}</span>,
+        },
+        {
+            header: "DC NO",
+            width: "130px",
+            render: (item) => {
+                const dc = item.dispatch?.dcNumber || item.dcNumber;
+                return (
+                    <span className="font-semibold text-ink text-xs font-mono">
+                        {dc || "-"}
+                    </span>
+                );
+            },
         },
         {
             header: "DATE",
             width: "110px",
-            render: (item) => <span className="text-ink-muted">
-                {item.dispatch?.dispatchDate
-                    ? formatDate(item.dispatch.dispatchDate)
-                    : "-"}
-            </span>,
+            render: (item) => (
+                <span className="text-ink-muted text-xs">
+                    {item.dispatch?.dispatchDate ? formatDate(item.dispatch.dispatchDate) : "-"}
+                </span>
+            ),
         },
         {
             header: "PRODUCT",
-            render: (item) => (
-                <div>
-                    <span className="font-medium text-ink block">{item.product?.productName || item.productItem?.productName || "-"}</span>
-                    <span className="text-xs text-ink-subtle font-mono">{item.product?.productCode || item.productItem?.productCode || "-"}</span>
-                </div>
-            ),
+            render: (item) => {
+                const prodName = item.product?.productName || item.productItem?.productName || fullOrder?.productItem?.productName || fullOrder?.products?.[0]?.productName || "-";
+                const prodCode = item.product?.productCode || item.productItem?.productCode || fullOrder?.productItem?.productCode || fullOrder?.products?.[0]?.productCode;
+                return (
+                    <div>
+                        <span className="font-semibold text-ink text-xs block">{prodName}</span>
+                        {prodCode && (
+                            <span className="text-[11px] text-ink-subtle font-mono">{prodCode}</span>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             header: "DISPATCHED QTY",
             align: "right",
             width: "140px",
             render: (item) => (
-                <span className="font-bold text-blue-600">
-                    {Number(item.dispatchQty || 0).toLocaleString("en-IN")} <span className="text-xs font-normal text-ink-subtle">{normalizeUom(item.uom || item.product?.uom)}</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400 text-xs">
+                    {Number(item.dispatchQty || 0).toLocaleString("en-IN")} <span className="text-[10px] font-normal text-ink-subtle">{normalizeUom(item.uom || item.product?.uom || fullOrder?.productItem?.uom)}</span>
                 </span>
             ),
         },
@@ -753,7 +738,66 @@ const ProductionOrderHistoryView: React.FC = () => {
         {
             header: "STATUS",
             width: "130px",
+            align: "center",
             render: (item) => <StatusBadge status={item.dispatch?.status || "DISPATCHED"} />,
+        },
+    ], [fullOrder]);
+
+    // ── RM Issues table columns ───────────────────────────────────────────────
+    const rmColumns: DataTableColumn<any>[] = useMemo(() => [
+        {
+            header: "RAW MATERIAL",
+            render: (item) => (
+                <div>
+                    <div className="font-semibold text-xs text-ink">{item.rawMaterialName}</div>
+                    {item.rawMaterialCode && item.rawMaterialCode !== "-" && (
+                        <div className="text-[11px] text-ink-subtle font-mono">{item.rawMaterialCode}</div>
+                    )}
+                </div>
+            ),
+        },
+        {
+            header: "STORE",
+            width: "140px",
+            render: (item) => <span className="text-ink-muted text-xs">{item.store}</span>,
+        },
+        {
+            header: "BEFORE",
+            align: "right",
+            width: "120px",
+            render: (item) => (
+                <span className="text-ink-muted text-xs tabular-nums">
+                    {Number(item.currentQty || 0).toFixed(3)} {item.uom}
+                </span>
+            ),
+        },
+        {
+            header: "AFTER",
+            align: "right",
+            width: "120px",
+            render: (item) => (
+                <span className="text-ink-muted text-xs tabular-nums">
+                    {Number(item.adjustedQty || 0).toFixed(3)} {item.uom}
+                </span>
+            ),
+        },
+        {
+            header: "ISSUED QTY",
+            align: "right",
+            width: "130px",
+            render: (item) => (
+                <span className={`text-xs tabular-nums font-bold whitespace-nowrap ${Number(item.difference) < 0 ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {Number(item.difference) < 0 ? "" : "+"}{Number(item.difference || 0).toFixed(3)} {item.uom}
+                </span>
+            ),
+        },
+        {
+            header: "REMARKS",
+            render: (item) => (
+                <span className="text-ink-subtle text-xs truncate max-w-[200px] inline-block" title={item.remarks}>
+                    {item.remarks || "-"}
+                </span>
+            ),
         },
     ], []);
 
@@ -782,7 +826,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                 const gross = Number(h.qtyProduced ?? 0);
                 const rej = Number(h.rejectQty ?? 0);
                 const net = Number(h.netProducedQty !== undefined ? h.netProducedQty : Math.max(0, gross - rej));
-                return <span className="font-bold text-emerald-600">{net.toLocaleString("en-IN")} pcs</span>;
+                return <span className="font-bold text-emerald-600 dark:text-emerald-400">{net.toLocaleString("en-IN")} pcs</span>;
             },
         },
         {
@@ -790,7 +834,7 @@ const ProductionOrderHistoryView: React.FC = () => {
             align: "right",
             width: "110px",
             render: (h) => (
-                <span className={`font-semibold ${Number(h.rejectQty) > 0 ? "text-red-500 font-bold" : "text-ink-subtle"}`}>
+                <span className={`font-semibold ${Number(h.rejectQty) > 0 ? "text-red-500 dark:text-red-400 font-bold" : "text-ink-subtle"}`}>
                     {Number(h.rejectQty || 0).toLocaleString("en-IN")}
                 </span>
             ),
@@ -800,7 +844,7 @@ const ProductionOrderHistoryView: React.FC = () => {
             align: "right",
             width: "110px",
             render: (h) => (
-                <span className={`font-semibold ${Number(h.scrapQty) > 0 ? "text-amber-500 font-bold" : "text-ink-subtle"}`}>
+                <span className={`font-semibold ${Number(h.scrapQty) > 0 ? "text-amber-500 dark:text-amber-400 font-bold" : "text-ink-subtle"}`}>
                     {Number(h.scrapQty || 0).toLocaleString("en-IN")}
                 </span>
             ),
@@ -810,7 +854,7 @@ const ProductionOrderHistoryView: React.FC = () => {
             align: "right",
             width: "120px",
             render: (h) => (
-                <span className={`font-semibold ${Number(h.downtime) > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
+                <span className={`font-semibold ${Number(h.downtime) > 0 ? "text-amber-600 dark:text-amber-400" : "text-ink-subtle"}`}>
                     {Number(h.downtime || 0)} mins
                 </span>
             ),
@@ -839,6 +883,77 @@ const ProductionOrderHistoryView: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState<"shifts" | "dispatch" | "rm_issues">("shifts");
 
+    // ── Flattened rows for continuous keyboard navigation across tabs ─────────
+    const flattenedShiftPlans = useMemo(() => {
+        return machineShiftGroups.flatMap((g) => g.plans);
+    }, [machineShiftGroups]);
+
+    const shiftGlobalIndexMap = useMemo(() => {
+        const map = new Map<string | number, number>();
+        flattenedShiftPlans.forEach((p, idx) => {
+            map.set(p.id || `shift-${idx}`, idx);
+        });
+        return map;
+    }, [flattenedShiftPlans]);
+
+    const flattenedRmItems = useMemo(() => {
+        return rmIssues.flatMap((adj, adjIdx) =>
+            adj.items.map((item: any, itemIdx: number) => ({
+                ...item,
+                adjId: adj.adjId,
+                adjustmentNumber: adj.adjustmentNumber,
+                adjDate: adj.date,
+                globalIdx: `${adjIdx}-${itemIdx}`,
+            }))
+        );
+    }, [rmIssues]);
+
+    const rmGlobalIndexMap = useMemo(() => {
+        const map = new Map<string, number>();
+        flattenedRmItems.forEach((item, idx) => {
+            map.set(item.globalIdx, idx);
+        });
+        return map;
+    }, [flattenedRmItems]);
+
+    const activeTabCount = useMemo(() => {
+        if (activeTab === "shifts") return flattenedShiftPlans.length;
+        if (activeTab === "dispatch") return (fullOrder?.goodsDispatchItems || []).length;
+        if (activeTab === "rm_issues") return flattenedRmItems.length;
+        return 0;
+    }, [activeTab, flattenedShiftPlans, fullOrder?.goodsDispatchItems, flattenedRmItems]);
+
+    const tableRef = useRef<HTMLDivElement>(null);
+
+    const handleEnter = useCallback((index: number) => {
+        if (activeTab === "shifts") {
+            const plan = flattenedShiftPlans[index];
+            if (plan) handleOpenHourlyModal(plan);
+        }
+    }, [activeTab, flattenedShiftPlans, handleOpenHourlyModal]);
+
+    const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
+        count: activeTabCount,
+        onEnter: handleEnter,
+        containerRef: tableRef,
+    });
+
+    usePageShortcuts({
+        onRefresh: () => {
+            if (passedOrder) fetchOrderDetails(passedOrder);
+            else if (id) fetchOrderDetails({ id });
+            fetchRmIssues();
+        },
+    });
+
+    const handleTabChange = useCallback((tab: "shifts" | "dispatch" | "rm_issues") => {
+        setActiveTab(tab);
+        setFocusedIndex(0);
+        setTimeout(() => {
+            tableRef.current?.focus({ preventScroll: true });
+        }, 50);
+    }, [setFocusedIndex]);
+
     // ── Render ────────────────────────────────────────────────────────────────
     const totalProductsCount = fullOrder?.products?.length || 0;
     const totalShiftsCount = plansWithDispatch.length || (fallbackShiftData.length > 0 ? 1 : 0);
@@ -854,9 +969,9 @@ const ProductionOrderHistoryView: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-line">
                     <div>
-                        <h3 className="text-lg font-bold text-ink flex items-start">
-                            Production Order Details
-                            <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{id || displayOrder?.productionOrderId}</span>
+                        <h3 className="text-lg font-bold text-ink flex items-center flex-wrap gap-2">
+                            <span>Production Order Details</span>
+                            <span className="text-primary text-sm font-bold font-mono">*{id || displayOrder?.productionOrderId}</span>
                         </h3>
                         <p className="text-xs text-ink-subtle mt-1">
                             {displayOrder?.orderDate ? `Order Date: ${formatDate(displayOrder.orderDate)}` : ""}
@@ -871,7 +986,7 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                 {/* Insufficient stock alert */}
                 {hasInsufficientStock && (
-                    <div className="m-5 bg-red-500/10 border border-red-500/20 text-red-600 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-medium">
+                    <div className="m-5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-medium">
                         <FaInfoCircle className="text-lg flex-shrink-0" />
                         <span>One or more required raw materials have insufficient stock. Please create a Raw Material Order before proceeding to Weekly Machine Assignment.</span>
                     </div>
@@ -906,8 +1021,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                             <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
                                 <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Produced Qty</span>
                                 <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl font-extrabold text-emerald-600">{producedVal.toLocaleString("en-IN")}</span>
-                                    <span className="text-xs text-emerald-600 font-semibold">({completionPercent}%)</span>
+                                    <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{producedVal.toLocaleString("en-IN")}</span>
+                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">({completionPercent}%)</span>
                                 </div>
                                 <div className="w-full bg-card h-1.5 rounded-full mt-2 overflow-hidden border border-line">
                                     <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${completionPercent}%` }} />
@@ -918,8 +1033,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                             <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
                                 <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Dispatched Qty</span>
                                 <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl font-extrabold text-blue-600">{totalDispatchedQty.toLocaleString("en-IN")}</span>
-                                    <span className="text-xs text-blue-600 font-semibold">({dispatchPercent}%)</span>
+                                    <span className="text-xl font-extrabold text-blue-600 dark:text-blue-400">{totalDispatchedQty.toLocaleString("en-IN")}</span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">({dispatchPercent}%)</span>
                                 </div>
                                 <div className="w-full bg-card h-1.5 rounded-full mt-2 overflow-hidden border border-line">
                                     <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${dispatchPercent}%` }} />
@@ -943,7 +1058,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                         <div className="flex items-center gap-6 border-b border-line overflow-x-auto no-scrollbar pt-1">
                             <button
                                 type="button"
-                                onClick={() => setActiveTab("shifts")}
+                                onClick={() => handleTabChange("shifts")}
                                 className={`flex items-center gap-2 pb-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
                                     activeTab === "shifts"
                                         ? "text-primary border-primary"
@@ -961,7 +1076,7 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setActiveTab("dispatch")}
+                                onClick={() => handleTabChange("dispatch")}
                                 className={`flex items-center gap-2 pb-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
                                     activeTab === "dispatch"
                                         ? "text-primary border-primary"
@@ -979,7 +1094,7 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setActiveTab("rm_issues")}
+                                onClick={() => handleTabChange("rm_issues")}
                                 className={`flex items-center gap-2 pb-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
                                     activeTab === "rm_issues"
                                         ? "text-primary border-primary"
@@ -996,8 +1111,13 @@ const ProductionOrderHistoryView: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Tab Contents */}
-                        <div className="flex-1 flex flex-col">
+                        {/* Tab Contents with Table Nav container */}
+                        <div
+                            ref={tableRef}
+                            tabIndex={0}
+                            data-table-nav
+                            className="flex-1 flex flex-col outline-none focus:outline-none"
+                        >
                             {/* ── TAB 1: SHIFT PRODUCTION LOGS ── */}
                             {activeTab === "shifts" && (
                                 <div className="space-y-6">
@@ -1019,102 +1139,23 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                         </span>
                                                     </div>
 
-                                                    {/* Shift table */}
-                                                    <table className="w-full text-left border-collapse text-sm">
-                                                        <thead>
-                                                            <tr className="bg-head/60 border-b border-line h-10">
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-12 text-center align-middle">
-                                                                    #
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">
-                                                                    Date
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">
-                                                                    Shift
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">
-                                                                    Product
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-right align-middle">
-                                                                    Planned Qty
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-right align-middle">
-                                                                    Produced Qty
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-center align-middle">
-                                                                    Production Status
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-center align-middle">
-                                                                    Dispatch Status
-                                                                </th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-24 text-center align-middle">
-                                                                    Actions
-                                                                </th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-line">
-                                                            {group.plans.map((plan: any, idx: number) => {
-                                                                const isCompleted = plan.status === "COMPLETED" || (Number(plan.producedQty || 0) >= Number(plan.plannedQty || 0) && Number(plan.plannedQty || 0) > 0);
-                                                                const statusDisplay = isCompleted ? "COMPLETED" : (plan.status || "PENDING");
-
-                                                                return (
-                                                                    <tr
-                                                                        key={plan.id || idx}
-                                                                        className="bg-card hover:bg-card-2 transition-colors h-12"
-                                                                    >
-                                                                        <td className="px-4 py-2 text-ink-subtle text-xs text-center align-middle font-semibold">
-                                                                            {idx + 1}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-ink font-medium text-xs align-middle">
-                                                                            {plan.date}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-ink-muted text-xs align-middle font-medium">
-                                                                            {plan.shiftName}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 align-middle">
-                                                                            <div className="font-semibold text-ink text-xs">{plan.productName || "-"}</div>
-                                                                            {plan.productCode && (
-                                                                                <div className="text-[11px] text-ink-subtle font-mono">{plan.productCode}</div>
-                                                                            )}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-right font-semibold text-ink-muted text-xs align-middle">
-                                                                            {Number(plan.plannedQty || 0).toLocaleString("en-IN")}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-right font-bold text-emerald-600 text-xs align-middle">
-                                                                            {Number(plan.producedQty || 0).toLocaleString("en-IN")}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-center align-middle">
-                                                                            <StatusBadge status={statusDisplay} />
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-center align-middle">
-                                                                            {plan.dispatchStatus === "dispatched" || plan._dispatchStatus === "dispatched" ? (
-                                                                                <span className="inline-flex items-center px-2.5 py-1 bg-green-500/15 text-green-400 border border-green-500/30 rounded-full text-xs font-semibold whitespace-nowrap">
-                                                                                    Dispatched
-                                                                                </span>
-                                                                            ) : plan.dispatchStatus === "ready" || plan._dispatchStatus === "ready" ? (
-                                                                                <span className="inline-flex items-center px-2.5 py-1 bg-blue-500/15 text-blue-400 border border-blue-500/30 rounded-full text-xs font-semibold whitespace-nowrap">
-                                                                                    Ready for Dispatch
-                                                                                </span>
-                                                                            ) : plan.dispatchStatus === "no_production" ? (
-                                                                                <span className="inline-flex items-center px-2.5 py-1 bg-card-2 text-ink-subtle rounded-full text-xs font-semibold whitespace-nowrap">
-                                                                                    No Production
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="inline-flex items-center px-2.5 py-1 bg-card-2 text-ink-muted rounded-full text-xs font-semibold whitespace-nowrap">
-                                                                                    Not Dispatched
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-                                                                        <td className="px-4 py-2 text-center align-middle">
-                                                                            <div className="flex items-center justify-center">
-                                                                                <ViewButton onClick={() => handleOpenHourlyModal(plan)} />
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    </table>
+                                                    <DataTable
+                                                        columns={shiftColumns}
+                                                        data={group.plans}
+                                                        rowKey={(plan) => plan.id || `${plan.date}-${plan.shiftName}`}
+                                                        density="compact"
+                                                        minHeightClassName="min-h-0"
+                                                        className="border-0 rounded-none"
+                                                        rowClassName={(plan, idx) => {
+                                                            const gIdx = shiftGlobalIndexMap.get(plan.id || `shift-${idx}`) ?? idx;
+                                                            return gIdx === focusedIndex ? "bg-primary/8 font-medium" : "";
+                                                        }}
+                                                        onRowClick={(plan, idx) => {
+                                                            const gIdx = shiftGlobalIndexMap.get(plan.id || `shift-${idx}`) ?? idx;
+                                                            setFocusedIndex(gIdx);
+                                                            tableRef.current?.focus({ preventScroll: true });
+                                                        }}
+                                                    />
                                                 </div>
                                             ))}
                                         </div>
@@ -1125,51 +1166,19 @@ const ProductionOrderHistoryView: React.FC = () => {
                             {/* ── TAB 2: DISPATCH HISTORY ── */}
                             {activeTab === "dispatch" && (
                                 <div>
-                                    {fullOrder?.goodsDispatchItems && fullOrder.goodsDispatchItems.length > 0 ? (
-                                        <div className="border border-line rounded-xl overflow-hidden shadow-xs">
-                                            <table className="w-full text-left border-collapse text-sm">
-                                                <thead>
-                                                    <tr className="bg-head/60 border-b border-line h-10">
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-12 text-center align-middle">#</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Dispatch No</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Date</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Product</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-right align-middle">Dispatched Qty</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Vehicle No</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Driver Name</th>
-                                                        <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-center align-middle">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-line">
-                                                    {fullOrder.goodsDispatchItems.map((item: any, idx: number) => (
-                                                        <tr key={item.dispatchItemId || item.id || idx} className="bg-card hover:bg-card-2 transition-colors h-12">
-                                                            <td className="px-4 py-2 text-ink-subtle text-xs text-center align-middle font-semibold">{idx + 1}</td>
-                                                            <td className="px-4 py-2 font-semibold text-ink text-xs align-middle">{item.dispatch?.dispatchNumber || "-"}</td>
-                                                            <td className="px-4 py-2 text-ink-muted text-xs align-middle">{item.dispatch?.dispatchDate ? formatDate(item.dispatch.dispatchDate) : "-"}</td>
-                                                            <td className="px-4 py-2 align-middle">
-                                                                <div className="font-semibold text-ink text-xs">{item.product?.productName || item.productItem?.productName || "-"}</div>
-                                                                {(item.product?.productCode || item.productItem?.productCode) && (
-                                                                    <div className="text-[11px] text-ink-subtle font-mono">{item.product?.productCode || item.productItem?.productCode}</div>
-                                                                )}
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right font-bold text-blue-600 text-xs align-middle">
-                                                                {Number(item.dispatchQty || 0).toLocaleString("en-IN")} <span className="text-[10px] font-normal text-ink-subtle">{normalizeUom(item.uom || item.product?.uom)}</span>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-ink-muted font-mono text-xs align-middle">{item.dispatch?.vehicleNumber || "-"}</td>
-                                                            <td className="px-4 py-2 text-ink-muted text-xs align-middle">{item.dispatch?.driverName || "-"}</td>
-                                                            <td className="px-4 py-2 text-center align-middle">
-                                                                <StatusBadge status={item.dispatch?.status || "DISPATCHED"} />
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-12 text-ink-muted text-sm border border-dashed border-line rounded-xl">
-                                            No dispatches recorded for this order yet.
-                                        </div>
-                                    )}
+                                    <DataTable
+                                        columns={dispatchColumns}
+                                        data={fullOrder?.goodsDispatchItems || []}
+                                        rowKey={(item) => item.dispatchItemId || item.id || `${item.dispatch?.dispatchNumber}-${item.productId}`}
+                                        emptyMessage="No dispatches recorded for this order yet."
+                                        density="compact"
+                                        minHeightClassName="min-h-0"
+                                        rowClassName={(_, idx) => (idx === focusedIndex ? "bg-primary/8 font-medium" : "")}
+                                        onRowClick={(_, idx) => {
+                                            setFocusedIndex(idx);
+                                            tableRef.current?.focus({ preventScroll: true });
+                                        }}
+                                    />
                                 </div>
                             )}
 
@@ -1178,8 +1187,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                                 <div>
                                     {rmIssues.length > 0 ? (
                                         <div className="space-y-4">
-                                            {rmIssues.map((adj) => (
-                                                <div key={adj.adjustmentId} className="border border-line rounded-xl overflow-hidden bg-card shadow-xs">
+                                            {rmIssues.map((adj, adjIdx) => (
+                                                <div key={adj.adjId || adj.adjustmentNumber || adjIdx} className="border border-line rounded-xl overflow-hidden bg-card shadow-xs">
                                                     {/* Adjustment Header Bar */}
                                                     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-head border-b border-line">
                                                         <div className="flex items-center gap-3">
@@ -1198,44 +1207,23 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                         </span>
                                                     </div>
 
-                                                    {/* Items Table */}
-                                                    <table className="w-full text-left border-collapse text-sm">
-                                                        <thead>
-                                                            <tr className="bg-card-2/40 border-b border-line h-10">
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Raw Material</th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Store</th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-right align-middle">Before</th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-right align-middle">After</th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider text-right align-middle">Issued Qty</th>
-                                                                <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">Remarks</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-line">
-                                                            {adj.items.map((item: any, idx: number) => (
-                                                                <tr key={idx} className="bg-card hover:bg-card-2 transition-colors h-12">
-                                                                    <td className="px-4 py-2 align-middle">
-                                                                        <div className="font-semibold text-xs text-ink">{item.rawMaterialName}</div>
-                                                                        {item.rawMaterialCode && item.rawMaterialCode !== "-" && (
-                                                                            <div className="text-[11px] text-ink-subtle font-mono">{item.rawMaterialCode}</div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-ink-muted text-xs align-middle">{item.store}</td>
-                                                                    <td className="px-4 py-2 text-right text-ink-muted text-xs tabular-nums align-middle">
-                                                                        {item.currentQty.toFixed(3)} {item.uom}
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-right text-ink-muted text-xs tabular-nums align-middle">
-                                                                        {item.adjustedQty.toFixed(3)} {item.uom}
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-right text-xs tabular-nums font-bold whitespace-nowrap align-middle">
-                                                                        <span className={item.difference < 0 ? "text-red-500" : "text-emerald-600"}>
-                                                                            {item.difference < 0 ? "" : "+"}{item.difference.toFixed(3)} {item.uom}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-ink-subtle text-xs truncate max-w-[200px] align-middle">{item.remarks || "-"}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
+                                                    <DataTable
+                                                        columns={rmColumns}
+                                                        data={adj.items}
+                                                        rowKey={(item: any) => item.id || item.rawMaterialId || item.rawMaterialCode || String(Math.random())}
+                                                        density="compact"
+                                                        minHeightClassName="min-h-0"
+                                                        className="border-0 rounded-none"
+                                                        rowClassName={(_, itemIdx) => {
+                                                            const gIdx = rmGlobalIndexMap.get(`${adjIdx}-${itemIdx}`) ?? itemIdx;
+                                                            return gIdx === focusedIndex ? "bg-primary/8 font-medium" : "";
+                                                        }}
+                                                        onRowClick={(_, itemIdx) => {
+                                                            const gIdx = rmGlobalIndexMap.get(`${adjIdx}-${itemIdx}`) ?? itemIdx;
+                                                            setFocusedIndex(gIdx);
+                                                            tableRef.current?.focus({ preventScroll: true });
+                                                        }}
+                                                    />
                                                 </div>
                                             ))}
                                         </div>
@@ -1298,7 +1286,7 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                             <div>
                                 <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider block">Total Produced</span>
-                                <span className="text-base font-extrabold text-emerald-600 mt-1 block">
+                                <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 block">
                                     {Number(selectedShiftForHourly.producedQty || 0).toLocaleString("en-IN")} pcs
                                 </span>
                             </div>
@@ -1333,12 +1321,12 @@ const ProductionOrderHistoryView: React.FC = () => {
                         {hourlyDetails.length > 0 && (
                             <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-card-2 rounded-xl border border-line text-xs font-semibold">
                                 <div className="flex items-center gap-2 text-ink-muted">
-                                    <FaCheckCircle className="text-emerald-500" />
+                                    <FaCheckCircle className="text-emerald-500 dark:text-emerald-400" />
                                     <span>{hourlyDetails.length} hourly log entries recorded</span>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <span className="text-ink">
-                                        Total Produced: <strong className="text-emerald-600">
+                                        Total Produced: <strong className="text-emerald-600 dark:text-emerald-400">
                                             {hourlyDetails.reduce((sum, h) => {
                                                 const gross = Number(h.qtyProduced ?? 0);
                                                 const rej = Number(h.rejectQty ?? 0);
@@ -1348,17 +1336,17 @@ const ProductionOrderHistoryView: React.FC = () => {
                                         </strong>
                                     </span>
                                     <span className="text-ink">
-                                        Rejects: <strong className="text-red-500">
+                                        Rejects: <strong className="text-red-500 dark:text-red-400">
                                             {hourlyDetails.reduce((sum, h) => sum + Number(h.rejectQty || 0), 0).toLocaleString("en-IN")}
                                         </strong>
                                     </span>
                                     <span className="text-ink">
-                                        Scrap: <strong className="text-amber-500">
+                                        Scrap: <strong className="text-amber-500 dark:text-amber-400">
                                             {hourlyDetails.reduce((sum, h) => sum + Number(h.scrapQty || 0), 0).toLocaleString("en-IN")}
                                         </strong>
                                     </span>
                                     <span className="text-ink">
-                                        Downtime: <strong className="text-amber-600">
+                                        Downtime: <strong className="text-amber-600 dark:text-amber-400">
                                             {hourlyDetails.reduce((sum, h) => sum + Number(h.downtime || 0), 0)} mins
                                         </strong>
                                     </span>

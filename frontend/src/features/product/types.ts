@@ -23,6 +23,15 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdUserName?: string;
+  createdUserRole?: string;
+  editHistory?: Array<{
+    updatedBy?: string;
+    updatedByName?: string;
+    updatedAt?: string | Date;
+  }> | null;
   uom?: UOM | null;
   rate?: number | null;
   /** Grade-based dynamic pricing. Keys are grade names (e.g. "A", "B", "C"), values are prices. */

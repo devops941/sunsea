@@ -4,108 +4,24 @@ import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { usePermission } from "../../../hooks/usePermission";
 import { 
   FaClock, 
-  FaExternalLinkAlt,
   FaFilePdf
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 
-import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CustomButton from "../../../components/ui/Button/Button";
-import CommonModal from "../../../components/ui/Modal/CommonModal";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 
+import { getPlanStatusInfo } from "../../../utils/planningUtils";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { machineService } from "../../../services/machineService";
 import { shiftService } from "../../../services/shiftService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
-
-interface HourlyEntryItem {
-  hourIndex: number;
-  timeSlot?: string;
-  startHour24?: number;
-  endHour24?: number;
-  operatorName?: string;
-  qtyProduced?: number | "";
-  rejectQty?: number | "";
-  goodQty?: number | "";
-  wastageWeight?: number | "";
-  wastageUom?: string;
-  downtime?: number | "";
-  downtimeReason?: string;
-  reasonDescription?: string;
-  remarks?: string;
-  perfectWeight?: string | number;
-}
-
-interface ReportRow {
-  id: string;
-  dailyPlanId?: string;
-  hourlyProductionId?: string;
-  machineId: string;
-  machineName: string;
-  machineCode?: string;
-  shiftId: string;
-  shiftName: string;
-  shiftTime?: string;
-  shiftStartTime?: string;
-  shiftEndTime?: string;
-  productionOrderId: string;
-  productionOrderNumber: string;
-  productName: string;
-  productCode?: string;
-  uom?: string;
-  operatorName: string;
-  shotCounter: number;
-  plannedCapacity: number;
-  actualProduction: number;
-  rejectedPcs: number;
-  perfectPcs: number;
-  rejectedWeight: string;
-  perfectWeight: string;
-  downtimeMinutes: number;
-  remarks: string;
-  efficiency: string;
-  status: string;
-  planStatus: string;
-  hourlyEntries: HourlyEntryItem[];
-  wastages?: any[];
-}
-
-function formatHourAmPm(hour24: number): string {
-  const h = hour24 % 24;
-  const ampm = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${String(h12).padStart(2, "0")}:00 ${ampm}`;
-}
-
-function formatHourRange(hourIndex: number, shiftStartTime?: string, shiftName?: string): string {
-  let startHour = 9;
-  if (shiftStartTime) {
-    const parts = shiftStartTime.trim().split(":");
-    const parsed = parseInt(parts[0], 10);
-    if (!isNaN(parsed)) startHour = parsed;
-  } else if (shiftName) {
-    const sLow = shiftName.toLowerCase();
-    if (sLow.includes("night")) {
-      startHour = 21; // 9:00 PM
-    } else if (sLow.includes("evening")) {
-      startHour = 17; // 5:00 PM
-    } else if (sLow.includes("afternoon")) {
-      startHour = 14; // 2:00 PM
-    } else if (sLow.includes("morning") || sLow.includes("day")) {
-      startHour = 9; // 9:00 AM
-    }
-  }
-
-  const slotStartH = (startHour + (hourIndex - 1)) % 24;
-  const slotEndH = (startHour + hourIndex) % 24;
-  return `${formatHourAmPm(slotStartH)} – ${formatHourAmPm(slotEndH)}`;
-}
+import DailyReportMachineCard, { type ReportRow, type HourlyEntryItem, formatHourRange } from "../components/DailyReportMachineCard";
+import DailyReportHourlyModal from "../components/DailyReportHourlyModal";
 
 const DailyReportPage: React.FC = () => {
   const navigate = useNavigate();
@@ -396,20 +312,8 @@ const DailyReportPage: React.FC = () => {
       const pendingQty = Math.max(0, plannedCapacity - actualProduction);
       const efficiency = plannedCapacity > 0 ? (actualProduction / plannedCapacity) * 100 : 0;
       
-      let status = "—";
-      if (hasHourlyEntries && actualProduction > 0 && plannedCapacity > 0) {
-        if (actualProduction >= plannedCapacity) {
-          status = "High";
-        } else if (efficiency >= 90) {
-          status = "Medium";
-        } else {
-          status = "Low";
-        }
-      } else if (hasHourlyEntries && actualProduction > 0) {
-        status = "Medium";
-      } else {
-        status = "—";
-      }
+      const { statusText, customColor } = getPlanStatusInfo(plannedCapacity, actualProduction);
+      const status = (hasHourlyEntries || actualProduction > 0) ? statusText : "—";
       
       totalPlannedCapacity += plannedCapacity;
       totalActualProduction += actualProduction;
@@ -509,6 +413,7 @@ const DailyReportPage: React.FC = () => {
         remarks,
         efficiency: efficiency.toFixed(1),
         status,
+        statusColor: customColor,
         planStatus: plan.status || "PLANNED",
         hourlyEntries: full12HourEntries,
         wastages: hpWastages,
@@ -588,206 +493,6 @@ const DailyReportPage: React.FC = () => {
     return Object.values(groups);
   }, [filteredRows]);
 
-  // ── DataTable Columns definition for Machine Log Sheet (Clean & Neat Enterprise Style) ──
-  const machineTableColumns: DataTableColumn<ReportRow>[] = useMemo(() => [
-    {
-      header: "SHIFT",
-      render: (row) => (
-        <span className="font-semibold text-ink uppercase text-xs">
-          {row.shiftName}
-        </span>
-      ),
-    },
-    {
-      header: "NAME (OPERATOR)",
-      render: (row) => (
-        <span className="font-medium text-ink text-xs">
-          {row.operatorName}
-        </span>
-      ),
-    },
-    {
-      header: "TIME (IN / OUT)",
-      render: (row) => (
-        <span className="font-mono text-xs text-ink-muted whitespace-nowrap">
-          {row.shiftTime || "09:00 – 21:00"}
-        </span>
-      ),
-    },
-    {
-      header: "PRODUCT NAME",
-      render: (row) => (
-        <div>
-          <span className="font-semibold text-ink block text-xs">
-            {row.productName}
-          </span>
-          <span className="text-[11px] text-ink-subtle font-mono">
-            PO: {row.productionOrderNumber}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "TARGET COUNT",
-      align: "right",
-      render: (row) => (
-        <span className="font-mono text-ink-muted text-xs">
-          {row.shotCounter.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      header: "REJECTED PCS.",
-      align: "right",
-      render: (row) => (
-        <span className={`font-mono text-xs ${row.rejectedPcs > 0 ? "text-rose-400 font-bold" : "text-ink-subtle"}`}>
-          {row.rejectedPcs.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      header: "PERFECT PCS.",
-      align: "right",
-      render: (row) => (
-        <span className="font-mono font-bold text-emerald-400 text-xs">
-          {row.perfectPcs.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      header: "REJECTED PCS. WT",
-      align: "right",
-      render: (row) => (
-        <span className="font-mono text-ink-muted text-xs">
-          {row.rejectedWeight}
-        </span>
-      ),
-    },
-    {
-      header: "STATUS",
-      align: "center",
-      width: "90px",
-      render: (row) => {
-        if (!row.status || row.status === "—" || row.status === "-" || row.actualProduction === 0) {
-          return <span className="text-ink-subtle font-mono text-xs">—</span>;
-        }
-        let badgeClass = "bg-rose-500/15 text-rose-400 border border-rose-500/25";
-        if (row.status === "High" || row.status === "Highest") {
-          badgeClass = "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25";
-        } else if (row.status === "Medium") {
-          badgeClass = "bg-blue-500/15 text-blue-400 border border-blue-500/25";
-        }
-        return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide ${badgeClass}`}>
-            {row.status}
-          </span>
-        );
-      },
-    },
-    {
-      header: "REMARKS",
-      render: (row) => (
-        <div className="max-w-[220px] truncate text-xs text-ink-muted" title={row.remarks}>
-          {row.downtimeMinutes > 0 && (
-            <span className="text-amber-400 font-semibold mr-1">
-              [{row.downtimeMinutes}m DT]
-            </span>
-          )}
-          <span>{row.remarks}</span>
-        </div>
-      ),
-    },
-    {
-      header: "ACTION",
-      align: "center",
-      width: "60px",
-      render: (row) => (
-        <div className="flex items-center justify-center">
-          <ViewButton onClick={() => setActiveDetailRow(row)} />
-        </div>
-      ),
-    },
-  ], []);
-
-  // ── DataTable Columns definition for Modal's Hourly Log ──
-  const modalHourlyColumns: DataTableColumn<HourlyEntryItem>[] = useMemo(() => [
-    {
-      header: "HOUR",
-      align: "center",
-      width: "60px",
-      render: (entry) => (
-        <span className="font-mono text-xs font-bold text-ink-muted">
-          H{entry.hourIndex}
-        </span>
-      ),
-    },
-    {
-      header: "TIME SLOT (HOURS)",
-      render: (entry) => (
-        <span className="font-mono text-xs font-semibold text-ink whitespace-nowrap">
-          {entry.timeSlot || formatHourRange(entry.hourIndex, activeDetailRow?.shiftStartTime, activeDetailRow?.shiftName)}
-        </span>
-      ),
-    },
-    {
-      header: "OPERATOR",
-      render: (entry) => (
-        <span className="font-medium text-ink text-xs">
-          {entry.operatorName || activeDetailRow?.operatorName || "—"}
-        </span>
-      ),
-    },
-    {
-      header: "SHOT COUNT",
-      align: "right",
-      render: (entry) => (
-        <span className="font-mono font-medium text-ink text-xs">
-          {entry.qtyProduced !== "" && entry.qtyProduced !== undefined ? Number(entry.qtyProduced).toLocaleString() : 0}
-        </span>
-      ),
-    },
-    {
-      header: "REJECTED",
-      align: "right",
-      render: (entry) => (
-        <span className={`font-mono text-xs ${Number(entry.rejectQty || 0) > 0 ? "text-rose-400 font-bold" : "text-ink-subtle"}`}>
-          {Number(entry.rejectQty || 0)}
-        </span>
-      ),
-    },
-    {
-      header: "PERFECT PCS",
-      align: "right",
-      render: (entry) => (
-        <span className="font-mono font-bold text-emerald-400 text-xs">
-          {entry.goodQty !== "" && entry.goodQty !== undefined ? Number(entry.goodQty).toLocaleString() : (Number(entry.qtyProduced || 0) - Number(entry.rejectQty || 0))}
-        </span>
-      ),
-    },
-    {
-      header: "DOWNTIME",
-      align: "center",
-      render: (entry) => Number(entry.downtime || 0) > 0 ? (
-        <span className="text-amber-400 font-bold font-mono text-xs">
-          {entry.downtime} min
-        </span>
-      ) : (
-        <span className="text-ink-subtle font-mono text-xs">—</span>
-      ),
-    },
-    {
-      header: "DOWNTIME REASON / REMARKS",
-      render: (entry) => (entry.downtimeReason || entry.remarks) ? (
-        <span className="text-xs text-ink-muted">
-          {entry.downtimeReason && <span className="text-amber-400 font-medium mr-1">[{entry.downtimeReason}]</span>}
-          {entry.remarks}
-        </span>
-      ) : (
-        <span className="text-ink-subtle text-xs">—</span>
-      ),
-    },
-  ], [activeDetailRow]);
-
   const machineOptions = useMemo(() => [
     { value: "ALL", label: `All Machines (${machines.length})` },
     ...machines.map((m: any) => ({
@@ -845,16 +550,17 @@ const DailyReportPage: React.FC = () => {
 
               {/* All Shifts Tab */}
               <button
+                type="button"
                 onClick={() => setSelectedShiftTab("ALL")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
                   selectedShiftTab === "ALL"
                     ? "bg-accent text-white border-accent shadow-xs"
-                    : "bg-card-2 text-ink-muted hover:text-ink border-line-soft hover:border-line"
+                    : "bg-card-2 text-ink-subtle hover:text-ink border-line-soft hover:border-line"
                 }`}
               >
                 <span>All Shifts</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  selectedShiftTab === "ALL" ? "bg-white/20 text-white" : "bg-card text-ink-subtle"
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  selectedShiftTab === "ALL" ? "bg-white/20 text-white" : "bg-card text-ink-subtle border border-line-soft"
                 }`}>
                   {reportData.allRows.length}
                 </span>
@@ -866,17 +572,18 @@ const DailyReportPage: React.FC = () => {
                 return (
                   <button
                     key={shiftTab.id}
+                    type="button"
                     onClick={() => setSelectedShiftTab(shiftTab.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
                       isActive
                         ? "bg-accent text-white border-accent shadow-xs"
-                        : "bg-card-2 text-ink-muted hover:text-ink border-line-soft hover:border-line"
+                        : "bg-card-2 text-ink-subtle hover:text-ink border-line-soft hover:border-line"
                     }`}
                   >
                     <FaClock className={isActive ? "text-white/80" : "text-ink-subtle"} size={10} />
                     <span>{shiftTab.name}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                      isActive ? "bg-white/20 text-white" : "bg-card text-ink-subtle"
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      isActive ? "bg-white/20 text-white" : "bg-card text-ink-subtle border border-line-soft"
                     }`}>
                       {shiftTab.count}
                     </span>
@@ -899,7 +606,7 @@ const DailyReportPage: React.FC = () => {
 
         </div>
 
-        {/* ── Main Scrollable Area: Machine Log Book Tables using DataTable Component ── */}
+        {/* ── Main Scrollable Area: Machine Log Cards using DailyReportMachineCard Component ── */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center p-16">
@@ -909,145 +616,31 @@ const DailyReportPage: React.FC = () => {
               </div>
             </div>
           ) : machineWiseGroups.length === 0 ? (
-            <div className="py-16 text-center text-ink-subtle text-sm border border-line-soft rounded-xl bg-card-2/30">
+            <div className="py-16 text-center text-ink-subtle text-sm border border-line-soft rounded-xl bg-card-2/50">
               No production records found for {selectedDate} with current filters.
             </div>
           ) : (
             machineWiseGroups.map((group) => (
-              <div 
-                key={group.machineName} 
-                className="border border-line rounded-xl overflow-hidden shadow-2xs bg-card"
-              >
-                {/* ── Machine Section Header Bar (Clean & Professional without Icons/Badges) ── */}
-                <div className="px-5 py-3 bg-head/80 border-b border-line flex flex-wrap justify-between items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
-                      MACHINE - {group.machineName}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-xs text-ink-subtle">
-                    <span>
-                      Date: <strong className="text-ink-muted">{selectedDate}</strong>
-                    </span>
-                    <span className="text-line-soft">·</span>
-                    <span className="font-medium text-ink-muted">
-                      {group.rows.length} {group.rows.length === 1 ? 'Entry' : 'Entries'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* ── Machine Log Sheet Table using DataTable Component ── */}
-                <DataTable<ReportRow>
-                  columns={machineTableColumns}
-                  data={group.rows}
-                  rowKey={(row) => row.id}
-                  minHeightClassName="min-h-0"
-                  density="compact"
-                  onRowClick={(row) => setActiveDetailRow(row)}
-                  className="border-none"
-                />
-
-                {/* Machine Sub-total Footer */}
-                <div className="px-5 py-2.5 bg-head/40 border-t border-line flex flex-wrap justify-between items-center text-xs font-medium text-ink-muted">
-                  <div className="flex items-center gap-3">
-                    <span>Output: <strong className="text-emerald-400 font-mono">{group.rows.reduce((sum, r) => sum + r.perfectPcs, 0).toLocaleString()} Perfect Pcs</strong></span>
-                    <span className="text-line-soft">·</span>
-                    <span>Rejections: <strong className="text-rose-400 font-mono">{group.rows.reduce((sum, r) => sum + r.rejectedPcs, 0).toLocaleString()} Pcs</strong></span>
-                  </div>
-                  <div>
-                    <span>Target: <strong className="text-ink font-mono">{group.rows.reduce((sum, r) => sum + r.shotCounter, 0).toLocaleString()} Pcs</strong></span>
-                  </div>
-                </div>
-
-              </div>
+              <DailyReportMachineCard
+                key={group.machineName}
+                machineName={group.machineName}
+                machineCode={group.machineCode}
+                rows={group.rows}
+                selectedDate={selectedDate}
+                onViewRow={(row) => setActiveDetailRow(row)}
+              />
             ))
           )}
         </div>
 
       </div>
 
-      {/* ── Hourly Production Entry Detail Modal ── */}
-      {activeDetailRow && (
-        <CommonModal
-          show={!!activeDetailRow}
-          onHide={() => setActiveDetailRow(null)}
-          title={
-            <div>
-              <h3 className="text-sm font-bold text-ink uppercase">
-                MACHINE - {activeDetailRow.machineName} · Hourly Production Breakdown
-              </h3>
-              <p className="text-[11px] text-ink-subtle font-normal mt-0.5">
-                {selectedDate} · Shift: {activeDetailRow.shiftName} ({activeDetailRow.shiftTime}) · PO: {activeDetailRow.productionOrderNumber}
-              </p>
-            </div>
-          }
-          maxWidth="wide"
-          footer={
-            <div className="flex justify-between items-center w-full">
-              <div className="text-xs text-ink-subtle">
-                Operator(s): <span className="font-semibold text-ink">{activeDetailRow.operatorName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {activeDetailRow.dailyPlanId && (
-                  <CustomButton
-                    variant="secondary"
-                    text="Open Hourly Entry Page"
-                    icon={FaExternalLinkAlt}
-                    onClick={() => {
-                      navigate(`/daily-production-plans/hourly/${activeDetailRow.dailyPlanId}`);
-                    }}
-                  />
-                )}
-                <CustomButton
-                  variant="primary"
-                  text="Close"
-                  onClick={() => setActiveDetailRow(null)}
-                />
-              </div>
-            </div>
-          }
-        >
-          <div className="flex flex-col gap-4 p-1">
-            
-            {/* Hour by Hour Logs Table using DataTable Component */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
-                  Hourly Entry Records (Hour 1 to Hour 12)
-                </h4>
-                <span className="text-xs text-ink-subtle font-mono">
-                  Shift Timing: {activeDetailRow.shiftTime}
-                </span>
-              </div>
-
-              <div className="border border-line rounded-xl overflow-hidden">
-                <DataTable<HourlyEntryItem>
-                  columns={modalHourlyColumns}
-                  data={activeDetailRow.hourlyEntries}
-                  rowKey={(entry) => entry.hourIndex}
-                  minHeightClassName="min-h-0"
-                  density="compact"
-                  className="border-none"
-                />
-                {/* Hourly Total Summary Footer */}
-                <div className="px-5 py-2.5 bg-head/80 border-t-2 border-line flex flex-wrap justify-between items-center text-xs font-medium text-ink">
-                  <div className="text-ink-muted uppercase font-bold">
-                    Total Summary:
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4 text-xs">
-                    <span>Shots: <strong className="font-mono text-ink">{activeDetailRow.hourlyEntries.reduce((s, e) => s + Number(e.qtyProduced || 0), 0).toLocaleString()}</strong></span>
-                    <span>Reject: <strong className="font-mono text-rose-400">{activeDetailRow.hourlyEntries.reduce((s, e) => s + Number(e.rejectQty || 0), 0).toLocaleString()}</strong></span>
-                    <span>Perfect: <strong className="font-mono text-emerald-400">{activeDetailRow.hourlyEntries.reduce((s, e) => s + (e.goodQty !== undefined ? Number(e.goodQty) : Math.max(0, Number(e.qtyProduced || 0) - Number(e.rejectQty || 0))), 0).toLocaleString()}</strong></span>
-                    <span>Downtime: <strong className="font-mono text-amber-400">{activeDetailRow.hourlyEntries.reduce((s, e) => s + Number(e.downtime || 0), 0)} min</strong></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </CommonModal>
-      )}
+      {/* ── Hourly Production Entry Detail Modal Component ── */}
+      <DailyReportHourlyModal
+        row={activeDetailRow}
+        selectedDate={selectedDate}
+        onClose={() => setActiveDetailRow(null)}
+      />
       
       {/* ── Hidden Printable Daily Production Report Document (Compact Black & White A4 Register Layout) ── */}
       <div

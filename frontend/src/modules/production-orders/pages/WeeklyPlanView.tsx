@@ -7,9 +7,9 @@ import { toast } from "react-toastify";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
-import EditButton from "../../../components/ui/EditButton/EditButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
@@ -176,14 +176,110 @@ const WeeklyPlanView: React.FC = () => {
         });
     }, [navigate, baseId]);
 
-    const handleEditOrder = useCallback((po: PlanRow) => {
-        const isEditable = !['IN_PRODUCTION', 'POST_PRODUCTION', 'COMPLETED', 'CLOSED', 'DISPATCHED'].includes(po.status?.toUpperCase());
-        if (isEditable) {
-            navigate(`/production-orders/edit/${po.productionOrderId}`);
-        } else {
-            toast.info(`Order ${po.productionOrderId} cannot be edited in status ${po.status}`);
-        }
-    }, [navigate]);
+    const summaryStats = useMemo(() => {
+        let totalTarget = 0;
+        let totalProduced = 0;
+        let completedCount = 0;
+
+        children.forEach((po) => {
+            const t = Number(po.targetQty || 0);
+            const p = getNetProducedQty(po);
+            totalTarget += t;
+            totalProduced += p;
+            if (po.status === "COMPLETED" || (p >= t && t > 0)) {
+                completedCount++;
+            }
+        });
+
+        const progressPercent = totalTarget > 0 ? Math.min(100, Math.round((totalProduced / totalTarget) * 100)) : 0;
+
+        return {
+            totalTarget,
+            totalProduced,
+            progressPercent,
+            completedCount,
+            totalOrders: children.length,
+            totalMachines: machineGroups.length,
+        };
+    }, [children, machineGroups]);
+
+
+    const columns: DataTableColumn<PlanRow>[] = useMemo(() => [
+        {
+            header: "#",
+            width: "48px",
+            align: "center",
+            render: (_po, idx) => <span className="text-xs font-semibold text-ink-subtle">{idx + 1}</span>,
+        },
+        {
+            header: "PRODUCT",
+            render: (po) => (
+                <div>
+                    <div className="font-semibold text-ink text-xs block group-hover:text-primary transition-colors">
+                        {po.productItem?.productName || "—"}
+                    </div>
+                    {po.productItem?.productCode && (
+                        <div className="text-[11px] text-ink-subtle font-mono">
+                            {po.productItem.productCode}
+                        </div>
+                    )}
+                </div>
+            ),
+        },
+        {
+            header: "TARGET QTY",
+            align: "right",
+            width: "120px",
+            render: (po) => (
+                <span className="font-semibold text-ink-muted text-xs">
+                    {Number(po.targetQty || 0).toLocaleString("en-IN")}
+                </span>
+            ),
+        },
+        {
+            header: "PRODUCED QTY",
+            align: "right",
+            width: "130px",
+            render: (po) => {
+                const netProduced = getNetProducedQty(po);
+                return (
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {netProduced.toLocaleString("en-IN")}
+                    </span>
+                );
+            },
+        },
+        {
+            header: "REMARKS",
+            render: (po) => (
+                <span className="text-ink-muted text-xs truncate max-w-[200px] inline-block" title={po.remarks}>
+                    {po.remarks || "—"}
+                </span>
+            ),
+        },
+        {
+            header: "STATUS",
+            width: "170px",
+            align: "center",
+            render: (po) => {
+                const netProduced = getNetProducedQty(po);
+                const isCompleted = po.status === "COMPLETED" || (netProduced >= Number(po.targetQty || 0) && Number(po.targetQty || 0) > 0);
+                return <StatusBadge status={isCompleted ? "COMPLETED" : po.status} />;
+            },
+        },
+        {
+            header: "ACTIONS",
+            width: "90px",
+            align: "center",
+            render: (po) => (
+                <div className="flex items-center justify-center">
+                    <ViewButton
+                        onClick={() => handleViewOrder(po)}
+                    />
+                </div>
+            ),
+        },
+    ], [handleViewOrder]);
 
     const tableRef = useRef<HTMLDivElement>(null);
 
@@ -192,12 +288,6 @@ const WeeklyPlanView: React.FC = () => {
         onEnter: (i) => {
             const po = flattenedRows[i];
             if (po) handleViewOrder(po);
-        },
-        onEdit: (i) => {
-            const po = flattenedRows[i];
-            if (po && (editMode || can("production_orders.edit"))) {
-                handleEditOrder(po);
-            }
         },
         containerRef: tableRef,
     });
@@ -328,114 +418,73 @@ const WeeklyPlanView: React.FC = () => {
                         No assignments found for this plan.
                     </div>
                 ) : (
-                    <div
-                        ref={tableRef}
-                        tabIndex={0}
-                        data-table-nav
-                        className="p-5 flex flex-col gap-6 outline-none"
-                    >
-                        {machineGroups.map((group) => (
-                            <div key={group.machineKey} className="border border-line rounded-xl overflow-hidden shadow-xs">
-                                {/* Machine section header */}
-                                <div className="px-4 py-2.5 bg-head border-b border-line flex items-center justify-between">
-                                    <h3 className="text-[13px] font-bold text-ink uppercase tracking-wide">
-                                        {group.machineName} — Machine Program List
-                                    </h3>
-                                    <span className="text-xs font-semibold text-ink-subtle">
-                                        {group.rows.length} product{group.rows.length !== 1 ? "s" : ""}
-                                    </span>
-                                </div>
-
-                                {/* Products table */}
-                                <table className="w-full text-left border-collapse text-sm">
-                                    <thead>
-                                        <tr role="row" className="bg-head/60 border-b border-line h-10">
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-10 text-center align-middle">
-                                                #
-                                            </th>
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">
-                                                Product
-                                            </th>
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[120px] text-right align-middle">
-                                                Target Qty
-                                            </th>
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[130px] text-right align-middle">
-                                                Produced Qty
-                                            </th>
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider align-middle">
-                                                Remarks
-                                            </th>
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[170px] text-center align-middle">
-                                                Status
-                                            </th>
-                                            <th className="px-4 py-2 text-[11px] font-semibold text-ink-subtle uppercase tracking-wider w-[100px] text-center align-middle">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-line">
-                                        {group.rows.map((po, idx) => {
-                                            const netProduced = getNetProducedQty(po);
-                                            const isCompleted = po.status === "COMPLETED" || (netProduced >= Number(po.targetQty || 0) && Number(po.targetQty || 0) > 0);
-                                            const flatIndex = rowGlobalIndexMap.get(po.productionOrderId) ?? idx;
-                                            const isFocused = flatIndex === focusedIndex;
-
-                                            return (
-                                                <tr
-                                                    key={po.productionOrderId}
-                                                    role="row"
-                                                    data-nav-index={flatIndex}
-                                                    className={`transition-colors h-12 cursor-pointer group ${
-                                                        isFocused
-                                                            ? "ring-1 ring-inset ring-primary/40 bg-primary/8"
-                                                            : "bg-card hover:bg-card-2"
-                                                    }`}
-                                                    onClick={() => {
-                                                        setFocusedIndex(flatIndex);
-                                                        tableRef.current?.focus({ preventScroll: true });
-                                                    }}
-                                                    onDoubleClick={() => handleViewOrder(po)}
-                                                >
-                                                    <td className="px-4 py-2 text-ink-subtle text-[13px] text-center align-middle">{idx + 1}</td>
-                                                    <td className="px-4 py-2 align-middle">
-                                                        <div className="font-semibold text-ink text-[13px] group-hover:text-primary transition-colors">
-                                                            {po.productItem?.productName || "—"}
-                                                        </div>
-                                                        {po.productItem?.productCode && (
-                                                            <div className="text-[11px] text-ink-subtle font-mono">
-                                                                {po.productItem.productCode}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right font-semibold text-ink-muted text-[13px] align-middle">
-                                                        {Number(po.targetQty || 0).toLocaleString("en-IN")}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right font-bold text-emerald-600 text-[14px] align-middle">
-                                                        {netProduced.toLocaleString("en-IN")}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-ink-muted text-[13px] align-middle">
-                                                        {po.remarks || "—"}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-center align-middle" onClick={(e) => e.stopPropagation()}>
-                                                        <StatusBadge status={isCompleted ? "COMPLETED" : po.status} />
-                                                    </td>
-                                                    <td className="px-4 py-2 text-center align-middle" onClick={(e) => e.stopPropagation()}>
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            <ViewButton
-                                                                onClick={() => handleViewOrder(po)}
-                                                            />
-                                                            {(editMode || can("production_orders.edit")) && (
-                                                                <EditButton onClick={() => handleEditOrder(po)} />
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                    <div className="flex flex-col">
+                        {/* Summary KPI Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 pt-4 pb-1">
+                            <div className="bg-card-2 border border-line-soft rounded-xl p-3 flex flex-col justify-between">
+                                <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Total Target Qty</span>
+                                <div className="text-lg font-bold text-ink mt-1">{summaryStats.totalTarget.toLocaleString("en-IN")}</div>
+                                <span className="text-[11px] text-ink-subtle mt-0.5">{summaryStats.totalOrders} assigned order{summaryStats.totalOrders !== 1 ? "s" : ""}</span>
                             </div>
-                        ))}
+                            <div className="bg-card-2 border border-line-soft rounded-xl p-3 flex flex-col justify-between">
+                                <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Total Produced</span>
+                                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1">{summaryStats.totalProduced.toLocaleString("en-IN")}</div>
+                                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium">{summaryStats.completedCount} / {summaryStats.totalOrders} completed</span>
+                            </div>
+                            <div className="bg-card-2 border border-line-soft rounded-xl p-3 flex flex-col justify-between">
+                                <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Overall Progress</span>
+                                <div className="text-lg font-bold text-primary mt-1">{summaryStats.progressPercent}%</div>
+                                <div className="w-full bg-line rounded-full h-1.5 mt-1 overflow-hidden">
+                                    <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${summaryStats.progressPercent}%` }} />
+                                </div>
+                            </div>
+                            <div className="bg-card-2 border border-line-soft rounded-xl p-3 flex flex-col justify-between">
+                                <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Assigned Machines</span>
+                                <div className="text-lg font-bold text-ink mt-1">{summaryStats.totalMachines}</div>
+                                <span className="text-[11px] text-ink-subtle mt-0.5">{machineGroups.length} active machine group{machineGroups.length !== 1 ? "s" : ""}</span>
+                            </div>
+                        </div>
+
+                        {/* Machine Tables List */}
+                        <div
+                            ref={tableRef}
+                            tabIndex={0}
+                            data-table-nav
+                            className="p-5 flex flex-col gap-6 outline-none"
+                        >
+                            {machineGroups.map((group) => (
+                                <div key={group.machineKey} className="border border-line rounded-xl overflow-hidden shadow-xs">
+                                    {/* Machine section header */}
+                                    <div className="px-4 py-2.5 bg-head border-b border-line flex items-center justify-between">
+                                        <h3 className="text-[13px] font-bold text-ink uppercase tracking-wide">
+                                            {group.machineName} — Machine Program List
+                                        </h3>
+                                        <span className="text-xs font-semibold text-ink-subtle">
+                                            {group.rows.length} product{group.rows.length !== 1 ? "s" : ""}
+                                        </span>
+                                    </div>
+
+                                {/* Products DataTable */}
+                                <DataTable
+                                    columns={columns}
+                                    data={group.rows}
+                                    rowKey={(po) => po.productionOrderId}
+                                    density="compact"
+                                    minHeightClassName="min-h-0"
+                                    className="border-0 rounded-none shadow-none"
+                                    rowClassName={(po, idx) => {
+                                        const flatIndex = rowGlobalIndexMap.get(po.productionOrderId) ?? idx;
+                                        return flatIndex === focusedIndex ? "bg-primary/8 font-medium" : "";
+                                    }}
+                                    onRowClick={(po, idx) => {
+                                        const flatIndex = rowGlobalIndexMap.get(po.productionOrderId) ?? idx;
+                                        setFocusedIndex(flatIndex);
+                                        tableRef.current?.focus({ preventScroll: true });
+                                    }}
+                                />
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>

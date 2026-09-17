@@ -6,7 +6,8 @@ import { ApiResponse } from "../../utils/ApiResponse";
 
 class SalesProductController {
   create = asyncHandler(async (req: Request, res: Response) => {
-    const salesProduct = await salesProductService.create(req.body);
+    const userId = req.user?.userId;
+    const salesProduct = await salesProductService.create(req.body, userId);
 
     return res.status(201).json(
       new ApiResponse("Sales Product created successfully", salesProduct)
@@ -33,7 +34,8 @@ class SalesProductController {
 
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(String(req.params.id));
-    const salesProduct = await salesProductService.update(id, req.body);
+    const userId = req.user?.userId;
+    const salesProduct = await salesProductService.update(id, req.body, userId);
 
     return res.status(200).json(
       new ApiResponse("Sales Product updated successfully", salesProduct)

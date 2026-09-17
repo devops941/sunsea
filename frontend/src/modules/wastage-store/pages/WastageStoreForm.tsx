@@ -22,6 +22,8 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { convertToPrimaryUom } from "../../../utils/uomConversion";
 import { categoryService } from "../../../services/categoryService";
+import RecordAuditInfo from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 const initialFormState = {
     rawMaterialId: "",
@@ -81,6 +83,11 @@ const WastageStoreForm: React.FC = () => {
     const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [auditInfo, setAuditInfo] = useState<{
+        createdAt?: string | Date;
+        createdBy?: string;
+        editHistory?: any[];
+    } | null>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
@@ -123,20 +130,36 @@ const WastageStoreForm: React.FC = () => {
         setOpeningStockUom("");
     }, [formData.baseUom]);
 
+    const populateFormData = useCallback((item: any) => {
+        setFormData({
+            rawMaterialId: item.rawMaterialId,
+            materialName: item.materialName || "",
+            categoryId: item.categoryId ?? item.category?.id ?? "",
+            storeId: item.storeId || item.store?.storeId || "",
+            baseUom: item.baseUom || "",
+            onHandQty: item.onHandQty !== null && item.onHandQty !== undefined ? String(item.onHandQty) : "",
+            narration: item.narration || item.remarks || "",
+            status: item.isActive ? "Active" : "Inactive",
+        });
+        setAuditInfo({
+            createdAt: item.createdAt,
+            createdBy: item.createdUserName || item.createdBy,
+            editHistory: item.editHistory,
+        });
+    }, []);
+
     useEffect(() => {
         fetchStoresData();
 
-        if (isEditMode && locationState.state) {
-            setFormData({
-                rawMaterialId: locationState.state.rawMaterialId,
-                materialName: locationState.state.materialName,
-                categoryId: locationState.state.categoryId ?? locationState.state.category?.id ?? "",
-                storeId: locationState.state.storeId || locationState.state.store?.storeId || "",
-                baseUom: locationState.state.baseUom || "",
-                onHandQty: locationState.state.onHandQty !== null && locationState.state.onHandQty !== undefined ? String(locationState.state.onHandQty) : "",
-                narration: locationState.state.narration || locationState.state.remarks || "",
-                status: locationState.state.isActive ? "Active" : "Inactive",
-            });
+        if (isEditMode && id) {
+            rawMaterialService.fetchById(id)
+                .then((data: any) => {
+                    populateFormData(data);
+                })
+                .catch(() => {
+                    toast.error("Failed to load Wastage Product");
+                    navigate("/wastage-store");
+                });
         } else if (!isEditMode) {
             const getNextId = async () => {
                 try {
@@ -148,7 +171,7 @@ const WastageStoreForm: React.FC = () => {
             };
             getNextId();
         }
-    }, [isEditMode, locationState.state, fetchStoresData]);
+    }, [isEditMode, id, fetchStoresData, navigate, populateFormData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -160,25 +183,54 @@ const WastageStoreForm: React.FC = () => {
     };
 
     const handleClear = () => {
-        if (isEditMode && locationState.state) {
-            setFormData({
-                rawMaterialId: locationState.state.rawMaterialId,
-                materialName: locationState.state.materialName,
-                categoryId: locationState.state.categoryId ?? locationState.state.category?.id ?? "",
-                storeId: locationState.state.storeId || locationState.state.store?.storeId || "",
-                baseUom: locationState.state.baseUom || "",
-                onHandQty: locationState.state.onHandQty !== null && locationState.state.onHandQty !== undefined ? String(locationState.state.onHandQty) : "",
-                narration: locationState.state.narration || locationState.state.remarks || "",
-                status: locationState.state.isActive ? "Active" : "Inactive",
-            });
+        if (isEditMode && id) {
+            rawMaterialService.fetchById(id)
+                .then((data: any) => {
+                    populateFormData(data);
+                })
+                .catch(() => {});
         } else {
             setFormData(prev => ({ ...initialFormState, rawMaterialId: prev.rawMaterialId }));
             setOpeningStockUom("");
         }
         setErrors({});
+        setIsDirty(false);
     };
 
-    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (resetRef.current) {
+            const r = resetRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            r();
+        }
+        setTimeout(() => {
+            lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setIsDirty(false);
+        if (proceedRef.current) {
+            const p = proceedRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            p();
+            return;
+        }
+        navigate("/wastage-store");
+    }, [navigate]);
+
+    const handleSaveFromModal = useCallback(async () => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            handleSubmitRef.current();
+        }, 50);
+    }, []);
+
+    handleSubmitRef.current = () => handleSubmit();
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
@@ -190,21 +242,20 @@ const WastageStoreForm: React.FC = () => {
             e.preventDefault();
             e.stopPropagation();
             if (saveConfirmOpenRef.current) {
-                setSaveConfirmOpen(false);
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+                handleResume();
             } else if (isDirtyRef.current) {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate(-1);
+                navigate("/wastage-store");
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-    }, [navigate]);
+    }, [handleResume, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e?.preventDefault) e.preventDefault();
 
         if (isSubmitting) return;
 
@@ -249,21 +300,21 @@ const WastageStoreForm: React.FC = () => {
             };
 
             if (isEditMode) {
-                await dispatch(updateRawMaterial({ id: id as string, data: payload })).unwrap();
+                const updated: any = await dispatch(updateRawMaterial({ id: id as string, data: payload })).unwrap();
+                invalidateCacheByPrefix("rawMaterials");
                 toast.success("Wastage product updated successfully!");
+                if (updated) {
+                    populateFormData(updated);
+                }
+                setIsDirty(false);
             } else {
                 await dispatch(createRawMaterial(payload)).unwrap();
+                invalidateCacheByPrefix("rawMaterials");
                 toast.success("Wastage product created successfully!");
-            }
-
-            setIsDirty(false);
-            if (isEditMode) {
-                navigate(-1);
-            } else {
+                setIsDirty(false);
                 setFormData(initialFormState);
                 setOpeningStockUom("");
                 setErrors({});
-                setIsSubmitting(false);
                 try {
                     const nextId = await rawMaterialService.fetchNextId();
                     setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
@@ -276,6 +327,7 @@ const WastageStoreForm: React.FC = () => {
             }
         } catch (err: any) {
             toast.error(typeof err === 'string' ? err : err?.message || (isEditMode ? "Failed to update wastage product" : "Failed to create wastage product"));
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -283,11 +335,24 @@ const WastageStoreForm: React.FC = () => {
     return (
         <div className="w-full max-w-[1024px] xl:mr-auto h-full flex flex-col">
             <div className="bg-card rounded-xl shadow-xs border border-line-soft flex flex-col flex-1 h-full">
-                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="text-xl font-bold text-ink">
-                        {isEditMode ? "Edit Wastage Product" : "Create Wastage Product"}
-                    </h2>
-                    <BackButton text="Back to List" to="/wastage-store" />
+                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-ink">
+                            {isEditMode ? "Edit Wastage Product" : "Create Wastage Product"}
+                        </h2>
+                        {isEditMode && <RecordAuditInfo auditData={auditInfo} title="Wastage Product" />}
+                    </div>
+                    <BackButton
+                        text="Back to List"
+                        onClick={() => {
+                            if (isDirty) {
+                                lastFocusedRef.current = document.activeElement as HTMLElement;
+                                setSaveConfirmOpen(true);
+                            } else {
+                                navigate("/wastage-store");
+                            }
+                        }}
+                    />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex flex-col flex-1" noValidate>
@@ -410,21 +475,15 @@ const WastageStoreForm: React.FC = () => {
             </div>
         <CommonConfirmModal
             show={saveConfirmOpen}
-            onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
-            onConfirm={() => {
-                setSaveConfirmOpen(false);
-                setTimeout(() => {
-                    handleSubmitRef.current();
-                    setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-                }, 150);
-            }}
+            onHide={handleResume}
+            onConfirm={handleSaveFromModal}
             title="Unsaved Changes"
             message="You have unsaved changes. Do you want to save before leaving?"
             confirmText="Save"
             cancelText="Discard"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } navigate(-1); }}
+            onCancel={handleDiscard}
         />
         </div>
     );

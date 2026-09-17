@@ -216,7 +216,12 @@ const MachineList: React.FC = () => {
             <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
                     <div>
-                        <h2 className="text-base font-bold text-ink">Machine Management</h2>
+                        <h2 className="text-base font-bold text-ink flex items-center gap-2">
+                            Machine Management
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {sortedData.length}
+                            </span>
+                        </h2>
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         <div className="relative w-full md:w-64">

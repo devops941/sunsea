@@ -29,6 +29,8 @@ import { machineService } from "../../../services/machineService";
 import { customerGradeService, type CustomerGrade } from "../../../services/customerGradeService";
 import { categoryService } from "../../../services/categoryService";
 import { formatAmountOnBlur } from "../../../utils/pricingUtils";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
+import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
 
 const MAX_IMAGES = 7;
 
@@ -57,7 +59,7 @@ type RawMaterialRow = { rawMaterialId: string; percentage: string };
 type InitialCapacityRow = {
     capDate: string;
     capShiftId: string;
-    capRoleId: string;
+    capRoleIds: string[];
     capOperatorIds: string[];
     capQty: string;
     capMachine: string;
@@ -84,7 +86,17 @@ const ProductForm: React.FC = () => {
 
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([{ rawMaterialId: "", percentage: "" }]);
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
-    const [initialCapacities, setInitialCapacities] = useState<InitialCapacityRow[]>([]);
+    const emptyCapacityRow: InitialCapacityRow = useMemo(() => ({
+        capDate: new Date().toISOString().split("T")[0],
+        capShiftId: "",
+        capMachine: "",
+        capRoleIds: [],
+        capOperatorIds: [],
+        capQty: ""
+    }), []);
+    const [initialCapacities, setInitialCapacities] = useState<InitialCapacityRow[]>([
+        { capDate: new Date().toISOString().split("T")[0], capShiftId: "", capMachine: "", capRoleIds: [], capOperatorIds: [], capQty: "" }
+    ]);
 
     const [employees, setEmployees] = useState<any[]>([]);
     const [roles, setRoles] = useState<any[]>([]);
@@ -97,6 +109,7 @@ const ProductForm: React.FC = () => {
 
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
@@ -237,7 +250,14 @@ const ProductForm: React.FC = () => {
         if (isEditMode && id) {
             setIsLoadingData(true);
             productService.fetchById(id)
-                .then(data => populateFormData(data))
+                .then(data => {
+                    populateFormData(data);
+                    setAuditInfo({
+                        createdAt: data.createdAt,
+                        createdBy: (data as any).createdUserName || (data as any).createdBy,
+                        editHistory: (data as any).editHistory,
+                    });
+                })
                 .catch(err => {
                     console.error("Failed to fetch product:", err);
                     toast.error("Failed to load product data");
@@ -346,15 +366,21 @@ const ProductForm: React.FC = () => {
             }
         }
 
-        // Validate Initial Capacity Setup fields — all fields mandatory when a setup is added
-        if (initialCapacities.length > 0) {
+        // Validate Initial Capacity Setup fields — validate active rows where data is entered
+        const activeCapacities = initialCapacities.filter(cap =>
+            cap.capShiftId || cap.capMachine || (cap.capRoleIds && cap.capRoleIds.length > 0) || (cap.capOperatorIds && cap.capOperatorIds.length > 0) || (cap.capQty && Number(cap.capQty) > 0)
+        );
+        if (activeCapacities.length > 0) {
             initialCapacities.forEach((cap, idx) => {
-                if (!cap.capDate) newErrors[`cap_${idx}_date`] = "Date is required";
-                if (!cap.capShiftId) newErrors[`cap_${idx}_shift`] = "Shift is required";
-                if (!cap.capMachine) newErrors[`cap_${idx}_machine`] = "Machine is required";
-                if (!cap.capRoleId) newErrors[`cap_${idx}_role`] = "Role is required";
-                if (cap.capOperatorIds.length === 0) newErrors[`cap_${idx}_operators`] = "At least one operator is required";
-                if (!cap.capQty || Number(cap.capQty) <= 0) newErrors[`cap_${idx}_qty`] = "Qty / Shift must be > 0";
+                const isActive = cap.capShiftId || cap.capMachine || (cap.capRoleIds && cap.capRoleIds.length > 0) || (cap.capOperatorIds && cap.capOperatorIds.length > 0) || (cap.capQty && Number(cap.capQty) > 0);
+                if (isActive) {
+                    if (!cap.capDate) newErrors[`cap_${idx}_date`] = "Date is required";
+                    if (!cap.capShiftId) newErrors[`cap_${idx}_shift`] = "Shift is required";
+                    if (!cap.capMachine) newErrors[`cap_${idx}_machine`] = "Machine is required";
+                    if (!cap.capRoleIds || cap.capRoleIds.length === 0) newErrors[`cap_${idx}_roles`] = "At least one role is required";
+                    if (!cap.capOperatorIds || cap.capOperatorIds.length === 0) newErrors[`cap_${idx}_operators`] = "At least one operator is required";
+                    if (!cap.capQty || Number(cap.capQty) <= 0) newErrors[`cap_${idx}_qty`] = "Qty / Shift must be > 0";
+                }
             });
         }
 
@@ -404,31 +430,18 @@ const ProductForm: React.FC = () => {
         });
     }, []);
 
-    const handleAddInitialCapacity = () => {
-        setInitialCapacities(prev => [...prev, {
-            capDate: new Date().toISOString().split("T")[0],
-            capShiftId: "",
-            capRoleId: "",
-            capOperatorIds: [],
-            capQty: "",
-            capMachine: ""
-        }]);
-    };
+    const handleAddInitialCapacity = useCallback(() => {
+        setInitialCapacities(prev => [...prev, { ...emptyCapacityRow }]);
+        setIsDirty(true);
+    }, [emptyCapacityRow]);
 
-    const handleRemoveInitialCapacity = (index: number) => {
-        setInitialCapacities(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleInitialCapacityChange = (index: number, field: keyof InitialCapacityRow, value: any) => {
+    const handleRemoveInitialCapacity = useCallback((index: number) => {
         setInitialCapacities(prev => {
-            const newCap = [...prev];
-            newCap[index] = { ...newCap[index], [field]: value };
-            if (field === 'capRoleId') {
-                newCap[index].capOperatorIds = [];
-            }
-            return newCap;
+            const next = prev.filter((_, i) => i !== index);
+            return next;
         });
-    };
+        setIsDirty(true);
+    }, []);
 
     const remainingSlots = MAX_IMAGES - existingImages.length - newImageFiles.length;
 
@@ -485,7 +498,40 @@ const ProductForm: React.FC = () => {
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
-    handleSubmitRef.current = () => handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    const handleResume = useCallback(() => {
+        setSaveConfirmOpen(false);
+        if (resetRef.current) {
+            const r = resetRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            r();
+        }
+        setTimeout(() => {
+            lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus();
+        }, 50);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        setSaveConfirmOpen(false);
+        setIsDirty(false);
+        if (proceedRef.current) {
+            const p = proceedRef.current;
+            proceedRef.current = null;
+            resetRef.current = null;
+            p();
+            return;
+        }
+        navigate("/products");
+    }, [navigate]);
+
+    const handleSaveFromModal = useCallback(async () => {
+        setSaveConfirmOpen(false);
+        setTimeout(() => {
+            handleSubmitRef.current();
+        }, 50);
+    }, []);
+
+    handleSubmitRef.current = () => handleSubmit();
 
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
     useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
@@ -507,21 +553,20 @@ const ProductForm: React.FC = () => {
             e.preventDefault();
             e.stopPropagation();
             if (saveConfirmOpenRef.current) {
-                setSaveConfirmOpen(false);
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
+                handleResume();
             } else if (isDirtyRef.current) {
                 lastFocusedRef.current = document.activeElement as HTMLElement;
                 setSaveConfirmOpen(true);
             } else {
-                navigate(-1);
+                navigate("/products");
             }
         };
         window.addEventListener("keydown", handleEscape, { capture: true });
         return () => window.removeEventListener("keydown", handleEscape, { capture: true });
-    }, [navigate]);
+    }, [handleResume, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e?.preventDefault) e.preventDefault();
         if (isSubmitting) return;
 
         if (!validateForm()) return;
@@ -594,12 +639,21 @@ const ProductForm: React.FC = () => {
             }
 
             if (isEditMode && id) {
-                await editProduct(id, payload as any);
+                const updated: any = await editProduct(id, payload as any);
+                invalidateCacheByPrefix("products");
                 toast.success("Product updated successfully!");
+                if (updated) {
+                    populateFormData(updated);
+                    setAuditInfo({
+                        createdAt: updated.createdAt,
+                        createdBy: updated.createdUserName || updated.createdBy,
+                        editHistory: updated.editHistory,
+                    });
+                }
                 setIsDirty(false);
-                navigate(-1);
             } else {
                 await addProduct(payload as any);
+                invalidateCacheByPrefix("products");
                 toast.success("Saved");
                 setIsDirty(false);
                 handleClear();
@@ -722,6 +776,179 @@ const ProductForm: React.FC = () => {
         },
     ], [rawMaterials, bomAutocompleteOptions, errors]);
 
+    const capacityColumns: BusyColumn<InitialCapacityRow>[] = useMemo(() => [
+        {
+            key: "capDate",
+            header: "Date",
+            width: "135px",
+            render: (row: InitialCapacityRow, index: number, update: (patch: Partial<InitialCapacityRow>) => void) => (
+                <input
+                    type="date"
+                    data-nav
+                    value={row?.capDate || new Date().toISOString().split("T")[0]}
+                    onChange={(e) => {
+                        update({ capDate: e.target.value });
+                        setIsDirty(true);
+                    }}
+                    className="w-full bg-transparent text-[12px] text-ink outline-none border-none p-0 cursor-pointer"
+                />
+            )
+        },
+        {
+            key: "capShiftId",
+            header: "Shift",
+            width: "140px",
+            render: (row: InitialCapacityRow, index: number, update: (patch: Partial<InitialCapacityRow>) => void) => {
+                const shiftOptions: AutocompleteOption[] = shifts.map(s => ({
+                    value: String(s.shiftName || s.shiftCode),
+                    label: String(s.shiftName || s.shiftCode),
+                }));
+                return (
+                    <AutocompleteInput
+                        inline
+                        openOnFocus
+                        name={`capShiftId-${index}`}
+                        value={row?.capShiftId || ""}
+                        options={shiftOptions}
+                        placeholder="Select shift..."
+                        onChange={(val) => {
+                            update({ capShiftId: val });
+                            setIsDirty(true);
+                            setTimeout(() => {
+                                const machineCell = document.querySelector(`[data-r="${index}"][data-c="2"]`) as HTMLElement | null;
+                                const machineInput = machineCell?.querySelector("input[data-nav], [data-nav], input, select") as HTMLElement | null;
+                                if (machineInput) { machineInput.focus(); }
+                            }, 50);
+                        }}
+                    />
+                );
+            }
+        },
+        {
+            key: "capMachine",
+            header: "Machine",
+            width: "160px",
+            render: (row: InitialCapacityRow, index: number, update: (patch: Partial<InitialCapacityRow>) => void) => {
+                const availableMachines = machines.filter(m =>
+                    String(m.machineId) === String(row?.capMachine) ||
+                    !initialCapacities.some((c, i) => i !== index && String(c.capMachine) === String(m.machineId))
+                );
+                const machineOptions: AutocompleteOption[] = availableMachines.map(m => ({
+                    value: String(m.machineId),
+                    label: m.machineName,
+                }));
+                return (
+                    <AutocompleteInput
+                        inline
+                        openOnFocus
+                        name={`capMachine-${index}`}
+                        value={row?.capMachine || ""}
+                        options={machineOptions}
+                        placeholder="Select machine..."
+                        onChange={(val) => {
+                            update({ capMachine: val });
+                            setIsDirty(true);
+                            setTimeout(() => {
+                                const roleCell = document.querySelector(`[data-r="${index}"][data-c="3"]`) as HTMLElement | null;
+                                const roleInput = roleCell?.querySelector("input[data-nav], [data-nav], input, select") as HTMLElement | null;
+                                if (roleInput) { roleInput.focus(); }
+                            }, 50);
+                        }}
+                    />
+                );
+            }
+        },
+        {
+            key: "capRoleIds",
+            header: "Role",
+            width: "200px",
+            render: (row: InitialCapacityRow, index: number, update: (patch: Partial<InitialCapacityRow>) => void) => {
+                const roleOpts = roles.map(role => ({
+                    value: String(role.id || role.roleId || role.code),
+                    label: role.name || role.roleName || role.code
+                }));
+                return (
+                    <MultiSelect
+                        inline
+                        label=""
+                        name={`capRoleIds-${index}`}
+                        options={roleOpts}
+                        value={row?.capRoleIds || []}
+                        onChange={(_, vals) => {
+                            const selectedRoleIds = vals || [];
+                            const updatedOperators = (row?.capOperatorIds || []).filter(opId => {
+                                if (selectedRoleIds.length === 0) return false;
+                                const emp = employees.find(e => String(e.id) === opId);
+                                if (!emp) return false;
+                                const empRoleId = String(emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id ?? emp.designationId ?? "");
+                                if (selectedRoleIds.includes(empRoleId)) return true;
+                                const matchedSelectedRoles = roles.filter(r => selectedRoleIds.includes(String(r.id || r.roleId || r.code)));
+                                return matchedSelectedRoles.some(r => emp.role?.name === r.name || emp.roleName === r.name || emp.designation?.name === r.name);
+                            });
+                            update({ capRoleIds: selectedRoleIds, capOperatorIds: updatedOperators });
+                            setIsDirty(true);
+                        }}
+                        placeholder="Select role(s)"
+                    />
+                );
+            }
+        },
+        {
+            key: "capQty",
+            header: "Qty / Shift",
+            width: "110px",
+            align: "center" as const,
+            render: (row: InitialCapacityRow, index: number, update: (patch: Partial<InitialCapacityRow>) => void) => (
+                <input
+                    type="text"
+                    inputMode="decimal"
+                    data-nav
+                    value={row?.capQty ?? ""}
+                    onChange={e => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        const parts = val.split(".");
+                        const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : val;
+                        update({ capQty: cleanVal });
+                        setIsDirty(true);
+                    }}
+                    placeholder="0"
+                    className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0"
+                />
+            )
+        },
+        {
+            key: "capOperatorIds",
+            header: "Operators",
+            width: "1fr",
+            render: (row: InitialCapacityRow, index: number, update: (patch: Partial<InitialCapacityRow>) => void) => {
+                const filteredOperators = employees.filter(emp => {
+                    const selectedRoleIds = row?.capRoleIds || [];
+                    if (!selectedRoleIds || selectedRoleIds.length === 0) return true;
+                    const empRoleId = String(emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id ?? emp.designationId ?? "");
+                    if (selectedRoleIds.includes(empRoleId)) return true;
+                    const matchedSelectedRoles = roles.filter(r => selectedRoleIds.includes(String(r.id || r.roleId || r.code)));
+                    if (matchedSelectedRoles.some(r => emp.role?.name === r.name || emp.roleName === r.name || emp.designation?.name === r.name)) return true;
+                    return false;
+                });
+                const opOptions = filteredOperators.map(emp => ({ value: String(emp.id), label: emp.fullName }));
+                return (
+                    <MultiSelect
+                        inline
+                        label=""
+                        name={`capOperatorIds-${index}`}
+                        options={opOptions}
+                        value={row?.capOperatorIds || []}
+                        onChange={(_, vals) => {
+                            update({ capOperatorIds: vals });
+                            setIsDirty(true);
+                        }}
+                        placeholder={(row?.capRoleIds || []).length > 0 ? "Select operators" : "Select role(s) first"}
+                    />
+                );
+            }
+        }
+    ], [shifts, machines, roles, employees, initialCapacities]);
+
     const hasAnyImage = existingImages.length > 0 || newImagePreviews.length > 0;
 
     if (isLoadingData) {
@@ -746,9 +973,22 @@ const ProductForm: React.FC = () => {
             <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
 
                 {/* ── Page Header ── */}
-                <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
-                    <h2 className="text-base font-bold text-ink">{isEditMode ? "Edit Product" : "Create Product"}</h2>
-                    <BackButton text="Back to List" to="/products" />
+                <div className="px-5 py-3 border-b border-line-soft flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex flex-col">
+                        <h2 className="text-base font-bold text-ink">{isEditMode ? "Edit Product" : "Create Product"}</h2>
+                        {isEditMode && <RecordAuditInfo auditData={auditInfo} title="Product" />}
+                    </div>
+                    <BackButton
+                        text="Back to List"
+                        onClick={() => {
+                            if (isDirty) {
+                                lastFocusedRef.current = document.activeElement as HTMLElement;
+                                setSaveConfirmOpen(true);
+                            } else {
+                                navigate("/products");
+                            }
+                        }}
+                    />
                 </div>
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-5 py-3 space-y-3" noValidate>
@@ -763,7 +1003,7 @@ const ProductForm: React.FC = () => {
                             <TextInput label="Product Name" name="productName" value={formData.productName} placeholder="e.g. Plastic Bucket 20L" required onChange={handleChange} error={errors.productName} />
                             <SelectInput label="Category" name="categoryId" value={formData.categoryId} options={categoryOptions} defaultOptionLabel="-- Select Category --" required onChange={handleChange} error={errors.categoryId} disabled={isEditMode} />
                             <SelectInput label="Product Type" name="productType" value={formData.productType} options={[{ value: "PRODUCTION", label: "Production" }, { value: "SALES_PRODUCTION", label: "Sales Production" }]} required onChange={handleChange} error={errors.productType} />
-                            <QuantityInput label="Weight per Piece" name="weightPerPiece" required value={formData.weightPerPiece} baseUoms="g,kg" uom={formData.weightUom} onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))} onChange={handleChange} error={errors.weightPerPiece} disabled={isEditMode} />
+                            <QuantityInput label="Weight per Piece" name="weightPerPiece" required value={formData.weightPerPiece} baseUoms="g,kg" uom={formData.weightUom} onUomChange={(val) => setFormData(prev => ({ ...prev, weightUom: val }))} onChange={handleChange} error={errors.weightPerPiece} />
                             <TextInput label="Rate (₹)" name="rate" type="number" step="0.01" value={formData.rate} placeholder="0.00" onChange={handleChange} onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "rate", value: v } } as any))} error={errors.rate} />
                             <SelectInput label="Opening Stock Store" name="openingStockStoreId" required value={formData.openingStockStoreId} options={storeOptions} onChange={handleChange} error={errors.openingStockStoreId} disabled={isEditMode} />
                             <TextInput label="Opening Stock Qty" name="openingStockQty" type="number" placeholder="0" required value={formData.openingStockQty} onChange={handleChange} error={errors.openingStockQty} disabled={isEditMode} />
@@ -899,36 +1139,24 @@ const ProductForm: React.FC = () => {
                     {/* ── Initial Capacity Setup — create mode only ── */}
                     {!isEditMode && (
                         <div>
-                            <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-line-soft">
+                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
                                 <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Initial Capacity Setup</h3>
-                                <CustomButton text="Add Capacity Setup" icon={FaPlus} onClick={handleAddInitialCapacity} type="button" size="sm" variant="secondary" />
                             </div>
-                            {initialCapacities.length > 0 ? (
-                                <div className="space-y-1.5">
-                                    {initialCapacities.map((cap, idx) => (
-                                        <div key={`cap-${idx}`} className="p-2 border border-line-soft rounded-lg bg-card-2/40">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">Setup #{idx + 1}</span>
-                                                <DeleteButton onClick={() => handleRemoveInitialCapacity(idx)} />
-                                            </div>
-                                            <div className="grid grid-cols-6 gap-x-2 gap-y-1">
-                                                <DatePickerCalendar label="Date" name={`capDate-${idx}`} value={cap.capDate} onChange={(e) => handleInitialCapacityChange(idx, "capDate", e.target.value)} required error={errors[`cap_${idx}_date`]} />
-                                                <SelectInput label="Shift" name={`capShiftId-${idx}`} value={cap.capShiftId} options={[{ value: "", label: "-- Shift --" }, ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))]} onChange={(e) => handleInitialCapacityChange(idx, "capShiftId", e.target.value)} required error={errors[`cap_${idx}_shift`]} />
-                                                <SelectInput label="Machine" name={`capMachine-${idx}`} value={cap.capMachine} options={[{ value: "", label: "-- Machine --" }, ...machines.filter(m => String(m.machineId) === String(cap.capMachine) || !initialCapacities.some((c, i) => i !== idx && String(c.capMachine) === String(m.machineId))).map(m => ({ value: String(m.machineId), label: m.machineName }))]} onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)} required error={errors[`cap_${idx}_machine`]} />
-                                                <SelectInput label="Role" name={`capRoleId-${idx}`} value={cap.capRoleId} options={[{ value: "", label: "-- Role --" }, ...roles.map(role => ({ value: String(role.id), label: role.name }))]} onChange={(e) => handleInitialCapacityChange(idx, "capRoleId", e.target.value)} required error={errors[`cap_${idx}_role`]} />
-                                                <TextInput label="Qty / Shift" name={`capQty-${idx}`} type="number" step="any" value={cap.capQty} onChange={(e) => handleInitialCapacityChange(idx, "capQty", e.target.value)} placeholder="0" required error={errors[`cap_${idx}_qty`]} />
-                                                <div className="col-span-full">
-                                                    <MultiSelect label="Operators" name={`capOperatorIds-${idx}`} options={employees.filter(emp => { if (!cap.capRoleId) return false; const empRoleId = emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id; return String(empRoleId) === String(cap.capRoleId); }).map(emp => ({ value: String(emp.id), label: emp.fullName }))} value={cap.capOperatorIds} onChange={(_, vals) => handleInitialCapacityChange(idx, "capOperatorIds", vals)} placeholder={cap.capRoleId ? "Select operators" : "Select role first"} required error={errors[`cap_${idx}_operators`]} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-[11px] italic p-1.5 rounded-lg bg-card-2 border border-dashed border-line-soft text-ink-subtle text-center">
-                                    No capacity added. Click "Add Capacity Setup" to configure machines and operators.
-                                </div>
-                            )}
+
+                            <BusyItemsTable<InitialCapacityRow>
+                                columns={capacityColumns}
+                                rows={initialCapacities}
+                                onChange={(newRows) => {
+                                    setInitialCapacities(newRows);
+                                    setIsDirty(true);
+                                }}
+                                emptyRow={emptyCapacityRow}
+                                onAdd={handleAddInitialCapacity}
+                                onRemove={handleRemoveInitialCapacity}
+                                editable={true}
+                                rowHeight={40}
+                                visibleRows={5}
+                            />
                         </div>
                     )}
 
@@ -948,31 +1176,20 @@ const ProductForm: React.FC = () => {
             </div>
         </div>
         <CommonConfirmModal
-            show={saveConfirmOpen}
-            onHide={() => {
-                if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); }
-                setSaveConfirmOpen(false);
-                setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50);
-            }}
-            onConfirm={() => {
-                setSaveConfirmOpen(false);
-                setTimeout(() => {
-                    handleSubmitRef.current();
-                    setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-                }, 150);
-            }}
+            isOpen={saveConfirmOpen}
+            onClose={handleResume}
+            onCancel={handleDiscard}
+            onConfirm={handleSaveFromModal}
             title="Unsaved Changes"
             message="You have unsaved changes. Do you want to save before leaving?"
+            warningText="Save to keep your changes, or Discard to leave."
             confirmText="Save"
             cancelText="Discard"
+            cancelVariant="danger"
             confirmVariant="primary"
             confirmIcon={FaCheck}
-            onCancel={() => {
-                setSaveConfirmOpen(false);
-                setIsDirty(false);
-                if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
-                navigate(-1);
-            }}
+            isDangerous={false}
+            defaultFocusCancel={false}
         />
         </>
     );

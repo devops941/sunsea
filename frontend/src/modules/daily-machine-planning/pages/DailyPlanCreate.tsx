@@ -1068,7 +1068,13 @@ const DailyPlanCreate: React.FC = () => {
     }
   };
 
-  useFormShortcuts({ onSave: () => handleSave("PLANNED") });
+  useFormShortcuts({
+    onSave: () => {
+      if (isEditMode ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) {
+        handleSave("PLANNED");
+      }
+    },
+  });
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalPlanned   = Object.keys(boardMap).length;

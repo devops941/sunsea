@@ -30,7 +30,18 @@ import DailyPlanViewModal from "../components/DailyPlanViewModal";
 import DailyRawMaterialIssueModal from "../components/DailyRawMaterialIssueModal";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-
+import DailyProductionBoard, {
+  DAY_NAMES,
+  type DayName,
+  SHIFT_SLOTS,
+  type ShiftSlot,
+  shortDate,
+  RM_ISSUED_DOT,
+  STATUS_BOARD_DOT,
+  calcProduced,
+  countLoggedEntries,
+  hasDraftHourly,
+} from "../components/DailyProductionBoard";
 
 // ── Status config ────────────────────────────────────────────
 const STATUS_FLOW: Record<string, { label: string; next: string | null }> = {
@@ -43,12 +54,6 @@ const STATUS_FLOW: Record<string, { label: string; next: string | null }> = {
   SHORT_CLOSED:    { label: "Completed with Shortage",  next: null },
   POST_PRODUCTION: { label: "Post-Production",          next: null },
 };
-
-// ── Board helpers ────────────────────────────────────────────
-const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
-type DayName = typeof DAY_NAMES[number];
-const SHIFT_SLOTS = ["DAY", "NIGHT"] as const;
-type ShiftSlot = (typeof SHIFT_SLOTS)[number];
 
 const normalizeDateStr = (dateStr: string | null | undefined): string => {
   if (!dateStr) return "";
@@ -77,66 +82,6 @@ const addDays = (base: string, n: number) => {
   const d = new Date(base + "T00:00:00");
   d.setDate(d.getDate() + n);
   return fmtDate(d);
-};
-const shortDate = (s: string) =>
-  new Date(s + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-
-const STATUS_BOARD_COLOR: Record<string, string> = {
-  DRAFT:           "border-l-amber-400 bg-amber-500/10",
-  PLANNED:         "border-l-sky-400 bg-sky-500/10",
-  IN_PROGRESS:     "border-l-indigo-400 bg-indigo-500/10",
-  COMPLETED:       "border-l-emerald-400 bg-emerald-500/10",
-  STOPPED:         "border-l-rose-400 bg-rose-500/10",
-  SHORT_CLOSED:    "border-l-rose-400 bg-rose-500/10",
-  CANCELLED:       "border-l-red-400 bg-red-500/10",
-  POST_PRODUCTION: "border-l-purple-400 bg-purple-500/10",
-};
-const STATUS_BOARD_DOT: Record<string, string> = {
-  DRAFT: "bg-amber-400", PLANNED: "bg-sky-400", IN_PROGRESS: "bg-indigo-400",
-  COMPLETED: "bg-emerald-400",
-  STOPPED: "bg-rose-400", SHORT_CLOSED: "bg-rose-400", CANCELLED: "bg-red-400",
-  POST_PRODUCTION: "bg-purple-400",
-};
-
-// RM-issued badge color (violet — kept distinct from all status dot colors above)
-const RM_ISSUED_DOT = "bg-violet-400";
-
-// ── Helpers for produced qty ─────────────────────────────────
-const calcProduced = (plan: any) => {
-  if (!Array.isArray(plan?.hourlyProductions) || plan.hourlyProductions.length === 0) return 0;
-  return plan.hourlyProductions.reduce((s: number, h: any) => {
-    if (h.totalQtyProduced !== undefined) {
-      return s + Math.max(0, Number(h.totalQtyProduced || 0) - Number(h.totalRejectQty || 0));
-    }
-    return s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0));
-  }, 0);
-};
-
-const countLoggedEntries = (plan: any) => {
-  if (!Array.isArray(plan?.hourlyProductions) || plan.hourlyProductions.length === 0) return 0;
-  let count = 0;
-  plan.hourlyProductions.forEach((hp: any) => {
-    if (Array.isArray(hp.hourlyEntries)) {
-      count += hp.hourlyEntries.filter((e: any) => Number(e.hourIndex) > 0 && (Number(e.qtyProduced || 0) > 0 || Number(e.downtime || 0) > 0 || Boolean(e.downtimeReason))).length;
-    } else if (Number(hp.hourIndex) > 0) {
-      count += 1;
-    }
-  });
-  return count;
-};
-
-const hasDraftHourly = (plan: any) => {
-  const statusStr = String(plan?.status || "").toUpperCase();
-  if (["COMPLETED", "STOPPED", "CANCELLED", "SHORT_CLOSED", "POST_PRODUCTION"].includes(statusStr)) {
-    return false;
-  }
-  if (!Array.isArray(plan?.hourlyProductions) || plan.hourlyProductions.length === 0) return false;
-  if (countLoggedEntries(plan) > 0 && statusStr === "DRAFT") return true;
-  return plan.hourlyProductions.some((hp: any) => {
-    if (hp.status === "DRAFT") return true;
-    if (Array.isArray(hp.hourlyEntries) && hp.hourlyEntries.length > 0 && statusStr === "DRAFT") return true;
-    return false;
-  });
 };
 
 // ── Component ────────────────────────────────────────────────
@@ -188,13 +133,26 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (contextMenu) {
+          setContextMenu(null);
+        } else if (showWeekSelectModal) {
+          setShowWeekSelectModal(false);
+        } else if (selectedDay !== "ALL") {
+          setSelectedDay("ALL");
+        }
+      }
+    };
     window.addEventListener("click", handleClickOutside);
     window.addEventListener("scroll", handleClickOutside, true);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("click", handleClickOutside);
       window.removeEventListener("scroll", handleClickOutside, true);
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [contextMenu, showWeekSelectModal, selectedDay]);
 
   useEffect(() => {
     rawMaterialService.fetchAll().then((res) => {
@@ -548,21 +506,27 @@ const DailyProductionPlanningPage: React.FC = () => {
               </div>
 
               {/* Day pills */}
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setSelectedDay("ALL")}
-                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
-                    selectedDay === "ALL" ? "bg-primary text-white shadow-sm" : "bg-card-2 text-ink-muted hover:text-ink border border-line-soft"
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer select-none ${
+                    selectedDay === "ALL"
+                      ? "bg-primary text-white shadow-xs ring-1 ring-primary"
+                      : "bg-white dark:bg-card-2 text-slate-700 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink border border-slate-200 dark:border-line-soft hover:bg-slate-50 dark:hover:bg-card-2/80"
                   }`}
-                >All Days</button>
+                >
+                  All Days
+                </button>
                 {DAY_NAMES.map((day, i) => (
                   <button
                     key={day}
                     type="button"
                     onClick={() => setSelectedDay(day === selectedDay ? "ALL" : day)}
-                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                      selectedDay === day ? "bg-primary text-white shadow-sm" : "bg-card-2 text-ink-muted hover:text-ink border border-line-soft"
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap select-none ${
+                      selectedDay === day
+                        ? "bg-primary text-white shadow-xs ring-1 ring-primary"
+                        : "bg-white dark:bg-card-2 text-slate-700 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink border border-slate-200 dark:border-line-soft hover:bg-slate-50 dark:hover:bg-card-2/80"
                     }`}
                   >
                     {day.slice(0, 3)} {new Date(boardWeekDates[i] + "T00:00:00").getDate()}
@@ -572,13 +536,16 @@ const DailyProductionPlanningPage: React.FC = () => {
 
               <div className="flex items-center gap-2.5 ml-auto flex-wrap">
                 {[
-                  { label: "Draft", dot: "bg-amber-400" }, { label: "Planned", dot: "bg-sky-400" },
-                  { label: "In Progress", dot: "bg-indigo-400" },
-                  { label: "Completed", dot: "bg-emerald-400" }, { label: "Stopped", dot: "bg-rose-400" },
-                  { label: "RM Issued", dot: RM_ISSUED_DOT },
+                  { label: "Draft", dot: "bg-amber-500" },
+                  { label: "Planned", dot: "bg-sky-500" },
+                  { label: "In Progress", dot: "bg-indigo-500" },
+                  { label: "Completed", dot: "bg-emerald-500" },
+                  { label: "Stopped", dot: "bg-rose-500" },
+                  { label: "RM Issued", dot: "bg-violet-500" },
                 ].map(({ label, dot }) => (
-                  <span key={label} className="flex items-center gap-1 text-[9px] font-semibold text-ink-subtle">
-                    <span className={`w-2 h-2 rounded-full ${dot}`} />{label}
+                  <span key={label} className="flex items-center gap-1.5 text-[9.5px] font-semibold text-slate-600 dark:text-ink-subtle">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                    {label}
                   </span>
                 ))}
                 <div className="h-4 w-px bg-line-soft/80 mx-1" />
@@ -624,157 +591,15 @@ const DailyProductionPlanningPage: React.FC = () => {
             </div>
 
             {/* ══ BOARD VIEW ═══════════════════════════════════════ */}
-            <div className="flex-1 overflow-auto px-6 pb-6 pt-2">
-              <div className="overflow-x-auto rounded-xl border border-line-soft h-full">
-                <table
-                  className="border-collapse text-xs h-full"
-                  style={{ width: "100%", minWidth: filteredDays.length === 1 ? "420px" : `${Math.max(900, filteredDays.length * 240)}px` }}
-                >
-                  <thead className="sticky top-0 z-20">
-                    <tr className="bg-card-2 border-b border-line-soft">
-                      <th className="px-3 py-2.5 text-left text-[10px] font-bold text-ink-subtle uppercase tracking-wider w-36 border-r border-line-soft sticky left-0 bg-card-2 z-30">
-                        Machine
-                      </th>
-                      {filteredDays.map((day) => (
-                        <th key={day} colSpan={2} className="px-3 py-2.5 text-center text-[10px] font-bold text-ink-subtle uppercase tracking-wider border-r border-line-soft">
-                          <div className="text-ink font-extrabold text-[11px]">{day.slice(0, 3).toUpperCase()}</div>
-                          <div className="text-ink-subtle font-semibold">{shortDate(dayDates[day])}</div>
-                        </th>
-                      ))}
-                    </tr>
-                    <tr className="bg-card-2/80 border-b border-line-soft">
-                      <th className="sticky left-0 bg-card-2/80 z-30 border-r border-line-soft" />
-                      {filteredDays.flatMap((day) =>
-                        SHIFT_SLOTS.map((slot) => (
-                          <th key={`${day}-${slot}`} className={`px-2 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-ink-subtle/80 ${slot === "NIGHT" ? "border-r border-line-soft" : "border-r border-dashed border-line-soft/40"}`}>
-                            {slot === "DAY" ? "☀ Day" : "☾ Night"}
-                          </th>
-                        ))
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allowedMachines.length === 0 ? (
-                      <tr><td colSpan={1 + filteredDays.length * 2} className="py-16 text-center text-ink-subtle text-sm">
-                        <FaIndustry className="mx-auto mb-2 opacity-20" size={32} /> No machines found
-                      </td></tr>
-                    ) : allowedMachines.map((machine: any, mIdx: number) => {
-                      const machinePlans = boardMap[machine.machineId];
-                      const rowBg = mIdx % 2 === 0 ? "bg-card" : "bg-card-2/20";
-                      return (
-                        <tr key={machine.machineId} className={`${rowBg} border-b border-line-soft/40 hover:bg-primary/5 transition-colors group`}>
-                          <td className={`px-3 py-3 border-r border-line-soft sticky left-0 ${rowBg} z-10 group-hover:bg-primary/5`}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                                <FaIndustry className="text-primary" size={11} />
-                              </div>
-                              <div>
-                                <div className="font-bold text-ink text-[11px] leading-tight">{machine.machineName}</div>
-                                <div className="text-[9px] text-ink-subtle font-medium">{machine.machineId}</div>
-                              </div>
-                            </div>
-                          </td>
-                          {filteredDays.flatMap((day) =>
-                            SHIFT_SLOTS.map((slot) => {
-                              const cellPlans: any[] = machinePlans?.[day]?.[slot] ?? [];
-                              const isNight = slot === "NIGHT";
-                              return (
-                                <td
-                                  key={`${day}-${slot}`}
-                                  className={`px-1.5 py-1.5 align-top ${isNight ? "border-r border-line-soft" : "border-r border-dashed border-line-soft/40"}`}
-                                  style={{ verticalAlign: "top", minWidth: filteredDays.length === 1 ? "160px" : "110px" }}
-                                >
-                                  {cellPlans.length === 0 ? (
-                                    <div className="board-empty-cell h-14 rounded-lg border border-dashed border-line-soft/30 flex items-center justify-center">
-                                      <span className="text-[9px] text-ink-subtle/25 font-semibold">—</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col gap-1">
-                                      {cellPlans.map((plan: any) => {
-                                        const produced       = calcProduced(plan);
-                                        const planned        = Number(plan.plannedQty || 0);
-                                        const pct            = planned > 0 ? Math.min(100, Math.round((produced / planned) * 100)) : 0;
-                                        const loggedCount    = countLoggedEntries(plan);
-                                        const isCompleted    = plan.status === "COMPLETED";
-                                        const isStopped      = plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || plan.status === "CANCELLED";
-                                        const isPostProd     = plan.status === "POST_PRODUCTION";
-                                        const isDraft        = !isCompleted && !isStopped && !isPostProd && (plan.status === "DRAFT" || hasDraftHourly(plan));
-                                        const isInProgress   = !isCompleted && !isStopped && !isPostProd && !isDraft && (plan.status === "IN_PROGRESS" || pct > 0);
-
-                                        const colorCard = isCompleted
-                                          ? "bg-emerald-500/15 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.10)]"
-                                          : isStopped
-                                          ? "bg-rose-500/15 border border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.10)]"
-                                          : isPostProd
-                                          ? "bg-purple-500/15 border border-purple-500/30 shadow-[0_0_12px_rgba(168,85,247,0.10)]"
-                                          : isDraft
-                                          ? "bg-amber-500/10 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.05)]"
-                                          : isInProgress
-                                          ? "bg-indigo-500/10 border border-indigo-500/25"
-                                          : "bg-card border border-line-soft";
-
-                                        const dot = isCompleted
-                                          ? "bg-emerald-400 ring-2 ring-emerald-400/40"
-                                          : isStopped
-                                          ? "bg-rose-400 ring-2 ring-rose-400/40"
-                                          : isPostProd
-                                          ? "bg-purple-400 ring-2 ring-purple-400/40"
-                                          : isDraft
-                                          ? "bg-amber-400"
-                                          : isInProgress
-                                          ? "bg-indigo-400 ring-2 ring-indigo-400/30"
-                                          : (rmIssuedDates.has(dayDates[day]) ? RM_ISSUED_DOT : (STATUS_BOARD_DOT[plan.status] ?? "bg-zinc-400"));
-
-                                        return (
-                                          <div
-                                            key={plan.dailyPlanId}
-                                            onClick={() => handleCardClick(plan)}
-                                            onContextMenu={(e) => handleContextMenu(e, plan)}
-                                            className={`plan-card rounded-lg px-2 py-2 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all ${colorCard}`}
-                                          >
-                                            <div className="flex items-center justify-between mb-1 gap-1">
-                                              <span className={`text-[8.5px] font-mono font-bold truncate flex-1 ${isCompleted ? "text-emerald-300/90" : isStopped ? "text-rose-300/90" : isPostProd ? "text-purple-300/90" : isDraft ? "text-amber-300/80" : "text-ink-subtle"}`}>{plan.productionOrderId}</span>
-                                              <div className="flex items-center gap-1 shrink-0">
-                                                {isDraft && (
-                                                  <span
-                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
-                                                    title={`Draft Saved (${loggedCount} hours recorded)`}
-                                                  >
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                                    Draft{loggedCount > 0 ? ` (${loggedCount}h)` : ""}
-                                                  </span>
-                                                )}
-
-                                                <span
-                                                  className={`w-1.5 h-1.5 rounded-full ${dot}`}
-                                                  title={isCompleted ? "Production Completed (100%)" : isStopped ? "Production Stopped" : isPostProd ? "Post Production" : isDraft ? "Draft Saved" : rmIssuedDates.has(dayDates[day]) ? "RM Issued" : `Status: ${plan.status}`}
-                                                />
-                                              </div>
-                                            </div>
-                                            <div className={`text-[10px] font-bold leading-tight line-clamp-1 mb-1.5 ${isCompleted ? "text-emerald-200" : isStopped ? "text-rose-200" : isPostProd ? "text-purple-200" : "text-ink"}`}>{plan.productionOrder?.productItem?.productName || "—"}</div>
-                                            <div className="flex items-center justify-between gap-1 mb-1">
-                                              <span className={`text-[9px] font-semibold ${isCompleted ? "text-emerald-300/80" : isStopped ? "text-rose-300/80" : isPostProd ? "text-purple-300/80" : "text-ink-subtle"}`}>{planned} pcs</span>
-                                              <span className={`text-[9px] font-extrabold ${isCompleted ? "text-emerald-400" : isStopped ? "text-rose-400" : isPostProd ? "text-purple-300" : isDraft ? "text-amber-300" : pct >= 50 ? "text-indigo-300" : "text-ink"}`}>{pct}%</span>
-                                            </div>
-                                            <div className="w-full h-1 bg-black/10 rounded-full overflow-hidden">
-                                              <div className={`h-full rounded-full ${isCompleted ? "bg-emerald-500" : isStopped ? "bg-rose-500" : isPostProd ? "bg-purple-500" : isDraft ? "bg-amber-400" : pct >= 50 ? "bg-indigo-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            })
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <DailyProductionBoard
+              allowedMachines={allowedMachines}
+              filteredDays={filteredDays}
+              dayDates={dayDates}
+              boardMap={boardMap}
+              rmIssuedDates={rmIssuedDates}
+              onCardClick={handleCardClick}
+              onContextMenu={handleContextMenu}
+            />
 
         {/* ══ CONTEXT MENU (Right Click on Card) ══════════════ */}
         {contextMenu && (

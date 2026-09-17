@@ -52,54 +52,46 @@ const VOLUME_UNITS = new Set(['ml', 'l', 'fl-oz', 'cup', 'pnt', 'qt', 'gal', 'ft
 const LENGTH_UNITS = new Set(['mm', 'cm', 'm', 'km', 'in', 'ft-us', 'ft', 'fathom', 'mi', 'nMi']);
 
 /**
- * Formats a stock quantity for display, converting from the primary (first-listed)
- * UOM code in a comma-separated baseUom string to a human-readable display unit.
+ * Formats a stock quantity for display using the primary (first-listed) UOM code
+ * in a comma-separated baseUom string (e.g. "g, kg, mt" -> displays in "g").
  *
- * Mass   → kg  (e.g. 1 mt → "1000 kg",  500 g → "0.5 kg")
- * Volume → L   (e.g. 500 ml → "0.5 L")
- * Length → m   (e.g. 100 cm → "1 m")
- * Each   → pcs (e.g. 2 dz → "24 pcs")
- *
- * Uses convert-units library for all conversions — no hardcoded factors.
+ * It uses the raw stored quantity (which is already stored in primary UOM)
+ * and formats it cleanly with the primary unit.
  */
 export const formatStockQty = (qty: number | string | null | undefined, uomStr?: string): string => {
     const num = Number(qty ?? 0);
-    if (isNaN(num)) return `0 kg`;
-    if (!uomStr) return `${num} kg`;
+    if (isNaN(num)) return `0`;
+    if (!uomStr) return `${num}`;
 
     const primaryCode = uomStr.split(',')[0].trim();
-    const code = primaryCode.toLowerCase();
+    if (!primaryCode) return `${num}`;
 
-    // Mass → kg
-    if (MASS_UNITS.has(code)) {
-        if (code === 'kg') return `${Number(num.toFixed(3))} kg`;
-        const inKg = convertUomQty(num, primaryCode, 'kg');
-        return `${Number(inKg.toFixed(3))} kg`;
+    let displayUnit = primaryCode;
+    const lower = primaryCode.toLowerCase();
+    if (lower === 'ea' || lower === 'each') {
+        displayUnit = 'pcs';
     }
 
-    // Volume → L
-    if (VOLUME_UNITS.has(code)) {
-        if (code === 'l') return `${Number(num.toFixed(3))} L`;
-        const inL = convertUomQty(num, primaryCode, 'l');
-        return `${Number(inL.toFixed(3))} L`;
-    }
+    const formattedNum = Number(num.toFixed(3));
+    return `${formattedNum} ${displayUnit}`;
+};
 
-    // Length → m
-    if (LENGTH_UNITS.has(code)) {
-        if (code === 'm') return `${Number(num.toFixed(3))} m`;
-        const inM = convertUomQty(num, primaryCode, 'm');
-        return `${Number(inM.toFixed(3))} m`;
-    }
+/**
+ * Returns the relevant list of UOM options for a given UOM string or base UOM code.
+ * E.g. "kg" → ["kg", "g", "mt", "t"], "g,kg" → ["g", "kg"], "pcs" → ["pcs"]
+ */
+export const getUomOptions = (uomStr?: string): string[] => {
+    if (!uomStr) return ["pcs"];
+    const listFromStr = uomStr.split(",").map((u) => u.trim()).filter(Boolean);
+    if (listFromStr.length > 1) return Array.from(new Set(listFromStr));
 
-    // Each / count
-    if (code === 'ea' || code === 'each' || code === 'pcs') {
-        return `${num} pcs`;
-    }
-    if (code === 'dz') {
-        const inPcs = convertUomQty(num, 'dz', 'ea');
-        return `${inPcs} pcs`;
-    }
+    const primary = listFromStr[0].toLowerCase();
+    if (primary === "kg") return ["kg", "g", "mt", "t"];
+    if (primary === "g") return ["g", "kg"];
+    if (primary === "l" || primary === "ltr") return ["ltr", "ml"];
+    if (primary === "ml") return ["ml", "ltr"];
+    if (primary === "m") return ["m", "cm", "mm"];
+    if (primary === "dz") return ["dz", "pcs"];
 
-    // Unknown unit — show raw value with unit code
-    return `${num} ${primaryCode}`;
+    return [listFromStr[0] || "pcs"];
 };

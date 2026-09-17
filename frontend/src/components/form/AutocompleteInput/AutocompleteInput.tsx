@@ -29,6 +29,7 @@ interface AutocompleteInputProps {
   /** Inline mode: open the options dropdown as soon as the field receives focus,
    *  so a single keystroke (or landing on the cell) reveals the list. */
   openOnFocus?: boolean;
+  allowClear?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -47,6 +48,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   dataNavDefault = false,
   autoFocus = false,
   openOnFocus = false,
+  allowClear,
   onChange,
 }) => {
   const [search, setSearch] = useState("");
@@ -59,11 +61,14 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((o) => o.value === value);
+  const canClear = allowClear ?? options.some((o) => o.value === "");
+  const selectedOption = value ? options.find((o) => o.value === value) : undefined;
   const displayText =
-    selectedOption?.selectedLabel ||
-    (typeof selectedOption?.label === "string" ? selectedOption.label : "") ||
-    "";
+    value && selectedOption
+      ? selectedOption.selectedLabel ||
+        (typeof selectedOption.label === "string" ? selectedOption.label : "") ||
+        ""
+      : "";
 
   // When not focused, show selected text; when focused, show search
   const [isFocused, setIsFocused] = useState(false);
@@ -324,7 +329,22 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               }}
             >
               <span className="truncate">{typeof selectedOption.label === "string" ? selectedOption.label : selectedOption.selectedLabel}</span>
-              {selectedOption.info && <div className="shrink-0">{selectedOption.info}</div>}
+              <div className="shrink-0 flex items-center gap-1">
+                {selectedOption.info}
+                {canClear && !disabled && (
+                  <span
+                    role="button"
+                    title="Clear selection"
+                    className="text-ink-subtle/70 hover:text-rose-400 p-0.5 rounded transition-colors text-xs font-bold leading-none cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange("");
+                    }}
+                  >
+                    ✕
+                  </span>
+                )}
+              </div>
             </div>
           ) : (
           <input
@@ -408,7 +428,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             ) : (
               filtered.map((opt, idx) => (
                 <div
-                  key={opt.value}
+                  key={opt.value || `empty-opt-${idx}`}
                   className={`
                     px-3 py-2 text-xs sm:text-[13px] cursor-pointer flex items-center justify-between gap-2
                     transition-colors duration-150
@@ -418,7 +438,9 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
                         ? "bg-primary/20 text-primary font-semibold"
                         : value === opt.value
                           ? "bg-primary/10 text-primary font-semibold"
-                          : "text-ink hover:bg-card-2"
+                          : opt.value === ""
+                            ? "text-ink-subtle hover:bg-card-2 hover:text-ink"
+                            : "text-ink hover:bg-card-2"
                     }
                   `}
                   onMouseEnter={() => {
@@ -433,7 +455,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
                     }
                   }}
                 >
-                  <span className="truncate">{opt.label}</span>
+                  <span className={`truncate ${opt.value === "" ? "italic text-ink-subtle" : ""}`}>{opt.label}</span>
                   {opt.info && <div className="shrink-0">{opt.info}</div>}
                 </div>
               ))

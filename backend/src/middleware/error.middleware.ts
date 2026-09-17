@@ -51,11 +51,10 @@ export const errorMiddleware = (
   }
 
   if (err instanceof Prisma.PrismaClientValidationError) {
-    // Extract the human-readable part: everything up to the first newline after "Invalid"
-    const raw = err.message;
-    const match = raw.match(/Invalid[^\n]+/);
-    const detail = match ? match[0].trim() : 'One or more fields have an invalid value.';
-    console.warn(`[Prisma Validation] ${detail}`);
+    const raw = err.message || '';
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    const detail = lines.length > 1 ? lines.slice(1).join(' ') : (lines[0] || 'One or more fields have an invalid value.');
+    console.warn(`[Prisma Validation]`, raw);
     res.status(400).json({
       success: false,
       message: `Validation error: ${detail}`,

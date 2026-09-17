@@ -48,6 +48,9 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
   updatedAt: item.updatedAt,
   createdBy: item.createdBy,
   updatedBy: item.updatedBy,
+  createdUserName: item.createdUserName,
+  createdUserRole: item.createdUserRole,
+  editHistory: item.editHistory,
 });
 
 export const rawMaterialService = {

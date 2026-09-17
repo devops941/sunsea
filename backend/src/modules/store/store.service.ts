@@ -36,6 +36,14 @@ class StoreService {
         status: data.status || "Active",
         isActive: data.isActive ?? true,
         createdBy: userId,
+        editHistory: userId
+          ? [
+              {
+                updatedBy: userId,
+                updatedAt: new Date().toISOString(),
+              },
+            ]
+          : undefined,
       },
     });
   }
@@ -169,7 +177,73 @@ class StoreService {
       throw new ApiError(404, `Store with ID ${storeId} not found`);
     }
 
-    return store;
+    // Resolve createdBy user
+    let createdUserName = "Unknown User";
+    let createdUserRole = "User";
+    if (store.createdBy) {
+      if (store.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(store.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: store.createdBy },
+          select: { username: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.username;
+          createdUserRole = user.role?.name || "User";
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    if (Array.isArray((store as any).editHistory)) {
+      enrichedEditHistory = await Promise.all(
+        ((store as any).editHistory as any[]).map(async (edit: any) => {
+          let name = "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true },
+              });
+              if (admin) name = admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true },
+              });
+              if (user) name = user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    if (enrichedEditHistory.length === 0 && store.createdAt) {
+      enrichedEditHistory.push({
+        updatedBy: store.createdBy,
+        updatedByName: createdUserName,
+        updatedAt: store.createdAt,
+      });
+    }
+
+    return {
+      ...store,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
   async update(storeId: string, data: UpdateStoreInput, userId?: string) {
@@ -212,7 +286,27 @@ class StoreService {
       }
     }
 
-    return prisma.store.update({
+    let newEditHistory: any[] = [];
+    if (Array.isArray((existingStore as any).editHistory)) {
+      newEditHistory = [...(existingStore as any).editHistory].map((e: any) => {
+        const { updatedByName, ...raw } = e;
+        return raw;
+      });
+    } else if (existingStore.createdAt) {
+      newEditHistory.push({
+        updatedBy: existingStore.createdBy,
+        updatedAt: existingStore.createdAt instanceof Date ? existingStore.createdAt.toISOString() : existingStore.createdAt,
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    await prisma.store.update({
       where: { storeId },
       data: {
         ...data,
@@ -227,6 +321,16 @@ class StoreService {
         updatedBy: userId,
       },
     });
+
+    if (newEditHistory.length > 0) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "stores" SET "edit_history" = $1::jsonb WHERE "store_id" = $2`,
+        JSON.stringify(newEditHistory),
+        storeId
+      );
+    }
+
+    return this.findById(storeId);
   }
 
   async delete(storeId: string) {
