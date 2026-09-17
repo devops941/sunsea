@@ -235,9 +235,9 @@ const SalesInvoiceForm: React.FC = () => {
   const [sundryRows, setSundryRows] = useState<SundryRow[]>([]);
   const [invoiceStatus, setInvoiceStatus] = useState<string>("DRAFT");
   const [customerTransports, setCustomerTransports] = useState<any[]>([]);
-  
+
   const [selectedTransport, setSelectedTransport] = useState<any>(null);
-  
+
   const [numberOfBundle, setNumberOfBundle] = useState<string>("");
   const [dcNo, setDcNo] = useState<string>("");
 
@@ -406,7 +406,7 @@ const SalesInvoiceForm: React.FC = () => {
               }
               return prev;
             });
-          }).catch(() => {});
+          }).catch(() => { });
         }
         if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate.split("T")[0]);
         if (invoice.dueDate) setDueDate(invoice.dueDate.split("T")[0]);
@@ -415,20 +415,39 @@ const SalesInvoiceForm: React.FC = () => {
         setOriginalInvoiceAmount(Number(invoice.grandTotal || 0));
 
         if (invoice.items?.length > 0) {
-          setLines(invoice.items.map((item: any) => ({
-            id: crypto.randomUUID(),
-            itemId: String(item.productId || ""),
-            itemName: item.product?.productName || "Unknown Item",
-            qty: Number(item.quantity) || 0,
-            rate: Number(item.unitPrice) || 0,
-            weight: Number(item.weight) || 0,
-            discountAmount: Number(item.discountAmount) || 0,
-            taxPercent: Number(item.taxRate) || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0) + Number(item.igstRate || 0)),
-            amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
-            taxAmount: Number(item.taxAmount) || 0,
-            total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
-            fromOrder: true,
-          })));
+          const newExcluded: Record<string, Set<string>> = {};
+          let parsedNarration: any = {};
+          try {
+            if (invoice.narration) parsedNarration = JSON.parse(invoice.narration);
+          } catch (e) { }
+
+          const loadedLines = invoice.items.map((item: any) => {
+            const lineId = crypto.randomUUID();
+            const itemId = String(item.productId || "");
+
+            if (parsedNarration.__excludedComponents__ && parsedNarration.__excludedComponents__[itemId]) {
+              newExcluded[lineId] = new Set(parsedNarration.__excludedComponents__[itemId]);
+            } else if (Array.isArray(item.excludedComponents)) {
+              newExcluded[lineId] = new Set(item.excludedComponents);
+            }
+
+            return {
+              id: lineId,
+              itemId,
+              itemName: item.product?.productName || "Unknown Item",
+              qty: Number(item.quantity) || 0,
+              rate: Number(item.unitPrice) || 0,
+              weight: Number(item.weight) || 0,
+              discountAmount: Number(item.discountAmount) || 0,
+              taxPercent: Number(item.taxRate) || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0) + Number(item.igstRate || 0)),
+              amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
+              taxAmount: Number(item.taxAmount) || 0,
+              total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
+              fromOrder: true,
+            };
+          });
+          setLines(loadedLines);
+          setExcludedComponents(newExcluded);
         }
         setChargeRows(parseChargeRowsFromNarration((invoice as any).narration));
 
@@ -517,7 +536,7 @@ const SalesInvoiceForm: React.FC = () => {
               if (mapped.length > 0) setLines(mapped);
               setChargeRows(parseChargeRowsFromNarration((fullOrder as any).narration));
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       })
       .catch(() => toast.error("Failed to load customers/items"))
@@ -543,7 +562,7 @@ const SalesInvoiceForm: React.FC = () => {
           return Array.from(map.values());
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -592,7 +611,7 @@ const SalesInvoiceForm: React.FC = () => {
       const totalPrice = items.reduce((sum: number, oi: any) => {
         const rate = Number(oi.quotationUnitPrice) > 0 ? Number(oi.quotationUnitPrice)
           : Number(oi.unitPrice) > 0 ? Number(oi.unitPrice)
-          : Number(oi.rate) || 0;
+            : Number(oi.rate) || 0;
         return sum + rate * Number(oi.quantity || 0);
       }, 0);
       const unitPrice = orderQty > 0 ? Math.round((totalPrice / orderQty) * 100) / 100 : 0;
@@ -880,15 +899,26 @@ const SalesInvoiceForm: React.FC = () => {
 
   // ---- Credit Limit Check ----
   const limitExceeded = useMemo(() => {
-    const selectedCustomer = customersRaw.find((c) => String(c.id) === customerId);
-    if (!selectedCustomer) return false;
-    const creditLimit = Number(selectedCustomer.creditLimit || 0);
-    // Use netBalance (actual balance from receivables) instead of raw outstandingAmount
-    const currentOutstanding = Math.max(0, Number(selectedCustomer.netBalance ?? selectedCustomer.outstandingAmount ?? 0));
-    const remainingAmount = creditLimit - currentOutstanding;
-    const exceededBy = totals.grandTotal - remainingAmount;
-    return exceededBy > 0 ? { exceededBy, remainingAmount } : false;
-  }, [customersRaw, customerId, totals.grandTotal]);
+    const cust = customersRaw.find((c) => String(c.id) === customerId);
+    if (!cust) return false;
+    const creditLimit = Number(cust.creditLimit || 0);
+    
+    const rawOpenBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
+    const rawBType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
+    
+    // Convert to signed balance: Dr is positive, Cr is negative
+    let currentSignedBal = (rawBType.startsWith("C") ? -1 : 1) * rawOpenBal;
+    
+    if (isEditMode) {
+      // Reverse current invoice amount from customer's current balance
+      currentSignedBal -= originalInvoiceAmount;
+    }
+    
+    const newClosingBal = currentSignedBal + totals.grandTotal;
+    const exceededBy = newClosingBal - creditLimit;
+    
+    return exceededBy > 0 ? { exceededBy, remainingAmount: creditLimit - currentSignedBal } : false;
+  }, [customersRaw, customerId, totals.grandTotal, isEditMode, originalInvoiceAmount]);
 
   // ---- Validation ----
   const validate = (): boolean => {
@@ -1067,20 +1097,39 @@ const SalesInvoiceForm: React.FC = () => {
             setNotes(invoice.notes || "");
             setPreviewInvoiceNo(invoice.invoiceNo || "");
             if (invoice.items?.length > 0) {
-              setLines(invoice.items.map((item: any) => ({
-                id: crypto.randomUUID(),
-                itemId: String(item.productId || ""),
-                itemName: item.product?.productName || "Unknown Item",
-                qty: Number(item.quantity) || 0,
-                rate: Number(item.unitPrice) || 0,
-                weight: Number(item.weight) || 0,
-                discountAmount: Number(item.discountAmount) || 0,
-                taxPercent: Number(item.taxRate) || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0) + Number(item.igstRate || 0)),
-                amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
-                taxAmount: Number(item.taxAmount) || 0,
-                total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
-                fromOrder: true,
-              })));
+              const newExcluded: Record<string, Set<string>> = {};
+              let parsedNarration: any = {};
+              try {
+                if (invoice.narration) parsedNarration = JSON.parse(invoice.narration);
+              } catch (e) { }
+
+              const refreshedLines = invoice.items.map((item: any) => {
+                const lineId = crypto.randomUUID();
+                const itemId = String(item.productId || "");
+
+                if (parsedNarration.__excludedComponents__ && parsedNarration.__excludedComponents__[itemId]) {
+                  newExcluded[lineId] = new Set(parsedNarration.__excludedComponents__[itemId]);
+                } else if (Array.isArray(item.excludedComponents)) {
+                  newExcluded[lineId] = new Set(item.excludedComponents);
+                }
+
+                return {
+                  id: lineId,
+                  itemId,
+                  itemName: item.product?.productName || "Unknown Item",
+                  qty: Number(item.quantity) || 0,
+                  rate: Number(item.unitPrice) || 0,
+                  weight: Number(item.weight) || 0,
+                  discountAmount: Number(item.discountAmount) || 0,
+                  taxPercent: Number(item.taxRate) || (Number(item.cgstRate || 0) + Number(item.sgstRate || 0) + Number(item.igstRate || 0)),
+                  amount: Number(item.lineTotal) || (Number(item.quantity) * Number(item.unitPrice)),
+                  taxAmount: Number(item.taxAmount) || 0,
+                  total: (Number(item.lineTotal) || 0) + (Number(item.taxAmount) || 0),
+                  fromOrder: true,
+                };
+              });
+              setLines(refreshedLines);
+              setExcludedComponents(newExcluded);
             }
           }
           toast.info("Invoice details refreshed");
@@ -1284,11 +1333,7 @@ const SalesInvoiceForm: React.FC = () => {
             className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 h-full"
             placeholder="0"
           />
-          {row.itemId && row.qty > (stockMap.get(row.itemId) || 0) && (
-            <div className="absolute -bottom-1 text-red-500 text-[9px] font-medium whitespace-nowrap pointer-events-none">
-              Avail: {Math.round((stockMap.get(row.itemId) || 0) * 100) / 100}
-            </div>
-          )}
+
         </div>
       ),
     },
@@ -1352,7 +1397,7 @@ const SalesInvoiceForm: React.FC = () => {
 
   // ── Expanded components renderer for BusyItemsTable ──
   const renderExpandedComponents = useCallback((row: InvoiceLineItem, _index: number) => {
-    const sp = selectedSalesOrderId ? salesProducts.find((s: any) => String(s.id) === row.itemId) : null;
+    const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
     const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
     if (spComps.length === 0) return null;
 
@@ -1432,31 +1477,31 @@ const SalesInvoiceForm: React.FC = () => {
             .map((o) => ({
               value: o.value,
               label: o.label,
-          }));
+            }));
 
           return (
             <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
-            <AutocompleteInput
-              inline
-              openOnFocus
-              name={`sundry.${index}.type`}
-              value={row.type || ""}
-              options={opts}
-              placeholder="Select bill sundry..."
-              onChange={(val) => {
-                update({ type: val });
-                setTimeout(() => {
-                  const hasRate = val.startsWith("BILL_TAX") || val.startsWith("DISCOUNT");
-                  const targetCol = hasRate ? 1 : 2;
-                  const cell = sundryTableRef.current?.querySelector(`[data-r="${index}"][data-c="${targetCol}"]`) as HTMLElement | null;
-                  const input = cell?.querySelector("input") as HTMLInputElement | null;
-                  if (input) {
-                    input.focus();
-                    input.select?.();
-                  }
-                }, 50);
-              }}
-            />
+              <AutocompleteInput
+                inline
+                openOnFocus
+                name={`sundry.${index}.type`}
+                value={row.type || ""}
+                options={opts}
+                placeholder="Select bill sundry..."
+                onChange={(val) => {
+                  update({ type: val });
+                  setTimeout(() => {
+                    const hasRate = val.startsWith("BILL_TAX") || val.startsWith("DISCOUNT");
+                    const targetCol = hasRate ? 1 : 2;
+                    const cell = sundryTableRef.current?.querySelector(`[data-r="${index}"][data-c="${targetCol}"]`) as HTMLElement | null;
+                    const input = cell?.querySelector("input") as HTMLInputElement | null;
+                    if (input) {
+                      input.focus();
+                      input.select?.();
+                    }
+                  }, 50);
+                }}
+              />
             </div>
           );
         },
@@ -1556,342 +1601,342 @@ const SalesInvoiceForm: React.FC = () => {
           noValidate
         >
           <div className="flex flex-col gap-2">
-          {/* ── Full-width Form ── */}
-          <div className="w-full space-y-2">
+            {/* ── Full-width Form ── */}
+            <div className="w-full space-y-2">
 
-          {/* Credit limit warning */}
-          {limitExceeded !== false && (
-            <div className="bg-red-500/10 border-l-4 border-red-500 p-2 rounded-md flex items-start gap-2">
-              <FaExclamationTriangle className="text-red-500 mt-0.5 flex-shrink-0 text-xs" />
-              <p className="text-red-500 text-xs">
-                Credit exceeded by <span className="font-bold">₹{(limitExceeded as any).exceededBy.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </p>
-            </div>
-          )}
+              {/* Credit limit warning */}
+              {limitExceeded !== false && (
+                <div className="bg-red-500/10 border-l-4 border-red-500 p-2 rounded-md flex items-start gap-2">
+                  <FaExclamationTriangle className="text-red-500 mt-0.5 flex-shrink-0 text-xs" />
+                  <p className="text-red-500 text-xs">
+                    Credit exceeded by <span className="font-bold">₹{(limitExceeded as any).exceededBy.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  </p>
+                </div>
+              )}
 
-          {/* ── Row 1: Customer & Sales Order ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-            <AutocompleteInput
-              horizontal
-              label="Customer"
-              name="customerId"
-              required
-              value={customerId}
-              disabled={isLocked}
-              error={errors.customerId}
-              options={customerAutocompleteOptions}
-              placeholder="Type to search customer..."
-              onChange={(val) => {
-                setCustomerId(val);
-                if (val) loadCustomerOrders(val);
-                if (selectedSalesOrderId) {
-                  const selOrder = salesOrders.find((o) => String(o.id) === String(selectedSalesOrderId));
-                  if (selOrder) {
-                    const orderCustId = String(selOrder.customerId || selOrder.customer?.id || "");
-                    if (orderCustId !== val) { setSelectedSalesOrderId(""); setLines([emptyLine()]); }
-                  }
-                }
-              }}
-            />
-            <AutocompleteInput
-              horizontal
-              label="Sales Order"
-              name="selectedSalesOrderId"
-              value={selectedSalesOrderId}
-              disabled={isEditMode || !customerId}
-              options={salesOrderAutocompleteOptions}
-              placeholder={customerId ? "Type to search order..." : "Select customer first"}
-              onChange={(val) => handleSalesOrderChange(val)}
-            />
-          </div>
-
-          {/* ── Row 2: Invoice Date, Due Date, Transport, No. of Bundle, DC No ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
-            <DatePickerCalendar
-              label="Invoice Date"
-              name="invoiceDate"
-              value={invoiceDate}
-              disabled={isLocked}
-              onChange={(e) => setInvoiceDate(e.target.value)}
-              required
-              error={errors.invoiceDate}
-              horizontal
-            />
-            <DatePickerCalendar
-              label="Due Date"
-              name="dueDate"
-              value={dueDate}
-              disabled={isLocked}
-              onChange={(e) => setDueDate(e.target.value)}
-              horizontal
-            />
-            <AutocompleteInput
-              horizontal
-              label="Transport"
-              name="transport"
-              value={selectedTransport ? String(customerTransports.findIndex((t: any) => t.name === selectedTransport.name)) : ""}
-              options={customerTransports.map((t: any, idx: number) => ({
-                value: String(idx),
-                label: t.name || `Transport ${idx + 1}`,
-                info: t.phone ? <span className="text-[11px] text-ink-subtle">{t.phone}</span> : undefined,
-              }))}
-              placeholder={customerTransports.length > 0 ? "Select transport..." : "No transports"}
-              disabled={isLocked || customerTransports.length === 0}
-              onChange={(val) => {
-                const idx = Number(val);
-                setSelectedTransport(customerTransports[idx] || null);
-              }}
-            />
-            <TextInput
-              horizontal
-              label="No. of Bundle"
-              name="numberOfBundle"
-              type="number"
-              value={numberOfBundle}
-              placeholder="Enter"
-              disabled={isLocked}
-              onChange={(e) => setNumberOfBundle(e.target.value)}
-            />
-            <TextInput
-              horizontal
-              label="DC No"
-              name="dcNo"
-              value={dcNo}
-              placeholder="Enter DC No"
-              disabled={isLocked}
-              onChange={(e) => setDcNo(e.target.value)}
-            />
-          </div>
-
-          {/* ── Addresses ── */}
-          {(billingAddress.line1 || billingAddress.city) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-2 border border-line-soft rounded-lg bg-card">
-                <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
-                <p className="text-xs text-ink-subtle mt-1">
-                  {[billingAddress.line1, billingAddress.city, billingAddress.state, billingAddress.pincode].filter(Boolean).join(", ")}
-                </p>
+              {/* ── Row 1: Customer & Sales Order ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                <AutocompleteInput
+                  horizontal
+                  label="Customer"
+                  name="customerId"
+                  required
+                  value={customerId}
+                  disabled={isLocked}
+                  error={errors.customerId}
+                  options={customerAutocompleteOptions}
+                  placeholder="Type to search customer..."
+                  onChange={(val) => {
+                    setCustomerId(val);
+                    if (val) loadCustomerOrders(val);
+                    if (selectedSalesOrderId) {
+                      const selOrder = salesOrders.find((o) => String(o.id) === String(selectedSalesOrderId));
+                      if (selOrder) {
+                        const orderCustId = String(selOrder.customerId || selOrder.customer?.id || "");
+                        if (orderCustId !== val) { setSelectedSalesOrderId(""); setLines([emptyLine()]); }
+                      }
+                    }
+                  }}
+                />
+                <AutocompleteInput
+                  horizontal
+                  label="Sales Order"
+                  name="selectedSalesOrderId"
+                  value={selectedSalesOrderId}
+                  disabled={isEditMode || !customerId}
+                  options={salesOrderAutocompleteOptions}
+                  placeholder={customerId ? "Type to search order..." : "Select customer first"}
+                  onChange={(val) => handleSalesOrderChange(val)}
+                />
               </div>
-              <div className="p-2 border border-line-soft rounded-lg bg-card">
-                <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
-                {customerAddresses.length > 0 ? (
-                  <div className="space-y-1 mt-1">
-                    {customerAddresses.map((a: any, idx: number) => {
-                      const addr = a.address || a;
-                      const addrLabel = [addr.addressLine1, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
-                      return (
-                        <label key={idx} className={`flex items-start gap-1.5 cursor-pointer text-xs p-1.5 rounded ${selectedShippingIdx === idx ? "bg-primary/10 text-primary" : "text-ink-subtle hover:bg-card-2"}`}>
-                          <input type="radio" name="shippingAddr" checked={selectedShippingIdx === idx} onChange={() => setSelectedShippingIdx(idx)} className="mt-0.5 w-3 h-3 accent-blue-600" />
-                          <span>{a.label || `Address ${idx + 1}`}: {addrLabel}</span>
-                        </label>
-                      );
-                    })}
+
+              {/* ── Row 2: Invoice Date, Due Date, Transport, No. of Bundle, DC No ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
+                <DatePickerCalendar
+                  label="Invoice Date"
+                  name="invoiceDate"
+                  value={invoiceDate}
+                  disabled={isLocked}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  required
+                  error={errors.invoiceDate}
+                  horizontal
+                />
+                <DatePickerCalendar
+                  label="Due Date"
+                  name="dueDate"
+                  value={dueDate}
+                  disabled={isLocked}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  horizontal
+                />
+                <AutocompleteInput
+                  horizontal
+                  label="Transport"
+                  name="transport"
+                  value={selectedTransport ? String(customerTransports.findIndex((t: any) => t.name === selectedTransport.name)) : ""}
+                  options={customerTransports.map((t: any, idx: number) => ({
+                    value: String(idx),
+                    label: t.name || `Transport ${idx + 1}`,
+                    info: t.phone ? <span className="text-[11px] text-ink-subtle">{t.phone}</span> : undefined,
+                  }))}
+                  placeholder={customerTransports.length > 0 ? "Select transport..." : "No transports"}
+                  disabled={isLocked || customerTransports.length === 0}
+                  onChange={(val) => {
+                    const idx = Number(val);
+                    setSelectedTransport(customerTransports[idx] || null);
+                  }}
+                />
+                <TextInput
+                  horizontal
+                  label="No. of Bundle"
+                  name="numberOfBundle"
+                  type="number"
+                  value={numberOfBundle}
+                  placeholder="Enter"
+                  disabled={isLocked}
+                  onChange={(e) => setNumberOfBundle(e.target.value)}
+                />
+                <TextInput
+                  horizontal
+                  label="DC No"
+                  name="dcNo"
+                  value={dcNo}
+                  placeholder="Enter DC No"
+                  disabled={isLocked}
+                  onChange={(e) => setDcNo(e.target.value)}
+                />
+              </div>
+
+              {/* ── Addresses ── */}
+              {(billingAddress.line1 || billingAddress.city) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-2 border border-line-soft rounded-lg bg-card">
+                    <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
+                    <p className="text-xs text-ink-subtle mt-1">
+                      {[billingAddress.line1, billingAddress.city, billingAddress.state, billingAddress.pincode].filter(Boolean).join(", ")}
+                    </p>
                   </div>
-                ) : (
-                  <p className="text-xs text-ink-subtle mt-1">Same as billing</p>
-                )}
-              </div>
-            </div>
-          )}
+                  <div className="p-2 border border-line-soft rounded-lg bg-card">
+                    <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
+                    {customerAddresses.length > 0 ? (
+                      <div className="space-y-1 mt-1">
+                        {customerAddresses.map((a: any, idx: number) => {
+                          const addr = a.address || a;
+                          const addrLabel = [addr.addressLine1, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
+                          return (
+                            <label key={idx} className={`flex items-start gap-1.5 cursor-pointer text-xs p-1.5 rounded ${selectedShippingIdx === idx ? "bg-primary/10 text-primary" : "text-ink-subtle hover:bg-card-2"}`}>
+                              <input type="radio" name="shippingAddr" checked={selectedShippingIdx === idx} onChange={() => setSelectedShippingIdx(idx)} className="mt-0.5 w-3 h-3 accent-blue-600" />
+                              <span>{a.label || `Address ${idx + 1}`}: {addrLabel}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-ink-subtle mt-1">Same as billing</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
-          {/* ── Line Items ── */}
-          {errors.lines && (
-            <div className="text-red-500 text-xs mb-2 bg-red-500/10 p-2 rounded-md border border-red-500/20">{errors.lines}</div>
-          )}
+              {/* ── Line Items ── */}
+              {errors.lines && (
+                <div className="text-red-500 text-xs mb-2 bg-red-500/10 p-2 rounded-md border border-red-500/20">{errors.lines}</div>
+              )}
 
-          {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
-          <div className="flex gap-3">
-            <div ref={itemsTableRef} className="w-[65%]">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-ink">Invoice Items</span>
-              </div>
-              <BusyItemsTable
-                columns={invoiceColumns}
-                rows={lines}
-                onAdd={() => setLines((prev) => [...prev, emptyLine()])}
-                onRemove={(i) => setLines((prev) => prev.length > 1 ? prev.filter((_, j) => j !== i) : prev)}
-                editable={!isEditMode && lines.length > 1}
-                expandable={Boolean(selectedSalesOrderId)}
-                canExpand={(row) => {
-                  const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
-                  const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
-                  return spComps.length > 0;
-                }}
-                expandedIndex={expandedLineIndex}
-                onExpandToggle={(i) => {
-                  const lineId = lines[i]?.id;
-                  setExpandedLineId(expandedLineId === lineId ? null : lineId);
-                }}
-                renderExpandedRow={renderExpandedComponents}
-                showTotals={[
-                  { colKey: "qty", value: lines.reduce((s, l) => s + l.qty, 0) },
-                  { colKey: "weight", value: lines.reduce((s, l) => s + (l.weight || 0), 0).toFixed(1) },
-                  { colKey: "total", value: `₹${totals.subTotal.toFixed(2)}` },
-                ]}
-                visibleRows={10}
-                getFieldBeforeTable={() => {
-                  const bundle = document.querySelector('input[name="numberOfBundle"]') as HTMLElement | null;
-                  if (bundle && !bundle.hasAttribute("disabled") && !(bundle as any).disabled) return bundle;
-                  const transport = document.querySelector('input[name="transport"]') as HTMLElement | null;
-                  if (transport && !transport.hasAttribute("disabled") && !(transport as any).disabled) return transport;
-                  const invDate = document.querySelector('input[name="invoiceDate"]') as HTMLElement | null;
-                  if (invDate && !invDate.hasAttribute("disabled") && !(invDate as any).disabled) return invDate;
-                  const selOrder = document.querySelector('input[name="selectedSalesOrderId"]') as HTMLElement | null;
-                  if (selOrder && !selOrder.hasAttribute("disabled") && !(selOrder as any).disabled) return selOrder;
-                  return document.querySelector('input[name="customerId"]') as HTMLElement | null;
-                }}
-                getFieldAfterTable={() => {
-                  const notes = document.querySelector('textarea[name="notes"]') as HTMLElement | null;
-                  if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
-                  return document.querySelector('button[type="submit"]') as HTMLElement | null;
-                }}
-                onNavigateRight={(row) => {
-                  const st = sundryTableRef.current;
-                  if (!st) return false;
-                  if (sundryRows.length === 0) {
-                    setSundryRows([{ ...sundryEmptyRow }]);
-                    setTimeout(() => {
-                      const firstCell = st.querySelector(`[data-r="0"][data-c="0"]`) as HTMLElement | null;
-                      const input = firstCell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
-                      if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); }
-                      else if (firstCell) { firstCell.focus(); }
-                    }, 40);
-                    return true;
-                  }
-                  const targetRow = Math.min(row, Math.max(0, sundryRows.length - 1));
-                  const doFocus = () => {
-                    const cell = st.querySelector(`[data-r="${targetRow}"][data-c="0"]`) as HTMLElement | null;
-                    const input = cell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
-                    if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); return true; }
-                    if (cell) { cell.focus(); return true; }
-                    return false;
-                  };
-                  if (!doFocus()) {
-                    setTimeout(doFocus, 30);
-                    setTimeout(doFocus, 80);
-                  }
-                  return true;
-                }}
-              />
-            </div>
-            <div ref={sundryTableRef} className="w-[35%]">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-ink">Bill Sundry</span>
-              </div>
-              <BusyItemsTable
-                columns={sundryColumns}
-                rows={sundryRows}
-                onChange={setSundryRows}
-                emptyRow={sundryEmptyRow}
-                editable={false}
-                visibleRows={5}
-                showTotals={[
-                  {
-                    colKey: "amount",
-                    value: (() => {
-                      const t = sundryRows.reduce((s, r) => {
-                        if (!r.type) return s;
-                        const a = Number(r.amount) || 0;
-                        const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
-                        return s + (o?.sign === -1 ? -a : a);
-                      }, 0);
-                      return t !== 0 ? `${t > 0 ? "+" : "-"} ₹${Math.abs(t).toFixed(2)}` : "0.00";
-                    })(),
-                  },
-                ]}
-                getFieldBeforeTable={() => {
-                  const bundle = document.querySelector('input[name="numberOfBundle"]') as HTMLElement | null;
-                  if (bundle && !bundle.hasAttribute("disabled") && !(bundle as any).disabled) return bundle;
-                  return document.querySelector('input[name="customerId"]') as HTMLElement | null;
-                }}
-                getFieldAfterTable={() => {
-                  const notes = document.querySelector('textarea[name="notes"]') as HTMLElement | null;
-                  if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
-                  return document.querySelector('button[type="submit"]') as HTMLElement | null;
-                }}
-                onNavigateLeft={(row) => {
-                  const it = itemsTableRef.current;
-                  if (!it) return false;
-                  const targetRow = Math.min(row, Math.max(0, lines.length - 1));
-                  const doFocus = () => {
-                    const cell = it.querySelector(`[data-r="${targetRow}"][data-c="3"]`) as HTMLElement | null;
-                    const input = cell?.querySelector("input, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
-                    if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); return true; }
-                    if (cell) { cell.focus(); return true; }
-                    return false;
-                  };
-                  if (!doFocus()) {
-                    setTimeout(doFocus, 30);
-                    setTimeout(doFocus, 80);
-                  }
-                  return true;
-                }}
-              />
-              {/* ── Full Amount ── */}
-              <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
-                <div className="text-right">
-                  <span className="text-base font-bold text-blue-600">
-                    ₹{totals.grandTotal.toFixed(2)}
-                  </span>
+              {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
+              <div className="flex gap-3">
+                <div ref={itemsTableRef} className="w-[65%]">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-semibold text-ink">Invoice Items</span>
+                  </div>
+                  <BusyItemsTable
+                    columns={invoiceColumns}
+                    rows={lines}
+                    onAdd={() => setLines((prev) => [...prev, emptyLine()])}
+                    onRemove={(i) => setLines((prev) => prev.length > 1 ? prev.filter((_, j) => j !== i) : prev)}
+                    editable={!isEditMode && lines.length > 1}
+                    expandable={true}
+                    canExpand={(row) => {
+                      const sp = salesProducts.find((s: any) => String(s.id) === row.itemId);
+                      const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
+                      return spComps.length > 0;
+                    }}
+                    expandedIndex={expandedLineIndex}
+                    onExpandToggle={(i) => {
+                      const lineId = lines[i]?.id;
+                      setExpandedLineId(expandedLineId === lineId ? null : lineId);
+                    }}
+                    renderExpandedRow={renderExpandedComponents}
+                    showTotals={[
+                      { colKey: "qty", value: lines.reduce((s, l) => s + l.qty, 0) },
+                      { colKey: "weight", value: lines.reduce((s, l) => s + (l.weight || 0), 0).toFixed(1) },
+                      { colKey: "total", value: `₹${totals.subTotal.toFixed(2)}` },
+                    ]}
+                    visibleRows={10}
+                    getFieldBeforeTable={() => {
+                      const bundle = document.querySelector('input[name="numberOfBundle"]') as HTMLElement | null;
+                      if (bundle && !bundle.hasAttribute("disabled") && !(bundle as any).disabled) return bundle;
+                      const transport = document.querySelector('input[name="transport"]') as HTMLElement | null;
+                      if (transport && !transport.hasAttribute("disabled") && !(transport as any).disabled) return transport;
+                      const invDate = document.querySelector('input[name="invoiceDate"]') as HTMLElement | null;
+                      if (invDate && !invDate.hasAttribute("disabled") && !(invDate as any).disabled) return invDate;
+                      const selOrder = document.querySelector('input[name="selectedSalesOrderId"]') as HTMLElement | null;
+                      if (selOrder && !selOrder.hasAttribute("disabled") && !(selOrder as any).disabled) return selOrder;
+                      return document.querySelector('input[name="customerId"]') as HTMLElement | null;
+                    }}
+                    getFieldAfterTable={() => {
+                      const notes = document.querySelector('textarea[name="notes"]') as HTMLElement | null;
+                      if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
+                      return document.querySelector('button[type="submit"]') as HTMLElement | null;
+                    }}
+                    onNavigateRight={(row) => {
+                      const st = sundryTableRef.current;
+                      if (!st) return false;
+                      if (sundryRows.length === 0) {
+                        setSundryRows([{ ...sundryEmptyRow }]);
+                        setTimeout(() => {
+                          const firstCell = st.querySelector(`[data-r="0"][data-c="0"]`) as HTMLElement | null;
+                          const input = firstCell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                          if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); }
+                          else if (firstCell) { firstCell.focus(); }
+                        }, 40);
+                        return true;
+                      }
+                      const targetRow = Math.min(row, Math.max(0, sundryRows.length - 1));
+                      const doFocus = () => {
+                        const cell = st.querySelector(`[data-r="${targetRow}"][data-c="0"]`) as HTMLElement | null;
+                        const input = cell?.querySelector("input, select, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                        if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); return true; }
+                        if (cell) { cell.focus(); return true; }
+                        return false;
+                      };
+                      if (!doFocus()) {
+                        setTimeout(doFocus, 30);
+                        setTimeout(doFocus, 80);
+                      }
+                      return true;
+                    }}
+                  />
+                </div>
+                <div ref={sundryTableRef} className="w-[35%]">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-semibold text-ink">Bill Sundry</span>
+                  </div>
+                  <BusyItemsTable
+                    columns={sundryColumns}
+                    rows={sundryRows}
+                    onChange={setSundryRows}
+                    emptyRow={sundryEmptyRow}
+                    editable={false}
+                    visibleRows={5}
+                    showTotals={[
+                      {
+                        colKey: "amount",
+                        value: (() => {
+                          const t = sundryRows.reduce((s, r) => {
+                            if (!r.type) return s;
+                            const a = Number(r.amount) || 0;
+                            const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
+                            return s + (o?.sign === -1 ? -a : a);
+                          }, 0);
+                          return t !== 0 ? `${t > 0 ? "+" : "-"} ₹${Math.abs(t).toFixed(2)}` : "0.00";
+                        })(),
+                      },
+                    ]}
+                    getFieldBeforeTable={() => {
+                      const bundle = document.querySelector('input[name="numberOfBundle"]') as HTMLElement | null;
+                      if (bundle && !bundle.hasAttribute("disabled") && !(bundle as any).disabled) return bundle;
+                      return document.querySelector('input[name="customerId"]') as HTMLElement | null;
+                    }}
+                    getFieldAfterTable={() => {
+                      const notes = document.querySelector('textarea[name="notes"]') as HTMLElement | null;
+                      if (notes && !notes.hasAttribute("disabled") && !(notes as any).disabled) return notes;
+                      return document.querySelector('button[type="submit"]') as HTMLElement | null;
+                    }}
+                    onNavigateLeft={(row) => {
+                      const it = itemsTableRef.current;
+                      if (!it) return false;
+                      const targetRow = Math.min(row, Math.max(0, lines.length - 1));
+                      const doFocus = () => {
+                        const cell = it.querySelector(`[data-r="${targetRow}"][data-c="3"]`) as HTMLElement | null;
+                        const input = cell?.querySelector("input, [tabindex]:not([tabindex='-1'])") as HTMLElement | null;
+                        if (input) { input.focus(); if (input instanceof HTMLInputElement) input.select?.(); return true; }
+                        if (cell) { cell.focus(); return true; }
+                        return false;
+                      };
+                      if (!doFocus()) {
+                        setTimeout(doFocus, 30);
+                        setTimeout(doFocus, 80);
+                      }
+                      return true;
+                    }}
+                  />
+                  {/* ── Full Amount ── */}
+                  <div className="flex justify-end mt-2 px-2 py-2 border border-line rounded-md bg-card-2">
+                    <div className="text-right">
+                      <span className="text-base font-bold text-blue-600">
+                        ₹{totals.grandTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* ── Customer Balance Summary ── */}
+                  {customerId && (() => {
+                    const cust = customersRaw.find((c: any) => String(c.id) === customerId);
+                    if (!cust) return null;
+                    const rawOpenBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
+                    const rawBType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
+
+                    // Convert to signed balance: Dr is positive, Cr is negative
+                    let currentSignedBal = (rawBType.startsWith("C") ? -1 : 1) * rawOpenBal;
+
+                    if (isEditMode) {
+                      // The customer's current balance already includes this invoice (which increased Dr / decreased Cr)
+                      // To find the true opening balance before this invoice, we reverse it.
+                      currentSignedBal -= originalInvoiceAmount;
+                    }
+
+                    const isDr = currentSignedBal >= 0;
+                    const openBal = Math.abs(currentSignedBal);
+                    const openLabel = isDr ? "Dr" : currentSignedBal < 0 ? "Cr" : "";
+
+                    const invoiceAmt = totals.grandTotal || 0;
+                    const closingSignedBal = currentSignedBal + invoiceAmt;
+                    const closingAbs = Math.abs(closingSignedBal);
+                    const closingType = closingSignedBal > 0 ? "Dr" : closingSignedBal < 0 ? "Cr" : "";
+
+                    return (
+                      <div className="mt-3 border border-line-soft rounded-lg overflow-hidden text-xs">
+                        <div className="flex justify-between px-3 py-2 border-b border-line-soft bg-card-2">
+                          <span className="font-semibold text-ink-muted">Opening Balance</span>
+                          <span className={`font-bold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>
+                            ₹{openBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openLabel}
+                          </span>
+                        </div>
+                        <div className="flex justify-between px-3 py-2 border-b border-line-soft">
+                          <span className="font-semibold text-ink-muted">Invoice Amount</span>
+                          <span className="font-bold text-blue-500">₹{invoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between px-3 py-2 bg-card-2">
+                          <span className="font-bold text-ink">Closing Balance</span>
+                          <span className={`font-bold ${closingType === "Dr" ? "text-rose-500" : "text-emerald-500"}`}>
+                            ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
-              {/* ── Customer Balance Summary ── */}
-              {customerId && (() => {
-                const cust = customersRaw.find((c: any) => String(c.id) === customerId);
-                if (!cust) return null;
-                const rawOpenBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
-                const rawBType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
-                
-                // Convert to signed balance: Dr is positive, Cr is negative
-                let currentSignedBal = (rawBType.startsWith("C") ? -1 : 1) * rawOpenBal;
-                
-                if (isEditMode) {
-                  // The customer's current balance already includes this invoice (which increased Dr / decreased Cr)
-                  // To find the true opening balance before this invoice, we reverse it.
-                  currentSignedBal -= originalInvoiceAmount;
-                }
-                
-                const isDr = currentSignedBal >= 0;
-                const openBal = Math.abs(currentSignedBal);
-                const openLabel = isDr ? "Dr" : currentSignedBal < 0 ? "Cr" : "";
-                
-                const invoiceAmt = totals.grandTotal || 0;
-                const closingSignedBal = currentSignedBal + invoiceAmt;
-                const closingAbs = Math.abs(closingSignedBal);
-                const closingType = closingSignedBal > 0 ? "Dr" : closingSignedBal < 0 ? "Cr" : "";
+              {/* ── Notes ── */}
+              <div className="w-full md:w-1/2">
+                <TextInput as="textarea" label="Narration" name="notes" rows={2} value={notes} disabled={isLocked}
+                  onChange={(e) => setNotes(e.target.value)} placeholder="Optional narration..." />
+              </div>
 
-                return (
-                  <div className="mt-3 border border-line-soft rounded-lg overflow-hidden text-xs">
-                    <div className="flex justify-between px-3 py-2 border-b border-line-soft bg-card-2">
-                      <span className="font-semibold text-ink-muted">Opening Balance</span>
-                      <span className={`font-bold ${isDr ? "text-rose-500" : "text-emerald-500"}`}>
-                        ₹{openBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openLabel}
-                      </span>
-                    </div>
-                    <div className="flex justify-between px-3 py-2 border-b border-line-soft">
-                      <span className="font-semibold text-ink-muted">Invoice Amount</span>
-                      <span className="font-bold text-blue-500">₹{invoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between px-3 py-2 bg-card-2">
-                      <span className="font-bold text-ink">Closing Balance</span>
-                      <span className={`font-bold ${closingType === "Dr" ? "text-rose-500" : "text-emerald-500"}`}>
-                        ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* ── Notes ── */}
-          <div className="w-full md:w-1/2">
-            <TextInput as="textarea" label="Narration" name="notes" rows={2} value={notes} disabled={isLocked}
-              onChange={(e) => setNotes(e.target.value)} placeholder="Optional narration..." />
-          </div>
-
-          </div>{/* end full-width column */}
+            </div>{/* end full-width column */}
 
           </div>{/* end flex column */}
 
