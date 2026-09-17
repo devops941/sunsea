@@ -16,10 +16,12 @@ model Employee {
   dateOfJoining DateTime?
   departmentId  Int?
   status        EmployeeStatus @default(active)
+  statusChangedAt DateTime?    @map("status_changed_at") @db.Timestamptz(6)
   createdAt     DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime       @updatedAt @db.Timestamptz(6)
   createdBy     String?
   updatedBy     String?
+  editHistory   Json?          @map("edit_history")
 
   // Section 1: Basic Info
   photoUrl      String?
@@ -271,6 +273,10 @@ model Role {
   isSystem                   Boolean                      @default(true)
   status                     RoleStatus                   @default(active)
   createdAt                  DateTime                     @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                     @default(now()) @updatedAt @db.Timestamptz(6)
+  createdBy                  String?
+  updatedBy                  String?
+  editHistory                Json?                        @map("edit_history")
   Admin                      Admin[]
   rolePermissions            RolePermission[]
   users                      User[]
@@ -294,8 +300,11 @@ model Department {
   id          Int        @id @default(autoincrement())
   name        String
   description String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  createdBy   String?
+  updatedBy   String?
+  editHistory Json?      @map("edit_history")
   employees   Employee[]
 
   @@map("departments")
@@ -559,6 +568,9 @@ model Shift {
   isActive             Boolean                      @default(true)
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
+  createdBy            String?                      @map("created_by")
+  updatedBy            String?                      @map("updated_by")
+  editHistory          Json?                        @map("edit_history")
   dailyProductionPlans DailyProductionPlan[]
   HourlyProduction     HourlyProduction[]
   productionWastages   ProductionWastage[]
@@ -746,6 +758,9 @@ model Machine {
   description           String?                      @db.VarChar(255)
   createdAt             DateTime                     @default(now()) @map("created_at")
   updatedAt             DateTime                     @updatedAt @map("updated_at")
+  createdBy             String?                      @map("created_by")
+  updatedBy             String?                      @map("updated_by")
+  editHistory           Json?                        @map("edit_history")
   businessPlaceId       BigInt?
   dailyProductionPlans  DailyProductionPlan[]
   hourlyProductions     HourlyProduction[]

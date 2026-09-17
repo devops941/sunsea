@@ -15,6 +15,7 @@ import { roleService } from "../../../services/roleService";
 import { employeeService } from "../../../services/employeeService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 
@@ -55,6 +56,7 @@ const MachineForm: React.FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(isEdit);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
     const [isDirty, setIsDirty] = useState(false);
     const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
@@ -159,6 +161,11 @@ const MachineForm: React.FC = () => {
                         targetTemperature: s.targetTemperature ? String(s.targetTemperature) : "",
                         operatorId: s.operatorId || "",
                         isActive: s.isActive ?? true,
+                    });
+                    setAuditInfo({
+                        createdAt: s.createdAt,
+                        createdBy: s.createdUserName || s.createdBy,
+                        editHistory: s.editHistory,
                     });
                     if (s.operatorId) setPendingOperatorId(s.operatorId);
                 })
@@ -298,6 +305,11 @@ const MachineForm: React.FC = () => {
                             operatorId: machine.operatorId || "",
                             isActive: machine.isActive ?? true,
                         });
+                        setAuditInfo({
+                            createdAt: machine.createdAt,
+                            createdBy: machine.createdUserName || machine.createdBy,
+                            editHistory: machine.editHistory,
+                        });
                         setIsDirty(false);
                         toast.info("Machine details refreshed");
                     }
@@ -329,8 +341,14 @@ const MachineForm: React.FC = () => {
         <>
             <div className="max-w-[1024px] xl:mr-auto">
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-                        <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Machine" : "Create Machine"}</h2>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
+                        <div className="flex flex-col">
+                            <h2 className="text-xl font-bold text-ink flex items-start">
+                                {isEdit ? "Edit Machine" : "Create Machine"}
+                                {isEdit && <span className="text-purple-400 text-sm ml-1.5 mt-0.5 leading-none font-mono">*{formData.machineId}</span>}
+                            </h2>
+                            {isEdit && <RecordAuditInfo auditData={auditInfo} title="Machine" />}
+                        </div>
                         <BackButton text="Back to List" onClick={() => navigate(-1)} />
                     </div>
 
@@ -409,10 +427,12 @@ const MachineForm: React.FC = () => {
                                 defaultOptionLabel={!inchargeRoleId ? "Select Role First (Optional)" : "-- Select Incharge --"}
                                 horizontal
                                 disabled={!inchargeRoleId}
-                                options={(Array.isArray(employees) ? employees : []).map(emp => ({
-                                    label: emp.fullName || emp.name || "",
-                                    value: emp.id,
-                                }))}
+                                options={(Array.isArray(employees) ? employees : [])
+                                    .filter(emp => emp.status === "active" || (formData.operatorId && String(emp.id) === String(formData.operatorId)))
+                                    .map(emp => ({
+                                        label: emp.fullName || emp.name || "",
+                                        value: emp.id,
+                                    }))}
                                 error={errors.operatorId}
                                 onChange={handleChange}
                             />

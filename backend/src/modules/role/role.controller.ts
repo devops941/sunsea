@@ -6,11 +6,12 @@ export const createRole = async (
   req: Request,
   res: Response
 ) => {
-  const role = await roleService.createRole(
-    req.body
-  );
+  const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+  const role = await roleService.createRole({
+    ...req.body,
+    userId,
+  });
   getIO().emit("role:created", role);
-
 
   return res.status(201).json({
     success: true,
@@ -66,14 +67,17 @@ export const updateRole = async (
   const roleId = Number(
     String(req.params.id)
   );
+  const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
 
   const role =
     await roleService.updateRole(
       roleId,
-      req.body
+      {
+        ...req.body,
+        userId,
+      }
     );
   getIO().emit("role:updated", role);
-
 
   return res.status(200).json({
     success: true,

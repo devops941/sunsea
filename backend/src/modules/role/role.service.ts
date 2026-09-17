@@ -5,10 +5,22 @@ export const createRole = async (
     code: string;
     name: string;
     description?: string;
+    status?: "active" | "inactive";
+    userId?: string;
   }
 ) => {
+  const { userId, ...roleData } = data;
+  const initialEditHistory = userId
+    ? [{ updatedBy: userId, updatedAt: new Date().toISOString() }]
+    : [];
+
   return prisma.role.create({
-    data,
+    data: {
+      ...roleData,
+      createdBy: userId || undefined,
+      updatedBy: userId || undefined,
+      editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
+    } as any,
   });
 };
 
@@ -59,11 +71,89 @@ export const getAllRoles = async (page?: number, limit?: number, search?: string
 export const getRoleById = async (
   id: number
 ) => {
-  return prisma.role.findUnique({
+  const role = await prisma.role.findUnique({
     where: {
       id,
     },
   });
+
+  if (!role) {
+    return null;
+  }
+
+  let createdUserName = "Unknown User";
+  let createdUserRole = "Unknown Role";
+  const roleWithAudit = role as any;
+
+  if (roleWithAudit.createdBy) {
+    if (roleWithAudit.createdBy.startsWith("admin_")) {
+      const adminId = BigInt(roleWithAudit.createdBy.replace("admin_", ""));
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: { username: true, fullName: true, role: { select: { name: true } } },
+      });
+      if (admin) {
+        createdUserName = admin.fullName || admin.username;
+        createdUserRole = admin.role?.name || "Super Admin";
+      } else {
+        createdUserName = roleWithAudit.createdBy;
+      }
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { userId: roleWithAudit.createdBy },
+        select: { username: true, fullName: true, role: { select: { name: true } } },
+      });
+      if (user) {
+        createdUserName = user.fullName || user.username;
+        createdUserRole = user.role?.name || "User";
+      } else {
+        createdUserName = roleWithAudit.createdBy;
+      }
+    }
+  }
+
+  // Resolve names for editHistory
+  let enrichedEditHistory: any[] = [];
+  let rawHistory = roleWithAudit.editHistory;
+  if (typeof rawHistory === "string") {
+    try {
+      rawHistory = JSON.parse(rawHistory);
+    } catch (e) {
+      rawHistory = [];
+    }
+  }
+
+  if (Array.isArray(rawHistory)) {
+    enrichedEditHistory = await Promise.all(
+      rawHistory.map(async (edit: any) => {
+        let name = edit.updatedByName || edit.updatedBy || "Unknown User";
+        if (edit.updatedBy) {
+          if (edit.updatedBy.startsWith("admin_")) {
+            const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+            const admin = await prisma.admin.findUnique({
+              where: { id: adminId },
+              select: { username: true, fullName: true },
+            });
+            if (admin) name = admin.fullName || admin.username;
+          } else {
+            const user = await prisma.user.findUnique({
+              where: { userId: edit.updatedBy },
+              select: { username: true, fullName: true },
+            });
+            if (user) name = user.fullName || user.username;
+          }
+        }
+        return { ...edit, updatedByName: name };
+      })
+    );
+  }
+
+  return {
+    ...role,
+    createdUserName,
+    createdUserRole,
+    editHistory: enrichedEditHistory,
+  };
 };
 
 export const updateRole = async (
@@ -73,13 +163,57 @@ export const updateRole = async (
     name?: string;
     description?: string;
     status?: "active" | "inactive";
+    userId?: string;
   }
 ) => {
+  const currentRole = await prisma.role.findUnique({
+    where: { id },
+  });
+
+  if (!currentRole) {
+    throw new Error("Role not found");
+  }
+
+  const { userId, ...roleData } = data;
+  const updatePayload: any = { ...roleData };
+
+  let newEditHistory: any[] = [];
+  let rawHistory = (currentRole as any).editHistory;
+  if (typeof rawHistory === "string") {
+    try {
+      rawHistory = JSON.parse(rawHistory);
+    } catch (e) {
+      rawHistory = [];
+    }
+  }
+
+  if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+    newEditHistory = rawHistory.map((item: any) => ({
+      updatedBy: item.updatedBy,
+      updatedAt: item.updatedAt,
+    }));
+  } else if ((currentRole as any).createdBy || currentRole.createdAt) {
+    newEditHistory.push({
+      updatedBy: (currentRole as any).createdBy || "System",
+      updatedAt: currentRole.createdAt ? new Date(currentRole.createdAt).toISOString() : new Date().toISOString(),
+    });
+  }
+
+  if (userId) {
+    newEditHistory.push({
+      updatedBy: userId,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  updatePayload.updatedBy = userId || undefined;
+  updatePayload.editHistory = newEditHistory.length > 0 ? newEditHistory : undefined;
+
   return prisma.role.update({
     where: {
       id,
     },
-    data,
+    data: updatePayload,
   });
 };
 

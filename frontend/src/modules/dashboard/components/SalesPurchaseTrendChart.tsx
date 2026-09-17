@@ -5,9 +5,8 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
-import { FaChartBar, FaChartArea, FaChartPie, FaProjectDiagram, FaTable } from "react-icons/fa";
+import { FaChartBar, FaChartArea, FaChartPie, FaProjectDiagram, FaTable, FaChevronDown, FaCheck } from "react-icons/fa";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../../components/ui/chart";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 
 /* ════════════════════════════════════════════════════════════════
    TYPES
@@ -89,8 +88,22 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
     return "bar";
   });
 
+  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+  const periodDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target as Node)) {
+        setIsPeriodDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handlePeriodChange = (newPeriod: PeriodKey) => {
     setInternalPeriod(newPeriod);
+    setIsPeriodDropdownOpen(false);
     try {
       localStorage.setItem("dashboard_trend_period", newPeriod);
     } catch (e) {}
@@ -119,7 +132,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
         d.setDate(d.getDate() - i);
         const start = getStartOfDay(d);
         const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-        const label = formatDate(new Date());
+        const label = formatDate(d);
         buckets.push({ label, start, end, sales: 0, purchase: 0 });
       }
     } else if (period === "30d") {
@@ -135,7 +148,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const start = d;
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-        const label = formatDate(new Date());
+        const label = d.toLocaleString("default", { month: "short", year: "2-digit" });
         buckets.push({ label, start, end, sales: 0, purchase: 0 });
       }
     } else if (period === "12m") {
@@ -241,24 +254,48 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
         {/* Header row (Dropdown + 5 Chart Type Switchers + Legend) */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-3 sm:mb-4 gap-2 sm:gap-4 shrink-0">
 
-          {/* Left: Dropdown + 5 Distinct Chart Switch Icons */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Period Dropdown — hidden when global dashboard filter controls the period */}
+          {/* Left: Custom Period Dropdown + 5 Distinct Chart Switch Icons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Period Dropdown matching the exact height & rounded format of chart switcher */}
             {!externalPeriod && (
-              <div className="flex items-center w-28 sm:w-32">
-                <SelectInput
-                  hideLabel
-                  noMargin
-                  searchable={false}
-                  value={period}
-                  onChange={(e) => handlePeriodChange(e.target.value as PeriodKey)}
-                  options={Object.entries(PERIODS).map(([k, v]) => ({ label: v, value: k }))}
-                />
+              <div className="relative" ref={periodDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsPeriodDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-2 px-3 py-1 bg-card-2 hover:bg-card border border-line-soft hover:border-teal-500/40 rounded-lg shadow-inner text-[11px] font-bold text-ink transition-all cursor-pointer h-[30px]"
+                >
+                  <span>{PERIODS[period]}</span>
+                  <FaChevronDown
+                    className={`text-[8px] text-ink-muted transition-transform duration-200 ${
+                      isPeriodDropdownOpen ? "rotate-180 text-teal-400" : ""
+                    }`}
+                  />
+                </button>
+
+                {isPeriodDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1.5 z-30 min-w-[125px] bg-card border border-line-soft rounded-lg shadow-2xl p-1 animate-in fade-in-50 zoom-in-95 duration-100">
+                    {Object.entries(PERIODS).map(([k, v]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => handlePeriodChange(k as PeriodKey)}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-all flex items-center justify-between cursor-pointer ${
+                          period === k
+                            ? "bg-teal-500 text-white shadow-xs font-black"
+                            : "text-ink-muted hover:text-ink hover:bg-card-2"
+                        }`}
+                      >
+                        <span>{v}</span>
+                        {period === k && <FaCheck className="text-[9px]" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* 5 Distinct Chart Type Switch Icons */}
-            <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-0.5 shadow-inner">
+            <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-0.5 shadow-inner h-[30px]">
               <button
                 type="button"
                 onClick={() => handleChartTypeChange("bar")}

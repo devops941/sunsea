@@ -12,6 +12,10 @@ export interface Machine {
   description?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  createdBy?: string;
+  createdUserName?: string;
+  updatedBy?: string;
+  editHistory?: Array<{ updatedBy?: string; updatedByName?: string; updatedAt?: string | Date }>;
 }
 export interface MachineState {
   data: Machine[];

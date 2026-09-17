@@ -9,6 +9,10 @@ export interface Shift {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  createdUserName?: string;
+  updatedBy?: string;
+  editHistory?: Array<{ updatedBy?: string; updatedByName?: string; updatedAt?: string | Date }>;
 }
 
 export interface CreateShiftDto {

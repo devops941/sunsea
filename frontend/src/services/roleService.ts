@@ -11,6 +11,11 @@ export const roleService = {
     };
   },
 
+  getById: async (id: number): Promise<Role> => {
+    const response = await apiClient.get(`${config.role.base}/${id}`);
+    return response.data?.data || response.data;
+  },
+
   create: async (data: CreateRoleDto): Promise<Role> => {
     const response = await apiClient.post(config.role.base, data);
     return response.data?.data || response.data;

@@ -147,6 +147,16 @@ const StatusCell: React.FC<{
   onContextMenu: (e: React.MouseEvent) => void;
 }> = ({ cell, isLocked, onClick, onContextMenu }) => {
   const hasExtra = cell.otHours > 0 || cell.otDays > 0 || cell.teaOtCount > 0 || cell.lateMinutes > 0 || cell.permissionMinutes > 0 || !!cell.inTime || !!cell.outTime;
+  
+  const tooltipDetails: string[] = [];
+  if (cell.status) tooltipDetails.push(S[cell.status]?.label ?? cell.status);
+  else tooltipDetails.push('Unset');
+  if (cell.otHours > 0) tooltipDetails.push(`OT: ${cell.otHours}h`);
+  if (cell.otDays > 0) tooltipDetails.push(`OT Days: ${cell.otDays}`);
+  if (cell.teaOtCount > 0) tooltipDetails.push(`Tea OT: ${cell.teaOtCount}`);
+  if (cell.lateMinutes > 0) tooltipDetails.push(`Late: ${cell.lateMinutes}m`);
+  if (cell.permissionMinutes > 0) tooltipDetails.push(`Perm: ${cell.permissionMinutes}m`);
+
   return (
     <div className="relative inline-flex">
       <button
@@ -164,8 +174,8 @@ const StatusCell: React.FC<{
         }`}
         title={
           isLocked
-            ? `Locked (Payroll Approved) — ${cell.status ? S[cell.status].label : 'Unset'}`
-            : 'Left-click: cycle status | Right-click: edit OT / Late / Perm / Shift'
+            ? `Locked (Payroll Approved) — ${tooltipDetails.join(' · ')}`
+            : tooltipDetails.join(' · ') + ' (Click to edit)'
         }
       >
         {cell.status ? S[cell.status].abbr : '—'}
@@ -183,7 +193,7 @@ const CellEditPanel: React.FC<{
   shifts: Shift[]; weeklyOffDays: number[];
   onChange: (c: CellData) => void; onClose: () => void;
 }> = ({ empName, date, cell, isLocked, shifts, weeklyOffDays, onChange, onClose }) => {
-  const showExtras = cell.status === 'PRESENT' || cell.status === 'HALF_DAY';
+  const showExtras = cell.status !== null;
   const isWeeklyOff = weeklyOffDays.includes(dayOfWeek(date));
   return (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -228,7 +238,7 @@ const CellEditPanel: React.FC<{
         </div>
       </div>
 
-      {/* Shift selector — only for Present or Half Day */}
+      {/* Shift selector — available whenever a status is marked */}
       {showExtras && shifts.length > 0 && (
         <div>
           <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Shift</label>
@@ -248,7 +258,7 @@ const CellEditPanel: React.FC<{
         </div>
       )}
 
-      {/* OT Hours / OT Days / Tea OT — only for Present or Half Day */}
+      {/* OT Hours / OT Days / Tea OT — available for all marked statuses */}
       {showExtras && (
         <div className="grid grid-cols-3 gap-3">
           {([
@@ -272,7 +282,7 @@ const CellEditPanel: React.FC<{
         </div>
       )}
 
-      {/* Late / Permission — only for Present or Half Day */}
+      {/* Late / Permission — available for all marked statuses */}
       {showExtras && (
         <div className="grid grid-cols-2 gap-3">
           {([
@@ -295,8 +305,8 @@ const CellEditPanel: React.FC<{
         </div>
       )}
 
-      {/* In Time & Out Time — only shown when late or permission is entered */}
-      {showExtras && (cell.status === 'HALF_DAY' || cell.lateMinutes > 0 || cell.permissionMinutes > 0) && (
+      {/* In Time & Out Time — shown when times or late/perm/half-day are present */}
+      {showExtras && (cell.status === 'HALF_DAY' || cell.lateMinutes > 0 || cell.permissionMinutes > 0 || !!cell.inTime || !!cell.outTime || cell.otHours > 0) && (
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-bold text-ink-muted mb-1 flex items-center gap-1.5">
@@ -420,7 +430,7 @@ const AttendancePage: React.FC = () => {
 
   // ── Load employees + config + shifts ───────────────────────────────────────
   useEffect(() => {
-    Promise.all([payrollService.listEmployees(), payrollService.getConfig(), shiftService.fetchAll()])
+    Promise.all([payrollService.listEmployees({ period }), payrollService.getConfig(), shiftService.fetchAll()])
       .then(([emps, cfg, allShifts]) => {
         setEmployees(emps);
         setPayrollCfg(cfg);
@@ -428,7 +438,7 @@ const AttendancePage: React.FC = () => {
       })
       .catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [period]);
 
   // ── Rebuild grid when dates / filtered employees change ───────────────────
   useEffect(() => {
@@ -970,7 +980,12 @@ const AttendancePage: React.FC = () => {
                         <td className={`sticky left-0 z-20 px-3 py-1.5 border-b border-r border-line-soft shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] w-[250px] min-w-[250px] max-w-[250px] ${solidBg}`}>
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0 pr-1">
-                              <p className="font-semibold text-ink text-xs truncate">{emp.fullName}</p>
+                              <p className="font-semibold text-ink text-xs truncate flex items-center gap-1.5">
+                                <span>{emp.fullName}</span>
+                                {(emp as any).status === 'inactive' && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 rounded">Inactive</span>
+                                )}
+                              </p>
                               <p className="text-[10px] text-ink-subtle">{emp.empCode} · {(emp.payrollConfig?.salaryType ?? '—').replace(/_/g,' ')}</p>
                             </div>
                             <div className="flex gap-1 shrink-0">

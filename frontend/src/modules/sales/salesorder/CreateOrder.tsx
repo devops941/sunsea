@@ -519,7 +519,7 @@ const SalesOrderForm: React.FC = () => {
     // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {
         loadCustomers({ limit: 1000 });
-        if (can("employees.view")) loadEmployees({ limit: 500 });
+        if (can("employees.view")) loadEmployees({ limit: 500, status: "active" });
     }, [loadCustomers, loadEmployees, can]);
 
     // ─── Auto-focus Order Items table in Edit Mode ───────────────────
@@ -599,12 +599,15 @@ const SalesOrderForm: React.FC = () => {
         [salesProducts]
     );
 
+    const selectedSourceEmployeeId = watch("sourceEmployeeId");
     const employeeOptions = useMemo(() =>
-        employees.map((e: any) => ({
-            value: String(e.id),
-            label: e.fullName || e.name || e.empName || e.empCode || `Employee #${e.id}`,
-        })),
-        [employees]
+        employees
+            .filter((e: any) => e.status === "active" || (selectedSourceEmployeeId && String(e.id) === String(selectedSourceEmployeeId)))
+            .map((e: any) => ({
+                value: String(e.id),
+                label: e.fullName || e.name || e.empName || e.empCode || `Employee #${e.id}`,
+            })),
+        [employees, selectedSourceEmployeeId]
     );
 
     // ─── Watched fields ──────────────────────────────────────────────

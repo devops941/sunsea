@@ -92,22 +92,6 @@ const DashboardPage: React.FC = () => {
     return "list";
   });
 
-  type DashPeriod = "day" | "week" | "month" | "year";
-  const [dashPeriod, setDashPeriod] = useState<DashPeriod>(() => {
-    try {
-      const saved = localStorage.getItem("dashboard_period");
-      if (saved && ["day", "week", "month", "year"].includes(saved)) {
-        return saved as DashPeriod;
-      }
-    } catch (e) {}
-    return "year";
-  });
-
-  const handleDashPeriodChange = (p: DashPeriod) => {
-    setDashPeriod(p);
-    try { localStorage.setItem("dashboard_period", p); } catch (e) {}
-  };
-
   type TaskPeriod = "day" | "week" | "month";
   const [taskPeriod, setTaskPeriod] = useState<TaskPeriod>(() => {
     try {
@@ -122,14 +106,6 @@ const DashboardPage: React.FC = () => {
   const handleTaskPeriodChange = (p: TaskPeriod) => {
     setTaskPeriod(p);
     try { localStorage.setItem("dashboard_tasks_period", p); } catch (e) {}
-  };
-
-  // Map dashboard period → SalesPurchaseTrendChart period key
-  const trendPeriodMap: Record<DashPeriod, "7d" | "30d" | "90d" | "12m"> = {
-    day: "7d",
-    week: "30d",
-    month: "90d",
-    year: "12m",
   };
 
   const handleTopProductsChartTypeChange = (newType: "list" | "bar" | "pie") => {
@@ -204,12 +180,12 @@ const DashboardPage: React.FC = () => {
   //  listeners keep it fresh in realtime as vouchers are posted.
   // ─────────────────────────────────────────────────────────────
   const accountsSummaryFetcher = useCallback(async (_signal: AbortSignal) => {
-    const summary = await dashboardService.getAccountsSummary(dashPeriod);
+    const summary = await dashboardService.getAccountsSummary();
     return { data: [summary], total: 1 };
-  }, [dashPeriod]);
+  }, []);
 
   const accountsSummaryCache = useListCache<AccountsSummary>({
-    cacheKey: `accounts:dashboard-summary:${dashPeriod}`,
+    cacheKey: "accounts:dashboard-summary",
     socketModule: "voucher",
     fetcher: accountsSummaryFetcher,
   });
@@ -644,7 +620,7 @@ const DashboardPage: React.FC = () => {
               </span>
             )}
               
-              <button
+            <button
               type="button"
               onClick={() => navigate("/tv-dashboard")}
               title="Open the full-screen TV dashboard"
@@ -652,24 +628,6 @@ const DashboardPage: React.FC = () => {
             >
               <FaTv className="text-[11px]" /> TV Dashboard
             </button>
-            
-            {/* Period filter toggle */}
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-0.5 gap-0.5 shadow-inner">
-              {(["day", "week", "month", "year"] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => handleDashPeriodChange(p)}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide transition-all duration-200 cursor-pointer ${
-                    dashPeriod === p
-                      ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/40"
-                      : "text-ink-muted hover:text-ink hover:bg-white/5"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -783,27 +741,29 @@ const DashboardPage: React.FC = () => {
         </div>        {/* ══════════════════════════════════════════════════════
            ROW 2  –  Sales/Purchase Trend Chart (Left) + Today's Tasks & Recent Sales (Right)
            ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "530px" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Left: Sales & Purchase Trend Chart */}
           {showTrend && (
-            <div className="h-full min-h-[530px]">
+            <div className="w-full" style={{ height: "530px", maxHeight: "530px" }}>
               <SalesPurchaseTrendChart
                 salesOrders={salesOrders}
                 purchaseOrders={purchaseOrders}
                 productionOrders={productionOrders}
                 salesInvoices={salesInvoices}
                 purchaseInvoices={purchaseInvoices}
-                externalPeriod={trendPeriodMap[dashPeriod]}
                 loading={isDashboardLoading}
               />
             </div>
           )}
 
           {/* Right: Today's Tasks & Production (Top) + Recent Sales Orders (Bottom) */}
-          <div className="flex flex-col gap-3 sm:gap-4 h-full min-h-[530px]">
+          <div className="flex flex-col gap-3 sm:gap-4 w-full" style={{ height: "530px", maxHeight: "530px" }}>
             {/* 1. Tasks / Daily Production Planning */}
             {showTasks && (
-              <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden flex-1 min-h-[255px]">
+              <div
+                className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden w-full shrink-0"
+                style={{ height: "257px", minHeight: "257px", maxHeight: "257px" }}
+              >
                 {/* Card Header */}
                 <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -852,7 +812,10 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 {/* Card Content */}
-                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                <div
+                  className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 [&::-webkit-scrollbar]:!block [&::-webkit-scrollbar]:!w-1.5 [&::-webkit-scrollbar-track]:!bg-transparent [&::-webkit-scrollbar-thumb]:!bg-slate-700/60 [&::-webkit-scrollbar-thumb]:!rounded-full hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500"
+                  style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(100, 116, 139, 0.4) transparent" }}
+                >
                   {isDashboardLoading ? (
                     <div className="space-y-2 animate-pulse">
                       {[1, 2, 3].map((n) => (
@@ -880,7 +843,7 @@ const DashboardPage: React.FC = () => {
                       const dateText = dateObj && !isNaN(dateObj.getTime()) ? (
                         dateObj.toDateString() === new Date().toDateString()
                           ? "Today"
-                          : formatDate(new Date())
+                          : formatDate(dateObj)
                       ) : "";
 
                       return (
@@ -934,7 +897,10 @@ const DashboardPage: React.FC = () => {
 
             {/* 2. Recent Sales Orders */}
             {showRecentSales && (
-              <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden flex-1 min-h-[255px]">
+              <div
+                className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden w-full shrink-0"
+                style={{ height: "257px", minHeight: "257px", maxHeight: "257px" }}
+              >
                 {/* Header */}
                 <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft bg-card-2/50 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -969,7 +935,10 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                <div
+                  className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 [&::-webkit-scrollbar]:!block [&::-webkit-scrollbar]:!w-1.5 [&::-webkit-scrollbar-track]:!bg-transparent [&::-webkit-scrollbar-thumb]:!bg-slate-700/60 [&::-webkit-scrollbar-thumb]:!rounded-full hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500"
+                  style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(100, 116, 139, 0.4) transparent" }}
+                >
                   {isDashboardLoading ? (
                     <div className="space-y-2 animate-pulse">
                       {[1, 2, 3].map((n) => (

@@ -11,6 +11,7 @@ import TimePickerInput from "../../../components/form/TimePickerInput/TimePicker
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 import { createShift, updateShift, fetchShifts } from "../../../features/shifts/shiftSlice";
 import { shiftService } from "../../../services/shiftService";
 import { invalidateCacheByPrefix } from "../../../hooks/useListCache";
@@ -40,6 +41,7 @@ const ShiftForm: React.FC = () => {
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [fetchingData, setFetchingData] = useState(isEdit);
+    const [auditInfo, setAuditInfo] = useState<AuditData | null>(null);
 
     const formRef = useRef<HTMLFormElement>(null);
     const handleSubmitRef = useRef<() => void>(() => {});
@@ -83,6 +85,11 @@ const ShiftForm: React.FC = () => {
                         endTime: shift.endTime || "",
                         breakDuration: shift.breakDuration !== null && shift.breakDuration !== undefined ? String(shift.breakDuration) : "",
                         isActive: shift.isActive ?? true,
+                    });
+                    setAuditInfo({
+                        createdAt: shift.createdAt,
+                        createdBy: shift.createdUserName || shift.createdBy,
+                        editHistory: shift.editHistory,
                     });
                 })
                 .catch(() => {
@@ -198,6 +205,11 @@ const ShiftForm: React.FC = () => {
                             breakDuration: shift.breakDuration !== null && shift.breakDuration !== undefined ? String(shift.breakDuration) : "",
                             isActive: shift.isActive ?? true,
                         });
+                        setAuditInfo({
+                            createdAt: shift.createdAt,
+                            createdBy: shift.createdUserName || shift.createdBy,
+                            editHistory: shift.editHistory,
+                        });
                         setIsDirty(false);
                     })
                     .catch(() => {});
@@ -218,8 +230,14 @@ const ShiftForm: React.FC = () => {
         <div className="max-w-[1024px] xl:mr-auto">
             <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
                 <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line">
-                        <h2 className="text-xl font-bold text-ink">{isEdit ? "Edit Shift" : "Create Shift"}</h2>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
+                        <div className="flex flex-col">
+                            <h2 className="text-xl font-bold text-ink flex items-start">
+                                {isEdit ? "Edit Shift" : "Create Shift"}
+                                {isEdit && <span className="text-purple-400 text-sm ml-1.5 mt-0.5 leading-none font-mono">*{formData.shiftCode}</span>}
+                            </h2>
+                            {isEdit && <RecordAuditInfo auditData={auditInfo} title="Shift" />}
+                        </div>
                         <BackButton text="Back to List" to="/shifts" />
                     </div>
 

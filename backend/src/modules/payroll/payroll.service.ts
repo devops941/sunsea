@@ -640,9 +640,53 @@ class PayrollService {
     return cfg;
   }
 
-  async listEmployeesWithPayroll(category?: string) {
+  async listEmployeesWithPayroll(category?: string, includeInactive = false, period?: string) {
+    let whereClause: any = { status: 'active' };
+
+    if (includeInactive) {
+      whereClause = {};
+    } else if (period) {
+      const isMonthPeriod = /^\d{4}-\d{2}$/.test(period);
+      const { start, end } = periodToDateRange(period);
+
+      // Inactive employees should only appear for historical locked/approved payroll periods.
+      // For open, upcoming, or draft periods, only active employees should be included.
+      const lockedRun = await prisma.payrollRun.findFirst({
+        where: {
+          period,
+          status: { in: ['APPROVED', 'LOCKED'] },
+        },
+      });
+
+      if (lockedRun) {
+        const attendanceRows = await prisma.attendanceRecord.findMany({
+          where: isMonthPeriod
+            ? { date: { startsWith: period } }
+            : {
+                OR: [
+                  { period },
+                  { date: { gte: start, lte: end } },
+                ],
+              },
+          select: { employeeId: true },
+          distinct: ['employeeId'],
+        });
+
+        const attendanceEmpIds = attendanceRows.map(r => r.employeeId);
+
+        whereClause = {
+          OR: [
+            { status: 'active' },
+            ...(attendanceEmpIds.length > 0 ? [{ id: { in: attendanceEmpIds } }] : []),
+          ],
+        };
+      } else {
+        whereClause = { status: 'active' };
+      }
+    }
+
     const employees = await prisma.employee.findMany({
-      where: { status: 'active' },
+      where: whereClause,
       include: {
         payrollConfig: true,
         department: { select: { name: true } },
@@ -912,9 +956,13 @@ class PayrollService {
     };
 
     // 2. Load employees
+    const attendanceEmpIds = (opts.attendance || []).map(a => BigInt(a.employeeId));
     const rawEmployees = await prisma.employee.findMany({
       where: {
-        status: 'active',
+        OR: [
+          { status: 'active' },
+          ...(attendanceEmpIds.length > 0 ? [{ id: { in: attendanceEmpIds } }] : [])
+        ]
       },
       include: {
         payrollConfig: true,

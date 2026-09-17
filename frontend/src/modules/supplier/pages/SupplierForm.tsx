@@ -235,7 +235,7 @@ const SupplierForm: React.FC = () => {
             openingBalanceType: supplier.openingBalanceType || "CREDIT",
             status: supplier.status || "Active",
         });
-        if (supplier.hasTransactions) setHasTransactions(true);
+        setHasTransactions(Boolean(supplier.hasTransactions));
         setAuditInfo({
             createdAt: supplier.createdAt,
             createdBy: supplier.createdUserName || supplier.createdByUser?.fullName || supplier.createdBy,
@@ -263,20 +263,16 @@ const SupplierForm: React.FC = () => {
 
     useEffect(() => {
         const initForm = async () => {
-            if (isEdit) {
-                if (location.state) {
-                    populateForm(location.state);
-                } else {
-                    try {
-                        setIsLoadingData(true);
-                        const supplier = await supplierService.fetchById(id!);
-                        populateForm(supplier);
-                    } catch (err) {
-                        toast.error("Failed to load supplier details.");
-                        navigate("/suppliers");
-                    } finally {
-                        setIsLoadingData(false);
-                    }
+            if (isEdit && id) {
+                try {
+                    setIsLoadingData(true);
+                    const supplier = await supplierService.fetchById(id);
+                    populateForm(supplier);
+                } catch (err) {
+                    toast.error("Failed to load supplier details.");
+                    navigate("/suppliers");
+                } finally {
+                    setIsLoadingData(false);
                 }
             } else {
                 try {
@@ -291,7 +287,7 @@ const SupplierForm: React.FC = () => {
         };
 
         initForm();
-    }, [id, isEdit, location.state, user]);
+    }, [id, isEdit, user]);
 
     useEffect(() => {
         if (!socket) return;
@@ -447,7 +443,12 @@ const SupplierForm: React.FC = () => {
 
         try {
             if (isEdit) {
-                await editSupplier(id, payload);
+                if (hasTransactions) {
+                    const { openingBalance: _ob, openingBalanceType: _obt, ...updatePayload } = payload;
+                    await editSupplier(id, updatePayload);
+                } else {
+                    await editSupplier(id, payload);
+                }
                 toast.success("Supplier updated successfully!");
                 setIsDirty(false);
                 navigate(-1);
@@ -502,7 +503,7 @@ const SupplierForm: React.FC = () => {
                 <div className="px-5 py-3 border-b border-line-soft flex items-start justify-between">
                     <div className="flex flex-col">
                         <h2 className="text-base font-bold text-ink">{isEdit ? "Edit Supplier" : "Add New Supplier"}</h2>
-                        {isEdit && <RecordAuditInfo auditData={auditInfo} />}
+                        {isEdit && <RecordAuditInfo auditData={auditInfo} title="Supplier" />}
                     </div>
                     <BackButton text="Back" />
                 </div>

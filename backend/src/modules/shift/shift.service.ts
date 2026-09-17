@@ -6,7 +6,7 @@ import {
 } from "./shift.validation";
 
 class ShiftService {
-  async create(data: CreateShiftInput) {
+  async create(data: CreateShiftInput & { userId?: string }) {
     const existing = await prisma.shift.findFirst({
       where: {
         OR: [
@@ -20,15 +20,23 @@ class ShiftService {
       throw new ApiError(409, "Shift already exists");
     }
 
+    const { userId, ...shiftData } = data as any;
+    const initialEditHistory = userId
+      ? [{ updatedBy: userId, updatedAt: new Date().toISOString() }]
+      : [];
+
     return prisma.shift.create({
       data: {
-        shiftCode: data.shiftCode,
-        shiftName: data.shiftName,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        breakDuration: data.breakDuration !== undefined && data.breakDuration !== "" ? Number(data.breakDuration) : null,
-        isActive: data.isActive ?? true,
-      },
+        shiftCode: shiftData.shiftCode,
+        shiftName: shiftData.shiftName,
+        startTime: shiftData.startTime,
+        endTime: shiftData.endTime,
+        breakDuration: shiftData.breakDuration !== undefined && shiftData.breakDuration !== "" ? Number(shiftData.breakDuration) : null,
+        isActive: shiftData.isActive ?? true,
+        createdBy: userId || undefined,
+        updatedBy: userId || undefined,
+        editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
+      } as any,
     });
   }
 
@@ -68,11 +76,89 @@ class ShiftService {
       throw new ApiError(404, "Shift not found");
     }
 
-    return shift;
+    let createdUserName = "Unknown User";
+    let createdUserRole = "Unknown Role";
+    const shiftWithAudit = shift as any;
+
+    if (shiftWithAudit.createdBy) {
+      if (shiftWithAudit.createdBy.startsWith("admin_")) {
+        const adminId = BigInt(shiftWithAudit.createdBy.replace("admin_", ""));
+        const admin = await prisma.admin.findUnique({
+          where: { id: adminId },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (admin) {
+          createdUserName = admin.fullName || admin.username;
+          createdUserRole = admin.role?.name || "Super Admin";
+        } else {
+          createdUserName = shiftWithAudit.createdBy;
+        }
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { userId: shiftWithAudit.createdBy },
+          select: { username: true, fullName: true, role: { select: { name: true } } },
+        });
+        if (user) {
+          createdUserName = user.fullName || user.username;
+          createdUserRole = user.role?.name || "User";
+        } else {
+          createdUserName = shiftWithAudit.createdBy;
+        }
+      }
+    }
+
+    // Resolve names for editHistory
+    let enrichedEditHistory: any[] = [];
+    let rawHistory = shiftWithAudit.editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory)) {
+      enrichedEditHistory = await Promise.all(
+        rawHistory.map(async (edit: any) => {
+          let name = edit.updatedByName || edit.updatedBy || "Unknown User";
+          if (edit.updatedBy) {
+            if (edit.updatedBy.startsWith("admin_")) {
+              const adminId = BigInt(edit.updatedBy.replace("admin_", ""));
+              const admin = await prisma.admin.findUnique({
+                where: { id: adminId },
+                select: { username: true, fullName: true },
+              });
+              if (admin) name = admin.fullName || admin.username;
+            } else {
+              const user = await prisma.user.findUnique({
+                where: { userId: edit.updatedBy },
+                select: { username: true, fullName: true },
+              });
+              if (user) name = user.fullName || user.username;
+            }
+          }
+          return { ...edit, updatedByName: name };
+        })
+      );
+    }
+
+    return {
+      ...shift,
+      createdUserName,
+      createdUserRole,
+      editHistory: enrichedEditHistory,
+    };
   }
 
-  async update(id: number, data: UpdateShiftInput) {
-    await this.findById(id);
+  async update(id: number, data: UpdateShiftInput & { userId?: string }) {
+    const currentShift = await prisma.shift.findUnique({
+      where: { id },
+    });
+
+    if (!currentShift) {
+      throw new ApiError(404, "Shift not found");
+    }
 
     if (data.shiftCode) {
       const existing = await prisma.shift.findFirst({
@@ -87,16 +173,49 @@ class ShiftService {
       }
     }
 
+    const { userId, ...shiftData } = data as any;
+
+    let newEditHistory: any[] = [];
+    let rawHistory = (currentShift as any).editHistory;
+    if (typeof rawHistory === "string") {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch (e) {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+      newEditHistory = rawHistory.map((item: any) => ({
+        updatedBy: item.updatedBy,
+        updatedAt: item.updatedAt,
+      }));
+    } else if (currentShift.createdBy || currentShift.createdAt) {
+      newEditHistory.push({
+        updatedBy: currentShift.createdBy || "System",
+        updatedAt: currentShift.createdAt ? new Date(currentShift.createdAt).toISOString() : new Date().toISOString(),
+      });
+    }
+
+    if (userId) {
+      newEditHistory.push({
+        updatedBy: userId,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
     return prisma.shift.update({
       where: { id },
       data: {
-        shiftCode: data.shiftCode ?? undefined,
-        shiftName: data.shiftName ?? undefined,
-        startTime: data.startTime ?? undefined,
-        endTime: data.endTime ?? undefined,
-        breakDuration: data.breakDuration !== undefined ? (data.breakDuration !== "" ? Number(data.breakDuration) : null) : undefined,
-        isActive: data.isActive ?? undefined,
-      },
+        shiftCode: shiftData.shiftCode ?? undefined,
+        shiftName: shiftData.shiftName ?? undefined,
+        startTime: shiftData.startTime ?? undefined,
+        endTime: shiftData.endTime ?? undefined,
+        breakDuration: shiftData.breakDuration !== undefined ? (shiftData.breakDuration !== "" ? Number(shiftData.breakDuration) : null) : undefined,
+        isActive: shiftData.isActive ?? undefined,
+        updatedBy: userId || undefined,
+        editHistory: newEditHistory.length > 0 ? newEditHistory : undefined,
+      } as any,
     });
   }
 
