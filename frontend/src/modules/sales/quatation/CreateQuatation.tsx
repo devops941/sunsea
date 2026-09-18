@@ -827,6 +827,28 @@ const QuotationForm: React.FC = () => {
 
     const totals = calculateOrderTotals();
 
+    // ─── Auto-recalculate sundry amounts when subtotal changes ───
+    useEffect(() => {
+        setSundryRows((prev) => {
+            let changed = false;
+            const newRows = prev.map((r) => {
+                if (!r.type || !r.rate) return r;
+                if (r.type.startsWith("BILL_TAX") || r.type.startsWith("DISCOUNT")) {
+                    const rateNum = Number(r.rate) || 0;
+                    if (rateNum > 0) {
+                        const calcAmount = ((totals.subtotal * rateNum) / 100).toFixed(2);
+                        if (calcAmount !== r.amount) {
+                            changed = true;
+                            return { ...r, amount: calcAmount };
+                        }
+                    }
+                }
+                return r;
+            });
+            return changed ? newRows : prev;
+        });
+    }, [totals.subtotal]);
+
     // ─── Handle draft order selection ──────────────────────────
     const handleDraftOrderSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value ? Number(e.target.value) : null;

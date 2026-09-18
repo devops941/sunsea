@@ -897,6 +897,28 @@ const SalesInvoiceForm: React.FC = () => {
     return { subTotal, totalDiscount, taxTotal, sundryTotal, grandTotal, cgst, sgst, igst, additions, deductions, discountLabel: discNum > 0 ? `${discNum}${discountType === "PERCENT" ? "%" : " Flat"}` : "" };
   }, [lines, isInterState, chargeRows, discountValue, discountType, sundryRows]);
 
+  // ---- Auto-recalculate sundry amounts when subtotal changes ----
+  useEffect(() => {
+    setSundryRows((prev) => {
+      let changed = false;
+      const newRows = prev.map((r) => {
+        if (!r.type || !r.rate) return r;
+        if (r.type.startsWith("BILL_TAX") || r.type.startsWith("DISCOUNT")) {
+          const rateNum = Number(r.rate) || 0;
+          if (rateNum > 0) {
+            const calcAmount = ((totals.subTotal * rateNum) / 100).toFixed(2);
+            if (calcAmount !== r.amount) {
+              changed = true;
+              return { ...r, amount: calcAmount };
+            }
+          }
+        }
+        return r;
+      });
+      return changed ? newRows : prev;
+    });
+  }, [totals.subTotal]);
+
   // ---- Credit Limit Check ----
   const limitExceeded = useMemo(() => {
     const cust = customersRaw.find((c) => String(c.id) === customerId);
