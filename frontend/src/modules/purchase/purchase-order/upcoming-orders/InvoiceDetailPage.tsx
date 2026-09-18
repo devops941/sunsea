@@ -1026,7 +1026,7 @@ const InvoiceDetailPage: React.FC = () => {
             render: (_row: GRNItem, index: number) => {
                 const item = items[index];
                 if (!item) return null;
-                if (isPOSelected || isEditMode) {
+                if (isPOSelected && index < (selectedPO?.items?.length || 0)) {
                     const itemRawMaterial = (rawMaterials || []).find((rm: any) =>
                         String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId)
                     );
@@ -1114,14 +1114,12 @@ const InvoiceDetailPage: React.FC = () => {
                             onChange={(e) => updateItem(index, "qty", Number(e.target.value))}
                             placeholder="0"
                             step="0.01"
-                            disabled={isEditMode}
                             className="flex-1 min-w-0 bg-transparent text-[13px] text-ink outline-none border-none p-0 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         {uomOptions.length > 1 ? (
                             <select
                                 value={item.uom || uomOptions[0]}
                                 onChange={(e) => updateItem(index, "uom", e.target.value)}
-                                disabled={isEditMode}
                                 className="bg-transparent text-[11px] font-medium text-ink-subtle border-none outline-none cursor-pointer px-0.5 w-[46px] flex-shrink-0"
                             >
                                 {uomOptions.map((u: string) => <option key={u} value={u}>{u}</option>)}
@@ -1145,7 +1143,6 @@ const InvoiceDetailPage: React.FC = () => {
                     <DecimalCell
                         value={item.unitPrice || 0}
                         showEmpty={!item.productId}
-                        disabled={isEditMode}
                         onChange={(v) => updateItem(index, "unitPrice", v)}
                         placeholder="0.00"
                         className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0"
@@ -1169,7 +1166,7 @@ const InvoiceDetailPage: React.FC = () => {
                 return <span className="text-[13px] font-bold text-ink">₹{lineTotal.toFixed(2)}</span>;
             },
         },
-    ], [items, productAutocompleteOptions, rawMaterials, activeUOMs, errors, isEditMode, isPOSelected, updateItem]);
+    ], [items, productAutocompleteOptions, rawMaterials, activeUOMs, errors, isPOSelected, selectedPO, updateItem]);
 
     // ─── Bill Sundry columns ────────────────────────────────────────
     const subtotalRef = useRef(0);
@@ -1222,7 +1219,6 @@ const InvoiceDetailPage: React.FC = () => {
                             }}
                             onBlur={formatAmountOnBlur((v) => update({ rate: v }))}
                             placeholder="0.000"
-                            disabled={isEditMode}
                             className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right"
                         />
                         <span className="text-[11px] text-ink-subtle">%</span>
@@ -1245,14 +1241,13 @@ const InvoiceDetailPage: React.FC = () => {
                         onChange={(e) => update({ amount: e.target.value.replace(/[^0-9.]/g, ""), rate: "" })}
                         onBlur={formatAmountOnBlur((v) => update({ amount: v }))}
                         placeholder="0.00"
-                        disabled={isEditMode}
                         className="w-full bg-transparent text-[13px] outline-none border-none p-0 h-full text-right font-semibold"
                         style={{ color: isNeg ? "#ef4444" : "var(--color-ink)" }}
                     />
                 );
             },
         },
-    ], [isEditMode]);
+    ], []);
 
     const sundryEmptyRow: SundryRow = useMemo(() => ({
         id: `${Date.now()}-${Math.random()}`, type: "", rate: "0.00", amount: "0.00",
@@ -1317,10 +1312,10 @@ const InvoiceDetailPage: React.FC = () => {
 
                         {/* ── Row 2: Invoice No, GRN Date, Store ── */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
-                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} disabled={isEditMode} horizontal />
-                            <DatePickerCalendar label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required error={errors.grnDate} disabled={isEditMode} horizontal />
+                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} horizontal />
+                            <DatePickerCalendar label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required error={errors.grnDate} horizontal />
                             <div className="lg:col-span-2">
-                                <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable error={errors.storeId} horizontal />
+                                <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isPOSelected} searchable error={errors.storeId} horizontal />
                             </div>
                         </div>
 
@@ -1344,16 +1339,14 @@ const InvoiceDetailPage: React.FC = () => {
 
                         {/* ── Receipt Details ── */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
-                            <DatePickerCalendar label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} disabled={isEditMode} horizontal />
-                            <DatePickerCalendar label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} disabled={isEditMode} horizontal />
-                            <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" disabled={isEditMode} horizontal />
-                            <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" disabled={isEditMode} horizontal />
+                            <DatePickerCalendar label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} horizontal />
+                            <DatePickerCalendar label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} horizontal />
+                            <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" horizontal />
+                            <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" horizontal />
                         </div>
-                        {!isEditMode && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
-                                <FileUpload label={form.invoiceImage ? `Invoice: ${(form.invoiceImage as File).name}` : "Upload Invoice"} name="invoiceImage" onChange={handleFileChange} />
-                            </div>
-                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
+                            <FileUpload label={form.invoiceImage ? `Invoice: ${(form.invoiceImage as File).name}` : "Upload Invoice"} name="invoiceImage" onChange={handleFileChange} />
+                        </div>
 
                         {/* ── Invoice Items (65%) + Bill Sundry (35%) ── */}
                         <div className="flex gap-3">
@@ -1366,7 +1359,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     rows={items}
                                     onAdd={addItem}
                                     onRemove={(i) => removeItem(i)}
-                                    editable={!isEditMode}
+                                    editable={true}
                                     visibleRows={10}
                                     showTotals={[
                                         { colKey: "netAmount", value: `₹${subtotal.toFixed(2)}` },
@@ -1382,7 +1375,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     rows={sundryRows}
                                     onChange={setSundryRows}
                                     emptyRow={sundryEmptyRow}
-                                    editable={false}
+                                    editable={true}
                                     visibleRows={5}
                                     showTotals={[
                                         {
@@ -1448,7 +1441,7 @@ const InvoiceDetailPage: React.FC = () => {
 
                         {/* ── Notes ── */}
                         <div className="w-full md:w-1/2">
-                            <TextArea label="Notes" name="remarks" value={form.remarks} placeholder="Optional notes..." rows={2} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} disabled={isEditMode} />
+                            <TextArea label="Narration" name="remarks" value={form.remarks} placeholder="Optional notes..." rows={2} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} />
                         </div>
                     </div>
 

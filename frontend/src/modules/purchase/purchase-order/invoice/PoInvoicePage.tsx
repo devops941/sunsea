@@ -185,18 +185,18 @@ const PoInvoicePage: React.FC = () => {
     const emptyRowCount = Math.max(0, ROWS_PER_PAGE - itemsWithTax.length);
 
     return (
-        <div className="w-full mx-auto p-6 lg:p-8 print:p-0 print:block bg-gray-100 min-h-screen">
+        <div className="w-full mx-auto p-6 lg:p-8 print:p-0 print:block bg-page min-h-screen">
             <div className="max-w-5xl mx-auto">
                 {/* Action buttons */}
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6 no-print">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => navigate(-1)}
-                            className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 font-semibold bg-transparent border-none outline-none cursor-pointer"
+                            className="flex items-center gap-1.5 text-ink-muted hover:text-ink font-semibold bg-transparent border-none outline-none cursor-pointer"
                         >
                             <FaArrowLeft className="text-xs" /> Back
                         </button>
-                        <h2 className="text-xl font-bold text-gray-800 m-0">
+                        <h2 className="text-xl font-bold text-ink m-0">
                             PO Invoice #{po.poNumber}
                         </h2>
                     </div>
@@ -206,8 +206,16 @@ const PoInvoicePage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Print stylesheet */}
+                {/* Print + screen overrides — invoice card always white/black regardless of theme */}
                 <style>{`
+                    #printable-po-invoice-card,
+                    #printable-po-invoice-card * {
+                        color: #000 !important;
+                        border-color: #000 !important;
+                    }
+                    #printable-po-invoice-card {
+                        background: #fff !important;
+                    }
                     @media print {
                         @page {
                             size: A4 portrait;
@@ -218,6 +226,8 @@ const PoInvoicePage: React.FC = () => {
                         }
                         #printable-po-invoice-card, #printable-po-invoice-card * {
                             visibility: visible !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
                         }
                         #printable-po-invoice-card {
                             position: absolute;
@@ -225,7 +235,6 @@ const PoInvoicePage: React.FC = () => {
                             top: 0;
                             width: 100%;
                             min-height: auto !important;
-                            background: #fff !important;
                             box-shadow: none !important;
                             margin: 0 !important;
                         }
@@ -233,8 +242,11 @@ const PoInvoicePage: React.FC = () => {
                             display: none !important;
                         }
                         html, body {
+                            background: #fff !important;
                             height: auto;
                             overflow: visible !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
                         }
                     }
                 `}</style>

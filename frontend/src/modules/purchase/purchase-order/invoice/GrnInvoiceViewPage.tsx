@@ -1,6 +1,6 @@
 import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { FaPrint, FaEye, FaDownload, FaTrash, FaArrowLeft, FaFilePdf } from "react-icons/fa";
+import { FaPrint, FaEye, FaDownload, FaTrash, FaArrowLeft, FaFilePdf, FaCircleNotch, FaEdit } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
@@ -141,6 +141,26 @@ const GrnInvoiceViewPage: React.FC = () => {
     }, [fetchInvoicesList, idParam, loadDetail]);
 
     useSocketSync("grnInvoice", undefined, handleSocketUpdate);
+
+    // Keyboard navigation: Escape to go back, E to edit, F10 to print
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (e.key === "Escape") {
+                navigate(-1);
+            } else if (e.key === "e" || e.key === "E") {
+                if (selectedItem?.id) {
+                    e.preventDefault();
+                    navigate(`/invoice/edit/${selectedItem.id}`);
+                }
+            } else if (e.key === "F10") {
+                e.preventDefault();
+                window.print();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selectedItem?.id, navigate]);
 
     // Fetch supplier balance when invoice loads
     useEffect(() => {
@@ -338,14 +358,14 @@ const GrnInvoiceViewPage: React.FC = () => {
     };
 
     return (
-        <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)] print:block print:h-auto print:overflow-visible print:bg-white">
+        <div className="flex bg-page overflow-hidden h-[calc(100vh-115px)] print:block print:h-auto print:overflow-visible print:bg-white">
             {/* ── Left Sidebar ── */}
-            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full no-print">
+            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-card border-r border-line flex-col h-full no-print">
                 {/* Header */}
-                <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
+                <div className="p-4 border-b border-line flex flex-col gap-3">
                     <button
                         onClick={() => navigate(-1)}
-                        className="flex items-center gap-2 text-gray-700 hover:text-gray-900 font-bold text-lg bg-transparent border-none outline-none cursor-pointer text-left"
+                        className="flex items-center gap-2 text-ink hover:text-primary font-bold text-lg bg-transparent border-none outline-none cursor-pointer text-left transition-colors"
                     >
                         <FaArrowLeft className="text-sm" /> Bill & Invoice
                     </button>
@@ -358,32 +378,42 @@ const GrnInvoiceViewPage: React.FC = () => {
                 </div>
 
                 {/* List Content */}
-                <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+                <div className="flex-1 overflow-y-auto divide-y divide-line-soft">
                     {loadingList ? (
-                        <CommonLoader text="Loading invoices..." fullScreen={false} />
+                        <div className="flex items-center justify-center py-8">
+                            <FaCircleNotch className="animate-spin text-ink-subtle text-xl" />
+                        </div>
                     ) : filteredInvoices.map((inv) => {
-                        const isSelected = String(inv.id) === String(idParam);
+                        const isSelected = String(inv.id) === String(idParam || selectedItem?.id);
                         return (
                             <div
                                 key={inv.id}
                                 onClick={() => navigate(`/invoice/details/${inv.id}`)}
-                                className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? "bg-primary/10 border-l-4 border-primary" : ""}`}
+                                className={`p-4 cursor-pointer hover:bg-card-2 transition-colors ${isSelected ? "bg-primary/10 border-l-4 border-primary" : ""}`}
                             >
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className="font-bold text-gray-900">{inv.invoiceNo || inv.grnNumber}</span>
+                                    <span className="font-bold text-ink">{inv.invoiceNo || inv.grnNumber}</span>
+                                    {inv.status && (
+                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${inv.status?.toUpperCase() === "PAID" || inv.status?.toUpperCase() === "COMPLETED"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-yellow-100 text-yellow-800"
+                                            }`}>
+                                            {inv.status}
+                                        </span>
+                                    )}
                                 </div>
-                                <div className="text-sm text-gray-600 mb-2 truncate">
+                                <div className="text-sm text-ink-muted mb-2 truncate">
                                     {inv.supplier?.displayName || inv.supplier?.legalName || "N/A"}
                                 </div>
-                                <div className="flex justify-between items-center text-xs text-gray-400">
+                                <div className="flex justify-between items-center text-xs text-ink-subtle">
                                     <span>{formatDate(inv.grnDate)}</span>
-                                    <span className="font-bold text-gray-900">₹{formatMoney(getInvoiceDisplayTotal(inv))}</span>
+                                    <span className="font-bold text-ink">₹{formatMoney(getInvoiceDisplayTotal(inv))}</span>
                                 </div>
                             </div>
                         );
                     })}
                     {!loadingList && filteredInvoices.length === 0 && (
-                        <div className="p-8 text-center text-gray-500 text-sm">
+                        <div className="p-8 text-center text-ink-muted text-sm">
                             No invoices found.
                         </div>
                     )}
@@ -392,11 +422,12 @@ const GrnInvoiceViewPage: React.FC = () => {
 
             {/* ── Right Content Panel ── */}
             <div className="flex-1 overflow-y-auto p-6 lg:p-8 print:overflow-visible print:h-auto print:p-0 print:block">
-                {loadingDetail ? (
-                    <CommonLoader text="Loading invoice details..." fullScreen={false} />
-                ) : !selectedItem ? (
-                    <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-slate-400">
-                        <p className="text-base font-semibold">Select an invoice from the sidebar to view details.</p>
+                {loadingDetail || !selectedItem ? (
+                    <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                        <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
+                        <p className="text-ink-muted font-medium">
+                            {loadingDetail ? "Loading invoice details..." : "Select an invoice from the sidebar to view details."}
+                        </p>
                     </div>
                 ) : (
                     <div className="max-w-5xl mx-auto">
@@ -405,32 +436,50 @@ const GrnInvoiceViewPage: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => navigate(-1)}
-                                    className="md:hidden flex items-center gap-1.5 text-gray-600 hover:text-gray-900 font-semibold bg-transparent border-none outline-none cursor-pointer"
+                                    className="md:hidden flex items-center gap-1.5 text-ink-muted hover:text-ink font-semibold bg-transparent border-none outline-none cursor-pointer"
                                 >
                                     <FaArrowLeft className="text-xs" /> Back
                                 </button>
-                                <h2 className="text-xl font-bold text-gray-800 m-0">
+                                <h2 className="text-xl font-bold text-ink m-0">
                                     Purchase Invoice #{selectedItem.invoiceNo || selectedItem.grnNumber}
                                 </h2>
                             </div>
                             <div className="flex items-center gap-3">
+                                <CustomButton text="Edit" icon={FaEdit} variant="secondary" onClick={() => navigate(`/invoice/edit/${selectedItem.id}`)} />
                                 <CustomButton text="Print" icon={FaPrint} variant="primary" onClick={() => window.print()} />
                                 <CustomButton text="Download PDF" icon={FaDownload} variant="secondary" onClick={handleDownloadPdf} />
                             </div>
                         </div>
 
-                        {/* Print stylesheet */}
+                        {/* Print + screen overrides — invoice card always white/black regardless of theme */}
                         <style>{`
+                            #printable-grn-invoice-card,
+                            #printable-grn-invoice-card * {
+                                color: #000 !important;
+                                border-color: #000 !important;
+                            }
+                            #printable-grn-invoice-card {
+                                background: #fff !important;
+                            }
                             @media print {
                                 @page {
                                     size: A4 portrait;
                                     margin: 8mm;
+                                }
+                                html, body {
+                                    background: #fff !important;
+                                    height: auto;
+                                    overflow: visible !important;
+                                    margin: 0 !important;
+                                    padding: 0 !important;
                                 }
                                 body * {
                                     visibility: hidden !important;
                                 }
                                 #printable-grn-invoice-card, #printable-grn-invoice-card * {
                                     visibility: visible !important;
+                                    -webkit-print-color-adjust: exact;
+                                    print-color-adjust: exact;
                                 }
                                 #printable-grn-invoice-card {
                                     position: absolute;
@@ -438,7 +487,6 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     top: 0;
                                     width: 100%;
                                     height: 277mm;
-                                    background: #fff !important;
                                     box-shadow: none !important;
                                     margin: 0 !important;
                                     border-width: 1px !important;
@@ -446,10 +494,6 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 }
                                 .no-print {
                                     display: none !important;
-                                }
-                                html, body {
-                                    height: auto;
-                                    overflow: visible !important;
                                 }
                                 table { page-break-inside: avoid; }
                             }
@@ -760,8 +804,8 @@ const GrnInvoiceViewPage: React.FC = () => {
 
                         {/* Attachment Section */}
                         {selectedItem.invoiceImage && (
-                            <div className="mt-6 pt-6 border-t border-gray-200 no-print">
-                                <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+                            <div className="mt-6 pt-6 border-t border-line no-print">
+                                <div className="text-xs font-bold text-ink-muted uppercase tracking-widest mb-3">
                                     Invoice Attachment
                                 </div>
                                 {selectedItem.invoiceImage.toLowerCase().endsWith(".pdf") ? (
@@ -769,7 +813,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                         href={selectedItem.invoiceImage}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-decoration-none"
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors text-decoration-none"
                                     >
                                         <FaFilePdf size={14} /> View PDF Document
                                     </a>
@@ -778,13 +822,13 @@ const GrnInvoiceViewPage: React.FC = () => {
                                         <img
                                             src={selectedItem.invoiceImage}
                                             alt="Invoice Copy"
-                                            className="max-h-60 object-contain border border-gray-300 rounded-lg max-w-sm"
+                                            className="max-h-60 object-contain border border-line rounded-lg max-w-sm"
                                         />
                                         <a
                                             href={selectedItem.invoiceImage}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-sm font-semibold text-blue-600 hover:underline"
+                                            className="text-sm font-semibold text-primary hover:underline"
                                         >
                                             Open in New Tab
                                         </a>
