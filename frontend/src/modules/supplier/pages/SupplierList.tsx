@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
-import { FaSearch, FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
+import { FaTimes, FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -8,6 +8,10 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
@@ -21,6 +25,14 @@ type SortOrder = "default" | "asc" | "desc";
 
 const ITEMS_PER_PAGE = 15;
 const SORT_STORAGE_KEY = "sunsea_supplier_sort_name";
+
+interface FilterState {
+    status: string; // "" = all | "Active" | "Backup" | "Inactive" | "Blacklisted"
+}
+
+const DEFAULT_FILTERS: FilterState = {
+    status: "",
+};
 
 const SupplierList: React.FC = () => {
     const navigate = useNavigate();
@@ -39,6 +51,16 @@ const SupplierList: React.FC = () => {
     const initialSearch = searchParams.get("search") || "";
 
     const [searchTerm, setSearchTerm] = useState(initialSearch);
+
+    // Filters state
+    const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
+    const [draftFilters, setDraftFilters] = useState<FilterState>(DEFAULT_FILTERS);
+
+    const activeFilterCount = [
+        appliedFilters.status !== "",
+    ].filter(Boolean).length;
+
+    const hasActiveFilters = activeFilterCount > 0;
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -110,14 +132,23 @@ const SupplierList: React.FC = () => {
 
     // Client-side filtered suppliers
     const filteredSuppliers = useMemo(() => {
-        if (!searchTerm) return allSuppliers;
-        const term = searchTerm.toLowerCase();
-        return allSuppliers.filter((s: any) =>
-            s.supplierCode?.toLowerCase().includes(term) ||
-            s.legalName?.toLowerCase().includes(term) ||
-            s.displayName?.toLowerCase().includes(term)
-        );
-    }, [allSuppliers, searchTerm]);
+        let result = allSuppliers || [];
+        if (appliedFilters.status) {
+            result = result.filter((s: any) => s.status?.toLowerCase() === appliedFilters.status.toLowerCase());
+        }
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            result = result.filter((s: any) =>
+                s.supplierCode?.toLowerCase().includes(term) ||
+                s.legalName?.toLowerCase().includes(term) ||
+                s.displayName?.toLowerCase().includes(term) ||
+                s.contactPerson?.toLowerCase().includes(term) ||
+                s.gstin?.toLowerCase().includes(term) ||
+                (typeof s.mobile === "string" && s.mobile.toLowerCase().includes(term))
+            );
+        }
+        return result;
+    }, [allSuppliers, appliedFilters, searchTerm]);
 
     // Client-side sorted suppliers
     const suppliers = useMemo(() => {
@@ -148,6 +179,21 @@ const SupplierList: React.FC = () => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
+
+    const handleFilterOpen = useCallback(() => {
+        setDraftFilters(appliedFilters);
+    }, [appliedFilters]);
+
+    const handleApplyFilters = useCallback(() => {
+        setAppliedFilters(draftFilters);
+        setCurrentPage(1);
+    }, [draftFilters]);
+
+    const handleClearFilters = useCallback(() => {
+        setDraftFilters(DEFAULT_FILTERS);
+        setAppliedFilters(DEFAULT_FILTERS);
+        setCurrentPage(1);
+    }, []);
 
     const handleOpenView = useCallback((sup: any) => {
         setSelectedSupplier(sup);
@@ -191,6 +237,7 @@ const SupplierList: React.FC = () => {
         const columns = [
             { header: "Supplier Code", accessor: (item: any) => item.supplierCode || "" },
             { header: "Name", accessor: (item: any) => item.legalName || item.displayName || "" },
+            { header: "Contact Person", accessor: (item: any) => item.contactPerson || "" },
             { header: "Mobile", accessor: (item: any) => Array.isArray(item.mobile) && item.mobile.length > 0 ? item.mobile[0].number : (typeof item.mobile === "string" ? item.mobile : "") },
             { header: "Email", accessor: (item: any) => item.email || "" },
             { header: "GSTIN", accessor: (item: any) => item.gstin || "" },
@@ -205,160 +252,227 @@ const SupplierList: React.FC = () => {
     }, []);
 
     return (
-        <div>
-            <div className="">
-                <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
-                    {/* Page Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
-                        <div>
-                            <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
-                                Supplier Master
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                    {suppliers.length}
-                                </span>
-                            </h2>
-                        </div>
-                        <div className="flex items-center gap-3 w-full md:w-auto">
-                            <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
-                                <input
-                                    type="text"
-                                    data-search-input
-                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                    placeholder="Search Supplier..."
-                                    value={searchTerm}
-                                    onChange={handleSearch}
-                                />
-                            </div>
-                            {canExportSupplier && (
-                                <ExportCSVButton
-                                    fetchData={fetchSuppliersForExport}
-                                    columns={csvColumns}
-                                    filename={csvFilename}
-                                    text="Export"
-                                />
-                            )}
-                            {canCreateSupplier && (
-                                <CustomButton
-                                    text="Add Supplier"
-                                    icon={FaPlus}
-                                    onClick={() => navigate("/suppliers/create")}
-                                />
-                            )}
-                        </div>
+        <div className="max-w-[1400px] xl:mr-auto">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                {/* Page Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
+                    <div>
+                        <h2 className="text-2xl font-bold text-ink">Supplier Master</h2>
                     </div>
-
-                    {/* Table — data-table-nav lets F3-exit restore focus here */}
-                    <div
-                        ref={tableRef}
-                        tabIndex={0}
-                        data-table-nav
-                        className="p-0 outline-none"
-                    >
-                        <DataTable
-                            data={paginatedSuppliers}
-                            rowKey={(supplier) => supplier.id}
-                            loading={loading}
-                            emptyMessage="No suppliers found."
-                            rowClassName={(_row, index) =>
-                                index === focusedIndex
-                                    ? "bg-primary/8"
-                                    : ""
-                            }
-                            onRowClick={(supplier, index) => {
-                                setFocusedIndex(index);
-                                tableRef.current?.focus({ preventScroll: true });
-                                handleOpenView(supplier);
-                            }}
-                            pagination={
-                                totalPages > 1
-                                    ? { currentPage, totalPages, onPageChange: setCurrentPage }
-                                    : undefined
-                            }
-                            columns={[
-                                { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
-                                {
-                                    header: "NAME",
-                                    accessor: "legalName",
-                                    headerNode: (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
-                                            title={`Sort Alphabetically (F6)`}
-                                            className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
-                                        >
-                                            <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
-                                                NAME
-                                            </span>
-                                            <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
-                                                {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
-                                            </span>
-                                            {sortOrder !== "default" && (
-                                                <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
-                                                    {sortOrder === "asc" ? "A-Z" : "Z-A"}
-                                                </span>
-                                            )}
-                                        </button>
-                                    ),
-                                },
-                                { header: "MOBILE", render: (supplier) => Array.isArray(supplier.mobile) && supplier.mobile.length > 0 ? supplier.mobile[0].number : (typeof supplier.mobile === "string" ? supplier.mobile : "N/A") },
-                                { header: "EMAIL", render: (supplier) => supplier.email || "N/A" },
-                                { header: "GSTIN", render: (supplier) => supplier.gstin || "-" },
-                                {
-                                    header: "BALANCE",
-                                    align: "right",
-                                    render: (supplier: any) => {
-                                        const bal = Number(supplier.balanceAmount ?? supplier.openingBalance ?? 0);
-                                        const type = supplier.balanceType || (supplier.openingBalanceType === "CREDIT" ? "Cr" : supplier.openingBalanceType === "DEBIT" ? "Dr" : "");
-                                        const color = bal > 0 ? (type === "Cr" ? "text-orange-500" : "text-emerald-500") : "text-ink-subtle";
-                                        return (
-                                            <span className={`font-mono ${color}`}>
-                                                ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {bal > 0 ? type : ""}
-                                            </span>
-                                        );
-                                    }
-                                },
-                                {
-                                    header: "STATUS",
-                                    render: (supplier) => (
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${supplier.status === "Active" ? "bg-green-100 text-green-700 border border-green-200" : "bg-red-100 text-red-700 border border-red-200"}`}>
-                                            {supplier.status}
-                                        </span>
-                                    ),
-                                    align: "center"
-                                },
-                                {
-                                    header: "ACTIONS",
-                                    render: (supplier) => (
-                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                            <ViewButton onClick={() => handleOpenView(supplier)} />
-                                            {canEditSupplier && <EditButton onClick={() => handleEdit(supplier)} />}
-                                            {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(String(supplier.id))} />}
-                                        </div>
-                                    ),
-                                    align: "center"
-                                },
-                            ]}
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search Supplier..."
+                            className="w-full md:w-64"
                         />
+
+                        <FilterPopover
+                            activeFilterCount={activeFilterCount}
+                            hasActiveFilters={hasActiveFilters}
+                            onOpen={handleFilterOpen}
+                            onApply={handleApplyFilters}
+                            onClear={handleClearFilters}
+                        >
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Status
+                                    </label>
+                                    <SelectInput
+                                        name="filterStatus"
+                                        value={draftFilters.status}
+                                        options={[
+                                            { value: "Active", label: "Active" },
+                                            { value: "Backup", label: "Backup" },
+                                            { value: "Inactive", label: "Inactive" },
+                                            { value: "Blacklisted", label: "Blacklisted" },
+                                        ]}
+                                        defaultOptionLabel="All Statuses"
+                                        searchable={false}
+                                        noMargin
+                                        onChange={(e) =>
+                                            setDraftFilters((p) => ({ ...p, status: e.target.value }))
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        </FilterPopover>
+
+                        {canExportSupplier && (
+                            <ExportCSVButton
+                                fetchData={fetchSuppliersForExport}
+                                columns={csvColumns}
+                                filename={csvFilename}
+                                text="Export"
+                            />
+                        )}
+                        {canCreateSupplier && (
+                            <CustomButton
+                                text="Add Supplier"
+                                icon={FaPlus}
+                                onClick={() => navigate("/suppliers/create")}
+                            />
+                        )}
                     </div>
                 </div>
 
-                <SupplierViewModal
-                    show={showViewModal}
-                    onHide={handleCloseViewModal}
-                    supplier={selectedSupplier}
-                />
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div className="flex items-center gap-2 px-6 py-2 border-b border-line flex-wrap">
+                        <span className="text-xs text-ink-subtle">Active filters:</span>
 
-                <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
-                    onConfirm={handleDeleteConfirm}
-                    title="Confirm Delete"
-                    message="Are you sure you want to delete this supplier?"
-                    confirmText={isDeleting ? "Deleting..." : "Delete"}
-                    confirmVariant="danger"
-                />
+                        {appliedFilters.status && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Status: {appliedFilters.status}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setAppliedFilters((p) => ({ ...p, status: "" })); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Table — data-table-nav lets F3-exit restore focus here */}
+                <div
+                    ref={tableRef}
+                    tabIndex={0}
+                    data-table-nav
+                    className="p-0 outline-none"
+                >
+                    <DataTable
+                        data={paginatedSuppliers}
+                        rowKey={(supplier) => supplier.id}
+                        loading={loading}
+                        emptyMessage="No suppliers found."
+                        rowClassName={(_row, index) =>
+                            index === focusedIndex
+                                ? "bg-primary/8"
+                                : ""
+                        }
+                        onRowClick={(supplier, index) => {
+                            setFocusedIndex(index);
+                            tableRef.current?.focus({ preventScroll: true });
+                            handleOpenView(supplier);
+                        }}
+                        pagination={
+                            totalPages > 1
+                                ? { currentPage, totalPages, onPageChange: (page) => setCurrentPage(page) }
+                                : undefined
+                        }
+                        columns={[
+                            { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                            {
+                                header: "NAME",
+                                accessor: "legalName",
+                                headerNode: (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                                        title={`Sort Alphabetically: ${
+                                            sortOrder === "default"
+                                                ? "Default Order"
+                                                : sortOrder === "asc"
+                                                ? "A to Z (Ascending)"
+                                                : "Z to A (Descending)"
+                                        } (Click or press F6)`}
+                                        className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                    >
+                                        <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                            NAME
+                                        </span>
+                                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                                            {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                                        </span>
+                                        {sortOrder !== "default" && (
+                                            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                                {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                            </span>
+                                        )}
+                                    </button>
+                                ),
+                            },
+                            { header: "CONTACT PERSON", render: (supplier) => supplier.contactPerson || "—" },
+                            {
+                                header: "MOBILE",
+                                render: (supplier) =>
+                                    Array.isArray(supplier.mobile) && supplier.mobile.length > 0
+                                        ? supplier.mobile[0].number
+                                        : typeof supplier.mobile === "string"
+                                        ? supplier.mobile
+                                        : "N/A"
+                            },
+                            { header: "EMAIL", render: (supplier) => supplier.email || "N/A" },
+                            { header: "GSTIN", render: (supplier) => supplier.gstin || "—" },
+                            {
+                                header: "BALANCE",
+                                align: "right",
+                                render: (s: any) => {
+                                    const netBal = Number(
+                                        s.netBalance ??
+                                            (s.openingBalanceType === "CREDIT"
+                                                ? -Math.abs(s.openingBalance || 0)
+                                                : Math.abs(s.openingBalance || 0))
+                                    );
+                                    const amt = Math.abs(netBal);
+                                    const formattedAmt = amt.toLocaleString("en-IN", {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    });
+                                    if (netBal > 0) {
+                                        return (
+                                            <span className="font-mono font-bold text-blue-400">
+                                                ₹{formattedAmt} Dr
+                                            </span>
+                                        );
+                                    } else if (netBal < 0) {
+                                        return (
+                                            <span className="font-mono font-bold text-emerald-400">
+                                                ₹{formattedAmt} Cr
+                                            </span>
+                                        );
+                                    }
+                                    return <span className="font-mono text-ink-muted">₹0.00</span>;
+                                }
+                            },
+                            {
+                                header: "STATUS",
+                                render: (supplier) => <StatusBadge status={supplier.status?.toUpperCase() || "ACTIVE"} />,
+                                align: "center"
+                            },
+                            {
+                                header: "ACTIONS",
+                                render: (supplier) => (
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <ViewButton onClick={() => handleOpenView(supplier)} />
+                                        {canEditSupplier && <EditButton onClick={() => handleEdit(supplier)} />}
+                                        {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(String(supplier.id))} />}
+                                    </div>
+                                ),
+                                align: "center"
+                            },
+                        ]}
+                    />
+                </div>
             </div>
+
+            <SupplierViewModal
+                show={showViewModal}
+                onHide={handleCloseViewModal}
+                supplier={selectedSupplier}
+            />
+
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Confirm Delete"
+                message="Are you sure you want to delete this supplier? This action cannot be undone."
+                confirmText={isDeleting ? "Deleting..." : "Delete"}
+                confirmVariant="danger"
+                isDangerous={true}
+            />
         </div>
     );
 };

@@ -3,8 +3,8 @@ import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
 import { useSelector } from "react-redux";
-import { FaSave, FaEraser, FaPlus, FaCheck } from "react-icons/fa";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { FaArrowLeft, FaPlus, FaCheck } from "react-icons/fa";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
 
@@ -19,9 +19,9 @@ import type { SupplierAddress } from "../../../features/supplier/types";
 import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneInput/PhoneInput";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useSocket } from "../../../providers/SocketProvider";
 import { formatAmountOnBlur } from "../../../utils/pricingUtils";
+import { formatDate } from "../../../utils/dateUtils";
 import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 const supplierFormSchema = z.object({
@@ -93,7 +93,6 @@ const SupplierForm: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const isEdit = !!id;
-    const location = useLocation();
     const { addSupplier, editSupplier, loading } = useSuppliers();
     const user = useSelector((state: any) => state.auth.user);
     const { socket } = useSocket();
@@ -151,7 +150,7 @@ const SupplierForm: React.FC = () => {
         return () => window.removeEventListener("fkey-refresh", handleRefresh);
     }, [id, isEdit]);
 
-    // ── Escape: dirty-check back navigation ──────────────────────────────────
+    // ── Dirty-check back navigation ──────────────────────────────────
     const isDirtyRef = useRef(isDirty);
     useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
 
@@ -178,6 +177,14 @@ const SupplierForm: React.FC = () => {
         if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
         navigate(-1);
     }, [navigate]);
+
+    const handleBack = useCallback(() => {
+        if (isDirty) {
+            openDiscardModal();
+        } else {
+            navigate(-1);
+        }
+    }, [isDirty, openDiscardModal, navigate]);
 
     // Ref to remember blocker's proceed()/reset() from the current block-attempt
     // so the existing discard modal can drive them from its buttons.
@@ -287,7 +294,7 @@ const SupplierForm: React.FC = () => {
         };
 
         initForm();
-    }, [id, isEdit, user]);
+    }, [id, isEdit, user, navigate]);
 
     useEffect(() => {
         if (!socket) return;
@@ -483,192 +490,316 @@ const SupplierForm: React.FC = () => {
 
     if (isLoadingData) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-lg font-semibold text-ink-subtle animate-pulse">Loading Supplier Details...</div>
+            <div className="p-6 text-center text-ink-muted">
+                Loading supplier details...
             </div>
         );
     }
 
     return (
-        <div className="w-full max-w-[1200px] mr-auto supplier-form-compact">
-            <style>{`
-                .supplier-form-compact label { margin-bottom: 2px !important; font-size: 11px !important; }
-                .supplier-form-compact input, .supplier-form-compact select,
-                .supplier-form-compact button[role="combobox"] { height: 32px !important; min-height: 32px !important; font-size: 12px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
-                .supplier-form-compact .group { margin-bottom: 0 !important; }
-            `}</style>
-            <div className="bg-card rounded-xl border border-line-soft shadow-xs overflow-visible">
+        <div className="max-w-[1400px] xl:mr-auto">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
 
                 {/* Header */}
-                <div className="px-5 py-3 border-b border-line-soft flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-5 py-4 border-b border-line">
                     <div className="flex flex-col">
-                        <h2 className="text-base font-bold text-ink">{isEdit ? "Edit Supplier" : "Add New Supplier"}</h2>
+                        <h3 className="text-lg font-bold text-ink flex items-start">
+                            {isEdit ? "Edit Supplier" : "Create Supplier"}
+                            {formData.supplierCode && (
+                                <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{formData.supplierCode}</span>
+                            )}
+                        </h3>
                         {isEdit && <RecordAuditInfo auditData={auditInfo} title="Supplier" />}
                     </div>
-                    <BackButton text="Back" />
+                    <CustomButton
+                        text="Back to List"
+                        icon={FaArrowLeft}
+                        variant="secondary"
+                        onClick={handleBack}
+                    />
                 </div>
 
-                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} noValidate>
-                    <div className="px-5 py-3 space-y-3">
+                <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="p-5 space-y-5" noValidate>
 
-                        {/* ── Section 1: Supplier Details ── */}
+                    {/* ── Main Supplier Details ── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 lg:gap-x-10 gap-y-3 md:gap-y-4">
+                        <TextInput
+                            label="Firm / Legal Name"
+                            name="legalName"
+                            value={formData.legalName}
+                            placeholder="e.g. Sri Vinayaga Chemicals Pvt Ltd"
+                            required
+                            error={errors.legalName}
+                            onChange={handleChange}
+                        />
+                        <TextInput
+                            label="Display Name"
+                            name="displayName"
+                            value={formData.displayName}
+                            placeholder="e.g. SVC"
+                            error={errors.displayName}
+                            onChange={handleChange}
+                        />
+                        <SelectInput
+                            label="Status"
+                            name="status"
+                            searchable={false}
+                            value={formData.status}
+                            options={[
+                                { value: "Active", label: "Active" },
+                                { value: "Backup", label: "Backup" },
+                                { value: "Inactive", label: "Inactive" },
+                                { value: "Blacklisted", label: "Blacklisted" }
+                            ]}
+                            error={errors.status}
+                            onChange={handleChange}
+                        />
+                        <TextInput
+                            label="Contact Person"
+                            name="contactPerson"
+                            value={formData.contactPerson}
+                            placeholder="e.g. Ramesh Kumar"
+                            error={errors.contactPerson}
+                            onChange={handleChange}
+                        />
+                        <IndiaPhoneInput
+                            multi
+                            label="Mobile Numbers"
+                            name="phones"
+                            value={phones}
+                            onChange={(e) => {
+                                setPhones(e.target.value);
+                                setIsDirty(true);
+                                if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: "" }));
+                            }}
+                            maxNumbers={5}
+                            required={true}
+                            error={errors.mobile}
+                        />
+                        <TextInput
+                            label="Email"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            placeholder="e.g. sales@svchemicals.com"
+                            error={errors.email}
+                            onChange={handleChange}
+                        />
+                        <TextInput
+                            label="GSTIN (15 CHAR)"
+                            name="gstin"
+                            value={formData.gstin}
+                            placeholder="33ABCDE1234F1Z5"
+                            error={errors.gstin}
+                            onChange={handleChange}
+                        />
+                        <TextInput
+                            label="PAN (10 CHAR)"
+                            name="pan"
+                            value={formData.pan}
+                            placeholder="ABCDE1234F"
+                            error={errors.pan}
+                            onChange={handleChange}
+                        />
+                        <SelectInput
+                            label="GST Registration Type"
+                            name="gstRegType"
+                            searchable={false}
+                            value={formData.gstRegType}
+                            options={[
+                                { value: "Registered", label: "Registered" },
+                                { value: "Unregistered", label: "Unregistered" },
+                                { value: "Composition", label: "Composition" },
+                                { value: "SEZ", label: "SEZ Developer / Unit" }
+                            ]}
+                            error={errors.gstRegType}
+                            onChange={handleChange}
+                        />
                         <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Supplier Details</h3>
-                            </div>
-                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
-                                <TextInput label="Supplier Code" name="supplierCode" value={formData.supplierCode} placeholder="SUP-001" required error={errors.supplierCode} onChange={handleChange} disabled />
-                                <TextInput label="Legal Name" name="legalName" value={formData.legalName} placeholder="Sri Vinayaga Chemicals Pvt Ltd" required error={errors.legalName} onChange={handleChange} />
-                                <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="SVC" error={errors.displayName} onChange={handleChange} />
-                                <SelectInput label="Status" name="status" value={formData.status} options={[{ value: "Active", label: "Active" }, { value: "Backup", label: "Backup" }, { value: "Inactive", label: "Inactive" }, { value: "Blacklisted", label: "Blacklisted" }]} error={errors.status} onChange={handleChange} />
-                                <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Contact person name" error={errors.contactPerson} onChange={handleChange} />
-                                <TextInput label="Email" name="email" value={formData.email} placeholder="sales@svchemicals.com" error={errors.email} onChange={handleChange} />
-                                <TextInput label="GSTIN" name="gstin" value={formData.gstin} placeholder="33ABCDE1234F1Z5" error={errors.gstin} onChange={handleChange} />
-                                <TextInput label="PAN" name="pan" value={formData.pan} placeholder="ABCDE1234F" error={errors.pan} onChange={handleChange} />
-                            </div>
-                            <div className="mt-1.5 max-w-[50%]">
-                                <IndiaPhoneInput
-                                    multi
-                                    label="Mobile Numbers"
-                                    name="phones"
-                                    value={phones}
-                                    onChange={(e) => {
-                                        setPhones(e.target.value);
-                                        setIsDirty(true);
-                                        if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: "" }));
-                                    }}
-                                    maxNumbers={5}
-                                    error={errors.mobile}
-                                />
-                            </div>
-                        </div>
-
-                        {/* ── Section 2: Billing Address ── */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Billing Address <span className="text-rose-500">*</span></h3>
-                            </div>
-                            <AddressForm
-                                addressValue={formData.billingAddressLine1}
-                                onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
-                                addressError={errors.billingAddressLine1}
-                                countryValue={formData.billingAddressCountry}
-                                onCountryChange={(v) => {
-                                    setFormData(prev => ({ ...prev, billingAddressCountry: v, billingAddressState: "", billingAddressCity: "" }));
-                                    setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
-                                    setIsDirty(true);
-                                }}
-                                countryError={errors.billingAddressCountry}
-                                stateValue={formData.billingAddressState}
-                                onStateChange={(v) => {
-                                    setFormData(prev => ({ ...prev, billingAddressState: v, billingAddressCity: "" }));
-                                    setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "" }));
-                                    setIsDirty(true);
-                                }}
-                                stateError={errors.billingAddressState}
-                                cityValue={formData.billingAddressCity}
-                                onCityChange={(v) => {
-                                    setFormData(prev => ({ ...prev, billingAddressCity: v }));
-                                    setErrors(prev => ({ ...prev, billingAddressCity: "" }));
-                                    setIsDirty(true);
-                                }}
-                                cityError={errors.billingAddressCity}
-                                pincodeValue={formData.billingAddressPincode}
-                                onPincodeChange={(v) => handleChange({ target: { name: "billingAddressPincode", value: v } })}
-                                pincodeError={errors.billingAddressPincode}
+                            <TextInput
+                                label="Opening Balance ₹"
+                                name="openingBalance"
+                                type="number"
+                                value={String(formData.openingBalance)}
+                                placeholder="0.00"
+                                preventNegative
                                 required
+                                error={errors.openingBalance}
+                                onChange={handleChange}
+                                onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "openingBalance", value: v } } as any))}
+                                disabled={isEdit && hasTransactions}
+                            />
+                            {isEdit && hasTransactions && (
+                                <p className="mt-1 text-xs text-amber-600">Cannot edit — supplier has existing transactions.</p>
+                            )}
+                        </div>
+                        <SelectInput
+                            label="Opening Balance Type"
+                            name="openingBalanceType"
+                            searchable={false}
+                            value={formData.openingBalanceType}
+                            options={[
+                                { value: "CREDIT", label: "Credit (We owe supplier)" },
+                                { value: "DEBIT", label: "Debit (Advance paid to supplier)" }
+                            ]}
+                            onChange={handleChange}
+                            disabled={isEdit && hasTransactions}
+                            error={errors.openingBalanceType}
+                        />
+                        {isEdit && (
+                            <div>
+                                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Last Purchase Date</label>
+                                <div className="px-3 py-2 rounded-lg border border-line bg-card-2 text-sm text-ink">
+                                    {initialSupplier?.lastPurchaseDate ? formatDate(initialSupplier.lastPurchaseDate) : "No purchase yet"}
+                                </div>
+                            </div>
+                        )}
+                        {isEdit && (
+                            <div>
+                                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Last Payment Date</label>
+                                <div className="px-3 py-2 rounded-lg border border-line bg-card-2 text-sm text-ink">
+                                    {initialSupplier?.lastPaymentDate ? formatDate(initialSupplier.lastPaymentDate) : "No payment yet"}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── Billing Address ── */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">
+                                Billing Address
+                            </h4>
+                        </div>
+                        <AddressForm
+                            addressValue={formData.billingAddressLine1}
+                            onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
+                            addressError={errors.billingAddressLine1}
+                            countryValue={formData.billingAddressCountry}
+                            onCountryChange={(v) => {
+                                setFormData(prev => ({ ...prev, billingAddressCountry: v, billingAddressState: "", billingAddressCity: "" }));
+                                setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
+                                setIsDirty(true);
+                            }}
+                            countryError={errors.billingAddressCountry}
+                            stateValue={formData.billingAddressState}
+                            onStateChange={(v) => {
+                                setFormData(prev => ({ ...prev, billingAddressState: v, billingAddressCity: "" }));
+                                setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "" }));
+                                setIsDirty(true);
+                            }}
+                            stateError={errors.billingAddressState}
+                            cityValue={formData.billingAddressCity}
+                            onCityChange={(v) => {
+                                setFormData(prev => ({ ...prev, billingAddressCity: v }));
+                                setErrors(prev => ({ ...prev, billingAddressCity: "" }));
+                                setIsDirty(true);
+                            }}
+                            cityError={errors.billingAddressCity}
+                            pincodeValue={formData.billingAddressPincode}
+                            onPincodeChange={(v) => handleChange({ target: { name: "billingAddressPincode", value: v } })}
+                            pincodeError={errors.billingAddressPincode}
+                            required
+                        />
+                    </div>
+
+                    {/* ── Delivery / Plant Addresses ── */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-ink uppercase tracking-wide">
+                                Delivery / Plant Addresses
+                            </h4>
+                            <CustomButton
+                                type="button"
+                                text="Add Address"
+                                icon={FaPlus}
+                                variant="secondary"
+                                onClick={addShippingAddress}
                             />
                         </div>
 
-                        {/* ── Section 3: Delivery / Plant Addresses ── */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Delivery / Plant Addresses <span className="text-rose-500">*</span></h3>
-                                <CustomButton text="Add Address" icon={FaPlus} onClick={addShippingAddress} type="button" size="sm" variant="secondary" />
-                            </div>
-                            <div className="space-y-2">
-                                {addresses.length === 0 && (
-                                    <div className="text-center text-[11px] text-ink-subtle py-2 border border-dashed border-line-soft rounded-lg bg-card-2">No addresses added.</div>
-                                )}
-                                {(() => {
-                                    const isAnyAddressSameAsBilling = addresses.some((addr) =>
-                                        addr.address.addressLine1 === formData.billingAddressLine1 &&
-                                        addr.address.city === formData.billingAddressCity &&
-                                        addr.address.state === formData.billingAddressState &&
-                                        addr.address.pincode === formData.billingAddressPincode &&
-                                        !!formData.billingAddressLine1
-                                    );
-                                    return addresses.map((addr, index) => {
-                                        const isThisSameAsBilling =
-                                            addr.address.addressLine1 === formData.billingAddressLine1 &&
-                                            addr.address.city === formData.billingAddressCity &&
-                                            addr.address.state === formData.billingAddressState &&
-                                            addr.address.pincode === formData.billingAddressPincode &&
-                                            !!formData.billingAddressLine1;
-                                        const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
-                                        return (
-                                            <div key={index} className="p-2.5 border border-line-soft rounded-lg bg-card-2">
-                                                <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-line-soft">
-                                                    <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">Address {index + 1}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        {showSameAsBillingCheckbox && (
-                                                            <label className="flex items-center gap-1 text-[10px] text-ink-subtle cursor-pointer hover:text-ink">
-                                                                <input type="checkbox" className="w-3 h-3 rounded accent-primary cursor-pointer" checked={isThisSameAsBilling} onChange={(e) => toggleSameAsBilling(index, e.target.checked)} />
-                                                                Same as billing
-                                                            </label>
-                                                        )}
-                                                        {addresses.length > 1 && <DeleteButton onClick={() => removeShippingAddress(index)} />}
-                                                    </div>
-                                                </div>
-                                                <AddressForm
-                                                    addressValue={addr.address.addressLine1}
-                                                    onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
-                                                    addressError={errors[`addresses.${index}.address.addressLine1`]}
-                                                    stateValue={addr.address.state}
-                                                    onStateChange={(v) => { handleShippingAddressChange(index, "state", v); handleShippingAddressChange(index, "city", ""); }}
-                                                    stateError={errors[`addresses.${index}.address.state`]}
-                                                    cityValue={addr.address.city}
-                                                    onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
-                                                    cityError={errors[`addresses.${index}.address.city`]}
-                                                    pincodeValue={addr.address.pincode}
-                                                    onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
-                                                    pincodeError={errors[`addresses.${index}.address.pincode`]}
-                                                    required
-                                                />
-                                            </div>
-                                        );
-                                    });
-                                })()}
-                            </div>
-                        </div>
-
-                        {/* ── Section 4: Opening Balance ── */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
-                                <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Opening Balance</h3>
-                            </div>
-                            <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
-                                <div>
-                                    <TextInput label="Opening Balance (₹)" name="openingBalance" type="number" value={String(formData.openingBalance)} placeholder="0.00" error={errors.openingBalance} onChange={handleChange} onBlur={formatAmountOnBlur((v) => handleChange({ target: { name: "openingBalance", value: v } } as any))} disabled={isEdit && hasTransactions} />
-                                    {isEdit && hasTransactions && <p className="mt-0.5 text-[10px] text-amber-600">Cannot edit — supplier has existing transactions.</p>}
-                                </div>
-                                <SelectInput label="Balance Type" name="openingBalanceType" value={formData.openingBalanceType} options={[{ value: "CREDIT", label: "Credit (We owe supplier)" }, { value: "DEBIT", label: "Debit (Advance paid)" }]} onChange={handleChange} disabled={isEdit && hasTransactions} />
-                            </div>
-                        </div>
-                    </div>
-                    {/* Footer */}
-                    <div className="flex justify-end gap-3 px-5 py-2.5 border-t border-line-soft bg-card-2">
-                        {!isEdit && (
-                            <CustomButton text="Clear Form" icon={FaEraser} onClick={handleClear} type="button" variant="secondary" />
+                        {addresses.length === 0 && (
+                            <p className="text-xs text-ink-muted italic">No delivery address added yet. Click "Add Address" to add one.</p>
                         )}
-                        <CustomButton
-                            text={isSubmitting ? "Saving..." : (isEdit ? "Update Supplier" : "Save Supplier")}
-                            icon={FaSave}
-                            type="submit"
-                            disabled={isSubmitting || loading}
-                        />
+
+                        {(() => {
+                            const isAnyAddressSameAsBilling = addresses.some((addr) =>
+                                addr.address.addressLine1 === formData.billingAddressLine1 &&
+                                addr.address.city === formData.billingAddressCity &&
+                                addr.address.state === formData.billingAddressState &&
+                                addr.address.pincode === formData.billingAddressPincode &&
+                                !!formData.billingAddressLine1
+                            );
+                            return addresses.map((addr, index) => {
+                                const isThisSameAsBilling =
+                                    addr.address.addressLine1 === formData.billingAddressLine1 &&
+                                    addr.address.city === formData.billingAddressCity &&
+                                    addr.address.state === formData.billingAddressState &&
+                                    addr.address.pincode === formData.billingAddressPincode &&
+                                    !!formData.billingAddressLine1;
+                                const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
+
+                                return (
+                                    <div key={index} className="p-4 border border-line rounded-md relative bg-card-2/40">
+                                        <div className="flex items-center justify-between mb-3 border-b border-line pb-2">
+                                            <h4 className="text-sm font-semibold text-ink uppercase">Address {index + 1}</h4>
+                                            <div className="flex items-center gap-3">
+                                                {showSameAsBillingCheckbox && (
+                                                    <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer hover:text-ink">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-3.5 h-3.5 rounded accent-primary cursor-pointer"
+                                                            checked={isThisSameAsBilling}
+                                                            onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
+                                                        />
+                                                        Same as billing
+                                                    </label>
+                                                )}
+                                                {addresses.length > 1 && <DeleteButton onClick={() => removeShippingAddress(index)} />}
+                                            </div>
+                                        </div>
+                                        <AddressForm
+                                            addressValue={addr.address.addressLine1}
+                                            onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
+                                            addressError={errors[`addresses.${index}.address.addressLine1`]}
+                                            stateValue={addr.address.state}
+                                            onStateChange={(v) => {
+                                                handleShippingAddressChange(index, "state", v);
+                                                handleShippingAddressChange(index, "city", "");
+                                            }}
+                                            stateError={errors[`addresses.${index}.address.state`]}
+                                            cityValue={addr.address.city}
+                                            onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
+                                            cityError={errors[`addresses.${index}.address.city`]}
+                                            pincodeValue={addr.address.pincode}
+                                            onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
+                                            pincodeError={errors[`addresses.${index}.address.pincode`]}
+                                            required
+                                        />
+                                    </div>
+                                );
+                            });
+                        })()}
                     </div>
                 </form>
+
+                {/* Footer */}
+                <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
+                    {!isEdit && (
+                        <CustomButton
+                            text="Clear Form"
+                            onClick={handleClear}
+                            type="button"
+                            variant="secondary"
+                        />
+                    )}
+                    <CustomButton
+                        text={isSubmitting ? "Saving..." : (isEdit ? "Update Supplier" : "Save Supplier")}
+                        type="submit"
+                        disabled={isSubmitting || loading}
+                        onClick={handleSubmit}
+                    />
+                </div>
             </div>
 
             {/* Discard Changes Modal */}
