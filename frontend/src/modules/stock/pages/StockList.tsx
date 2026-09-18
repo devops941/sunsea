@@ -155,8 +155,6 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
         { header: "LOCATION", accessor: (item: any) => (item as any).storeLocation?.locationCode || item.locationId || "-" },
         { header: "PHYSICAL STOCK", accessor: (item: any) => formatExportQty(item.onHandQty ?? 0, (item as any).baseUom || item.rawMaterial?.baseUom || "") },
         { header: "MIN STOCK", accessor: (item: any) => formatExportQty(Number((item as any).minimumStock || 0), (item as any).baseUom || "") },
-        { header: "RESERVED", accessor: (item: any) => formatExportQty(item.reservedQty ?? 0, (item as any).baseUom || "") },
-        { header: "AVAILABLE", accessor: (item: any) => formatExportQty(Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0), (item as any).baseUom || "") },
         { header: "STATUS", accessor: (item: any) => item.status || "Active" },
     ];
 
@@ -289,34 +287,19 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             render: (item) => {
                                 const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
                                 const minStock = Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0);
+                                const reorderLevel = Number((item as any).reorderLevel || item.rawMaterial?.reorderLevel || 0);
+                                const onHand = Number(item.onHandQty ?? 0);
+
+                                let stockColorClass = "text-emerald-600 dark:text-emerald-400";
+                                if (onHand <= minStock) stockColorClass = "text-rose-600 dark:text-rose-400";
+                                else if (onHand <= reorderLevel) stockColorClass = "text-amber-600 dark:text-amber-400";
+
                                 return (
                                     <div className="flex flex-col">
-                                        <span className="text-ink">{formatDisplayQty(item.onHandQty, baseUom)}</span>
+                                        <span className={`font-semibold ${stockColorClass}`}>{formatDisplayQty(onHand, baseUom)}</span>
                                         <span className="text-xs text-ink-subtle">{formatDisplayQty(minStock, baseUom, "Min: ")}</span>
                                     </div>
                                 );
-                            }
-                        },
-                        {
-                            header: "RESERVED",
-                            render: (item) => {
-                                const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
-                                return <span className="text-ink-muted">{formatDisplayQty(item.reservedQty, baseUom)}</span>;
-                            }
-                        },
-                        {
-                            header: "AVAILABLE",
-                            render: (item) => {
-                                const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
-                                const minStock = Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0);
-                                const reorderLevel = Number((item as any).reorderLevel || item.rawMaterial?.reorderLevel || 0);
-                                const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
-
-                                let availColorClass = "text-green-600";
-                                if (available <= minStock) availColorClass = "text-red-600";
-                                else if (available <= reorderLevel) availColorClass = "text-amber-600";
-
-                                return <span className={`font-semibold ${availColorClass}`}>{formatDisplayQty(available, baseUom)}</span>;
                             }
                         },
                         {
@@ -356,8 +339,6 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
                             { label: "Store Location", value: formatLocationAddress((selectedItem as any).storeLocation?.locationCode || selectedItem.locationId) || "N/A" },
                             { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, (selectedItem as any).baseUom || "") },
-                            { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, (selectedItem as any).baseUom || "") },
-                            { label: "Available Stock", value: formatExportQty(Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0), (selectedItem as any).baseUom || "") },
                             { label: "Status", value: selectedItem.status || "Active" },
                         ]
                     }

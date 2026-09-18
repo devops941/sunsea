@@ -281,8 +281,8 @@ const EodStockList: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="max-w-[1024px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+    <div className="w-full pb-6">
+      <div className="w-full bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* ── Header ───────────────────────────────────────────────────────────── */}
         <div className="border-b border-line px-5 py-4">
@@ -371,30 +371,35 @@ const EodStockList: React.FC = () => {
             columns={[
               {
                 header: "ITEM CODE",
+                width: "160px",
                 render: (item) => (
-                  <span className="font-semibold text-ink tracking-tight text-sm">
+                  <span className="font-semibold text-ink tracking-tight text-sm font-mono">
                     {item.itemCode}
                   </span>
                 ),
               },
               {
                 header: "ITEM NAME",
+                width: "minmax(200px, 2fr)",
                 render: (item) => (
                   <span className="font-medium text-ink text-sm">{item.itemName}</span>
                 ),
               },
               {
                 header: "CATEGORY",
+                width: "160px",
                 render: (item) => <CategoryBadge category={item.category} />,
               },
               {
                 header: "STORE",
+                width: "160px",
                 render: (item) => (
                   <span className="text-ink font-normal text-sm">{getStoreName(item.storeId)}</span>
                 ),
               },
               {
                 header: "START QTY",
+                width: "150px",
                 align: "right",
                 render: (item) => (
                   <span className="text-ink font-mono font-medium text-sm">
@@ -404,6 +409,7 @@ const EodStockList: React.FC = () => {
               },
               {
                 header: isTodaySelected && isLive ? "CURRENT QTY" : "EOD QTY",
+                width: "160px",
                 align: "right",
                 render: (item) => (
                   <span className="font-bold font-mono text-sm text-ink flex items-center justify-end gap-1.5">

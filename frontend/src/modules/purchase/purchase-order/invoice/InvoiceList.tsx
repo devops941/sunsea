@@ -221,7 +221,7 @@ const InvoiceList: React.FC = () => {
                         totalPages,
                         onPageChange: (page) => setCurrentPage(page),
                     }}
-                    rowClassName={(_, i) => i === focusedIndex ? "ring-1 ring-inset ring-accent/40 bg-accent/5" : ""}
+                    rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
                     onRowClick={(row, i) => { setFocusedIndex(i); tableRef.current?.focus({ preventScroll: true }); }}
                     columns={[
                         {

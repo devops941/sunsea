@@ -104,7 +104,13 @@ const GoodsDispatchList: React.FC = () => {
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
     count: displayDispatches.length,
     onEnter: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/view/${item.id}`); },
-    onEdit: (i) => { const item = displayDispatches[i]; if (item) navigate(`/production/goods-dispatch/edit/${item.id}`); },
+    onEdit: (i) => {
+      const item = displayDispatches[i];
+      const isDirect = item?.items?.length > 0 && item.items.every((it: any) => it.bypassGate);
+      if (item && !isDirect && (item.status === "PENDING_GATE_APPROVAL" || item.status === "PENDING_STORE_RECEIPT")) {
+        navigate(`/production/goods-dispatch/edit/${item.id}`);
+      }
+    },
     containerRef: tableRef,
   });
 
@@ -114,6 +120,12 @@ const GoodsDispatchList: React.FC = () => {
       width: "130px",
       accessor: "dispatchNumber",
       render: (item: any) => <span className="font-bold text-ink tracking-tight">{item.dispatchNumber}</span>,
+    },
+    {
+      header: "DC No",
+      width: "120px",
+      accessor: "dcNumber",
+      render: (item: any) => <span className="font-semibold text-ink font-mono">{item.dcNumber || "—"}</span>,
     },
     {
       header: "Date",
@@ -151,16 +163,19 @@ const GoodsDispatchList: React.FC = () => {
       header: "Action",
       width: "90px",
       accessor: "id",
-      render: (item: any) => (
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          {can("goods-dispatch.view") && (
-            <ViewButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
-          )}
-          {(item.status === "PENDING_GATE_APPROVAL" || item.status === "PENDING_STORE_RECEIPT") && can("goods-dispatch.edit") && (
-            <EditButton onClick={() => navigate(`/production/goods-dispatch/edit/${item.id}`)} />
-          )}
-        </div>
-      ),
+      render: (item: any) => {
+        const isDirect = item.items?.length > 0 && item.items.every((it: any) => it.bypassGate);
+        return (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {can("goods-dispatch.view") && (
+              <ViewButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
+            )}
+            {!isDirect && (item.status === "PENDING_GATE_APPROVAL" || item.status === "PENDING_STORE_RECEIPT") && can("goods-dispatch.edit") && (
+              <EditButton onClick={() => navigate(`/production/goods-dispatch/edit/${item.id}`)} />
+            )}
+          </div>
+        );
+      },
     },
   ];
 

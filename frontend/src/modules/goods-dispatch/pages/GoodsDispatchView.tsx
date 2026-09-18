@@ -12,7 +12,6 @@ import {
 
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-import EditButton from "../../../components/ui/EditButton/EditButton";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import { formatDate, formatDateTime } from "../../../utils/dateUtils";
 import { usePermission } from "../../../hooks/usePermission";
@@ -37,8 +36,8 @@ const GoodsDispatchView: React.FC = () => {
   const dispatch = useAppDispatch();
   const { can } = usePermission();
 
-  // Only show approval actions when on the /approval/ route
-  const isApprovalRoute = location.pathname.includes("/approval/");
+  // Only show approval actions when on the edit or approval route
+  const isApprovalMode = location.pathname.includes("/approval/") || location.pathname.includes("/edit/") || location.search.includes("mode=approval");
 
   const { currentDispatch: dispatchData, loading } = useAppSelector((state) => state.goodsDispatch);
 
@@ -52,9 +51,11 @@ const GoodsDispatchView: React.FC = () => {
   useEffect(() => {
     if (dispatchData?.items && dispatchData.status === "PENDING_STORE_RECEIPT") {
       const initial: Record<number, string> = {};
-      dispatchData.items.forEach((item: any) => {
-        initial[item.id] = String(item.receivedQty || item.dispatchQty);
-      });
+      dispatchData.items
+        .filter((item: any) => !item.bypassGate)
+        .forEach((item: any) => {
+          initial[item.id] = String(item.receivedQty || item.dispatchQty);
+        });
       setReceivedQuantities(initial);
     }
   }, [dispatchData]);
@@ -69,7 +70,13 @@ const GoodsDispatchView: React.FC = () => {
 
   const isGate = dispatchData.status === "PENDING_GATE_APPROVAL";
   const isStore = dispatchData.status === "PENDING_STORE_RECEIPT";
-  const canAct = (isGate || isStore) && can("goods-dispatch.edit");
+  const canAct = isApprovalMode && (isGate || isStore) && can("goods-dispatch.edit");
+
+  // In Approval/Edit mode, exclude direct/bypass items so they don't appear in approval/receive actions.
+  // In View mode, show all items (including direct dispatch).
+  const itemsToDisplay = isApprovalMode
+    ? dispatchData.items?.filter((i: any) => !i.bypassGate) || []
+    : dispatchData.items || [];
 
   const handleApprove = async () => {
     try {
@@ -77,10 +84,12 @@ const GoodsDispatchView: React.FC = () => {
         await dispatch(gateApproveDispatch({ id: dispatchData.id, data: { action: "APPROVE", remarks } })).unwrap();
         toast.success("Gate approved successfully");
       } else {
-        const receivedItems = dispatchData.items?.map((item: any) => ({
-          itemId: Number(item.id),
-          receivedQty: Number(receivedQuantities[item.id] ?? item.dispatchQty),
-        }));
+        const receivedItems = dispatchData.items
+          ?.filter((item: any) => !item.bypassGate)
+          .map((item: any) => ({
+            itemId: Number(item.id),
+            receivedQty: Number(receivedQuantities[item.id] ?? item.dispatchQty),
+          }));
         await dispatch(storeReceiveDispatch({ id: dispatchData.id, data: { action: "APPROVE", remarks, receivedItems } })).unwrap();
         toast.success("Stock received successfully. Stock updated.");
       }
@@ -152,9 +161,6 @@ const GoodsDispatchView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {(dispatchData.status === "PENDING_GATE_APPROVAL" || dispatchData.status === "PENDING_STORE_RECEIPT") && can("goods-dispatch.edit") && (
-            <EditButton onClick={() => navigate(`/production/goods-dispatch/edit/${dispatchData.id}`)} />
-          )}
           <BackButton text="Back to List" to="/production/goods-dispatch" />
         </div>
       </div>
@@ -183,7 +189,7 @@ const GoodsDispatchView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line-soft bg-card">
-                    {dispatchData.items?.map((item: any) => (
+                    {itemsToDisplay.map((item: any) => (
                       <tr key={item.id} className="hover:bg-card-2/60 transition-colors">
                         <td className="px-4 py-3 text-sm text-ink font-bold">
                           <div>{item.productionOrder?.productionOrderId}</div>
