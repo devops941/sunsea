@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useFormShortcuts } from "../../../../hooks/useFormShortcuts";
-import { FaCheck } from "react-icons/fa";
+import { FaSave, FaPaperPlane, FaCheck } from "react-icons/fa";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import BusyItemsTable from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 import AutocompleteInput from "../../../../components/form/AutocompleteInput/AutocompleteInput";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import CustomButton from "../../../../components/ui/Button/Button";
@@ -1080,13 +1080,38 @@ const PurchaseOrderForm: React.FC = () => {
         const item = formData.items[index];
         if (!item) return null;
         return (
-          <DecimalCell
-            value={item.unitPrice || 0}
-            showEmpty={!item.productId}
-            disabled={isLocked}
-            onChange={(v) => handleItemChange(index, "unitPrice", v)}
+          <input
+            type="number"
+            value={item.unitPrice || ""}
+            onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
             placeholder="0.00"
-            className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0"
+            step="0.01"
+            min={0}
+            disabled={isLocked}
+            className="w-full bg-transparent text-[13px] text-ink text-right outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        );
+      },
+    },
+    {
+      key: "tax",
+      header: "Tax %",
+      width: "80px",
+      align: "center" as const,
+      render: (_row: PurchaseOrderItem, index: number) => {
+        const item = formData.items[index];
+        if (!item) return null;
+        return (
+          <input
+            type="number"
+            value={item.tax || ""}
+            onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
+            placeholder="0"
+            step="0.01"
+            min={0}
+            max={100}
+            disabled={isLocked}
+            className="w-full bg-transparent text-[13px] text-ink text-center outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         );
       },
@@ -1101,51 +1126,27 @@ const PurchaseOrderForm: React.FC = () => {
         if (!item) return null;
         const qty = Number(item.quantity) || 0;
         const price = Number(item.unitPrice) || 0;
+        const taxPercent = Number(item.tax) || 0;
         const rawMaterial = rawMaterials.find(rm => String(rm.rawMaterialId) === String(item.productId));
         const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
-        const lineTotal = qty * mult * price;
+        const taxableAmount = qty * mult * price;
+        const gstAmount = taxableAmount * (taxPercent / 100);
+        const lineTotal = taxableAmount + gstAmount;
         return (
-          <span className="text-[13px] font-bold text-ink">₹{(lineTotal || 0).toFixed(2)}</span>
+          <span className="text-[13px] font-bold text-ink">₹{lineTotal.toFixed(2)}</span>
         );
       },
     },
   ], [formData.items, productOptions, rawMaterials, errors, isLocked, handleItemChange, handleItemProductChange, isInterState]);
-
-  if (loading) {
-    return <CommonLoader text="Loading Purchase Order..." fullScreen={false} />;
-  }
-
-  if (poNotFound) {
-    return (
-      <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center my-8 max-w-lg">
-        <h2 className="text-xl font-bold text-red-600 mb-2">Purchase Order Not Found</h2>
-        <p className="text-gray-600 mb-6">The purchase order you are trying to edit does not exist or has been deleted.</p>
-        <BackButton text="Back to Purchase Orders" />
-      </div>
-    );
-  }
-
-  if (fetchError) {
-    return (
-      <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center my-8 max-w-lg">
-        <h2 className="text-xl font-bold text-red-600 mb-2">Failed to Load Purchase Order</h2>
-        <p className="text-gray-600 mb-6">Something went wrong while retrieving the purchase order data.</p>
-        <div className="flex justify-center gap-4">
-          <BackButton text="Back" />
-          <CustomButton text="Retry" onClick={() => window.location.reload()} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-[1200px] xl:mr-auto">
       <div className="bg-card rounded-2xl shadow-sm border border-line overflow-visible">
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-line">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-line-soft">
           <h2 className="text-lg font-bold text-ink flex items-start">
-            {isEdit ? (isLocked ? " Purchase Order" : " Purchase Order") : " Purchase Order"}
+            {isEdit ? (isLocked ? "View Purchase Order" : "Edit Purchase Order") : "Create Purchase Order"}
             {formData.poNumber && <span className="text-purple-400 text-sm ml-1 mt-0.5 leading-none">*{formData.poNumber}</span>}
           </h2>
           <BackButton text="Back to List" />
@@ -1160,34 +1161,40 @@ const PurchaseOrderForm: React.FC = () => {
 
         <form ref={formRef} onKeyDown={handleFormKeyDown} data-escape-guarded className="px-5 py-3 space-y-3" noValidate>
 
-            {/* ── PO Details ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
-              <DatePickerCalendar label="PO Date" name="poDate" value={formData.poDate} onChange={(e) => handleChange(e as any)} required error={errors.poDate} disabled={isLocked || isEdit} horizontal />
-              <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable error={errors.supplierId} disabled={isLocked || isEdit} horizontal />
-              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable error={errors.storeId} disabled={isLocked} horizontal />
+            {/* ── Section 1: PO Details ── */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-line-soft">
+                {/* <h3 className="text-xs font-bold text-ink uppercase tracking-wide">PO Details</h3> */}
+              </div>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-1.5">
+                <DatePickerCalendar label="PO Date" name="poDate" value={formData.poDate} onChange={(e) => handleChange(e as any)} required error={errors.poDate} disabled={isLocked || isEdit} />
+                <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable error={errors.supplierId} disabled={isLocked || isEdit} />
+                <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable error={errors.storeId} disabled={isLocked} />
+              </div>
             </div>
 
-            {/* ── Addresses ── */}
-            {(formData.billingAddressLine1 || formData.billingCity) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-2 border border-line-soft rounded-lg bg-card">
-                  <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Billing Address</span>
-                  <p className="text-xs text-ink-subtle mt-1">
-                    {[formData.billingAddressLine1, formData.billingCity, formData.billingState, formData.billingCountry, formData.billingPincode].filter(Boolean).join(", ")}
-                  </p>
-                </div>
-                <div className="p-2 border border-line-soft rounded-lg bg-card">
-                  <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
-                  <p className="text-xs text-ink-subtle mt-1">
-                    {[formData.shippingAddressLine1, formData.shippingCity, formData.shippingState, formData.shippingCountry, formData.shippingPincode].filter(Boolean).join(", ") || "Select a store to see address"}
-                  </p>
-                </div>
+            {/* ── Section 2: Billing & Shipping Address (Info Row) ── */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Billing Address - Company Address */}
+              <div className="bg-card-2 rounded-lg border border-line-soft px-4 py-2.5">
+                <h3 className="text-[11px] font-bold text-ink uppercase tracking-wide mb-1.5">Billing Address <span className="text-ink-subtle font-medium normal-case">(Company)</span></h3>
+                <p className="text-xs text-ink leading-relaxed">
+                  {[formData.billingAddressLine1, formData.billingCity, formData.billingState, formData.billingCountry, formData.billingPincode].filter(Boolean).join(", ") || <span className="text-ink-subtle italic">No address configured</span>}
+                </p>
               </div>
-            )}
 
-            {/* ── Order Items ── */}
+              {/* Shipping Address - Store Address */}
+              <div className="bg-card-2 rounded-lg border border-line-soft px-4 py-2.5">
+                <h3 className="text-[11px] font-bold text-ink uppercase tracking-wide mb-1.5">Shipping Address <span className="text-ink-subtle font-medium normal-case">(Store)</span></h3>
+                <p className="text-xs text-ink leading-relaxed">
+                  {[formData.shippingAddressLine1, formData.shippingCity, formData.shippingState, formData.shippingCountry, formData.shippingPincode].filter(Boolean).join(", ") || <span className="text-ink-subtle italic">Select a store to see address</span>}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Section 4: Order Items ── */}
             <div>
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-semibold text-ink">Order Items</span>
               </div>
 
@@ -1199,26 +1206,39 @@ const PurchaseOrderForm: React.FC = () => {
                 editable={!isLocked}
                 visibleRows={10}
                 showTotals={[
-                  { colKey: "total", value: `₹${(formData.subtotal ?? 0).toFixed(2)}` },
+                  { colKey: "total", value: `₹${formData.netAmount.toFixed(2)}` },
                 ]}
               />
             </div>
 
-            {/* ── Narration ── */}
-            <div className="w-full sm:w-1/2">
-              <TextArea label="Narration" name="remarks" value={formData.remarks} placeholder="Enter narration..." rows={2} onChange={handleChange} disabled={isLocked} />
+            {/* ── Section 5: Narration + Order Summary ── */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <TextArea label="Narration" name="remarks" value={formData.remarks} placeholder="Enter narration..." rows={2} onChange={handleChange} disabled={isLocked} />
+              </div>
+              <div className="bg-card-2 rounded-lg border border-line-soft px-3 py-2.5 shadow-xs">
+                <h6 className="mb-1.5 font-extrabold text-primary text-xs">Order Summary</h6>
+                <div className="flex justify-between mb-1 text-ink-subtle text-[11px] font-semibold">
+                  <span>Subtotal:</span><span className="text-ink font-extrabold">₹{formData.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="p-2 border border-line-soft rounded-lg bg-card">
+                  <span className="text-[10px] font-bold text-ink uppercase tracking-wide">Shipping Address</span>
+                  <p className="text-xs text-ink-subtle mt-1">
+                    {[formData.shippingAddressLine1, formData.shippingCity, formData.shippingState, formData.shippingCountry, formData.shippingPincode].filter(Boolean).join(", ") || "Select a store to see address"}
+                  </p>
+                </div>
+              </div>
             </div>
 
+          {/* Footer Buttons */}
+          {!isLocked && (
+            <div className="flex justify-end gap-3 px-5 py-4 border-t border-line-soft">
+              <CustomButton text="Clear" variant="danger" onClick={handleClear} disabled={isSubmitting || isSubmittingForApproval} />
+              <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+              <CustomButton text={isSubmittingForApproval ? "Approving..." : "Approved"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "APPROVED")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+            </div>
+          )}
         </form>
-
-        {/* ── Actions ── */}
-        {!isLocked && (
-          <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
-            <CustomButton text="Clear" variant="danger" onClick={handleClear} disabled={isSubmitting || isSubmittingForApproval} />
-            <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={(e: any) => handleSubmit(e, "DRAFT")} disabled={isSubmitting || isSubmittingForApproval} />
-            <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={(e: any) => handleSubmit(e, "APPROVED")} disabled={isSubmitting || isSubmittingForApproval} />
-          </div>
-        )}
       </div>
 
       <CommonConfirmModal
