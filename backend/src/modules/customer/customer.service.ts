@@ -460,6 +460,17 @@ class CustomerService {
       }
     }
 
+    // Update customer ledger name
+    try {
+      const ledgerName = updated.firmName || updated.displayName || updated.customerCode;
+      await prisma.accountLedger.updateMany({
+        where: { customerId: id },
+        data: { name: ledgerName },
+      });
+    } catch (err) {
+      console.error("Failed to update customer ledger name:", err);
+    }
+
     return updated;
   }
 

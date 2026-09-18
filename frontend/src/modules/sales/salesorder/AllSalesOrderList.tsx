@@ -129,7 +129,7 @@ const AllSalesOrderList: React.FC = () => {
         try {
             const saved = localStorage.getItem(SORT_STORAGE_KEY);
             if (saved === "asc" || saved === "desc") return saved as SortOrder;
-        } catch (_) {}
+        } catch (_) { }
         return "default";
     });
 
@@ -139,7 +139,7 @@ const AllSalesOrderList: React.FC = () => {
             if (prev === "default") next = "asc";
             else if (prev === "asc") next = "desc";
             else next = "default";
-            try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+            try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) { }
             return next;
         });
     }, []);
@@ -195,7 +195,7 @@ const AllSalesOrderList: React.FC = () => {
             setRemarksMap(updated);
             try {
                 localStorage.setItem(REMARKS_STORAGE_KEY, JSON.stringify(updated));
-            } catch (_) {}
+            } catch (_) { }
             toast.success("Remarks saved successfully!");
         }
         setShowSaveConfirmModal(false);
@@ -222,7 +222,7 @@ const AllSalesOrderList: React.FC = () => {
             setRemarksMap(updated);
             try {
                 localStorage.setItem(REMARKS_STORAGE_KEY, JSON.stringify(updated));
-            } catch (_) {}
+            } catch (_) { }
             toast.success("Remarks saved successfully!");
         }
     }, [estimateOrder?.id, remarksMap, draftRemarks]);
@@ -363,15 +363,15 @@ const AllSalesOrderList: React.FC = () => {
     // Merge typed remarks into order items for PDF rendering
     const estimateOrderForPdf = estimateOrder
         ? {
-              ...estimateOrder,
-              items: estimateOrder.items?.map((item: any) => ({
-                  ...item,
-                  remarks:
-                      draftRemarks[item.id] !== undefined
-                          ? draftRemarks[item.id]
-                          : item.remarks ?? "",
-              })),
-          }
+            ...estimateOrder,
+            items: estimateOrder.items?.map((item: any) => ({
+                ...item,
+                remarks:
+                    draftRemarks[item.id] !== undefined
+                        ? draftRemarks[item.id]
+                        : item.remarks ?? "",
+            })),
+        }
         : null;
 
     // ─── Filters ────────────────────────────────────────────────
@@ -472,7 +472,7 @@ const AllSalesOrderList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    
+
 
     const handleOpenView = useCallback((id: number) => {
         navigate(`/sales-order/details/${id}`);
@@ -623,107 +623,107 @@ const AllSalesOrderList: React.FC = () => {
 
                 {/* Table */}
                 <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
-                <DataTable
-                    data={sortedData}
-                    rowKey={(item) => item.id}
-                    loading={loading}
-                    emptyMessage="No sales orders found."
-                    rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
-                    onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item.id); }}
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page),
-                    }}
-                    columns={[
-                        {
-                            header: "#",
-                            width: "60px",
-                            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
-                        },
-                        { header: "ORDER NO", accessor: "orderNo" },
-                        { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
-                        {
-                            header: "CUSTOMER",
-                            headerNode: (
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
-                                    title={`Sort by Customer: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
-                                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
-                                >
-                                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
-                                        CUSTOMER
-                                    </span>
-                                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
-                                        {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
-                                    </span>
-                                    {sortOrder !== "default" && (
-                                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
-                                            {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                    <DataTable
+                        data={sortedData}
+                        rowKey={(item) => item.id}
+                        loading={loading}
+                        emptyMessage="No sales orders found."
+                        rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
+                        onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item.id); }}
+                        pagination={{
+                            currentPage,
+                            totalPages,
+                            onPageChange: (page) => setCurrentPage(page),
+                        }}
+                        columns={[
+                            {
+                                header: "#",
+                                width: "60px",
+                                render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+                            },
+                            { header: "ORDER NO", accessor: "orderNo" },
+                            { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
+                            {
+                                header: "CUSTOMER",
+                                headerNode: (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                                        title={`Sort by Customer: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
+                                        className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                    >
+                                        <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                            CUSTOMER
                                         </span>
-                                    )}
-                                </button>
-                            ),
-                            render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
-                        },
-                        { header: "DISPATCH", render: (item) => item?.dispatchType },
-                        { header: "STATUS", render: (item) => <StatusBadge status={item.status || ""} /> },
-                        {
-                            header: "ACTIONS",
-                            width: "210px",
-                            align: "center",
-                            render: (item) => (
-                                <div
-                                    className="flex items-center justify-center gap-2"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <ViewButton
-                                        onClick={() => handleOpenView(item.id)}
-                                    />
-                                    <IconButton
-                                        icon={FiClipboard}
-                                        variant="info"
-                                        size="sm"
-                                        title="Print / View Sales Order"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenEstimate(item.id);
-                                        }}
-                                    />
-                                    {item.status === "DRAFT" && (
-                                        <>
-                                            {can("sales-orders.edit") && (
-                                                <EditButton
-                                                    onClick={(e) => {
-                                                        e?.stopPropagation();
-                                                        handleOpenEdit(item);
-                                                    }}
-                                                />
-                                            )}
-                                            {can("sales-orders.delete") && (
-                                                <DeleteButton
-                                                    onClick={(e) => {
-                                                        e?.stopPropagation();
-                                                        triggerDelete(item.id);
-                                                    }}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            ),
-                        },
-                    ]}
-                />
+                                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                                            {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                                        </span>
+                                        {sortOrder !== "default" && (
+                                            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                                {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                            </span>
+                                        )}
+                                    </button>
+                                ),
+                                render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
+                            },
+                            // { header: "DISPATCH", render: (item) => item?.dispatchType },
+                            { header: "STATUS", render: (item) => <StatusBadge status={item.status || ""} /> },
+                            {
+                                header: "ACTIONS",
+                                width: "210px",
+                                align: "center",
+                                render: (item) => (
+                                    <div
+                                        className="flex items-center justify-center gap-2"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <ViewButton
+                                            onClick={() => handleOpenView(item.id)}
+                                        />
+                                        <IconButton
+                                            icon={FiClipboard}
+                                            variant="info"
+                                            size="sm"
+                                            title="Print / View Sales Order"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenEstimate(item.id);
+                                            }}
+                                        />
+                                        {item.status === "DRAFT" && (
+                                            <>
+                                                {can("sales-orders.edit") && (
+                                                    <EditButton
+                                                        onClick={(e) => {
+                                                            e?.stopPropagation();
+                                                            handleOpenEdit(item);
+                                                        }}
+                                                    />
+                                                )}
+                                                {can("sales-orders.delete") && (
+                                                    <DeleteButton
+                                                        onClick={(e) => {
+                                                            e?.stopPropagation();
+                                                            triggerDelete(item.id);
+                                                        }}
+                                                    />
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ),
+                            },
+                        ]}
+                    />
                 </div>
             </div>
 
             {/* Sales Order Estimate Modal (Tailwind CSS - On-Screen Only) */}
             {showEstimateModal && (
                 <>
-                {/* Print-isolation: when modal is open, hide everything except the estimate */}
-                <style>{`
+                    {/* Print-isolation: when modal is open, hide everything except the estimate */}
+                    <style>{`
                     @media print {
                         @page { size: A4 portrait; margin: 8mm; }
                         html, body {
@@ -760,94 +760,94 @@ const AllSalesOrderList: React.FC = () => {
                         }
                     }
                 `}</style>
-                <div className="fixed inset-0 z-50 overflow-y-auto no-print">
-                    {/* Backdrop */}
-                    <div
-                        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
-                        onClick={handleRequestCloseEstimate}
-                    />
+                    <div className="fixed inset-0 z-50 overflow-y-auto no-print">
+                        {/* Backdrop */}
+                        <div
+                            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
+                            onClick={handleRequestCloseEstimate}
+                        />
 
-                    {/* Modal Wrapper */}
-                    <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                        <div className="relative transform overflow-hidden rounded-2xl bg-card text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
-                            {/* Header */}
-                            <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-ink">
-                                    Sales Order Confirmation
-                                </h3>
-                                <button
-                                    onClick={handleRequestCloseEstimate}
-                                    className="rounded-lg p-1 text-ink-subtle hover:bg-card-2 hover:text-ink-muted transition-colors"
-                                >
-                                    <FaTimes size={18} />
-                                </button>
-                            </div>
+                        {/* Modal Wrapper */}
+                        <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                            <div className="relative transform overflow-hidden rounded-2xl bg-card text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
+                                {/* Header */}
+                                <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
+                                    <h3 className="text-lg font-bold text-ink">
+                                        Sales Order Confirmation
+                                    </h3>
+                                    <button
+                                        onClick={handleRequestCloseEstimate}
+                                        className="rounded-lg p-1 text-ink-subtle hover:bg-card-2 hover:text-ink-muted transition-colors"
+                                    >
+                                        <FaTimes size={18} />
+                                    </button>
+                                </div>
 
-                            {/* Body */}
-                            <div className="p-6 bg-card-2 min-h-[400px] max-h-[calc(100vh-200px)] overflow-y-auto">
-                                {loadingEstimate ? (
-                                    <div className="flex flex-col items-center justify-center py-20 h-full">
-                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                                        <span className="mt-4 text-ink-subtle font-semibold">Loading details...</span>
-                                    </div>
-                                ) : estimateOrder ? (
-                                    <SalesOrderDeliveryEstimate
-                                        order={estimateOrder}
-                                        company={company}
-                                        formatDate={formatDate}
-                                        isEditable={true}
-                                        itemRemarks={draftRemarks}
-                                        onItemRemarksChange={(id, val) =>
-                                            setDraftRemarks((prev) => ({
-                                                ...prev,
-                                                [id]: val,
-                                            }))
-                                        }
-                                    />
-                                ) : (
-                                    <div className="text-center py-10 text-ink-subtle">
-                                        Failed to load sales order details.
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-between">
-                                <div>
-                                    {isRemarksDirty && (
-                                        <span className="text-xs text-amber-500 font-semibold flex items-center gap-1.5 animate-pulse">
-                                            ● Unsaved changes in remarks
-                                        </span>
+                                {/* Body */}
+                                <div className="p-6 bg-card-2 min-h-[400px] max-h-[calc(100vh-200px)] overflow-y-auto">
+                                    {loadingEstimate ? (
+                                        <div className="flex flex-col items-center justify-center py-20 h-full">
+                                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                                            <span className="mt-4 text-ink-subtle font-semibold">Loading details...</span>
+                                        </div>
+                                    ) : estimateOrder ? (
+                                        <SalesOrderDeliveryEstimate
+                                            order={estimateOrder}
+                                            company={company}
+                                            formatDate={formatDate}
+                                            isEditable={true}
+                                            itemRemarks={draftRemarks}
+                                            onItemRemarksChange={(id, val) =>
+                                                setDraftRemarks((prev) => ({
+                                                    ...prev,
+                                                    [id]: val,
+                                                }))
+                                            }
+                                        />
+                                    ) : (
+                                        <div className="text-center py-10 text-ink-subtle">
+                                            Failed to load sales order details.
+                                        </div>
                                     )}
                                 </div>
-                                {estimateOrder && (
-                                    <div className="flex gap-2">
-                                        <CustomButton
-                                            text="Save Remarks"
-                                            icon={FiCheck}
-                                            onClick={handleSaveRemarksDirectly}
-                                            variant="primary"
-                                            disabled={!isRemarksDirty}
-                                        />
-                                        <CustomButton
-                                            text="Print"
-                                            icon={FaPrint}
-                                            onClick={() => window.print()}
-                                            variant="secondary"
-                                        />
-                                        <CustomButton
-                                            text={generatingPdf ? "Downloading..." : "Download PDF"}
-                                            icon={FaDownload}
-                                            onClick={() => generatePdf("download")}
-                                            variant="secondary"
-                                            disabled={generatingPdf}
-                                        />
+
+                                {/* Footer */}
+                                <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-between">
+                                    <div>
+                                        {isRemarksDirty && (
+                                            <span className="text-xs text-amber-500 font-semibold flex items-center gap-1.5 animate-pulse">
+                                                ● Unsaved changes in remarks
+                                            </span>
+                                        )}
                                     </div>
-                                )}
+                                    {estimateOrder && (
+                                        <div className="flex gap-2">
+                                            <CustomButton
+                                                text="Save Remarks"
+                                                icon={FiCheck}
+                                                onClick={handleSaveRemarksDirectly}
+                                                variant="primary"
+                                                disabled={!isRemarksDirty}
+                                            />
+                                            <CustomButton
+                                                text="Print"
+                                                icon={FaPrint}
+                                                onClick={() => window.print()}
+                                                variant="secondary"
+                                            />
+                                            <CustomButton
+                                                text={generatingPdf ? "Downloading..." : "Download PDF"}
+                                                icon={FaDownload}
+                                                onClick={() => generatePdf("download")}
+                                                variant="secondary"
+                                                disabled={generatingPdf}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 </>
             )}
 

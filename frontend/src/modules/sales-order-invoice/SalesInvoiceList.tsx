@@ -80,7 +80,7 @@ const SalesInvoiceList: React.FC = () => {
         try {
             const saved = localStorage.getItem(SORT_STORAGE_KEY);
             if (saved === "asc" || saved === "desc") return saved;
-        } catch (_) {}
+        } catch (_) { }
         return "default";
     });
 
@@ -92,7 +92,7 @@ const SalesInvoiceList: React.FC = () => {
             else next = "default";
             try {
                 localStorage.setItem(SORT_STORAGE_KEY, next);
-            } catch (_) {}
+            } catch (_) { }
             return next;
         });
     }, []);
@@ -217,7 +217,7 @@ const SalesInvoiceList: React.FC = () => {
         }
     };
 
-    
+
 
     const formatCurrency = (amount: any) =>
         `₹${Number(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
@@ -360,24 +360,22 @@ const SalesInvoiceList: React.FC = () => {
                         e.stopPropagation();
                         toggleSortOrder();
                     }}
-                    title={`Sort Alphabetically: ${
-                        sortOrder === "default"
-                            ? "Default Order"
-                            : sortOrder === "asc"
+                    title={`Sort Alphabetically: ${sortOrder === "default"
+                        ? "Default Order"
+                        : sortOrder === "asc"
                             ? "A to Z (Ascending)"
                             : "Z to A (Descending)"
-                    } (Click or press F6)`}
+                        } (Click or press F6)`}
                     className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
                 >
                     <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
                         CUSTOMER
                     </span>
                     <span
-                        className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
-                            sortOrder === "asc" || sortOrder === "desc"
-                                ? "bg-primary/20 text-primary scale-110"
-                                : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
-                        }`}
+                        className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc"
+                            ? "bg-primary/20 text-primary scale-110"
+                            : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+                            }`}
                     >
                         {sortOrder === "asc" ? (
                             <FaArrowUp size={10} />
@@ -441,7 +439,7 @@ const SalesInvoiceList: React.FC = () => {
 
     return (
         <div>
-            <div className="max-w-[1700px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="max-w-[1200px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
