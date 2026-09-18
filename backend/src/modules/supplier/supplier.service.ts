@@ -461,6 +461,17 @@ class SupplierService {
       }
     }
 
+    // Update supplier ledger name
+    try {
+      const ledgerName = updated.legalName || updated.displayName || updated.supplierCode;
+      await prisma.accountLedger.updateMany({
+        where: { supplierId: Number(id) },
+        data: { name: ledgerName },
+      });
+    } catch (err) {
+      console.error("Failed to update supplier ledger name:", err);
+    }
+
     return updated;
   }
 
