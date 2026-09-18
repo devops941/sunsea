@@ -287,8 +287,8 @@ class CustomerService {
 
     // Resolve names for editHistory
     let enrichedEditHistory: any[] = [];
-    if (Array.isArray(customer.editHistory)) {
-      enrichedEditHistory = await Promise.all(customer.editHistory.map(async (edit: any) => {
+    if (Array.isArray((customer as any).editHistory)) {
+      enrichedEditHistory = await Promise.all((customer as any).editHistory.map(async (edit: any) => {
         let name = "Unknown User";
         if (edit.updatedBy) {
           if (edit.updatedBy.startsWith('admin_')) {
@@ -477,26 +477,63 @@ class CustomerService {
   async deleteCustomer(id: string) {
     await this.getCustomerById(id);
 
-    // Block delete if any dependent records are linked
+    // Check all dependent records
     const [linkedOrders, linkedInvoices, linkedReturns, linkedLedger] = await Promise.all([
       prisma.salesOrder.count({ where: { customerId: id } }),
       prisma.salesInvoice.count({ where: { customerId: id } }),
       prisma.salesReturn.count({ where: { customerId: id } }),
       prisma.accountLedger.findUnique({
         where: { customerId: id },
-        include: { debitItems: true, creditItems: true },
+        include: {
+          debitItems: { include: { voucher: { select: { id: true, refDocType: true } } } },
+          creditItems: { include: { voucher: { select: { id: true, refDocType: true } } } },
+        },
       }),
     ]);
 
-    const journalCount =
-      (linkedLedger?.debitItems?.length ?? 0) + (linkedLedger?.creditItems?.length ?? 0);
+    // Separate opening-balance-only journal entries from real transactions
+    const allJournalItems = [
+      ...(linkedLedger?.debitItems ?? []),
+      ...(linkedLedger?.creditItems ?? []),
+    ];
+    const realJournalItems = allJournalItems.filter(
+      (item) => item.voucher?.refDocType !== "CUSTOMER_OPENING_BALANCE"
+    );
+    const openingBalanceVoucherIds = [
+      ...new Set(
+        allJournalItems
+          .filter((item) => item.voucher?.refDocType === "CUSTOMER_OPENING_BALANCE")
+          .map((item) => item.voucher!.id)
+      ),
+    ];
 
-    if (linkedOrders > 0 || linkedInvoices > 0 || linkedReturns > 0 || journalCount > 0) {
+    // Block delete if real transactions exist (orders, invoices, returns, real journal entries)
+    if (linkedOrders > 0 || linkedInvoices > 0 || linkedReturns > 0 || realJournalItems.length > 0) {
       throw new ApiError(
         409,
-        `Cannot delete customer — ${linkedOrders} sales order(s), ${linkedInvoices} sales invoice(s), ${linkedReturns} sales return(s), and ${journalCount} journal entry/entries are linked to this customer`
+        `Cannot delete customer — ${linkedOrders} sales order(s), ${linkedInvoices} sales invoice(s), ${linkedReturns} sales return(s), and ${realJournalItems.length} real journal entry/entries are linked to this customer`
       );
     }
+
+    // Safe to delete — first clean up the auto-generated opening balance voucher(s) and ledger
+    if (openingBalanceVoucherIds.length > 0) {
+      // Delete journal items linked to opening balance vouchers
+      await prisma.journalItem.deleteMany({
+        where: { voucherId: { in: openingBalanceVoucherIds } },
+      });
+      // Delete the opening balance vouchers themselves
+      await prisma.voucher.deleteMany({
+        where: { id: { in: openingBalanceVoucherIds } },
+      });
+    }
+
+    // Delete the account ledger for this customer (if any)
+    if (linkedLedger) {
+      await prisma.accountLedger.delete({ where: { id: linkedLedger.id } });
+    }
+
+    // Delete customer addresses
+    await prisma.customerAddress.deleteMany({ where: { customerId: id } });
 
     return executeDeleteWithValidation(
       () => prisma.customer.delete({ where: { id } }),
