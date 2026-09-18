@@ -190,6 +190,7 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "products.view", path: "/products" },
       { permission: "raw_material_stocks.view", path: "/stock" },
       { permission: "stock-adjustments.view", path: "/inventory/stock-adjustments" },
+      { permission: "eod-stock.view", path: "/inventory/eod-stock" },
     ],
     children: [
       // ── 1. Inventory Masters ──
@@ -310,11 +311,12 @@ export const sidebarItems: SidebarItem[] = [
       // ── 3. Stock Status ──
       {
         title: "Stock Status",
-        permissionAny: ["raw_material_stocks.view", "finished_goods_stocks.view", "wastage-stock.view"],
+        permissionAny: ["raw_material_stocks.view", "finished_goods_stocks.view", "wastage-stock.view", "eod-stock.view"],
         children: [
           { title: "Raw Material Stock", path: "/stock", permission: "raw_material_stocks.view", badge: "Ctrl+K" },
           { title: "Finished Goods Stock", path: "/finished-stock", permission: "finished_goods_stocks.view" },
           { title: "Wastage Stock", path: "/wastage-stock", permission: "wastage-stock.view" },
+          { title: "EOD Stock", path: "/inventory/eod-stock", permission: "eod-stock.view" },
         ],
       },
     ],
@@ -329,6 +331,7 @@ export const sidebarItems: SidebarItem[] = [
       "/stock",
       "/finished-stock",
       "/wastage-stock",
+      "/inventory/eod-stock",
     ],
     permissionAny: [
       "categories.view",
@@ -341,6 +344,7 @@ export const sidebarItems: SidebarItem[] = [
       "raw_material_stocks.view",
       "finished_goods_stocks.view",
       "wastage-stock.view",
+      "eod-stock.view",
     ],
   },
 

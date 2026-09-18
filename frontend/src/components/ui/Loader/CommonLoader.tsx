@@ -1,11 +1,11 @@
 import React from "react";
 
 interface CommonLoaderProps {
-  text: string;
+  text?: string;
   fullScreen?: boolean;
 }
 
-const CommonLoader: React.FC<CommonLoaderProps> = ({ text, fullScreen = true }) => {
+const CommonLoader: React.FC<CommonLoaderProps> = ({ text = "Loading...", fullScreen = true }) => {
   return (
     <div
       className={`relative flex items-center justify-center ${

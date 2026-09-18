@@ -189,11 +189,8 @@ const MODULE_GROUPS: ModuleGroup[] = [
       { key: "raw_material_stocks", label: "Raw Material Stock", subGroup: "Stock Status" },
       { key: "finished_goods_stocks", label: "Finished Goods Stock", subGroup: "Stock Status" },
       { key: "wastage-stock", label: "Wastage Stock", subGroup: "Stock Status" },
+      { key: "eod-stock", label: "EOD Stock", subGroup: "Stock Status" },
       // { key: "uoms", label: "Units of Measure (UOM)" },
-      // { key: "raw_material_categories", label: "RM Categories" },
-      // { key: "store-types", label: "Store Types" },
-      // { key: "locations", label: "Locations" },
-      // { key: "eod-stock", label: "EOD Stock" },
     ],
   },
   {

@@ -326,7 +326,11 @@ const GoodsDispatchCreate: React.FC = () => {
         firstInput?.focus();
       }, 50);
     } catch (error: any) {
-      toast.error(error || "Failed to save goods dispatch");
+      const errorMsg = typeof error === "string" ? error : error?.message || "Failed to save goods dispatch";
+      if (errorMsg.toLowerCase().includes("dc number")) {
+        setFormErrors((prev) => ({ ...prev, dcNumber: errorMsg }));
+      }
+      toast.error(errorMsg);
     }
   };
 

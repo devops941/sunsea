@@ -77,25 +77,81 @@ export class StockAdjustmentService {
   }
 
   static async getStockAdjustments(filters: any) {
-    const { status, search, page = 1, limit = 10, adjustmentType, productionOrderId, dateFrom, dateTo } = filters;
+    const { status, search, page = 1, limit = 10, adjustmentType, productionOrderId, dateFrom, dateTo, source } = filters;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const where: any = {};
-    if (status) where.status = status;
-    if (adjustmentType) where.adjustmentType = adjustmentType;
-    if (productionOrderId) where.productionOrderId = { contains: productionOrderId, mode: "insensitive" };
+    const andConditions: any[] = [];
+    if (status) andConditions.push({ status });
+    if (adjustmentType) andConditions.push({ adjustmentType });
+    if (productionOrderId) andConditions.push({ productionOrderId: { contains: productionOrderId, mode: "insensitive" } });
     if (dateFrom || dateTo) {
-      where.adjustmentDate = {};
-      if (dateFrom) where.adjustmentDate.gte = new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00.000Z`);
-      if (dateTo) where.adjustmentDate.lte = new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59.999Z`);
+      const dateCond: any = {};
+      if (dateFrom) dateCond.gte = new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00.000Z`);
+      if (dateTo) dateCond.lte = new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59.999Z`);
+      andConditions.push({ adjustmentDate: dateCond });
     }
     if (search) {
-      where.OR = [
-        { adjustmentNumber: { contains: search, mode: "insensitive" } },
-        { reason: { contains: search, mode: "insensitive" } },
-        { productionOrderId: { contains: search, mode: "insensitive" } },
-      ];
+      andConditions.push({
+        OR: [
+          { adjustmentNumber: { contains: search, mode: "insensitive" } },
+          { reason: { contains: search, mode: "insensitive" } },
+          { productionOrderId: { contains: search, mode: "insensitive" } },
+          { sourceDocument: { contains: search, mode: "insensitive" } },
+          { sourceDocId: { contains: search, mode: "insensitive" } },
+        ],
+      });
     }
+    if (source) {
+      const s = String(source).toUpperCase();
+      if (s === "PRODUCTION") {
+        andConditions.push({
+          OR: [
+            { productionOrderId: { not: null } },
+            { sourceDocument: { contains: "prod", mode: "insensitive" } },
+            { sourceDocument: { contains: "pmi", mode: "insensitive" } },
+            { adjustmentType: { in: ["PRODUCTION_MATERIAL_ISSUE", "PRODUCTION_MATERIAL_RETURN"] } },
+          ],
+        });
+      } else if (s === "PURCHASE") {
+        andConditions.push({
+          OR: [
+            { sourceDocument: { contains: "purchase", mode: "insensitive" } },
+            { sourceDocument: { contains: "grn", mode: "insensitive" } },
+            { sourceDocument: { contains: "po", mode: "insensitive" } },
+            { sourceDocument: { contains: "bill", mode: "insensitive" } },
+            { sourceDocument: { contains: "invoice", mode: "insensitive" } },
+          ],
+        });
+      } else if (s === "SALES") {
+        andConditions.push({
+          OR: [
+            { sourceDocument: { contains: "sales", mode: "insensitive" } },
+            { sourceDocument: { contains: "so", mode: "insensitive" } },
+            { sourceDocument: { contains: "dispatch", mode: "insensitive" } },
+            { sourceDocument: { contains: "return", mode: "insensitive" } },
+          ],
+        });
+      } else if (s === "MANUAL") {
+        andConditions.push({
+          AND: [
+            { productionOrderId: null },
+            {
+              OR: [
+                { sourceDocument: null },
+                { sourceDocument: "" },
+                { sourceDocument: { contains: "manual", mode: "insensitive" } },
+              ],
+            },
+          ],
+        });
+      } else {
+        andConditions.push({
+          sourceDocument: { contains: source, mode: "insensitive" },
+        });
+      }
+    }
+
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const [data, total] = await Promise.all([
       prisma.stockAdjustment.findMany({
@@ -142,22 +198,48 @@ export class StockAdjustmentService {
     // Attach createdBy user names
     const userIds = [...new Set(data.map((d) => d.createdBy).filter(Boolean) as string[])];
     const users = userIds.length > 0
-      ? await prisma.user.findMany({ where: { userId: { in: userIds } }, select: { userId: true, fullName: true } })
+      ? await prisma.user.findMany({
+          where: { OR: [{ userId: { in: userIds } }, { username: { in: userIds } }] },
+          select: { userId: true, username: true, fullName: true },
+        })
+      : [];
+
+    const admins = userIds.length > 0
+      ? await prisma.admin.findMany({
+          where: { username: { in: userIds } },
+          select: { username: true, fullName: true },
+        })
       : [];
 
     const empIds = userIds
-      .map(id => {
-        try { return BigInt(id); } catch (e) { return null; }
+      .map((id) => {
+        try {
+          return BigInt(id);
+        } catch (e) {
+          return null;
+        }
       })
       .filter((id): id is bigint => id !== null);
 
-    const employees = empIds.length > 0
-      ? await prisma.employee.findMany({ where: { id: { in: empIds } }, select: { id: true, fullName: true } })
+    const employees = userIds.length > 0
+      ? await prisma.employee.findMany({
+          where: { OR: [{ id: { in: empIds } }, { empCode: { in: userIds } }] },
+          select: { id: true, empCode: true, fullName: true },
+        })
       : [];
 
     const nameMap = new Map<string, string>();
-    users.forEach((u) => nameMap.set(u.userId, u.fullName));
-    employees.forEach((e) => nameMap.set(String(e.id), e.fullName || ""));
+    users.forEach((u) => {
+      if (u.userId) nameMap.set(u.userId, u.fullName);
+      if (u.username) nameMap.set(u.username, u.fullName);
+    });
+    admins.forEach((a) => {
+      if (a.username) nameMap.set(a.username, a.fullName);
+    });
+    employees.forEach((e) => {
+      nameMap.set(String(e.id), e.fullName || "");
+      if (e.empCode) nameMap.set(e.empCode, e.fullName || "");
+    });
 
     const enriched = data.map((d) => ({
       ...d,
@@ -213,22 +295,35 @@ export class StockAdjustmentService {
 
     // Attach createdBy user name
     if (adjustment.createdBy) {
-      const user = await prisma.user.findUnique({
-        where: { userId: adjustment.createdBy },
+      const user = await prisma.user.findFirst({
+        where: { OR: [{ userId: adjustment.createdBy }, { username: adjustment.createdBy }] },
         select: { fullName: true },
       });
-      if (user) {
+      if (user?.fullName) {
         (adjustment as any).createdByUser = { fullName: user.fullName };
       } else {
-        let emp = null;
-        try {
-          const empId = BigInt(adjustment.createdBy);
-          emp = await prisma.employee.findUnique({
-            where: { id: empId },
-            select: { fullName: true }
-          });
-        } catch (e) {}
-        (adjustment as any).createdByUser = emp ? { fullName: emp.fullName } : null;
+        const admin = await prisma.admin.findFirst({
+          where: { username: adjustment.createdBy },
+          select: { fullName: true },
+        });
+        if (admin?.fullName) {
+          (adjustment as any).createdByUser = { fullName: admin.fullName };
+        } else {
+          let emp = null;
+          try {
+            const empId = BigInt(adjustment.createdBy);
+            emp = await prisma.employee.findFirst({
+              where: { OR: [{ id: empId }, { empCode: adjustment.createdBy }] },
+              select: { fullName: true },
+            });
+          } catch (e) {
+            emp = await prisma.employee.findFirst({
+              where: { empCode: adjustment.createdBy },
+              select: { fullName: true },
+            });
+          }
+          (adjustment as any).createdByUser = emp?.fullName ? { fullName: emp.fullName } : null;
+        }
       }
     } else {
       (adjustment as any).createdByUser = null;

@@ -612,7 +612,8 @@ const AppRoutes = () => {
               <Route path="/production/goods-dispatch/create" element={<GoodsDispatchCreate />} />
             </Route>
             <Route element={<ProtectedRoute permission="goods-dispatch.edit" />}>
-              <Route path="/production/goods-dispatch/edit/:id" element={<GoodsDispatchCreate />} />
+              <Route path="/production/goods-dispatch/edit/:id" element={<GoodsDispatchView />} />
+              <Route path="/production/goods-dispatch/approval/:id" element={<GoodsDispatchView />} />
             </Route>
 
             {/* ---------- Sales ---------- */}

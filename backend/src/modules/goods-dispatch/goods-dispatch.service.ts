@@ -123,6 +123,21 @@ export class GoodsDispatchService {
 
   // ── Create Dispatch ─────────────────────────────────────────────────────────
   static async create(data: CreateGoodsDispatchInput, userId: string) {
+    // Check for duplicate DC Number
+    if (data.dcNumber && data.dcNumber.trim()) {
+      const existingDc = await prisma.goodsDispatch.findFirst({
+        where: {
+          dcNumber: {
+            equals: data.dcNumber.trim(),
+            mode: "insensitive",
+          },
+        },
+      });
+      if (existingDc) {
+        throw new ApiError(400, `DC Number '${data.dcNumber.trim()}' already exists. Please use a unique DC Number.`);
+      }
+    }
+
     // Validate each item
     for (const item of data.items) {
       const po = await prisma.productionOrder.findUnique({
@@ -382,10 +397,7 @@ export class GoodsDispatchService {
   }) {
     const { page = 1, limit = 10 } = filters;
     const skip = (Number(page) - 1) * Number(limit);
-    const where: any = {
-      // Exclude pure direct-to-stock dispatches (all items bypassed gate)
-      NOT: { items: { every: { bypassGate: true } } },
-    };
+    const where: any = {};
 
     if (filters.status) where.status = filters.status;
     if (filters.dateFrom || filters.dateTo) {
@@ -466,6 +478,21 @@ export class GoodsDispatchService {
       where: { id: BigInt(id) },
     });
     if (!existing) throw new ApiError(404, "Goods Dispatch not found");
+
+    if (data.dcNumber && data.dcNumber.trim()) {
+      const existingDc = await prisma.goodsDispatch.findFirst({
+        where: {
+          id: { not: BigInt(id) },
+          dcNumber: {
+            equals: data.dcNumber.trim(),
+            mode: "insensitive",
+          },
+        },
+      });
+      if (existingDc) {
+        throw new ApiError(400, `DC Number '${data.dcNumber.trim()}' already exists. Please use a unique DC Number.`);
+      }
+    }
 
     const updated = await prisma.goodsDispatch.update({
       where: { id: BigInt(id) },

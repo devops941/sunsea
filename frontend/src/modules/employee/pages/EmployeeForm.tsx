@@ -1432,13 +1432,7 @@ const EmployeeForm: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <BackButton />
-            <CustomButton
-              text={isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Employee")}
-              icon={FaSave}
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleSubmit}
-            />
+          
           </div>
         </div>
 

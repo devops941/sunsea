@@ -20,6 +20,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 15;
@@ -203,6 +204,7 @@ const StockAdjustmentList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
   const [adjustmentType, setAdjustmentType] = useState("");
+  const [source, setSource] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -210,11 +212,12 @@ const StockAdjustmentList: React.FC = () => {
   // Draft filter states for popover
   const [draftStatus, setDraftStatus] = useState("");
   const [draftAdjustmentType, setDraftAdjustmentType] = useState("");
+  const [draftSource, setDraftSource] = useState("");
   const [draftDateFrom, setDraftDateFrom] = useState("");
   const [draftDateTo, setDraftDateTo] = useState("");
 
-  const hasActiveFilters = !!(status || adjustmentType || dateFrom || dateTo);
-  const activeFilterCount = [status, adjustmentType, dateFrom, dateTo].filter(Boolean).length;
+  const hasActiveFilters = !!(status || adjustmentType || source || dateFrom || dateTo);
+  const activeFilterCount = [status, adjustmentType, source, dateFrom, dateTo].filter(Boolean).length;
 
   // Debounce search — 300 ms
   useEffect(() => {
@@ -225,13 +228,14 @@ const StockAdjustmentList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const cacheKey = `${SA_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${status}:${adjustmentType}:${dateFrom}:${dateTo}`;
+  const cacheKey = `${SA_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${status}:${adjustmentType}:${source}:${dateFrom}:${dateTo}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await stockAdjustmentService.fetchAll({
       search: debouncedSearch,
       status,
       adjustmentType,
+      source,
       dateFrom,
       dateTo,
       page: currentPage,
@@ -240,7 +244,7 @@ const StockAdjustmentList: React.FC = () => {
     const list = Array.isArray(res) ? res : (res.data || []);
     const tot = Array.isArray(res) ? res.length : (res.meta?.total || res.total || list.length);
     return { data: list, total: tot };
-  }, [debouncedSearch, status, adjustmentType, dateFrom, dateTo, currentPage]);
+  }, [debouncedSearch, status, adjustmentType, source, dateFrom, dateTo, currentPage]);
 
   const { data, total, loading, refresh } = useListCache({
     cacheKey,
@@ -261,25 +265,29 @@ const StockAdjustmentList: React.FC = () => {
   const handleOpenFilter = useCallback(() => {
     setDraftStatus(status);
     setDraftAdjustmentType(adjustmentType);
+    setDraftSource(source);
     setDraftDateFrom(dateFrom);
     setDraftDateTo(dateTo);
-  }, [status, adjustmentType, dateFrom, dateTo]);
+  }, [status, adjustmentType, source, dateFrom, dateTo]);
 
   const handleApplyFilters = useCallback(() => {
     setStatus(draftStatus);
     setAdjustmentType(draftAdjustmentType);
+    setSource(draftSource);
     setDateFrom(draftDateFrom);
     setDateTo(draftDateTo);
     setCurrentPage(1);
-  }, [draftStatus, draftAdjustmentType, draftDateFrom, draftDateTo]);
+  }, [draftStatus, draftAdjustmentType, draftSource, draftDateFrom, draftDateTo]);
 
   const handleClearFilters = useCallback(() => {
     setDraftStatus("");
     setDraftAdjustmentType("");
+    setDraftSource("");
     setDraftDateFrom("");
     setDraftDateTo("");
     setStatus("");
     setAdjustmentType("");
+    setSource("");
     setDateFrom("");
     setDateTo("");
     setCurrentPage(1);
@@ -319,8 +327,8 @@ const StockAdjustmentList: React.FC = () => {
   });
 
   return (
-    <div>
-      <div className="max-w-[1300px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+    <div className="w-full">
+      <div className="w-full bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-5 py-3 border-b border-line">
           <div>
@@ -350,6 +358,25 @@ const StockAdjustmentList: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Source
+                  </label>
+                  <SelectInput
+                    name="draftSource"
+                    value={draftSource}
+                    onChange={(e) => setDraftSource(e.target.value)}
+                    options={[
+                      { value: "PRODUCTION", label: "Production (PO / PMI)" },
+                      { value: "PURCHASE", label: "Purchase (GRN / Bill)" },
+                      { value: "SALES", label: "Sales (Dispatch / Return)" },
+                      { value: "MANUAL", label: "Manual Adjustment" },
+                    ]}
+                    defaultOptionLabel="All Sources"
+                    noMargin
+                  />
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
                     Status
@@ -429,6 +456,37 @@ const StockAdjustmentList: React.FC = () => {
           </div>
         </div>
 
+        {/* Quick Source Filter Tabs */}
+        <div className="px-5 py-2.5 border-b border-line bg-card-2/40 flex items-center gap-2 overflow-x-auto">
+          {[
+            { key: "", label: "All Sources" },
+            { key: "PRODUCTION", label: "Production" },
+            { key: "PURCHASE", label: "Purchase" },
+            { key: "SALES", label: "Sales" },
+            { key: "MANUAL", label: "Manual" },
+          ].map((tab) => {
+            const isActive = (source || "") === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setSource(tab.key);
+                  setDraftSource(tab.key);
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-card text-ink-subtle hover:text-ink hover:bg-card-2 border border-line-soft"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Table */}
         <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
         <DataTable
@@ -446,55 +504,43 @@ const StockAdjustmentList: React.FC = () => {
           columns={[
             {
               header: "ADJUSTMENT NO",
-              width: "140px",
+              width: "minmax(180px, 1.2fr)",
               accessor: "adjustmentNumber",
               render: (item) => (
-                <div>
-                  <div className="font-semibold text-ink-muted">{item.adjustmentNumber}</div>
+                <div className="whitespace-nowrap">
+                  <div className="font-semibold text-ink">{item.adjustmentNumber}</div>
                   <div className="text-xs text-ink-subtle font-medium">{formatDate(item.adjustmentDate)}</div>
                 </div>
               )
             },
             {
               header: "TYPE",
-              width: "150px",
+              width: "140px",
               render: (item) => {
                 const info = getStockAdjustmentTypeInfo(item);
                 return (
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
-                      info.variant === "success"
-                        ? "bg-green-100 text-green-700 border border-green-200"
-                        : "bg-red-100 text-red-700 border border-red-200"
-                    }`}
-                  >
-                    {info.label}
-                  </span>
+                  <StatusBadge
+                    status={info.variant === "success" ? "ACTIVE" : "INACTIVE"}
+                    customText={info.label}
+                  />
                 );
               }
             },
             {
               header: "SOURCE",
-              width: "110px",
+              width: "120px",
               render: (item) => {
                 const src = getStockAdjustmentSourceInfo(item);
                 return (
-                  <div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border ${src.badgeClass}`}>
-                      {src.module}
-                    </span>
-                    {src.detail && (
-                      <div className="text-xs text-ink-subtle font-mono mt-0.5 font-medium">
-                        {src.detail}
-                      </div>
-                    )}
-                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${src.badgeClass}`}>
+                    {src.module}
+                  </span>
                 );
               }
             },
             {
               header: "PRODUCT",
-              width: "minmax(160px, 1.5fr)",
+              width: "minmax(160px, 1.3fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 const product = item.productionOrder?.productItem || firstItem?.product;
@@ -502,64 +548,58 @@ const StockAdjustmentList: React.FC = () => {
 
                 if (product?.productName) {
                   return (
-                    <div>
-                      <div className="font-semibold text-sm text-ink">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm text-ink truncate whitespace-nowrap" title={product.productName}>
                         {product.productName}
                       </div>
-                      <div className="text-xs text-ink-subtle">
-                        {product.productCode}
-                      </div>
                       {item.items && item.items.length > 1 && (
-                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                        <div className="text-[10px] text-ink-subtle mt-0.5 whitespace-nowrap">+{item.items.length - 1} more</div>
                       )}
                     </div>
                   );
                 }
                 if (rawMaterial?.materialName) {
                   return (
-                    <div>
-                      <div className="font-semibold text-sm text-ink">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm text-ink truncate whitespace-nowrap" title={rawMaterial.materialName}>
                         {rawMaterial.materialName}
                       </div>
-                      <div className="text-xs text-ink-subtle font-mono">
-                        {rawMaterial.rawMaterialId || firstItem?.rawMaterialId}
-                      </div>
                       {item.items && item.items.length > 1 && (
-                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                        <div className="text-[10px] text-ink-subtle mt-0.5 whitespace-nowrap">+{item.items.length - 1} more</div>
                       )}
                     </div>
                   );
                 }
                 if (firstItem?.rawMaterialId) {
                   return (
-                    <div>
-                      <div className="font-semibold text-sm text-ink">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm text-ink truncate whitespace-nowrap">
                         {firstItem.rawMaterialId}
                       </div>
                       {item.items && item.items.length > 1 && (
-                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                        <div className="text-[10px] text-ink-subtle mt-0.5 whitespace-nowrap">+{item.items.length - 1} more</div>
                       )}
                     </div>
                   );
                 }
                 if (firstItem?.productItemId) {
                   return (
-                    <div>
-                      <div className="font-semibold text-sm text-ink">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm text-ink truncate whitespace-nowrap">
                         Product #{String(firstItem.productItemId)}
                       </div>
                       {item.items && item.items.length > 1 && (
-                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                        <div className="text-[10px] text-ink-subtle mt-0.5 whitespace-nowrap">+{item.items.length - 1} more</div>
                       )}
                     </div>
                   );
                 }
-                return <span className="text-ink-subtle">—</span>;
+                return <span className="text-ink-subtle text-sm">-</span>;
               }
             },
             {
               header: "ORIGINAL QTY",
-              width: "minmax(120px, 1fr)",
+              width: "minmax(130px, 1fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.currentQty == null) return <span className="text-ink-subtle">—</span>;
@@ -567,7 +607,7 @@ const StockAdjustmentList: React.FC = () => {
                 const primaryUom = getItemPrimaryUom(firstItem);
                 const uomStr = primaryUom ? ` ${primaryUom}` : "";
                 return (
-                  <div>
+                  <div className="whitespace-nowrap">
                     <span className="font-semibold text-ink-muted text-sm">{qty}{uomStr}</span>
                     {item.items && item.items.length > 1 && (
                       <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
@@ -578,7 +618,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ADJUSTED QTY",
-              width: "minmax(150px, 1fr)",
+              width: "minmax(180px, 1.2fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.adjustedQty == null) return <span className="text-ink-subtle">—</span>;
@@ -586,20 +626,23 @@ const StockAdjustmentList: React.FC = () => {
                 const diff = Number(firstItem.difference || 0);
                 const primaryUom = getItemPrimaryUom(firstItem);
                 const uomStr = primaryUom ? ` ${primaryUom}` : "";
-                const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-ink-subtle bg-card-2";
                 const diffSign = diff > 0 ? `+${diff}${primaryUom ? ` ${primaryUom}` : ''}` : `${diff}${primaryUom ? ` ${primaryUom}` : ''}`;
                 return (
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="whitespace-nowrap">
+                    <div className="flex items-baseline gap-1.5 flex-nowrap whitespace-nowrap">
                       <span className="font-bold text-ink text-sm">{qty}{uomStr}</span>
                       {diff !== 0 && (
-                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${diffColor}`}>
-                          {diffSign}
+                        <span className={`text-xs font-semibold ${
+                          diff > 0
+                            ? "text-emerald-500 dark:text-emerald-400"
+                            : "text-rose-500 dark:text-rose-400"
+                        }`}>
+                          ({diffSign})
                         </span>
                       )}
                     </div>
                     {item.items && item.items.length > 1 && (
-                      <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                      <div className="text-[10px] text-ink-subtle mt-0.5 whitespace-nowrap">+{item.items.length - 1} more</div>
                     )}
                   </div>
                 );
@@ -607,7 +650,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "REASON",
-              width: "minmax(150px, 1fr)",
+              width: "minmax(180px, 1.5fr)",
               render: (item) => {
                 const firstItem = item.items?.[0];
                 const displayReason = getAdjustmentDisplayReason(item);
@@ -617,12 +660,12 @@ const StockAdjustmentList: React.FC = () => {
                   <div className="min-w-0">
                     <span
                       title={fullTooltip}
-                      className="block truncate text-ink-muted font-medium"
+                      className="block truncate text-ink-muted font-medium text-sm"
                     >
                       {displayReason}
                     </span>
                     {item.items && item.items.length > 1 && (
-                      <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
+                      <div className="text-[10px] text-ink-subtle mt-0.5 whitespace-nowrap">+{item.items.length - 1} more</div>
                     )}
                   </div>
                 );
@@ -630,9 +673,10 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ACTIONS",
-              width: "80px",
+              width: "90px",
+              align: "center",
               render: (item: any) => (
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <ViewButton onClick={() => navigate(`/inventory/stock-adjustments/view/${item.id}`)} />
                   {can("stock-adjustments.delete") && item.status !== "APPROVED" && (
                     <DeleteButton onClick={() => setDeleteId(String(item.id))} />
