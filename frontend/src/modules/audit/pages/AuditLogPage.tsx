@@ -1,12 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Spinner } from 'react-bootstrap';
 import { getAllAuditLogs } from '../../../services/auditService';
 import type { DataTableColumn } from '../../../components/ui/table/DataTable';
 import DataTable from '../../../components/ui/table/DataTable';
-
-
-
-
+import SearchInput from '../../../components/ui/SearchInput/SearchInput';
 interface AuditLog {
   id: string;
   entityName: string;
@@ -16,10 +12,6 @@ interface AuditLog {
   changedByName: string;
   changedAt: string;
 }
-
-import { OverlayTrigger, Popover } from 'react-bootstrap';
-import { FaEye } from 'react-icons/fa';
-
 const AuditLogPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,12 +19,19 @@ const AuditLogPage: React.FC = () => {
   const [filterEntity, setFilterEntity] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
-  const [uniqueEntities, setUniqueEntities] = useState<string[]>([]);
   const ITEMS_PER_PAGE = 15;
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchLogs();
-  }, [currentPage, filterEntity]);
+  }, [currentPage, debouncedSearch]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -41,11 +40,10 @@ const AuditLogPage: React.FC = () => {
       const response = await getAllAuditLogs({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
-        entity: filterEntity === 'All' ? undefined : filterEntity
+        search: debouncedSearch || undefined
       });
       setLogs(response.data?.data || []);
       setTotalLogs(response.data?.total || 0);
-      setUniqueEntities(response.data?.uniqueEntities || []);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch audit logs');
     } finally {
@@ -54,85 +52,116 @@ const AuditLogPage: React.FC = () => {
   };
 
   const getActionBadge = (action: string) => {
-    let colors = { bg: '#f3f4f6', text: '#374151' }; // default gray
+    let colors = { bg: '#f3f4f6', text: '#374151', border: '#e5e7eb' }; // default gray
     
-    if (action === 'CREATE') colors = { bg: '#d1fae5', text: '#065f46' };
-    else if (action === 'UPDATE') colors = { bg: '#fef3c7', text: '#b45309' };
-    else if (action === 'DELETE') colors = { bg: '#fee2e2', text: '#b91c1c' };
-    else if (action === 'LOGIN_SUCCESS') colors = { bg: '#e0f2fe', text: '#0369a1' };
-    else if (action === 'LOGIN_FAILED') colors = { bg: '#fecaca', text: '#991b1b' };
+    if (action === 'CREATE') colors = { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0' };
+    else if (action === 'UPDATE') colors = { bg: '#fffbeb', text: '#d97706', border: '#fde68a' };
+    else if (action === 'DELETE') colors = { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' };
+    else if (action === 'LOGIN_SUCCESS') colors = { bg: '#f0f9ff', text: '#0284c7', border: '#bae6fd' };
+    else if (action === 'LOGIN_FAILED') colors = { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' };
 
     return (
-      <span className="px-2 py-1 rounded-md text-[11px] font-semibold tracking-wider uppercase shadow-sm" style={{ backgroundColor: colors.bg, color: colors.text }}>
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-sm border" style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}>
         {action}
       </span>
     );
   };
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
   const totalPages = Math.ceil(totalLogs / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const columns: DataTableColumn<AuditLog>[] = useMemo(() => [
     {
-      header: "Time",
+      header: "#",
+      width: "60px",
+      render: (_row, index) => <span className="text-xs text-ink-subtle font-medium">{startIndex + index + 1}</span>,
+      align: "center",
+    },
+    {
+      header: "TIME",
       accessor: "changedAt",
-      width: "160px",
-      render: (row) => (
-        <span className="text-xs text-ink whitespace-nowrap">
-          {new Date(row.changedAt).toLocaleString()}
-        </span>
-      ),
+      render: (row) => {
+        const date = new Date(row.changedAt);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const strHours = hours.toString().padStart(2, '0');
+        
+        return (
+          <span className="text-xs font-medium text-ink-subtle whitespace-nowrap">
+            {`${day}-${month}-${year}, ${strHours}:${minutes} ${ampm}`}
+          </span>
+        );
+      },
     },
     {
-      header: "Entity",
+      header: "ENTITY",
       accessor: "entityName",
-      width: "120px",
-      render: (row) => (
-        <span className="px-2 py-1 bg-brand-500/10 text-brand-500 rounded text-xs font-medium border border-brand-500/20 shadow-sm">
-          {row.entityName}
-        </span>
-      ),
+      render: (row) => {
+        const colors = ['text-blue-500', 'text-emerald-500', 'text-violet-500', 'text-amber-500', 'text-rose-500', 'text-cyan-500', 'text-indigo-500', 'text-fuchsia-500'];
+        let hash = 0;
+        for (let i = 0; i < row.entityName.length; i++) hash = row.entityName.charCodeAt(i) + ((hash << 5) - hash);
+        const color = colors[Math.abs(hash) % colors.length];
+        
+        return (
+          <span className={`text-[12px] font-bold uppercase tracking-wider ${color}`}>
+            {row.entityName}
+          </span>
+        );
+      },
     },
     {
-      header: "Record ID",
+      header: "RECORD ID",
       accessor: "entityId",
-      width: "140px",
       render: (row) => (
-        <span className="text-xs font-mono text-ink-subtle truncate block max-w-[140px]" title={row.entityId}>
+        <span className="text-[11px] font-mono font-medium text-ink-subtle/80 bg-surface px-1.5 py-0.5 rounded border border-line truncate block max-w-[120px]" title={row.entityId}>
           {row.entityId}
         </span>
       ),
     },
     {
-      header: "Record Name",
+      header: "RECORD NAME",
       accessor: "recordName",
-      width: "180px",
       render: (row) => (
-        <span className="text-sm font-medium text-ink truncate block max-w-[180px]" title={row.recordName || row.entityId}>
+        <span className="text-sm font-semibold text-ink truncate block max-w-[200px]" title={row.recordName || row.entityId}>
           {row.recordName || "-"}
         </span>
       ),
     },
     {
-      header: "User",
+      header: "USER",
       accessor: "changedByName",
-      width: "120px",
       render: (row) => (
-        <span className="text-sm font-medium text-ink">
-          {row.changedByName}
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold uppercase shadow-sm border border-primary/20 shrink-0">
+            {row.changedByName && row.changedByName !== "Unknown" ? row.changedByName.charAt(0) : '?'}
+          </div>
+          <span className="text-sm font-medium text-ink capitalize truncate max-w-[90px]" title={row.changedByName}>
+            {row.changedByName}
+          </span>
+        </div>
       ),
     },
     {
-      header: "Action",
+      header: "ACTION",
       accessor: "action",
-      width: "130px",
       render: (row) => getActionBadge(row.action),
     },
-  ], []);
+  ], [startIndex]);
 
   return (
     <div>
-      <div className="max-w-[1300px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+      <div className="max-w-[1400px] xl:mr-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* ── HEADER ── */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
           <div>
@@ -144,19 +173,11 @@ const AuditLogPage: React.FC = () => {
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 relative w-full md:w-auto">
-            <select 
-              className="w-full sm:w-64 bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:ring-1 focus:ring-brand-500 outline-none transition-all"
-              value={filterEntity}
-              onChange={(e) => {
-                setFilterEntity(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="All">All Entities</option>
-              {uniqueEntities.map(entity => (
-                <option key={entity} value={entity}>{entity}</option>
-              ))}
-            </select>
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search audit logs..."
+            />
           </div>
         </div>
 

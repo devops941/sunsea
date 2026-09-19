@@ -43,13 +43,18 @@ class AuditController {
   getAllLogs = asyncHandler(async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const filterEntity = req.query.entity as string;
+    const search = req.query.search as string;
 
     const skip = (page - 1) * limit;
 
     const whereClause: any = {};
-    if (filterEntity && filterEntity !== "All") {
-      whereClause.entityName = filterEntity;
+
+    if (search) {
+      whereClause.OR = [
+        { recordName: { contains: search, mode: "insensitive" } },
+        { entityName: { contains: search, mode: "insensitive" } },
+        { changedBy: { contains: search, mode: "insensitive" } },
+      ];
     }
 
     const [total, logs] = await Promise.all([
@@ -172,14 +177,8 @@ class AuditController {
       };
     });
 
-    const uniqueEntitiesQuery = await prisma.auditLog.findMany({
-      select: { entityName: true },
-      distinct: ['entityName']
-    });
-    const uniqueEntities = uniqueEntitiesQuery.map(e => e.entityName);
-
     return res.status(200).json(
-      new ApiResponse("All audit logs fetched successfully", { data: processedLogs, total, uniqueEntities })
+      new ApiResponse("All audit logs fetched successfully", { data: processedLogs, total })
     );
   });
 }
