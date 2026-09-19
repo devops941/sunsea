@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { ApiError } from "../../utils/ApiError";
 import { prisma } from "../../config/prisma";
 import { sendEmail } from "../../utils/mailer";
+import { logAudit } from "../../utils/auditLog.util";
 
 export const getEmailConfig = async (req: Request, res: Response) => {
   try {
@@ -58,6 +59,9 @@ export const saveEmailConfig = async (req: Request, res: Response) => {
         },
       });
     }
+
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+    await logAudit("EmailConfig", config.id, "UPDATE", userId, "System Email Config");
 
     res.status(200).json({
       success: true,
