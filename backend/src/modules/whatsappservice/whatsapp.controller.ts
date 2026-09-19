@@ -4,6 +4,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { prisma } from "../../config/prisma";
+import { logAudit } from "../../utils/auditLog.util";
 
 class WhatsappController {
   /**
@@ -88,6 +89,9 @@ class WhatsappController {
         webhookVerifyToken,
       },
     });
+
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+    await logAudit("WhatsappConfig", updatedConfig.companyId, "UPDATE", userId, company.companyName + " WhatsApp Config");
 
     return res.status(200).json(
       new ApiResponse("WhatsApp configuration saved successfully", {

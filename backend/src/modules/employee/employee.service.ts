@@ -612,7 +612,7 @@ class EmployeeService {
     }
 
     if (updatedEmployee?.empCode) {
-      await logAudit("Employee", updatedEmployee.empCode, "UPDATE", dbUpdatedBy, updatedEmployee.fullName || updatedEmployee.empCode);
+      await logAudit("Employee", updatedEmployee.empCode, "UPDATE", userId, updatedEmployee.fullName || updatedEmployee.empCode);
     }
 
     return updatedEmployee;

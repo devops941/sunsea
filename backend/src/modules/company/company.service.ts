@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { logAudit } from "../../utils/auditLog.util";
 import { ApiError } from "../../utils/ApiError";
 import { uploadToImageKit } from "../../utils/Imagekit";
 import { UpdateCompanyInput } from "./company.validation";
@@ -177,6 +178,8 @@ class CompanyService {
           id: bp.id.toString(),
         })) as any;
       }
+
+      await logAudit("Company", finalCompany!.id, "UPDATE", userId, finalCompany!.companyName);
 
       return finalCompany;
     });
