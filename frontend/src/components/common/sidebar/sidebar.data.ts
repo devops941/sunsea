@@ -142,6 +142,7 @@ export const sidebarItems: SidebarItem[] = [
           { title: "WhatsApp Settings", path: "/whatsapp", permission: "whatsapp.view" },
           { title: "Email Configuration", path: "/email-config", permission: "email-config.view" },
           { title: "Invoice Settings", path: "/settings/invoice", permission: "invoice-settings.view" },
+          { title: "Audit Logs", path: "/audit-logs", permission: "audit-reports.view" },
         ],
       },
     ],
@@ -178,7 +179,7 @@ export const sidebarItems: SidebarItem[] = [
     ],
   },
 
-    // ── 5. Inventory (Standalone Top-Level Header Module) ─────────────────────
+  // ── 5. Inventory (Standalone Top-Level Header Module) ─────────────────────
   {
     title: "Inventory",
     icon: FiPackage,

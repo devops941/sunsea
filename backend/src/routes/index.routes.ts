@@ -53,6 +53,7 @@ import pettyCashRoutes from "../modules/petty-cash/petty-cash.routes";
 import payrollRoutes from "../modules/payroll/payroll.routes";
 import dashboardRoutes from "../modules/dashboard/dashboard.routes";
 import categoryRoutes from "../modules/category/category.routes";
+import auditRoutes from "../modules/audit/audit.routes";
 
 const router = Router();
 
@@ -116,6 +117,7 @@ router.use("/petty-cash", pettyCashRoutes);
 router.use("/payroll", payrollRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/categories", categoryRoutes);
+router.use("/audit-logs", auditRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({

@@ -4,6 +4,7 @@ import { UserStatus } from "../../types/auth.types";
 import { sendEmail } from "../../utils/mailer";
 import { generateWelcomeEmailHtml } from "../../templates/welcomeEmailTemplate";
 import bcrypt from "bcrypt";
+import { logAudit } from "../../utils/auditLog.util";
 
 class EmployeeService {
   async create(data: any) {
@@ -198,6 +199,10 @@ class EmployeeService {
       } catch (emailErr) {
         console.error("Failed to send welcome email (non-fatal):", emailErr);
       }
+    }
+
+    if (createdEmployee?.empCode) {
+      await logAudit("Employee", createdEmployee.empCode, "CREATE", actualUserId);
     }
 
     return createdEmployee;
@@ -606,6 +611,10 @@ class EmployeeService {
       }
     }
 
+    if (updatedEmployee?.empCode) {
+      await logAudit("Employee", updatedEmployee.empCode, "UPDATE", dbUpdatedBy);
+    }
+
     return updatedEmployee;
   }
 
@@ -637,8 +646,8 @@ class EmployeeService {
     return `${prefix}${paddedNumber}${suffix}`;
   }
 
-  async delete(id: bigint) {
-    await this.findById(id);
+  async delete(id: bigint, userId?: string) {
+    const employee = await this.findById(id);
 
     const linkedStores = await prisma.store.findFirst({ where: { inchargeId: id } });
     if (linkedStores) throw new ApiError(400, "Cannot delete employee because they are assigned as Incharge for a Store.");
@@ -647,7 +656,7 @@ class EmployeeService {
     if (linkedSalesOrders) throw new ApiError(400, "Cannot delete employee because they are linked as Source Employee on Sales Orders.");
 
     // explicitly delete linked records first to prevent RESTRICT foreign key constraint failures
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. Delete linked user account
       const linkedUser = await tx.user.findUnique({ where: { employeeId: id } });
       if (linkedUser) {
@@ -672,6 +681,12 @@ class EmployeeService {
       // 7. Delete employee record
       return tx.employee.delete({ where: { id } });
     });
+
+    if (employee?.empCode) {
+      await logAudit("Employee", employee.empCode, "DELETE", userId);
+    }
+
+    return result;
   }
 }
 

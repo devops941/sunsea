@@ -109,8 +109,6 @@ export interface CreateAuditLogDto {
   entityName: string;
   entityId?: string;
   action: string;
-  oldValues?: Record<string, any>;
-  newValues?: Record<string, any>;
   changedBy?: string;
   changedByAdmin?: bigint;
   ipAddress?: string;

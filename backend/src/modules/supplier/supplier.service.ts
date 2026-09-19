@@ -9,6 +9,7 @@ import type {
 import { uploadToImageKit } from "../../utils/Imagekit";
 import { accountsService } from "../accounts/accounts.service";
 import { voucherPostingService } from "../accounts/voucherPosting.service";
+import { logAudit } from "../../utils/auditLog.util";
 
 async function processBankAccounts(bankAccounts: any): Promise<any> {
   if (!Array.isArray(bankAccounts)) return bankAccounts;
@@ -86,6 +87,13 @@ class SupplierService {
     } catch (err) {
       console.error("Failed to auto-create supplier ledger/opening balance voucher:", err);
     }
+
+    await logAudit(
+      "Supplier",
+      createdSupplier.supplierCode,
+      "CREATE",
+      userId
+    );
 
     return createdSupplier;
   }
@@ -472,13 +480,21 @@ class SupplierService {
       console.error("Failed to update supplier ledger name:", err);
     }
 
+    await logAudit(
+      "Supplier",
+      updated.supplierCode,
+      "UPDATE",
+      updatedByUserId
+    );
+
     return updated;
   }
 
   async deleteSupplier(
-    id: string
+    id: string,
+    userId?: string
   ) {
-    await this.getSupplierById(id);
+    const supplier = await this.getSupplierById(id);
 
     const linkedPurchaseOrders = await prisma.purchaseOrder.findFirst({ where: { supplierId: Number(id) } });
     if (linkedPurchaseOrders) throw new ApiError(400, "Cannot delete supplier because they have associated Purchase Orders.");
@@ -486,7 +502,16 @@ class SupplierService {
     const linkedGrnInvoices = await prisma.grnInvoice.findFirst({ where: { supplierId: Number(id) } });
     if (linkedGrnInvoices) throw new ApiError(400, "Cannot delete supplier because they have associated GRN Invoices.");
 
-    return supplierRepository.delete(id);
+    const result = await supplierRepository.delete(id);
+    
+    await logAudit(
+      "Supplier",
+      supplier.supplierCode,
+      "DELETE",
+      userId
+    );
+
+    return result;
   }
 }
 
