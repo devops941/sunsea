@@ -93,9 +93,11 @@ export const deleteRole = async (
   const roleId = Number(
     String(req.params.id)
   );
+  const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
 
   await roleService.deleteRole(
-    roleId
+    roleId,
+    userId
   );
   getIO().emit("role:deleted", { id: roleId });
 

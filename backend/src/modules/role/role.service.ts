@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { logAudit } from "../../utils/auditLog.util";
 
 export const createRole = async (
   data: {
@@ -14,7 +15,7 @@ export const createRole = async (
     ? [{ updatedBy: userId, updatedAt: new Date().toISOString() }]
     : [];
 
-  return prisma.role.create({
+  const createdRole = await prisma.role.create({
     data: {
       ...roleData,
       createdBy: userId || undefined,
@@ -22,6 +23,9 @@ export const createRole = async (
       editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
     } as any,
   });
+
+  await logAudit("Role", createdRole.code || createdRole.id.toString(), "CREATE", userId, createdRole.name);
+  return createdRole;
 };
 
 const SUPER_ADMIN_FILTER = [
@@ -209,26 +213,36 @@ export const updateRole = async (
   updatePayload.updatedBy = userId || undefined;
   updatePayload.editHistory = newEditHistory.length > 0 ? newEditHistory : undefined;
 
-  return prisma.role.update({
+  const updatedRole = await prisma.role.update({
     where: {
       id,
     },
     data: updatePayload,
   });
+
+  await logAudit("Role", updatedRole.code || updatedRole.id.toString(), "UPDATE", userId, updatedRole.name);
+  return updatedRole;
 };
 
 export const deleteRole = async (
-  id: number
+  id: number,
+  userId?: string
 ) => {
+  const role = await prisma.role.findUnique({ where: { id }});
+  if (!role) throw new Error("Role not found");
+
   const assignedUsers = await prisma.user.findFirst({ where: { roleId: id } });
   if (assignedUsers) throw new Error("Cannot delete role because it is assigned to one or more users.");
 
   const assignedAdmins = await prisma.admin.findFirst({ where: { roleId: id } });
   if (assignedAdmins) throw new Error("Cannot delete role because it is assigned to one or more admins.");
 
-  return prisma.role.delete({
+  const deletedRole = await prisma.role.delete({
     where: {
       id,
     },
   });
+
+  await logAudit("Role", deletedRole.code || deletedRole.id.toString(), "DELETE", userId, deletedRole.name);
+  return deletedRole;
 };

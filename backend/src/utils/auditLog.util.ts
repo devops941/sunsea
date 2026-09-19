@@ -17,6 +17,7 @@ export async function logAudit(
   entityId: string,
   action: AuditAction,
   userId?: string,
+  recordName?: string,
   ipAddress?: string,
   userAgent?: string
 ) {
@@ -35,6 +36,7 @@ export async function logAudit(
     data: {
       entityName,
       entityId,
+      recordName,
       action,
       changedBy,
       ...(changedByAdmin ? { changedByAdmin } : {}),

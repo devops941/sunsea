@@ -58,7 +58,8 @@ class MachineController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
-    await machineService.delete(String(req.params.machineId));
+    const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+    await machineService.delete(String(req.params.machineId), userId);
 
     try {
       getIO().emit("machine:deleted", { id: req.params.machineId, machineId: req.params.machineId });

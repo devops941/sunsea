@@ -237,6 +237,7 @@ model AuditLog {
   id                BigInt      @id @default(autoincrement())
   entityName        String
   entityId          String?
+  recordName        String?
   action            AuditAction
   changedBy         String?
   ipAddress         String?

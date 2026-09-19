@@ -118,7 +118,7 @@ class CustomerService {
       console.error("Failed to auto-create customer ledger:", err);
     }
 
-    await logAudit("Customer", newCustomer.customerCode, "CREATE", currentUser.userId);
+    await logAudit("Customer", newCustomer.customerCode, "CREATE", currentUser.userId, newCustomer.firmName);
 
     return newCustomer;
   }
@@ -474,7 +474,7 @@ class CustomerService {
       console.error("Failed to update customer ledger name:", err);
     }
 
-    await logAudit("Customer", updated.customerCode, "UPDATE", userId);
+    await logAudit("Customer", updated.customerCode, "UPDATE", userId, updated.firmName);
 
     return updated;
   }
@@ -545,7 +545,7 @@ class CustomerService {
       "Customer"
     );
 
-    await logAudit("Customer", customer.customerCode, "DELETE", userId);
+    await logAudit("Customer", customer.customerCode, "DELETE", userId, customer.firmName);
 
     return result;
   }

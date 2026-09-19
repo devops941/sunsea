@@ -54,7 +54,8 @@ class ShiftController {
   delete = asyncHandler(
     async (req: Request, res: Response) => {
       const id = Number(String(req.params.id));
-      await shiftService.delete(id);
+      const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+      await shiftService.delete(id, userId);
       
       getIO().emit("shift:deleted", { id });
       

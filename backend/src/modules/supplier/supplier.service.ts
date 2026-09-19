@@ -92,7 +92,8 @@ class SupplierService {
       "Supplier",
       createdSupplier.supplierCode,
       "CREATE",
-      userId
+      userId,
+      createdSupplier.legalName
     );
 
     return createdSupplier;
@@ -484,7 +485,8 @@ class SupplierService {
       "Supplier",
       updated.supplierCode,
       "UPDATE",
-      updatedByUserId
+      updatedByUserId,
+      updated.legalName
     );
 
     return updated;
@@ -508,7 +510,8 @@ class SupplierService {
       "Supplier",
       supplier.supplierCode,
       "DELETE",
-      userId
+      userId,
+      supplier.legalName
     );
 
     return result;

@@ -11,12 +11,15 @@ export const assignPermissions = async (
     permissionIds,
   } = req.body;
 
+  const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+
   await rolePermissionService.assignPermissionsToRole(
     Number(String(roleId)),
     permissionIds.map(
       (id: string | number) =>
         Number(String(id))
-    )
+    ),
+    userId
   );
 
   try {
@@ -60,9 +63,12 @@ export const removePermission = async (
     permissionId,
   } = req.body;
 
+  const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+
   await rolePermissionService.removePermissionFromRole(
     Number(String(roleId)),
-    Number(String(permissionId))
+    Number(String(permissionId)),
+    userId
   );
 
   try {

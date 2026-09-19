@@ -4,6 +4,7 @@ import {
   CreateShiftInput,
   UpdateShiftInput,
 } from "./shift.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 class ShiftService {
   async create(data: CreateShiftInput & { userId?: string }) {
@@ -25,7 +26,7 @@ class ShiftService {
       ? [{ updatedBy: userId, updatedAt: new Date().toISOString() }]
       : [];
 
-    return prisma.shift.create({
+    const createdShift = await prisma.shift.create({
       data: {
         shiftCode: shiftData.shiftCode,
         shiftName: shiftData.shiftName,
@@ -38,6 +39,9 @@ class ShiftService {
         editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
       } as any,
     });
+
+    await logAudit("Shift", createdShift.shiftCode || createdShift.id.toString(), "CREATE", userId, createdShift.shiftName);
+    return createdShift;
   }
 
   async findAll() {
@@ -204,7 +208,7 @@ class ShiftService {
       });
     }
 
-    return prisma.shift.update({
+    const updatedShift = await prisma.shift.update({
       where: { id },
       data: {
         shiftCode: shiftData.shiftCode ?? undefined,
@@ -217,9 +221,12 @@ class ShiftService {
         editHistory: newEditHistory.length > 0 ? newEditHistory : undefined,
       } as any,
     });
+
+    await logAudit("Shift", updatedShift.shiftCode || updatedShift.id.toString(), "UPDATE", userId, updatedShift.shiftName);
+    return updatedShift;
   }
 
-  async delete(id: number) {
+  async delete(id: number, userId?: string) {
     const shift = await prisma.shift.findUnique({
       where: { id },
       include: {
@@ -244,9 +251,12 @@ class ShiftService {
       throw new ApiError(400, "Shift is currently assigned and cannot be deleted");
     }
 
-    return prisma.shift.delete({
+    const deletedShift = await prisma.shift.delete({
       where: { id },
     });
+
+    await logAudit("Shift", deletedShift.shiftCode || deletedShift.id.toString(), "DELETE", userId, deletedShift.shiftName);
+    return deletedShift;
   }
 
   async getNextShiftId() {

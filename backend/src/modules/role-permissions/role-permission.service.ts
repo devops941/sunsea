@@ -1,9 +1,11 @@
 import { prisma } from "../../config/prisma";
+import { logAudit } from "../../utils/auditLog.util";
 
 export const assignPermissionsToRole =
   async (
     roleId: number,
-    permissionIds: number[]
+    permissionIds: number[],
+    userId?: string
   ) => {
     const data = permissionIds.map(
       (permissionId) => ({
@@ -12,10 +14,13 @@ export const assignPermissionsToRole =
       })
     );
 
-    return prisma.rolePermission.createMany({
+    const result = await prisma.rolePermission.createMany({
       data,
       skipDuplicates: true,
     });
+    const role = await prisma.role.findUnique({ where: { id: roleId } });
+    await logAudit("RolePermission", roleId.toString(), "UPDATE", userId, role ? `Permissions for ${role.name}` : undefined);
+    return result;
   };
 
 export const getRolePermissions =
@@ -37,9 +42,10 @@ export const getRolePermissions =
 export const removePermissionFromRole =
   async (
     roleId: number,
-    permissionId: number
+    permissionId: number,
+    userId?: string
   ) => {
-    return prisma.rolePermission.delete({
+    const result = await prisma.rolePermission.delete({
       where: {
         roleId_permissionId: {
           roleId,
@@ -47,4 +53,7 @@ export const removePermissionFromRole =
         },
       },
     });
+    const role = await prisma.role.findUnique({ where: { id: roleId } });
+    await logAudit("RolePermission", roleId.toString(), "UPDATE", userId, role ? `Permissions for ${role.name}` : undefined);
+    return result;
   };
