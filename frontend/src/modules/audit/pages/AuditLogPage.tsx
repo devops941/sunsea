@@ -11,6 +11,7 @@ interface AuditLog {
   id: string;
   entityName: string;
   entityId: string;
+  recordName?: string;
   action: string;
   changedByName: string;
   changedAt: string;
@@ -98,6 +99,16 @@ const AuditLogPage: React.FC = () => {
       render: (row) => (
         <span className="text-xs font-mono text-ink-subtle truncate block max-w-[140px]" title={row.entityId}>
           {row.entityId}
+        </span>
+      ),
+    },
+    {
+      header: "Record Name",
+      accessor: "recordName",
+      width: "180px",
+      render: (row) => (
+        <span className="text-sm font-medium text-ink truncate block max-w-[180px]" title={row.recordName || row.entityId}>
+          {row.recordName || "-"}
         </span>
       ),
     },

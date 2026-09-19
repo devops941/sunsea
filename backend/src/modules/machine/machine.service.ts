@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { Prisma } from "@prisma/client";
 import { CreateMachineInput, UpdateMachineInput } from "./machine.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 const mapTechType = (val?: string | null) => {
   if (!val) return undefined;
@@ -27,7 +28,7 @@ class MachineService {
       : [];
 
     try {
-      return await prisma.machine.create({
+      const createdMachine = await prisma.machine.create({
         data: {
           machineId: machineData.machineId,
           machineName: machineData.machineName,
@@ -47,6 +48,8 @@ class MachineService {
           editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
         } as any,
       });
+      await logAudit("Machine", createdMachine.machineId, "CREATE", userId, createdMachine.machineName);
+      return createdMachine;
     } catch (error: any) {
       if (
         (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2020') ||
@@ -223,13 +226,16 @@ class MachineService {
     updatePayload.updatedBy = userId || undefined;
     updatePayload.editHistory = newEditHistory.length > 0 ? newEditHistory : undefined;
 
-    return prisma.machine.update({
+    const updatedMachine = await prisma.machine.update({
       where: { machineId },
       data: updatePayload as any,
     });
+    
+    await logAudit("Machine", updatedMachine.machineId, "UPDATE", userId, updatedMachine.machineName);
+    return updatedMachine;
   }
 
-  async delete(machineId: string) {
+  async delete(machineId: string, userId?: string) {
     await this.findById(machineId);
 
     const [weeklyPrograms, productionOrders, dailyPlans, hourlyProds, oeeSnaps, wastages, shiftRecs] = await Promise.all([
@@ -250,9 +256,11 @@ class MachineService {
     }
 
     try {
-      return await prisma.machine.delete({
+      const deletedMachine = await prisma.machine.delete({
         where: { machineId },
       });
+      await logAudit("Machine", deletedMachine.machineId, "DELETE", userId, deletedMachine.machineName);
+      return deletedMachine;
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
         throw new ApiError(

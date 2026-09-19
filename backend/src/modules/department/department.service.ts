@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { logAudit } from "../../utils/auditLog.util";
 import { ApiError } from "../../utils/ApiError";
 
 export const createDepartmentService =
@@ -28,7 +29,7 @@ export const createDepartmentService =
       );
     }
 
-    return prisma.department.create({
+    const createdDept = await prisma.department.create({
       data: {
         ...departmentData,
         createdBy: userId || undefined,
@@ -36,6 +37,9 @@ export const createDepartmentService =
         editHistory: initialEditHistory.length > 0 ? initialEditHistory : undefined,
       } as any,
     });
+
+    await logAudit("Department", createdDept.name || createdDept.id.toString(), "CREATE", userId, createdDept.name);
+    return createdDept;
   };
 
 export const getAllDepartmentsService =
@@ -80,7 +84,7 @@ export const getAllDepartmentsService =
   };
 
 export const deleteDepartmentService =
-  async (id: number) => {
+  async (id: number, userId?: string) => {
     const department =
       await prisma.department.findUnique({
         where: { id },
@@ -104,9 +108,12 @@ export const deleteDepartmentService =
       throw new ApiError(400, "This department is currently assigned to one or more employees and cannot be deleted.");
     }
 
-    return prisma.department.delete({
+    const deletedDept = await prisma.department.delete({
       where: { id },
     });
+
+    await logAudit("Department", deletedDept.name || deletedDept.id.toString(), "DELETE", userId, deletedDept.name);
+    return deletedDept;
   };
 
 // Edit and update department
@@ -185,10 +192,13 @@ export const updateDepartmentService =
       editHistory: newEditHistory.length > 0 ? newEditHistory : undefined,
     };
 
-    return prisma.department.update({
+    const updatedDept = await prisma.department.update({
       where: { id },
       data: updatePayload,
     });
+
+    await logAudit("Department", updatedDept.name || updatedDept.id.toString(), "UPDATE", userId, updatedDept.name);
+    return updatedDept;
   };
 
 export const getDepartmentByIdService =

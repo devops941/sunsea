@@ -202,7 +202,7 @@ class EmployeeService {
     }
 
     if (createdEmployee?.empCode) {
-      await logAudit("Employee", createdEmployee.empCode, "CREATE", actualUserId);
+      await logAudit("Employee", createdEmployee.empCode, "CREATE", actualUserId, createdEmployee.fullName || createdEmployee.empCode);
     }
 
     return createdEmployee;
@@ -612,7 +612,7 @@ class EmployeeService {
     }
 
     if (updatedEmployee?.empCode) {
-      await logAudit("Employee", updatedEmployee.empCode, "UPDATE", dbUpdatedBy);
+      await logAudit("Employee", updatedEmployee.empCode, "UPDATE", dbUpdatedBy, updatedEmployee.fullName || updatedEmployee.empCode);
     }
 
     return updatedEmployee;
@@ -683,7 +683,7 @@ class EmployeeService {
     });
 
     if (employee?.empCode) {
-      await logAudit("Employee", employee.empCode, "DELETE", userId);
+      await logAudit("Employee", employee.empCode, "DELETE", userId, employee.fullName || employee.empCode);
     }
 
     return result;

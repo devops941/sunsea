@@ -134,7 +134,8 @@ export const deleteDepartment =
   asyncHandler(
     async (req: Request, res: Response) => {
       const departmentId = Number(String(req.params.id));
-      await deleteDepartmentService(departmentId);
+      const userId = (req as any).user?.userId || ((req as any).user?.id ? `admin_${(req as any).user.id}` : ((req as any).admin?.id ? `admin_${(req as any).admin.id}` : undefined));
+      await deleteDepartmentService(departmentId, userId);
       
       getIO().emit("department:deleted", { id: departmentId });
       
