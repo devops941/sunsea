@@ -238,8 +238,6 @@ model AuditLog {
   entityName        String
   entityId          String?
   action            AuditAction
-  oldValues         Json?
-  newValues         Json?
   changedBy         String?
   ipAddress         String?
   userAgent         String?

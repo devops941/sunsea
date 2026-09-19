@@ -240,8 +240,8 @@ const AllSalesOrderList: React.FC = () => {
             }
         };
 
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
     }, [showEstimateModal, showSaveConfirmModal, handleRequestCloseEstimate]);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -760,7 +760,7 @@ const AllSalesOrderList: React.FC = () => {
                         }
                     }
                 `}</style>
-                    <div className="fixed inset-0 z-50 overflow-y-auto no-print">
+                    <div className="fixed inset-0 z-50 overflow-y-auto no-print" data-escape-guarded={true}>
                         {/* Backdrop */}
                         <div
                             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"

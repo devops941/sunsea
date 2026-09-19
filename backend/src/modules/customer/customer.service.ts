@@ -8,6 +8,7 @@ import {
 } from "./customer.validation";
 import { accountsService } from "../accounts/accounts.service";
 import { voucherPostingService } from "../accounts/voucherPosting.service";
+import { logAudit } from "../../utils/auditLog.util";
 
 class CustomerService {
   /**
@@ -116,6 +117,8 @@ class CustomerService {
     } catch (err) {
       console.error("Failed to auto-create customer ledger:", err);
     }
+
+    await logAudit("Customer", newCustomer.customerCode, "CREATE", currentUser.userId);
 
     return newCustomer;
   }
@@ -471,11 +474,13 @@ class CustomerService {
       console.error("Failed to update customer ledger name:", err);
     }
 
+    await logAudit("Customer", updated.customerCode, "UPDATE", userId);
+
     return updated;
   }
 
-  async deleteCustomer(id: string) {
-    await this.getCustomerById(id);
+  async deleteCustomer(id: string, userId?: string) {
+    const customer = await this.getCustomerById(id);
 
     // Check all dependent records
     const [linkedOrders, linkedInvoices, linkedReturns, linkedLedger] = await Promise.all([
@@ -535,10 +540,14 @@ class CustomerService {
     // Delete customer addresses
     await prisma.customerAddress.deleteMany({ where: { customerId: id } });
 
-    return executeDeleteWithValidation(
+    const result = await executeDeleteWithValidation(
       () => prisma.customer.delete({ where: { id } }),
       "Customer"
     );
+
+    await logAudit("Customer", customer.customerCode, "DELETE", userId);
+
+    return result;
   }
 }
 

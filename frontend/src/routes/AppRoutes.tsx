@@ -33,6 +33,7 @@ const InvoiceSettings = lazy(() => import("../modules/sales-order-invoice/sales-
 const UserList = lazy(() => import("../modules/users/pages/UserList"));
 const PermissionList = lazy(() => import("../modules/permissions/pages/PermissionList"));
 const Settings = lazy(() => import("../modules/settings/Setting"));
+const AuditLogPage = lazy(() => import("../modules/audit/pages/AuditLogPage"));
 
 // ===========================================================================
 // CATEGORY MASTER
@@ -293,6 +294,9 @@ const AppRoutes = () => {
               <Route path="/whatsapp" element={<WhatsappSettings />} />
               <Route path="/email-config" element={<EmailConfigPage />} />
               <Route path="/settings/invoice" element={<InvoiceSettings />} />
+              <Route element={<ProtectedRoute permission="audit-reports.view" />}>
+                <Route path="/audit-logs" element={<AuditLogPage />} />
+              </Route>
 
               <Route element={<ProtectedRoute permission="profile.view" />}>
                 <Route path="/profile" element={<ProfilePage />} />

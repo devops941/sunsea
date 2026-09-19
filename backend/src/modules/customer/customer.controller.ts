@@ -121,7 +121,8 @@ class CustomerController {
       const id = req.params.id as string;
 
       await customerService.deleteCustomer(
-        id
+        id,
+        req.user?.userId
       );
 
       getIO().emit("customer:deleted", { id });

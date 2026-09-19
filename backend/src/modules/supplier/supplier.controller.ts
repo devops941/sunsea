@@ -118,7 +118,7 @@ class SupplierController {
   delete = asyncHandler(
     async (req: Request, res: Response) => {
       const id = String(req.params.id);
-      await supplierService.deleteSupplier(id);
+      await supplierService.deleteSupplier(id, req.user?.userId);
 
       getIO().emit("supplier:deleted", { id });
 

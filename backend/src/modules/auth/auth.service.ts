@@ -59,11 +59,6 @@ export class AuthService {
       entityName: "User",
       entityId: user.userId,
       action: "USER_CREATED",
-      newValues: {
-        email: user.email,
-        username: user.username,
-        roleId: user.roleId
-      },
       changedBy: payload.createdBy,
       ipAddress,
       userAgent
@@ -163,17 +158,6 @@ export class AuthService {
         });
       }
 
-      await authRepository.createAuditLog({
-        entityName: isAdminLogin ? "Admin" : "User",
-        entityId: isAdminLogin ? admin!.id.toString() : user.userId,
-        action: "LOGIN_FAILED",
-        newValues: { reason: "invalid_password" },
-        changedBy: isAdminLogin ? undefined : user.userId,
-        changedByAdmin: isAdminLogin ? admin!.id : undefined,
-        ipAddress,
-        userAgent
-      });
-
       throw new ApiError(401, "Invalid email or password");
     }
 
@@ -224,14 +208,6 @@ export class AuthService {
       });
     }
 
-    await authRepository.createAuditLog({
-      entityName: isAdminLogin ? "Admin" : "User",
-      entityId: isAdminLogin ? admin!.id.toString() : user.userId,
-      action: "LOGIN_SUCCESS",
-      ipAddress,
-      userAgent
-    });
-
     return {
       user: this.formatUserResponse(user, isAdminLogin),
       tokens: {
@@ -277,15 +253,6 @@ export class AuthService {
       }
     }
 
-    await authRepository.createAuditLog({
-      entityName: isAdmin ? "Admin" : "User",
-      entityId: isAdmin ? userId.replace("admin_", "") : userId,
-      action: "LOGOUT",
-      changedBy: isAdmin ? undefined : userId, // Don't pass admin userId to changedBy
-      changedByAdmin: isAdmin ? BigInt(userId.replace("admin_", "")) : undefined,
-      ipAddress,
-      userAgent
-    });
   }
 
   async logoutAllSessions(
@@ -302,15 +269,6 @@ export class AuthService {
       await authRepository.logoutAllUserSessions(userId);
     }
 
-    await authRepository.createAuditLog({
-      entityName: isAdmin ? "Admin" : "User",
-      entityId: isAdmin ? userId.replace("admin_", "") : userId,
-      action: "LOGOUT_ALL_SESSIONS",
-      changedBy: isAdmin ? undefined : userId, // Don't pass admin userId to changedBy
-      changedByAdmin: isAdmin ? BigInt(userId.replace("admin_", "")) : undefined,
-      ipAddress,
-      userAgent
-    });
   }
 
   // ============================================================
@@ -352,7 +310,6 @@ export class AuthService {
         entityName: "User",
         entityId: userId,
         action: "PASSWORD_CHANGE_FAILED",
-        newValues: { reason: "invalid_current_password" },
         changedBy: userId,
         ipAddress,
         userAgent

@@ -262,7 +262,7 @@ class EmployeeController {
   delete = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(String(req.params.id));
 
-    await employeeService.delete(id);
+    await employeeService.delete(id, req.user?.userId);
 
     getIO().emit("employee:deleted", { id: id.toString() });
 

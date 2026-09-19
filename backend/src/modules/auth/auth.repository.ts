@@ -427,8 +427,6 @@ export class AuthRepository {
         entityName: entry.entityName,
         entityId: entry.entityId,
         action: entry.action as AuditAction,
-        oldValues: entry.oldValues ? serializeBigInt(entry.oldValues) : undefined,
-        newValues: entry.newValues ? serializeBigInt(entry.newValues) : undefined,
         changedBy: entry.changedBy,
         changedByAdmin: entry.changedByAdmin,
         ipAddress: entry.ipAddress,
