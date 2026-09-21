@@ -691,26 +691,26 @@ const AllSalesOrderList: React.FC = () => {
                                                 handleOpenEstimate(item.id);
                                             }}
                                         />
-                                        {item.status === "DRAFT" && (
-                                            <>
-                                                {can("sales-orders.edit") && (
-                                                    <EditButton
-                                                        onClick={(e) => {
-                                                            e?.stopPropagation();
-                                                            handleOpenEdit(item);
-                                                        }}
-                                                    />
-                                                )}
-                                                {can("sales-orders.delete") && (
-                                                    <DeleteButton
-                                                        onClick={(e) => {
-                                                            e?.stopPropagation();
-                                                            triggerDelete(item.id);
-                                                        }}
-                                                    />
-                                                )}
-                                            </>
-                                        )}
+
+                                        <>
+                                            {can("sales-orders.edit") && (
+                                                <EditButton
+                                                    onClick={(e) => {
+                                                        e?.stopPropagation();
+                                                        handleOpenEdit(item);
+                                                    }}
+                                                />
+                                            )}
+                                            {can("sales-orders.delete") && item.status === "DRAFT" && (
+                                                <DeleteButton
+                                                    onClick={(e) => {
+                                                        e?.stopPropagation();
+                                                        triggerDelete(item.id);
+                                                    }}
+                                                />
+                                            )}
+                                        </>
+
                                     </div>
                                 ),
                             },

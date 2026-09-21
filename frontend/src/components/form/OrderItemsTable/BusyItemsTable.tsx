@@ -322,6 +322,25 @@ function BusyItemsTable<T extends Record<string, any>>({
     // Skip Enter/Space on the expand column (let it toggle components)
     if ((e.key === "Enter" || e.key === " ") && expandable && c === columns.length) return;
 
+    if (e.key === "Backspace" && c === 0 && r < rows.length) {
+      if (
+        (tgt instanceof HTMLInputElement && tgt.value === "") ||
+        (tgt instanceof HTMLDivElement && tgt.hasAttribute("data-nav"))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const row = rows[r];
+        if (!isRowDeletable || isRowDeletable(row, r)) {
+          if (rows.length > 1) {
+            if (onChange) onChange(rows.filter((_, j) => j !== r));
+            else if (onRemove) onRemove(r);
+            setTimeout(() => focus(Math.max(0, r - 1), 0), 50);
+          }
+        }
+        return;
+      }
+    }
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
       e.stopPropagation();

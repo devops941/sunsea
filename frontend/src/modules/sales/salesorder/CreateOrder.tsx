@@ -24,6 +24,7 @@ import { useEmployees } from "../../../hooks/useEmployees";
 import { salesProductService } from "../../../services/salesProductService";
 import { ORDER_SOURCE_OPTIONS, ORDER_SOURCE_NEEDS_EMPLOYEE, ORDER_SOURCE_NEEDS_REFERRAL, ORDER_SOURCE_NEEDS_DEALER } from "../../../constants/selectOption";
 import { companyService } from "../../../services/companyService";
+import { salesInvoiceService } from "../../../services/salesInvoiceService";
 import { usePermission } from "../../../hooks/usePermission";
 import { formatDate } from "../../../utils/dateUtils";
 
@@ -424,22 +425,50 @@ const SalesOrderForm: React.FC = () => {
 
     const handleFormKeyDown = useFormKeyboardNav(formRef);
 
+    const handleCreateInvoiceNavigate = useCallback(() => {
+        if (!targetId) {
+            toast.error("Please save the sales order first before creating an invoice.");
+            return;
+        }
+        if (preloadedOrder?.status === "INVOICED") {
+            salesInvoiceService.fetchAll({ salesOrderId: targetId })
+                .then((res: any) => {
+                    const invoices = res.data || res;
+                    if (invoices && invoices.length > 0) {
+                        navigate(`/sales-invoices/edit/${invoices[0].id}`);
+                    } else {
+                        navigate("/sales-invoices/create", { state: { preselectedOrderId: String(targetId) } });
+                    }
+                })
+                .catch(() => {
+                    navigate("/sales-invoices/create", { state: { preselectedOrderId: String(targetId) } });
+                });
+        } else {
+            navigate("/sales-invoices/create", { state: { preselectedOrderId: String(targetId) } });
+        }
+    }, [targetId, preloadedOrder, navigate]);
+
     useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            if (saveConfirmOpenRef.current) return;
-            e.preventDefault();
-            e.stopPropagation();
-            if (isDirtyRef.current) {
-                lastFocusedRef.current = document.activeElement as HTMLElement;
-                setSaveConfirmOpen(true);
-            } else {
-                navigate(-1);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                if (saveConfirmOpenRef.current) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (isDirtyRef.current) {
+                    lastFocusedRef.current = document.activeElement as HTMLElement;
+                    setSaveConfirmOpen(true);
+                } else {
+                    navigate(-1);
+                }
+            } else if (e.key === "F6") {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCreateInvoiceNavigate();
             }
         };
-        document.addEventListener("keydown", handleEscape, true);
-        return () => document.removeEventListener("keydown", handleEscape, true);
-    }, [navigate]);
+        document.addEventListener("keydown", handleKeyDown, true);
+        return () => document.removeEventListener("keydown", handleKeyDown, true);
+    }, [navigate, handleCreateInvoiceNavigate]);
 
     // ─── Load company info for inter-state ───────────────────────────
     useEffect(() => {
@@ -1003,10 +1032,28 @@ const SalesOrderForm: React.FC = () => {
                 </form>
 
                 {/* ── Actions ── */}
-                <div className="flex justify-end gap-3 px-5 py-3 border-t border-line">
-                    <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
-                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))(); }} disabled={isSubmitting} />
-                    <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))(); }} disabled={isSubmitting} />
+                <div className="flex justify-between items-center px-5 py-3 border-t border-line">
+                    <div>
+                        {targetId && (
+                            <CustomButton 
+                                variant="secondary" 
+                                text={preloadedOrder?.status === "INVOICED" ? "Edit Invoice (F6)" : "Create Invoice (F6)"} 
+                                type="button" 
+                                onClick={handleCreateInvoiceNavigate} 
+                            />
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        {preloadedOrder?.status !== "INVOICED" && (
+                            <>
+                                <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
+                                {(!targetId || preloadedOrder?.status === "DRAFT") && (
+                                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))(); }} disabled={isSubmitting} />
+                                )}
+                                <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))(); }} disabled={isSubmitting} />
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
