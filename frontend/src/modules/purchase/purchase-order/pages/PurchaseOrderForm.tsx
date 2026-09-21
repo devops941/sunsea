@@ -123,6 +123,8 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     totalSgst: Number(po.totalSgst ?? 0),
     totalIgst: Number(po.totalIgst ?? 0),
     netAmount: Number(po.netAmount ?? 0),
+    hasGrnInvoice: Boolean(po.hasGrnInvoice || (po.grnInvoicesCount && po.grnInvoicesCount > 0)),
+    grnInvoicesCount: po.grnInvoicesCount ?? 0,
   };
 };
 
@@ -222,8 +224,13 @@ const PurchaseOrderForm: React.FC = () => {
 
   const isLocked = useMemo(() => {
     if (!isEdit) return false;
-    return formData.status !== "DRAFT";
-  }, [isEdit, formData.status]);
+    return Boolean(
+      formData.hasGrnInvoice ||
+      (formData.grnInvoicesCount && formData.grnInvoicesCount > 0) ||
+      formData.status === "COMPLETED" ||
+      formData.status === "CANCELLED"
+    );
+  }, [isEdit, formData.hasGrnInvoice, formData.grnInvoicesCount, formData.status]);
 
   const isInterState = useMemo(() => {
     if (!companyState || !formData.billingState) return false;
@@ -1155,7 +1162,9 @@ const PurchaseOrderForm: React.FC = () => {
         {isLocked && (
           <div className="px-5 py-1.5 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 flex items-center gap-2 text-[11px] font-semibold">
             <span className="font-bold">View Only:</span>
-            This PO is in '{formData.status}' status. Only Draft orders can be modified.
+            {formData.hasGrnInvoice || (formData.grnInvoicesCount && formData.grnInvoicesCount > 0)
+              ? "This Purchase Order is linked to a GRN / Purchase Invoice and cannot be modified."
+              : `This PO is in '${formData.status}' status and cannot be modified.`}
           </div>
         )}
 
@@ -1167,8 +1176,8 @@ const PurchaseOrderForm: React.FC = () => {
                 {/* <h3 className="text-xs font-bold text-ink uppercase tracking-wide">PO Details</h3> */}
               </div>
               <div className="grid grid-cols-3 gap-x-4 gap-y-1.5">
-                <DatePickerCalendar label="PO Date" name="poDate" value={formData.poDate} onChange={(e) => handleChange(e as any)} required error={errors.poDate} disabled={isLocked || isEdit} />
-                <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable error={errors.supplierId} disabled={isLocked || isEdit} />
+                <DatePickerCalendar label="PO Date" name="poDate" value={formData.poDate} onChange={(e) => handleChange(e as any)} required error={errors.poDate} disabled={isLocked} />
+                <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable error={errors.supplierId} disabled={isLocked} />
                 <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable error={errors.storeId} disabled={isLocked} />
               </div>
             </div>

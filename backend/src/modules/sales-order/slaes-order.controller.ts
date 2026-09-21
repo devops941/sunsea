@@ -22,7 +22,7 @@ function getPerms(req: Request): string[] {
 class SalesOrderController {
 
     create = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.create(req.body, getPerms(req));
+        const order = await salesOrderService.create(req.body, getPerms(req), req.user?.userId);
         getIO().emit("salesOrder:created", order);
         return res.status(201).json(new ApiResponse("Sales Order created successfully", order));
     });
@@ -66,14 +66,14 @@ class SalesOrderController {
     });
 
     update = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.update(Number(req.params.id), req.body, getPerms(req));
+        const order = await salesOrderService.update(Number(req.params.id), req.body, getPerms(req), req.user?.userId);
         getIO().emit("salesOrder:updated", order);
         return res.status(200).json(new ApiResponse("Sales Order updated successfully", order));
     });
 
     delete = asyncHandler(async (req: Request, res: Response) => {
         const id = Number(req.params.id);
-        await salesOrderService.delete(id, getPerms(req));
+        await salesOrderService.delete(id, getPerms(req), req.user?.userId);
         getIO().emit("salesOrder:deleted", { id });
         return res.status(200).json(new ApiResponse("Sales Order deleted successfully"));
     });
@@ -139,19 +139,19 @@ class SalesOrderController {
     });
 
     confirmOrder = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.confirmOrder(Number(req.params.id), getPerms(req));
+        const order = await salesOrderService.confirmOrder(Number(req.params.id), getPerms(req), req.user?.userId);
         getIO().emit("salesOrder:updated", order);
         return res.status(200).json(new ApiResponse("Order confirmed successfully", order));
     });
 
     convertToSalesOrder = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.convertToSalesOrder(Number(req.params.id), getPerms(req));
+        const order = await salesOrderService.convertToSalesOrder(Number(req.params.id), getPerms(req), req.user?.userId);
         getIO().emit("salesOrder:updated", order);
         return res.status(200).json(new ApiResponse("Quotation converted to sales order successfully", order));
     });
 
     markInQuotation = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.markInQuotation(Number(req.params.id));
+        const order = await salesOrderService.markInQuotation(Number(req.params.id), req.user?.userId);
         getIO().emit("salesOrder:updated", order);
         return res.status(200).json(new ApiResponse("Order marked as in-quotation successfully", order));
     });

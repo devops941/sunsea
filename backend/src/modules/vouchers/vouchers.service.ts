@@ -2,6 +2,33 @@ import { prisma } from "../../config/prisma";
 import { VoucherType, Prisma } from "@prisma/client";
 import { ApiError } from "../../utils/ApiError";
 import { CreateVoucherInput, GetVouchersQueryInput, UpdateVoucherInput } from "./vouchers.types";
+import { logAudit } from "../../utils/auditLog.util";
+
+export function extractVoucherPartyName(voucher: any): string {
+  if (!voucher?.items || voucher.items.length === 0) {
+    return voucher?.narration || voucher?.voucherNo || "N/A";
+  }
+
+  if (voucher.type === "RECEIPT") {
+    const partyItem = voucher.items.find((i: any) => {
+      const g = (i.creditLedger?.group || "").toLowerCase();
+      return !g.includes("bank") && !g.includes("cash") && i.creditLedger?.name;
+    });
+    if (partyItem?.creditLedger?.name) return partyItem.creditLedger.name;
+    return voucher.items[0]?.creditLedger?.name || voucher.items[0]?.debitLedger?.name || voucher.narration || voucher.voucherNo;
+  }
+
+  if (voucher.type === "PAYMENT") {
+    const partyItem = voucher.items.find((i: any) => {
+      const g = (i.debitLedger?.group || "").toLowerCase();
+      return !g.includes("bank") && !g.includes("cash") && i.debitLedger?.name;
+    });
+    if (partyItem?.debitLedger?.name) return partyItem.debitLedger.name;
+    return voucher.items[0]?.debitLedger?.name || voucher.items[0]?.creditLedger?.name || voucher.narration || voucher.voucherNo;
+  }
+
+  return voucher.items[0]?.debitLedger?.name || voucher.items[0]?.creditLedger?.name || voucher.narration || voucher.voucherNo;
+}
 
 class VouchersService {
   private readonly prefixMap: Record<VoucherType, string> = {
@@ -64,8 +91,18 @@ class VouchersService {
     return `${prefix}-${Date.now().toString().slice(-6)}`;
   }
 
-  async deleteVoucher(id: number) {
-    const voucher = await prisma.voucher.findUnique({ where: { id }, select: { id: true, type: true, refDocType: true } });
+  async deleteVoucher(id: number, userId?: string) {
+    const voucher = await prisma.voucher.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            debitLedger: true,
+            creditLedger: true,
+          },
+        },
+      },
+    });
     if (!voucher) throw new ApiError(404, "Voucher not found");
 
     // Block deletion of system-generated vouchers (opening balance JVs, invoice-linked vouchers)
@@ -74,10 +111,16 @@ class VouchersService {
       throw new ApiError(400, "System-generated vouchers cannot be deleted");
     }
 
+    const partyName = extractVoucherPartyName(voucher);
+    const voucherNo = voucher.voucherNo;
+    const entityName = voucher.type === "RECEIPT" ? "Receipt" : (voucher.type === "PAYMENT" ? "Payment" : (voucher.type === "JOURNAL" ? "Journal" : (voucher.type === "CONTRA" ? "Contra" : "Voucher")));
+
     await prisma.$transaction([
       prisma.journalItem.deleteMany({ where: { voucherId: id } }),
       prisma.voucher.delete({ where: { id } }),
     ]);
+
+    await logAudit(entityName, voucherNo, "DELETE", userId, partyName);
 
     return { deleted: true, id };
   }
@@ -95,7 +138,7 @@ class VouchersService {
    *  • Dr/Cr totals must still balance if items are updated.
    *  • Same Bank/Cash side guard as create for PAYMENT/RECEIPT.
    */
-  async updateVoucher(id: number, data: UpdateVoucherInput) {
+  async updateVoucher(id: number, data: UpdateVoucherInput, userId?: string) {
     const existing = await prisma.voucher.findUnique({
       where: { id },
       select: { id: true, type: true, refDocType: true },
@@ -153,7 +196,7 @@ class VouchersService {
       }
     }
 
-    return prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
       await tx.voucher.update({
         where: { id },
         data: {
@@ -189,6 +232,14 @@ class VouchersService {
         },
       });
     });
+
+    if (updated) {
+      const partyName = extractVoucherPartyName(updated);
+      const entityName = updated.type === "RECEIPT" ? "Receipt" : (updated.type === "PAYMENT" ? "Payment" : (updated.type === "JOURNAL" ? "Journal" : (updated.type === "CONTRA" ? "Contra" : "Voucher")));
+      await logAudit(entityName, updated.voucherNo, "UPDATE", userId, partyName);
+    }
+
+    return updated;
   }
 
   private async enrichVouchers(vouchers: any[]) {
@@ -507,7 +558,7 @@ class VouchersService {
       }
     }
 
-    return prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx) => {
       const voucher = await tx.voucher.create({
         data: {
           voucherNo,
@@ -545,6 +596,14 @@ class VouchersService {
         },
       });
     });
+
+    if (created) {
+      const partyName = extractVoucherPartyName(created);
+      const entityName = created.type === "RECEIPT" ? "Receipt" : (created.type === "PAYMENT" ? "Payment" : (created.type === "JOURNAL" ? "Journal" : (created.type === "CONTRA" ? "Contra" : "Voucher")));
+      await logAudit(entityName, created.voucherNo, "CREATE", createdBy, partyName);
+    }
+
+    return created;
   }
 
   async autoPostVoucher(params: {

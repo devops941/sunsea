@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { executeDeleteWithValidation } from "../../utils/deleteValidation";
 import { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "./purchase-order.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 function getUomMultiplier(uom: string = "", baseUom: string = ""): number {
     const u = (uom || "").trim().toLowerCase();
@@ -181,7 +182,7 @@ class PurchaseOrderService {
         const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
             await this.calculateTotals(data.items, isInterState, poDiscountType, poDiscountValue, roundingAdjust);
 
-        return prisma.purchaseOrder.create({
+        const created = await prisma.purchaseOrder.create({
             data: {
                 poNumber,
                 poDate: new Date(data.poDate),
@@ -240,8 +241,13 @@ class PurchaseOrderService {
                     })),
                 },
             },
-            include: { items: true },
+            include: { items: true, supplier: true },
         });
+
+        const supplierName = supplier.legalName || supplier.displayName || supplier.supplierCode || created.poNumber;
+        await logAudit("PurchaseOrder", created.poNumber || created.id, "CREATE", currentUser.userId, supplierName);
+
+        return created;
     }
 
     // ── Get all (with optional pagination, search, and status filtering) ──────
@@ -305,6 +311,11 @@ class PurchaseOrderService {
                     },
                 },
                 items: true,
+                _count: {
+                    select: {
+                        grnInvoices: true,
+                    },
+                },
             },
         };
 
@@ -316,9 +327,12 @@ class PurchaseOrderService {
         const pos = await prisma.purchaseOrder.findMany(findOptions);
 
         const mapped = pos.map((po) => {
-            const { supplier, ...rest } = po as any;
+            const { supplier, _count, ...rest } = po as any;
+            const grnInvoicesCount = _count?.grnInvoices || 0;
             return {
                 ...rest,
+                hasGrnInvoice: grnInvoicesCount > 0,
+                grnInvoicesCount,
                 supplier: supplier
                     ? {
                         id: supplier.id,
@@ -371,13 +385,14 @@ class PurchaseOrderService {
         const productIds = po.items.map((i) => String(i.productId)).filter(Boolean);
         const numericProductIds = productIds.filter((id) => /^\d+$/.test(id)).map((id) => BigInt(id));
 
-        const [rawMaterials, products] = await Promise.all([
+        const [rawMaterials, products, grnInvoicesCount] = await Promise.all([
             productIds.length > 0
                 ? prisma.rawMaterial.findMany({ where: { rawMaterialId: { in: productIds } } })
                 : [],
             numericProductIds.length > 0
                 ? prisma.product.findMany({ where: { id: { in: numericProductIds } } })
                 : [],
+            prisma.grnInvoice.count({ where: { poId: id } }).catch(() => 0),
         ]);
 
         const rmMap = new Map(rawMaterials.map((rm) => [String(rm.rawMaterialId), rm]));
@@ -405,6 +420,8 @@ class PurchaseOrderService {
         const { supplier, ...rest } = po as any;
         return {
             ...rest,
+            hasGrnInvoice: grnInvoicesCount > 0,
+            grnInvoicesCount,
             items: itemsWithDetails,
             supplier: supplier
                 ? {
@@ -425,12 +442,24 @@ class PurchaseOrderService {
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
-    async updatePurchaseOrder(id: string, data: UpdatePurchaseOrderInput) {
+    async updatePurchaseOrder(id: string, data: UpdatePurchaseOrderInput, userId?: string) {
         const po = await prisma.purchaseOrder.findUnique({
             where: { id },
         });
         if (!po) {
             throw new ApiError(404, "Purchase Order not found");
+        }
+
+        // Block edit if a GRN invoice is already created against this PO
+        const linkedGRN = await prisma.grnInvoice.count({
+            where: { poId: id },
+        }).catch(() => 0);
+
+        if (linkedGRN > 0) {
+            throw new ApiError(
+                400,
+                "Cannot edit Purchase Order: A GRN / Purchase Invoice has already been created for this PO."
+            );
         }
 
         // Recalculate totals if items are being updated
@@ -523,33 +552,43 @@ class PurchaseOrderService {
             };
         }
 
-        return prisma.purchaseOrder.update({
+        const updated = await prisma.purchaseOrder.update({
             where: { id },
             data: updateData,
-            include: { items: true },
+            include: { items: true, supplier: true },
         });
+
+        const supplierName = (updated as any).supplier?.legalName || (updated as any).supplier?.displayName || updated.poNumber;
+        await logAudit("PurchaseOrder", updated.poNumber || updated.id, "UPDATE", userId, supplierName);
+
+        return updated;
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────
-    async deletePurchaseOrder(id: string) {
-        await this.getPurchaseOrderById(id);
+    async deletePurchaseOrder(id: string, userId?: string) {
+        const po = await this.getPurchaseOrderById(id);
 
         // Block delete if GRN or invoice is linked
-        const linkedGRN = await (prisma as any).goodsReceiptNote?.count({
-            where: { purchaseOrderId: id },
+        const linkedGRN = await prisma.grnInvoice.count({
+            where: { poId: id },
         }).catch(() => 0);
 
-        if (linkedGRN && linkedGRN > 0) {
+        if (linkedGRN > 0) {
             throw new ApiError(
                 409,
-                `Cannot delete — ${linkedGRN} Goods Receipt Note(s) are linked to this PO`
+                `Cannot delete — ${linkedGRN} Goods Receipt Note(s) / GRN Invoice(s) are linked to this PO`
             );
         }
 
-        return executeDeleteWithValidation(
+        const result = await executeDeleteWithValidation(
             () => prisma.purchaseOrder.delete({ where: { id } }),
             "Purchase Order"
         );
+
+        const supplierName = (po as any).supplier?.supplierName || (po as any).supplier?.legalName || (po as any).supplier?.displayName || po.poNumber;
+        await logAudit("PurchaseOrder", po.poNumber || id, "DELETE", userId, supplierName);
+
+        return result;
     }
 }
 

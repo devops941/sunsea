@@ -49,7 +49,7 @@ class VouchersController {
   async createVoucher(req: Request, res: Response, next: NextFunction) {
     try {
       const input = createVoucherSchema.parse(req.body);
-      const createdBy = (req as any).user?.id || (req as any).user?.userId;
+      const createdBy = (req as any).user?.userId || (req as any).user?.id;
       const voucher = await vouchersService.createVoucher(input, createdBy);
 
       try {
@@ -73,7 +73,8 @@ class VouchersController {
     try {
       const id = parseInt(req.params.id as string, 10);
       const input = updateVoucherSchema.parse(req.body);
-      const voucher = await vouchersService.updateVoucher(id, input);
+      const updatedBy = (req as any).user?.userId || (req as any).user?.id;
+      const voucher = await vouchersService.updateVoucher(id, input, updatedBy);
 
       try {
         const { getIO } = require("../../socket/socket");
@@ -95,7 +96,8 @@ class VouchersController {
   async deleteVoucher(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id as string, 10);
-      const result = await vouchersService.deleteVoucher(id);
+      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const result = await vouchersService.deleteVoucher(id, userId);
 
       try {
         const { getIO } = require("../../socket/socket");

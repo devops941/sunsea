@@ -89,6 +89,7 @@ const InvoiceDetailPage: React.FC = () => {
     const [rawMaterials, setRawMaterials] = useState<any[]>([]);
 
     const [payments, setPayments] = useState<any[]>([]);
+    const [originalInvoiceAmount, setOriginalInvoiceAmount] = useState(0);
     const [newPayment, setNewPayment] = useState({
         amount: "",
         paymentMethod: "Bank Transfer",
@@ -284,7 +285,13 @@ const InvoiceDetailPage: React.FC = () => {
                             if (Array.isArray(parsed?.__billSundry__)) savedSundry = parsed.__billSundry__;
                         } catch { /* not JSON, plain text remarks */ }
                     }
+                    let savedSundryTotal = 0;
                     if (Array.isArray(savedSundry) && savedSundry.length > 0) {
+                        savedSundryTotal = savedSundry.reduce((s: number, r: any) => {
+                            const a = Number(r.amount) || 0;
+                            const o = DEFAULT_SUNDRY_OPTIONS.find(x => x.value === r.type);
+                            return s + (o?.sign === -1 ? -a : a);
+                        }, 0);
                         setSundryRows(savedSundry.map((r: any) => ({
                             id: r.id || `${Date.now()}-${Math.random()}`,
                             type: r.type || "",
@@ -292,6 +299,7 @@ const InvoiceDetailPage: React.FC = () => {
                             amount: r.amount ? Number(r.amount).toFixed(2) : "",
                         })));
                     }
+                    setOriginalInvoiceAmount(Number(invoice.netAmount ?? 0) + savedSundryTotal);
                 })
                 .catch((err) => {
                     console.error("Failed to load GRN Invoice:", err);
@@ -600,10 +608,30 @@ const InvoiceDetailPage: React.FC = () => {
         return Number(form.discountValue) || 0;
     }, [subtotal, form.discountType, form.discountValue]);
 
-    const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
+    // grandTotal = item subtotal + totalTax; sundry (tax, discount, rounding) is added separately via sundryTotal
+    const grandTotal = subtotal + totalTax;
 
-    // grandTotal = item subtotal only; sundry (tax, discount, rounding) is added separately via sundryTotal
-    const grandTotal = subtotal;
+    // ---- Auto-recalculate sundry amounts when subtotal changes ----
+    useEffect(() => {
+        setSundryRows((prev) => {
+            let changed = false;
+            const newRows = prev.map((r) => {
+                if (!r.type || !r.rate) return r;
+                if (r.type.startsWith("BILL_TAX") || r.type.startsWith("DISCOUNT")) {
+                    const rateNum = Number(r.rate) || 0;
+                    if (rateNum > 0) {
+                        const calcAmount = ((subtotal * rateNum) / 100).toFixed(2);
+                        if (calcAmount !== r.amount) {
+                            changed = true;
+                            return { ...r, amount: calcAmount };
+                        }
+                    }
+                }
+                return r;
+            });
+            return changed ? newRows : prev;
+        });
+    }, [subtotal]);
 
     const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + Number(p.amount || 0), 0), [payments]);
     const balanceDue = useMemo(() => Math.max(0, grandTotal - totalPaid), [grandTotal, totalPaid]);
@@ -744,17 +772,20 @@ const InvoiceDetailPage: React.FC = () => {
             }
 
             const mult = getUomMultiplier(updated[index].uom || item.uom, itemRawMaterial?.baseUom);
-            const lineSubtotal = item.qty * mult * item.unitPrice;
+            const qty = Number(item.qty) || 0;
+            const unitPrice = Number(item.unitPrice) || 0;
+            const tax = Number(item.tax) || 0;
+            const lineSubtotal = qty * mult * unitPrice;
             const taxableAmount = lineSubtotal;
-            const totalGstAmount = (taxableAmount * item.tax) / 100;
+            const totalGstAmount = (taxableAmount * tax) / 100;
 
             let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
             if (isInterState) {
-                igstRate = item.tax;
+                igstRate = tax;
                 igstAmount = totalGstAmount;
             } else {
-                cgstRate = item.tax / 2;
-                sgstRate = item.tax / 2;
+                cgstRate = tax / 2;
+                sgstRate = tax / 2;
                 cgstAmount = totalGstAmount / 2;
                 sgstAmount = totalGstAmount / 2;
             }
@@ -1056,13 +1087,39 @@ const InvoiceDetailPage: React.FC = () => {
                                 const uPrice = Number(selectedRm.unitPrice) || 0;
                                 const gRate = Number(selectedRm.gstRate) || 0;
                                 const baseUomVal = selectedRm.baseUom ? selectedRm.baseUom.split(",")[0].trim() : "";
+                                const primaryUom = baseUomVal || items[index]?.uom || "kg";
+                                const mult = getUomMultiplier(primaryUom, selectedRm.baseUom);
+                                const qty = items[index]?.qty || 1;
+                                const lineSubtotal = qty * mult * uPrice;
+                                const totalGstAmount = (lineSubtotal * gRate) / 100;
+                                let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
+                                if (isInterState) {
+                                    igstRate = gRate;
+                                    igstAmount = totalGstAmount;
+                                } else {
+                                    cgstRate = gRate / 2;
+                                    sgstRate = gRate / 2;
+                                    cgstAmount = totalGstAmount / 2;
+                                    sgstAmount = totalGstAmount / 2;
+                                }
                                 setItems((prev) => {
                                     const updated = [...prev];
-                                    updated[index] = { ...updated[index], productId: selId, description: matName, unitPrice: uPrice, tax: gRate, uom: baseUomVal || updated[index].uom };
-                                    const lineSubtotal = updated[index].qty * uPrice;
-                                    const totalGstAmount = (lineSubtotal * gRate) / 100;
-                                    updated[index].taxableAmount = lineSubtotal;
-                                    updated[index].netAmount = lineSubtotal + totalGstAmount;
+                                    updated[index] = {
+                                        ...updated[index],
+                                        productId: selId,
+                                        description: matName,
+                                        unitPrice: uPrice,
+                                        tax: gRate,
+                                        uom: primaryUom,
+                                        taxableAmount: lineSubtotal,
+                                        cgstRate,
+                                        cgstAmount,
+                                        sgstRate,
+                                        sgstAmount,
+                                        igstRate,
+                                        igstAmount,
+                                        netAmount: lineSubtotal + totalGstAmount,
+                                    };
                                     return updated;
                                 });
                             } else {
@@ -1094,7 +1151,7 @@ const InvoiceDetailPage: React.FC = () => {
         {
             key: "qty",
             header: "Qty & UOM",
-            width: "180px",
+            width: "160px",
             align: "center" as const,
             render: (_row: GRNItem, index: number) => {
                 const item = items[index];
@@ -1134,7 +1191,7 @@ const InvoiceDetailPage: React.FC = () => {
         {
             key: "unitPrice",
             header: "Unit Price (₹)",
-            width: "120px",
+            width: "110px",
             align: "right" as const,
             render: (_row: GRNItem, index: number) => {
                 const item = items[index];
@@ -1151,6 +1208,28 @@ const InvoiceDetailPage: React.FC = () => {
             },
         },
         {
+            key: "tax",
+            header: "Tax (%)",
+            width: "80px",
+            align: "center" as const,
+            render: (_row: GRNItem, index: number) => {
+                const item = items[index];
+                if (!item) return null;
+                return (
+                    <div className="flex items-center justify-center w-full h-full">
+                        <input
+                            type="number"
+                            value={item.tax !== undefined && item.tax !== null ? item.tax : ""}
+                            onChange={(e) => updateItem(index, "tax", Number(e.target.value))}
+                            placeholder="0"
+                            step="0.01"
+                            className="w-full bg-transparent text-[13px] text-ink outline-none border-none p-0 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                    </div>
+                );
+            },
+        },
+        {
             key: "netAmount",
             header: "Total (₹)",
             width: "110px",
@@ -1162,11 +1241,13 @@ const InvoiceDetailPage: React.FC = () => {
                     String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
                 );
                 const mult = getUomMultiplier(item.uom, itemRawMaterial?.baseUom);
-                const lineTotal = item.qty * mult * item.unitPrice;
+                const taxableAmount = (Number(item.qty) || 0) * mult * (Number(item.unitPrice) || 0);
+                const gstAmount = (taxableAmount * (Number(item.tax) || 0)) / 100;
+                const lineTotal = taxableAmount + gstAmount;
                 return <span className="text-[13px] font-bold text-ink">₹{lineTotal.toFixed(2)}</span>;
             },
         },
-    ], [items, productAutocompleteOptions, rawMaterials, activeUOMs, errors, isPOSelected, selectedPO, updateItem]);
+    ], [items, productAutocompleteOptions, rawMaterials, activeUOMs, errors, isPOSelected, selectedPO, updateItem, isInterState]);
 
     // ─── Bill Sundry columns ────────────────────────────────────────
     const subtotalRef = useRef(0);
@@ -1362,7 +1443,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     editable={true}
                                     visibleRows={10}
                                     showTotals={[
-                                        { colKey: "netAmount", value: `₹${subtotal.toFixed(2)}` },
+                                        { colKey: "netAmount", value: `₹${(subtotal + totalTax).toFixed(2)}` },
                                     ]}
                                 />
                             </div>
@@ -1398,22 +1479,21 @@ const InvoiceDetailPage: React.FC = () => {
                                 {supplierLiveBalance && (() => {
                                     const currentBal = supplierLiveBalance.amount;
                                     const isDr = supplierLiveBalance.type === "Dr";
-                                    // Full invoice total (items + sundry) — sundry is now posted to ledger
+                                    // Full invoice total (items + sundry)
                                     const invoiceAmt = (grandTotal + sundryTotal) || 0;
 
-                                    // In edit mode: current balance already includes this invoice, subtract to get opening
-                                    // In create mode: current balance is the opening (invoice not saved yet)
-                                    let openBal = currentBal;
-                                    if (isEditMode) {
-                                        openBal = isDr ? currentBal + invoiceAmt : currentBal - invoiceAmt;
-                                    }
-                                    const openAbs = Math.abs(openBal);
-                                    const openType = openBal > 0 ? (isDr ? "Dr" : "Cr") : openBal < 0 ? (isDr ? "Cr" : "Dr") : isDr ? "Dr" : "Cr";
+                                    // In supplier accounts (payable): Cr is positive (we owe), Dr is negative (advance paid)
+                                    const currentSignedBal = (isDr ? -1 : 1) * currentBal;
+                                    const originalAmt = isEditMode ? originalInvoiceAmount : 0;
+                                    const openSignedBal = currentSignedBal - originalAmt;
 
-                                    // Closing = opening + invoice effect
-                                    const closingRaw = isDr ? openAbs - invoiceAmt : openAbs + invoiceAmt;
-                                    const closingAbs = Math.abs(closingRaw);
-                                    const closingType = closingRaw > 0 ? (isDr ? "Dr" : "Cr") : closingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+                                    const openAbs = Math.abs(openSignedBal);
+                                    const openType = openSignedBal > 0 ? "Cr" : openSignedBal < 0 ? "Dr" : (isDr ? "Dr" : "Cr");
+
+                                    // Adding a purchase invoice increases what we owe (+Cr)
+                                    const closingSignedBal = openSignedBal + invoiceAmt;
+                                    const closingAbs = Math.abs(closingSignedBal);
+                                    const closingType = closingSignedBal > 0 ? "Cr" : closingSignedBal < 0 ? "Dr" : "";
 
                                     return (
                                         <div className="mt-3 border border-line-soft rounded-lg overflow-hidden text-xs">

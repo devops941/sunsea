@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
+import { logAudit } from "../../utils/auditLog.util";
 import { CreateSalesInvoiceInput } from "./sales-invoice.validation";
 import crypto from "crypto";
 
@@ -396,6 +397,14 @@ class SalesInvoiceService {
       }
     }
 
+    await logAudit(
+      "SalesInvoice",
+      invoice.invoiceNo || invoice.id,
+      "CREATE",
+      currentUser.userId,
+      customer.firmName || customer.displayName || invoice.invoiceNo
+    );
+
     return serializeInvoice(invoice);
   }
 
@@ -567,7 +576,7 @@ class SalesInvoiceService {
           await prisma.salesInvoice.update({
             where: { id: invoice.id },
             data: { openingBalance, closingBalance },
-          }).catch(() => {});
+          }).catch(() => { });
 
           (invoice as any).openingBalance = openingBalance;
           (invoice as any).closingBalance = closingBalance;
@@ -578,10 +587,13 @@ class SalesInvoiceService {
     return serializeInvoice(invoice);
   }
 
-  async deleteSalesInvoice(id: string, companyId: string) {
-    return prisma.$transaction(async (tx) => {
+  async deleteSalesInvoice(id: string, companyId: string, userId?: string) {
+    const deletedInvoice = await prisma.$transaction(async (tx) => {
       const invoice = await tx.salesInvoice.findFirst({
         where: { id, companyId },
+        include: {
+          customer: { select: { id: true, firmName: true, displayName: true } },
+        },
       });
       if (!invoice) throw new ApiError(404, "Sales Invoice not found");
 
@@ -602,8 +614,18 @@ class SalesInvoiceService {
         },
       });
 
-      return true;
+      return invoice;
     });
+
+    await logAudit(
+      "SalesInvoice",
+      deletedInvoice.invoiceNo || deletedInvoice.id,
+      "DELETE",
+      userId,
+      (deletedInvoice as any).customer?.firmName || (deletedInvoice as any).customer?.displayName || deletedInvoice.invoiceNo
+    );
+
+    return true;
   }
 
   async updateSalesInvoice(id: string, data: CreateSalesInvoiceInput, currentUser: { userId: string; companyId: string }) {
@@ -938,6 +960,9 @@ class SalesInvoiceService {
     } catch (vErr) {
       console.error("[Auto-Post Voucher Error] Failed to re-post Sales Voucher on update:", vErr);
     }
+
+    const customerName = (result as any).customer?.firmName || (result as any).customer?.displayName || (result as any).invoiceNo || id;
+    await logAudit("SalesInvoice", (result as any).invoiceNo || id, "UPDATE", currentUser.userId, customerName);
 
     return result;
   }

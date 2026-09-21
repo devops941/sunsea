@@ -16,7 +16,7 @@ class ReturnsController {
   async createSalesReturn(req: Request, res: Response, next: NextFunction) {
     try {
       const input = createSalesReturnSchema.parse(req.body);
-      const createdBy = (req as any).user?.id || (req as any).user?.userId;
+      const createdBy = (req as any).user?.userId || (req as any).user?.id;
       const data = await returnsService.createSalesReturn(input, createdBy);
 
       try {
@@ -50,7 +50,7 @@ class ReturnsController {
     try {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const input = createSalesReturnSchema.parse(req.body);
-      const updatedBy = (req as any).user?.id || (req as any).user?.userId;
+      const updatedBy = (req as any).user?.userId || (req as any).user?.id;
       const data = await returnsService.updateSalesReturn(id, input, updatedBy);
 
       try {
@@ -83,7 +83,7 @@ class ReturnsController {
   async createPurchaseReturn(req: Request, res: Response, next: NextFunction) {
     try {
       const input = createPurchaseReturnSchema.parse(req.body);
-      const createdBy = (req as any).user?.id || (req as any).user?.userId;
+      const createdBy = (req as any).user?.userId || (req as any).user?.id;
       const data = await returnsService.createPurchaseReturn(input, createdBy);
 
       try {
@@ -117,7 +117,7 @@ class ReturnsController {
     try {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const input = createPurchaseReturnSchema.parse(req.body);
-      const updatedBy = (req as any).user?.id || (req as any).user?.userId;
+      const updatedBy = (req as any).user?.userId || (req as any).user?.id;
       const data = await returnsService.updatePurchaseReturn(id, input, updatedBy);
 
       try {

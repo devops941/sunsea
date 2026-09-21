@@ -97,6 +97,9 @@ export interface PurchaseOrder {
     roundingAdjust?: number;
     netAmount: number;
 
+    hasGrnInvoice?: boolean;
+    grnInvoicesCount?: number;
+
     companyId?: string;
     createdBy?: string;
     createdAt: string;
@@ -139,6 +142,9 @@ export interface PurchaseOrderFormData {
     totalIgst?: number;
     roundingAdjust?: number;
     netAmount: number;
+
+    hasGrnInvoice?: boolean;
+    grnInvoicesCount?: number;
 }
 
 export interface CreatePurchaseOrderDto {
