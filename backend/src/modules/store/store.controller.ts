@@ -60,7 +60,8 @@ class StoreController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
-    await storeService.delete(String(req.params.storeId));
+    const userId = req.user?.userId;
+    await storeService.delete(String(req.params.storeId), userId);
     getIO().emit("store:deleted", { id: req.params.storeId });
 
     return res.status(200).json(

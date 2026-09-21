@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateStoreInput, UpdateStoreInput } from "./store.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 class StoreService {
   async create(data: CreateStoreInput, userId?: string) {
@@ -22,7 +23,7 @@ class StoreService {
       throw new ApiError(409, `Store Name "${data.storeName}" already exists. Please use a unique Store Name.`);
     }
 
-    return prisma.store.create({
+    const newStore = await prisma.store.create({
       data: {
         storeId: data.storeId,
         storeName: data.storeName,
@@ -46,6 +47,10 @@ class StoreService {
           : undefined,
       },
     });
+
+    await logAudit("Store", newStore.storeId, "CREATE", userId, newStore.storeName);
+
+    return newStore;
   }
 
   async findAll(params: {
@@ -330,10 +335,12 @@ class StoreService {
       );
     }
 
-    return this.findById(storeId);
+    const updatedStore = await this.findById(storeId);
+    await logAudit("Store", updatedStore.storeId, "UPDATE", userId, updatedStore.storeName);
+    return updatedStore;
   }
 
-  async delete(storeId: string) {
+  async delete(storeId: string, userId?: string) {
     await this.findById(storeId);
 
     const rawMaterialCount = await prisma.rawMaterial.count({
@@ -352,9 +359,11 @@ class StoreService {
     }
 
     try {
-      return await prisma.store.delete({
+      const deletedStore = await prisma.store.delete({
         where: { storeId },
       });
+      await logAudit("Store", deletedStore.storeId, "DELETE", userId, deletedStore.storeName);
+      return deletedStore;
     } catch (error: any) {
       if (error.code === 'P2003' || (error.message && error.message.includes('foreign key constraint'))) {
         throw new ApiError(

@@ -44,7 +44,8 @@ class SalesProductController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(String(req.params.id));
-    await salesProductService.delete(id);
+    const userId = req.user?.userId;
+    await salesProductService.delete(id, userId);
 
     return res.status(200).json(
       new ApiResponse("Sales Product deleted successfully")

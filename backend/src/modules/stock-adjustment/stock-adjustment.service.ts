@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { getIO } from "../../socket/socket";
 import Decimal from "decimal.js";
+import { logAudit } from "../../utils/auditLog.util";
 
 export class StockAdjustmentService {
   static async getNextAdjustmentNumber(): Promise<string> {
@@ -73,6 +74,7 @@ export class StockAdjustmentService {
       await this.approveStockAdjustment(created.id, "APPROVED", "Auto-approved on creation", userId);
     }
 
+    await logAudit("Stock Adjustment", created.adjustmentNumber, "CREATE", userId, created.reason || "Stock Adjustment");
     return await this.getStockAdjustmentById(created.id);
   }
 
@@ -382,7 +384,9 @@ export class StockAdjustmentService {
       }
     });
 
-    return await this.getStockAdjustmentById(id);
+    const updated = await this.getStockAdjustmentById(id);
+    await logAudit("Stock Adjustment", updated.adjustmentNumber, "UPDATE", userId, updated.reason || "Stock Adjustment");
+    return updated;
   }
 
   static async approveStockAdjustment(id: bigint | number | string, status: string, reason: string | undefined, userId: string) {
@@ -510,12 +514,14 @@ export class StockAdjustmentService {
     return await this.getStockAdjustmentById(id);
   }
 
-  static async deleteStockAdjustment(id: bigint | number | string) {
+  static async deleteStockAdjustment(id: bigint | number | string, userId?: string) {
     const existing = await this.getStockAdjustmentById(id);
     if (existing.status === "APPROVED") {
       throw new ApiError(400, "Cannot delete an approved stock adjustment");
     }
-    return prisma.stockAdjustment.delete({ where: { id: BigInt(id) } });
+    const deleted = await prisma.stockAdjustment.delete({ where: { id: BigInt(id) } });
+    await logAudit("Stock Adjustment", deleted.adjustmentNumber, "DELETE", userId, deleted.reason || "Stock Adjustment");
+    return deleted;
   }
 
   /**

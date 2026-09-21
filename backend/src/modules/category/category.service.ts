@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateCategoryInput, UpdateCategoryInput } from "./category.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 class CategoryService {
   async create(data: CreateCategoryInput, userId?: string) {
@@ -26,7 +27,7 @@ class CategoryService {
       );
     }
 
-    return prisma.category.create({
+    const newCategory = await prisma.category.create({
       data: {
         code: data.code,
         name: data.name,
@@ -44,6 +45,10 @@ class CategoryService {
           : [],
       } as any,
     });
+
+    await logAudit("Category", newCategory.code, "CREATE", userId, newCategory.name);
+
+    return newCategory;
   }
 
   async findAll(params: {
@@ -244,7 +249,7 @@ class CategoryService {
       });
     }
 
-    await prisma.category.update({
+    const updatedCategory = await prisma.category.update({
       where: { id },
       data: {
         name: data.name,
@@ -264,10 +269,12 @@ class CategoryService {
       },
     });
 
+    await logAudit("Category", updatedCategory.code, "UPDATE", userId, updatedCategory.name);
+
     return this.findById(id);
   }
 
-  async delete(id: number) {
+  async delete(id: number, userId?: string) {
     const category = await this.findById(id);
 
     const rawMaterialCount = await prisma.rawMaterial.count({
@@ -285,7 +292,11 @@ class CategoryService {
       );
     }
 
-    return prisma.category.delete({ where: { id } });
+    const deletedCategory = await prisma.category.delete({ where: { id } });
+
+    await logAudit("Category", deletedCategory.code, "DELETE", userId, deletedCategory.name);
+
+    return deletedCategory;
   }
 
   async getNextCode(type: string) {
