@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+   import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import {
@@ -7,6 +7,7 @@ import {
     SalesOrderQueryInput,
     SalesOrderStatus,
 } from "./sales-order.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 // ─── Shared zero constant ──────────────────────────────────────────────────────
 
@@ -168,7 +169,7 @@ class SalesOrderService {
 
     // ─── Create ──────────────────────────────────────────────────────────────
 
-    async create(data: CreateSalesOrderInput, _permissions: string[] = []) {
+    async create(data: CreateSalesOrderInput, _permissions: string[] = [], userId?: string) {
         if (!data.items || data.items.length === 0) throw new ApiError(400, "At least one item is required");
         this.assertNoDuplicateProducts(data.items);
 
@@ -282,6 +283,10 @@ class SalesOrderService {
                 data: { status: "QUOTED" as any },
             });
         }
+
+        const customerName = customer.firmName || customer.displayName || gstOrder.orderNo;
+        const entityName = isQuotation || gstOrder.orderNo?.startsWith("QT-") ? "Quotation" : "SalesOrder";
+        await logAudit(entityName, gstOrder.orderNo || String(gstOrder.id), "CREATE", userId || data.createdBy || undefined, customerName);
 
         return gstOrder;
     }
@@ -418,8 +423,8 @@ class SalesOrderService {
 
     // ─── Update ──────────────────────────────────────────────────────────────
 
-    async update(id: number, data: UpdateSalesOrderInput, permissions: string[] = []) {
-        const existing = await this.findById(id, permissions);
+    async update(id: number, data: UpdateSalesOrderInput, _permissions: string[] = [], userId?: string) {
+        const existing = await this.findById(id, _permissions);
         const existingStatus = (existing as any).status as string;
 
         if (!["DRAFT", "CONFIRMED", "QUOTED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
@@ -541,12 +546,19 @@ class SalesOrderService {
             }
         }
 
+        const customerName = (updated as any).customer?.firmName || (updated as any).customer?.displayName || updated.orderNo;
+        const isQuotation = (updated.orderNo && updated.orderNo.startsWith("QT-")) ||
+                            updated.status === "QUOTED" ||
+                            (updated.items as any[])?.some((i: any) => i.quotationUnitPrice !== null && i.quotationUnitPrice !== undefined);
+        const entityName = isQuotation ? "Quotation" : "SalesOrder";
+        await logAudit(entityName, updated.orderNo || String(updated.id), "UPDATE", userId, customerName);
+
         return updated;
     }
 
     // ─── Delete ──────────────────────────────────────────────────────────────
 
-    async delete(id: number, _permissions: string[] = []) {
+    async delete(id: number, _permissions: string[] = [], userId?: string) {
         const order = await this.findById(id);
         const status = (order as any).status as string;
 
@@ -568,7 +580,16 @@ class SalesOrderService {
         }
 
         await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
-        return prisma.salesOrder.delete({ where: { id } });
+        const deleted = await prisma.salesOrder.delete({ where: { id } });
+
+        const customerName = (order as any).customer?.firmName || (order as any).customer?.displayName || (order as any).orderNo;
+        const isQuotation = ((order as any).orderNo && (order as any).orderNo.startsWith("QT-")) ||
+                            (order as any).status === "QUOTED" ||
+                            ((order as any).items as any[])?.some((i: any) => i.quotationUnitPrice !== null && i.quotationUnitPrice !== undefined);
+        const entityName = isQuotation ? "Quotation" : "SalesOrder";
+        await logAudit(entityName, (order as any).orderNo || String(id), "DELETE", userId, customerName);
+
+        return deleted;
     }
 
     // ─── Workflow (status transitions) ───────────────────────────────────────
@@ -610,16 +631,22 @@ class SalesOrderService {
         return updated;
     }
 
-    async confirmOrder(id: number, permissions: string[] = []) {
+    async confirmOrder(id: number, permissions: string[] = [], userId?: string) {
         const existing = await this.findById(id, permissions);
         const currentStatus = (existing as any).status as string;
         if (!["DRAFT", "QUOTATION_IN_PROGRESS"].includes(currentStatus)) {
             throw new ApiError(409, `Cannot confirm order with status ${currentStatus}`);
         }
-        return this.updateStatus(id, "CONFIRMED", permissions);
+        const updated = await this.updateStatus(id, "CONFIRMED", permissions);
+        const customerName = (updated as any).customer?.firmName || (updated as any).customer?.displayName || updated.orderNo;
+        const isQuotation = (updated.orderNo && updated.orderNo.startsWith("QT-")) ||
+                            (updated.items as any[])?.some((i: any) => i.quotationUnitPrice !== null && i.quotationUnitPrice !== undefined);
+        const entityName = isQuotation ? "Quotation" : "SalesOrder";
+        await logAudit(entityName, updated.orderNo || String(updated.id), "UPDATE", userId, customerName);
+        return updated;
     }
 
-    async convertToSalesOrder(id: number, permissions: string[] = []) {
+    async convertToSalesOrder(id: number, permissions: string[] = [], userId?: string) {
         const existing = await this.findById(id, permissions);
         const currentStatus = (existing as any).status as string;
         if (!["CUSTOMER_APPROVED", "CONFIRMED"].includes(currentStatus)) {
@@ -637,7 +664,10 @@ class SalesOrderService {
                 });
             }
         }
-        return this.updateStatus(id, "QUOTATION_COMPLETED", permissions);
+        const updated = await this.updateStatus(id, "QUOTATION_COMPLETED", permissions);
+        const customerName = (updated as any).customer?.firmName || (updated as any).customer?.displayName || updated.orderNo;
+        await logAudit("Quotation", updated.orderNo || String(updated.id), "UPDATE", userId, customerName);
+        return updated;
     }
 
     async getSourceOrders(customerId: string, _permissions: string[] = []) {
@@ -674,8 +704,11 @@ class SalesOrderService {
         return orders;
     }
 
-    async markInQuotation(id: number) {
-        const order = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, status: true } });
+    async markInQuotation(id: number, userId?: string) {
+        const order = await prisma.salesOrder.findUnique({
+            where: { id },
+            include: { customer: { select: { firmName: true, displayName: true } } },
+        });
         if (!order) throw new ApiError(404, `Sales order with ID ${id} not found`);
         if (order.status !== "CONFIRMED") {
             return { id, status: order.status };
@@ -685,6 +718,8 @@ class SalesOrderService {
             data:  { status: "QUOTATION_IN_PROGRESS" as any },
             select: { id: true, status: true, orderNo: true },
         });
+        const customerName = order.customer?.firmName || order.customer?.displayName || order.orderNo;
+        await logAudit("Quotation", updated.orderNo || String(id), "UPDATE", userId, customerName);
         return updated;
     }
 

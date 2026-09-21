@@ -74,8 +74,9 @@ class GrnInvoiceController {
 
     update = asyncHandler(async (req: Request, res: Response) => {
         const id = req.params.id as string;
+        const userId = req.user?.userId;
 
-        const grnInvoice = await grnInvoiceService.updateGrnInvoice(id, req.body, req.file);
+        const grnInvoice = await grnInvoiceService.updateGrnInvoice(id, req.body, req.file, userId);
 
         // Auto-post purchase and payment vouchers immediately on update
         try {
@@ -106,8 +107,9 @@ class GrnInvoiceController {
 
     delete = asyncHandler(async (req: Request, res: Response) => {
         const id = req.params.id as string;
+        const userId = req.user?.userId;
 
-        await grnInvoiceService.deleteGrnInvoice(id);
+        await grnInvoiceService.deleteGrnInvoice(id, userId);
 
         getIO().emit("grnInvoice:deleted", { id });
 

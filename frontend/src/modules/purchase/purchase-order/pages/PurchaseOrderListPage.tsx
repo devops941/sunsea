@@ -138,7 +138,7 @@ const PurchaseOrderListPage: React.FC = () => {
     onEnter: (i) => { const item = paginatedPOs[i]; if (item) handleView(item as PurchaseOrder); },
     onEdit: (i) => {
       const item = paginatedPOs[i];
-      if (item && item.status !== "COMPLETED" && item.status !== "CANCELLED") handleEdit(item as PurchaseOrder);
+      if (item && item.status !== "COMPLETED" && item.status !== "CANCELLED" && !item.hasGrnInvoice) handleEdit(item as PurchaseOrder);
     },
     containerRef: tableRef,
   });
@@ -459,7 +459,7 @@ const PurchaseOrderListPage: React.FC = () => {
                 render: (item) => (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <ViewButton onClick={() => handleView(item)} />
-                    {canEdit && item.status !== "COMPLETED" && item.status !== "CANCELLED" && (
+                    {canEdit && item.status !== "COMPLETED" && item.status !== "CANCELLED" && !item.hasGrnInvoice && (
                       <EditButton onClick={() => handleEdit(item)} />
                     )}
                     {item.status !== "REJECTED" && item.status !== "CANCELLED" && item.status !== "PENDING" && item.status !== "DRAFT" && (

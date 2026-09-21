@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { vouchersController } from "./vouchers.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
 
 const router = Router();
+
+router.use(authMiddleware);
 
 router.get("/", (req, res, next) => vouchersController.getVouchers(req, res, next));
 router.get("/next-no", (req, res, next) => vouchersController.peekNextVoucherNo(req, res, next));

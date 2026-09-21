@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateGrnInvoiceInput, UpdateGrnInvoiceInput } from "./grn-invoice.validation";
 import { uploadToImageKit } from "../../utils/Imagekit";
+import { logAudit } from "../../utils/auditLog.util";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -497,6 +498,9 @@ class GrnInvoiceService {
             console.error("[Auto-Post Voucher Error] Failed to post Purchase/Payment Voucher for GRN:", vErr);
         }
 
+        const supplierName = supplier.legalName || supplier.displayName || supplier.supplierCode || grnInvoice.invoiceNo;
+        await logAudit("PurchaseInvoice", grnInvoice.grnNumber || grnInvoice.id, "CREATE", currentUser.userId, supplierName);
+
         return grnInvoice;
     }
 
@@ -587,7 +591,7 @@ class GrnInvoiceService {
         return grnInvoice;
     }
 
-    async updateGrnInvoice(id: string, data: UpdateGrnInvoiceInput, file?: Express.Multer.File) {
+    async updateGrnInvoice(id: string, data: UpdateGrnInvoiceInput, file?: Express.Multer.File, userId?: string) {
         const existing = await prisma.grnInvoice.findUnique({
             where: { id },
             include: { items: true },
@@ -1188,26 +1192,33 @@ class GrnInvoiceService {
 
         try {
             const { voucherPostingService } = require("../accounts/voucherPosting.service");
+            await voucherPostingService.postPurchaseVoucher(updated.id);
             await voucherPostingService.postPaymentVouchersForGRN(updated.id);
         } catch (vErr) {
-            console.error("[Auto-Post Voucher Error] Failed to post Payment Vouchers for updated GRN:", vErr);
+            console.error("[Auto-Post Voucher Error] Failed to post Vouchers for updated GRN:", vErr);
         }
+
+        const supplierName = supplier.legalName || supplier.displayName || supplier.supplierCode || updated.invoiceNo;
+        await logAudit("PurchaseInvoice", updated.grnNumber || updated.id, "UPDATE", userId, supplierName);
 
         return updated;
     }
 
     // ── Delete ──────────────────────────────────────────────────────────────────
-    async deleteGrnInvoice(id: string) {
+    async deleteGrnInvoice(id: string, userId?: string) {
         const existing = await prisma.grnInvoice.findUnique({
             where: { id },
-            include: { items: true },
+            include: { items: true, supplier: true },
         });
 
         if (!existing) {
             throw new ApiError(404, "GRN Invoice not found");
         }
 
-        return prisma.$transaction(async (tx) => {
+        const supplierName = existing.supplier?.legalName || existing.supplier?.displayName || existing.supplier?.supplierCode || existing.invoiceNo;
+        const recordId = existing.grnNumber || existing.id;
+
+        await prisma.$transaction(async (tx) => {
             if (existing.updateStock) {
                 const revAdjustmentNumber = `ADJ-REV-${existing.grnNumber}`;
                 const revAdjustmentItems = [];
@@ -1245,7 +1256,7 @@ class GrnInvoiceService {
                         difference: -revertQtyNum,
                         unitCost: Number(item.unitPrice),
                         batchNo: rawMaterial.batchNo || null,
-                        remarks: `Reversal of GRN ${existing.grnNumber} due to deletion`
+                        remarks: `Reversal of GRN: ${existing.grnNumber} (Invoice Deleted)`
                     });
 
                     await tx.rawMaterial.update({
@@ -1254,6 +1265,7 @@ class GrnInvoiceService {
                             onHandQty: {
                                 decrement: revertQtyNum,
                             },
+                            lastMovementAt: new Date(),
                         },
                     });
 
@@ -1261,10 +1273,10 @@ class GrnInvoiceService {
                         data: {
                             storeId: existing.storeId,
                             rawMaterialId: item.productId,
-                            txnType: "STOCK_ADJUSTMENT_OUT",
+                            txnType: "ISSUE",
                             qty: revertQtyNum,
                             txnDateTime: new Date(),
-                            remarks: `GRN Deleted: ${existing.grnNumber}`,
+                            remarks: `Reversal from GRN Delete: ${existing.grnNumber}`,
                         },
                     });
                 }
@@ -1274,16 +1286,16 @@ class GrnInvoiceService {
                         data: {
                             adjustmentNumber: revAdjustmentNumber,
                             adjustmentDate: new Date(),
-                            reason: `Auto-generated Reversal on Deletion of Bill: ${existing.invoiceNo}`,
+                            reason: `Reversal of GRN: ${existing.grnNumber} on Invoice deletion`,
                             status: "APPROVED",
                             approvedBy: existing.createdBy,
                             approvedAt: new Date(),
                             createdBy: existing.createdBy,
                             updatedBy: existing.createdBy,
                             autoGenerated: true,
-                            sourceDocument: "GrnInvoice",
+                            sourceDocument: "GrnInvoice_Delete",
                             sourceDocId: existing.id,
-                            type: "Reversal",
+                            type: "Issue",
                             items: {
                                 create: revAdjustmentItems
                             }
@@ -1292,28 +1304,39 @@ class GrnInvoiceService {
                 }
             }
 
-            // Restore PO status on deletion
+            // If linked to a PO, recalculate PO status
             if (existing.poId) {
+                const otherGrns = await tx.grnInvoice.findMany({
+                    where: {
+                        poId: existing.poId,
+                        id: { not: id },
+                    },
+                    include: { items: true },
+                });
+
                 const po = await tx.purchaseOrder.findUnique({
                     where: { id: existing.poId },
                     include: { items: true },
                 });
+
                 if (po) {
+                    const receivedMap: Record<string, number> = {};
+                    for (const grn of otherGrns) {
+                        for (const gItem of grn.items) {
+                            receivedMap[gItem.productId] =
+                                (receivedMap[gItem.productId] || 0) + Number(gItem.quantity);
+                        }
+                    }
+
                     let allFullyReceived = true;
                     let hasPartialReceived = false;
 
                     for (const poItem of po.items) {
-                        const item = existing.items.find((i) => i.productId === poItem.productId);
-                        const currentRec = Number(poItem.receivedQty) || 0;
-                        const removedRec = item ? Number(item.quantity) : 0;
-                        const newRec = Math.max(0, currentRec - removedRec);
-
-                        if (removedRec > 0) {
-                            await tx.purchaseOrderItem.update({
-                                where: { id: poItem.id },
-                                data: { receivedQty: newRec },
-                            });
-                        }
+                        const newRec = receivedMap[poItem.productId] || 0;
+                        await tx.purchaseOrderItem.update({
+                            where: { id: poItem.id },
+                            data: { receivedQty: newRec },
+                        });
 
                         if (newRec < Number(poItem.quantity)) {
                             allFullyReceived = false;
@@ -1341,6 +1364,8 @@ class GrnInvoiceService {
                 where: { id },
             });
         }, { timeout: 30000, maxWait: 10000 });
+
+        await logAudit("PurchaseInvoice", recordId, "DELETE", userId, supplierName);
     }
 }
 

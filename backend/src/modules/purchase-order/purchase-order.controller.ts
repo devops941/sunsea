@@ -68,7 +68,7 @@ class PurchaseOrderController {
         const id = req.params.id as string;
 
         const oldPo = await purchaseOrderService.getPurchaseOrderById(id);
-        const po = await purchaseOrderService.updatePurchaseOrder(id, req.body);
+        const po = await purchaseOrderService.updatePurchaseOrder(id, req.body, req.user?.userId);
 
         if (oldPo.status !== "APPROVED" && po.status === "APPROVED") {
             // Fire-and-forget: send WhatsApp notification in the background
@@ -127,8 +127,9 @@ class PurchaseOrderController {
 
     delete = asyncHandler(async (req: Request, res: Response) => {
         const id = req.params.id as string;
+        const userId = req.user?.userId;
 
-        await purchaseOrderService.deletePurchaseOrder(id);
+        await purchaseOrderService.deletePurchaseOrder(id, userId);
 
         getIO().emit("purchaseOrder:deleted", { id });
 

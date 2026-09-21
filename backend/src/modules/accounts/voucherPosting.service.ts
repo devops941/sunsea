@@ -192,6 +192,13 @@ class VoucherPostingService {
       },
     });
 
+    // Always rebuild the voucher so the ledger reflects the CURRENT invoice amount/sundry/GST.
+    // Editing a purchase invoice changes these; leaving a stale voucher keeps the supplier ledger on old amount.
+    if (voucher) {
+      await db.voucher.delete({ where: { id: voucher.id } });
+      voucher = null;
+    }
+
     if (!voucher) {
       const g: any = grnInvoice;
       // Parse sundry from remarks to get full invoice total

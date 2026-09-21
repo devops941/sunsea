@@ -704,59 +704,30 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     <span className="font-bold">Amount in Words:</span> Rupees {amountInWords}
                                 </div>
 
-                                {/* Supplier Balance — use saved fields (like Sales Invoice) */}
-                                {(selectedItem.openingBalance != null || supplierBalance) && (
+                                {/* Supplier Balance — dynamic live balance matching Sales Invoice */}
+                                {supplierBalance && (
                                     <div className="border-t border-black">
                                         {(() => {
-                                            // Invoice amount = full total (items + sundry) since sundry is now posted to ledger
+                                            // Invoice amount = full total (items + sundry)
                                             const ledgerInvoiceAmt = displayGrandTotal;
-
-                                            // Prefer saved balance from invoice record
-                                            if (selectedItem.openingBalance != null) {
-                                                const ob = Number(selectedItem.openingBalance ?? 0);
-                                                const cb = Number(selectedItem.closingBalance ?? 0);
-                                                const obAbs = Math.abs(ob);
-                                                const obType = ob > 0 ? "Cr" : ob < 0 ? "Dr" : "";
-                                                const cbAbs = Math.abs(cb);
-                                                const cbType = cb > 0 ? "Cr" : cb < 0 ? "Dr" : "";
-                                                return (
-                                                    <table className="w-full text-[13px]">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td className="px-2 py-1 text-right">Opening Balance</td>
-                                                                <td className="px-2 py-1 text-right w-[140px]">
-                                                                    ₹{obAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {obType}
-                                                                </td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="px-2 py-1 text-right">Invoice Amount</td>
-                                                                <td className="px-2 py-1 text-right">
-                                                                    ₹{ledgerInvoiceAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                                                                </td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="px-2 py-1 text-right font-bold text-[14px]">Closing Balance</td>
-                                                                <td className="px-2 py-1 text-right font-bold text-[15px]">
-                                                                    ₹{cbAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {cbType}
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                );
-                                            }
-                                            // Fallback: compute from live supplier balance
-                                            if (!supplierBalance) return null;
                                             const isDr = supplierBalance.type === "Dr";
-                                            const openingRaw = isDr ? supplierBalance.amount + ledgerInvoiceAmt : supplierBalance.amount - ledgerInvoiceAmt;
-                                            const openingAbs = Math.abs(openingRaw);
-                                            const openingType = openingRaw > 0 ? (isDr ? "Dr" : "Cr") : openingRaw < 0 ? (isDr ? "Cr" : "Dr") : "";
+
+                                            // In supplier accounts (payable): Cr is positive (we owe), Dr is negative (advance paid)
+                                            const currentSignedBal = (isDr ? -1 : 1) * supplierBalance.amount;
+                                            const openSignedBal = currentSignedBal - ledgerInvoiceAmt;
+                                            const openAbs = Math.abs(openSignedBal);
+                                            const openType = openSignedBal > 0 ? "Cr" : openSignedBal < 0 ? "Dr" : (isDr ? "Dr" : "Cr");
+
+                                            const closingSignedBal = currentSignedBal;
+                                            const closingAbs = Math.abs(closingSignedBal);
+                                            const closingType = closingSignedBal > 0 ? "Cr" : closingSignedBal < 0 ? "Dr" : "";
                                             return (
                                                 <table className="w-full text-[13px]">
                                                     <tbody>
                                                         <tr>
                                                             <td className="px-2 py-1 text-right">Opening Balance</td>
                                                             <td className="px-2 py-1 text-right w-[140px]">
-                                                                ₹{openingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openingType}
+                                                                ₹{openAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {openType}
                                                             </td>
                                                         </tr>
                                                         <tr>
@@ -768,7 +739,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                                         <tr>
                                                             <td className="px-2 py-1 text-right font-bold text-[14px]">Closing Balance</td>
                                                             <td className="px-2 py-1 text-right font-bold text-[15px]">
-                                                                ₹{supplierBalance.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {supplierBalance.type}
+                                                                ₹{closingAbs.toLocaleString("en-IN", { minimumFractionDigits: 2 })} {closingType}
                                                             </td>
                                                         </tr>
                                                     </tbody>

@@ -6,6 +6,7 @@ import { accountsService } from "../accounts/accounts.service";
 import { voucherPostingService } from "../accounts/voucherPosting.service";
 import rawMaterialStockService from "../raw-material-stock/raw-material-stock.service";
 import { vouchersService } from "../vouchers/vouchers.service";
+import { logAudit } from "../../utils/auditLog.util";
 
 class ReturnsService {
   private generateReturnNo(prefix: string): string {
@@ -156,6 +157,9 @@ class ReturnsService {
         console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher:", vErr);
       }
 
+      const customerName = salesReturn.customer?.firmName || salesReturn.customer?.displayName || customer.firmName || customer.displayName || salesReturn.returnNo;
+      await logAudit("SalesReturn", salesReturn.returnNo || salesReturn.id, "CREATE", createdBy, customerName);
+
       return salesReturn;
   }
 
@@ -247,6 +251,9 @@ class ReturnsService {
     } catch (vErr) {
       console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher on update:", vErr);
     }
+
+    const customerName = updated.customer?.firmName || updated.customer?.displayName || customer.firmName || customer.displayName || updated.returnNo;
+    await logAudit("SalesReturn", updated.returnNo || updated.id, "UPDATE", _updatedBy, customerName);
 
     return updated;
   }
@@ -446,6 +453,9 @@ class ReturnsService {
       console.error("[Auto-Post Voucher Error] Failed to post Purchase Return Voucher:", vErr);
     }
 
+    const supplierName = purchaseReturn.supplier?.legalName || purchaseReturn.supplier?.displayName || supplier.legalName || supplier.displayName || purchaseReturn.returnNo;
+    await logAudit("PurchaseReturn", purchaseReturn.returnNo || purchaseReturn.id, "CREATE", createdBy, supplierName);
+
     return purchaseReturn;
   }
 
@@ -524,6 +534,9 @@ class ReturnsService {
     } catch (vErr) {
       console.error("[Auto-Post Voucher Error] Failed to post Purchase Return Voucher on update:", vErr);
     }
+
+    const supplierName = updated.supplier?.legalName || updated.supplier?.displayName || supplier.legalName || supplier.displayName || updated.returnNo;
+    await logAudit("PurchaseReturn", updated.returnNo || updated.id, "UPDATE", _updatedBy, supplierName);
 
     return updated;
   }

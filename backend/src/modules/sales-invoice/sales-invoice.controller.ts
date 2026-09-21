@@ -96,7 +96,7 @@ class SalesInvoiceController {
     const companyId = company.id;
 
     const id = req.params.id as string;
-    await salesInvoiceService.deleteSalesInvoice(id, companyId);
+    await salesInvoiceService.deleteSalesInvoice(id, companyId, req.user?.userId);
 
     getIO().emit("salesInvoice:deleted", { id });
     try {
