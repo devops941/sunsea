@@ -532,7 +532,7 @@ const SalesInvoiceForm: React.FC = () => {
                 const exists = prev.some((o: any) => String(o.id) === String(fullOrder.id));
                 return exists ? prev : [...prev, fullOrder];
               });
-              const mapped = mapOrderToLines(fullOrder);
+              const mapped = mapOrderToLines(fullOrder, spList);
               if (mapped.length > 0) setLines(mapped);
               setChargeRows(parseChargeRowsFromNarration((fullOrder as any).narration));
             })
@@ -576,7 +576,7 @@ const SalesInvoiceForm: React.FC = () => {
   // ── Helper: map a full sales-order/quotation into invoice line items.
   //    Distributes the order-level discount (orderDiscountValue) proportionally
   //    across items when per-item discountAmount is not already stored.
-  const mapOrderToLines = (fullOrder: any): InvoiceLineItem[] => {
+  const mapOrderToLines = (fullOrder: any, activeSalesProducts: any[] = salesProducts): InvoiceLineItem[] => {
     const orderItems: any[] = fullOrder.items || [];
     if (orderItems.length === 0) return [];
 
@@ -598,7 +598,7 @@ const SalesInvoiceForm: React.FC = () => {
 
     // Process grouped items (sales products)
     grouped.forEach((items, spIdStr) => {
-      const sp = salesProducts.find((s: any) => String(s.id) === spIdStr);
+      const sp = activeSalesProducts.find((s: any) => String(s.id) === spIdStr);
       const spComps = (sp?.components || []).filter((c: any) => c.componentProduct?.productType === "SALES_PRODUCTION");
       const firstItem = items[0];
 
