@@ -24,7 +24,6 @@ import { storeService } from "../../../services/storeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { machineService } from "../../../services/machineService";
-import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
@@ -102,13 +101,6 @@ const productionOrderSchema = z.object({
     status: z.string().min(1, "Status is required"),
     remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
-    if (data.dueDate && data.orderDate && data.dueDate < data.orderDate) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Due date must be on or after the order date",
-            path: ["dueDate"],
-        });
-    }
     if (data.weekStartDate && data.weekEndDate && data.weekEndDate < data.weekStartDate) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -1632,15 +1624,16 @@ const ProductionOrderCreate: React.FC = () => {
 
         setIsWeeklySubmitting(true);
         try {
-            const orderDate = new Date().toISOString();
-            const dueDate = new Date(weekEnd).toISOString();
+            const locState = (location.state || {}) as { children?: any[]; order?: any };
+            const existingOrderDate = locState.order?.orderDate || locState.children?.[0]?.orderDate;
+            const orderDate = existingOrderDate ? new Date(existingOrderDate).toISOString() : new Date(weekStart || new Date()).toISOString();
+            const dueDate = new Date(weekEnd || weekStart || new Date()).toISOString();
 
             // Track all used PO IDs across existingOrders, locState.children, and all current groups
             const usedPoIds = new Set<string>();
             existingOrders.forEach((o: any) => {
                 if (o.productionOrderId) usedPoIds.add(o.productionOrderId);
             });
-            const locState = (location.state || {}) as { children?: any[] };
             (locState.children || []).forEach((c: any) => {
                 if (c.productionOrderId) usedPoIds.add(c.productionOrderId);
             });
@@ -1744,7 +1737,6 @@ const ProductionOrderCreate: React.FC = () => {
                     });
 
                 // Delete POs that were removed during edit
-                const locState = (location.state || {}) as { children?: any[] };
                 const keptPoIds = new Set(allOrders.map(({ item }) => item.existingPoId).filter(Boolean));
                 const initialPoIds: string[] = (locState.children || []).map((c: any) => c.productionOrderId).filter(Boolean);
                 const removedPoIds = initialPoIds.filter((poId: string) => !keptPoIds.has(poId));

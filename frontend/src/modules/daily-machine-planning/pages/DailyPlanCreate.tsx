@@ -6,13 +6,13 @@ import { toast } from "react-toastify";
 import {
   FaSave, FaCalendarAlt, FaCheckCircle,
   FaGripVertical, FaTimes, FaExclamationTriangle,
-  FaSpinner, FaHistory,
+  FaSpinner, FaHistory, FaPencilAlt, FaBan, FaStopCircle,
 } from "react-icons/fa";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CustomButton from "../../../components/ui/Button/Button";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
-import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { dailyPlanService } from "../../../services/dailyPlanService";
@@ -55,7 +55,10 @@ interface BoardOrder {
   plannedElsewhere: number;
   hadPriorPlan:     boolean;
   isOverdue:        boolean;
+  isStopped?:       boolean;
   capacityPerShift: number;
+  hasHistoricalCapacity: boolean;
+  hasCustomCapacity?: boolean;
   uom:              string;
   color:            string;
   status?:          string;
@@ -69,6 +72,9 @@ interface CellAssignment {
   targetQty:   number;
   color:       string;
   seqNo?:      number;
+  status?:     string;
+  isStopped?:  boolean;
+  stopReason?: string | null;
 }
 
 type CellKey = `${string}__${DayName}__${ShiftSlot}`;
@@ -115,27 +121,23 @@ const shortDate = (s: string) => {
   return new Date(normalized + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-const getShiftSlot = (plan: any, shiftsList: Array<{ shiftCode: string; shiftName: string }>): ShiftSlot => {
-  // Prefer the actual shiftCode from the included shift relation over shiftId (which may be a UUID)
-  const sCode = (plan.shift?.shiftCode || "").trim();
-  const sId   = (plan.shiftId || "").trim();
-  const sName = (plan.shift?.shiftName || "").toLowerCase();
+const getShiftSlot = (plan: any): ShiftSlot => {
+  const sCode = (plan.shiftId || plan.shift?.shiftCode || plan.shiftCode || "").toUpperCase().trim();
+  const sName = (plan.shift?.shiftName || plan.shiftName || "").toLowerCase();
 
-  // 1. Match by shiftCode against the loaded shifts list (most reliable)
-  if (sCode && shiftsList.length > 1 && sCode === shiftsList[1]?.shiftCode) return "NIGHT";
-  if (sCode && shiftsList.length > 0 && sCode === shiftsList[0]?.shiftCode) return "DAY";
-
-  // 2. Match by shiftId against the loaded shifts list (in case shiftId == shiftCode)
-  if (sId && shiftsList.length > 1 && sId === shiftsList[1]?.shiftCode) return "NIGHT";
-  if (sId && shiftsList.length > 0 && sId === shiftsList[0]?.shiftCode) return "DAY";
-
-  // 3. Name-based detection (most robust fallback)
-  if (sName.includes("night") || sName.includes("evening") || sName.includes("second")) return "NIGHT";
-
-  // 4. Code-based keyword fallback
-  const combined = `${sCode} ${sId}`.toLowerCase();
-  if (combined.includes("night") || combined.includes("eve") || combined.includes("shift2") || combined.includes("shift_2")) return "NIGHT";
-
+  if (
+    sCode === "NIGHT" ||
+    sCode.includes("NIGHT") ||
+    sCode.includes("EVENING") ||
+    sName.includes("night") ||
+    sName.includes("evening") ||
+    sCode.includes("S2") ||
+    sCode.includes("SHT002") ||
+    sName.includes("shift 2") ||
+    sName.includes("shift-2")
+  ) {
+    return "NIGHT";
+  }
   return "DAY";
 };
 
@@ -149,7 +151,7 @@ const StatusBadge: React.FC<{ status: PlanStatus }> = ({ status }) => {
   const cfg: Record<PlanStatus, { label: string; cls: string }> = {
     "draft":       { label: "DRAFT",       cls: "bg-zinc-500/10 text-zinc-400 border-zinc-500/25"           },
     "in-progress": { label: "IN PROGRESS", cls: "bg-primary/10 text-primary border-primary/25"              },
-    "ready":       { label: "READY",       cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"  },
+    "ready":       { label: "READY",       cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"  },
   };
   const { label, cls } = cfg[status];
   return (
@@ -172,22 +174,34 @@ interface OrderCardProps {
   onMouseEnter:      () => void;
   onMouseLeave:      () => void;
   onClearGroup:      () => void;
+  onEditCapacity?:   (order: BoardOrder) => void;
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({
   order, remaining, allocatedQty, isCarriedForward, isDragging, isHovered,
-  onDragStart, onMouseEnter, onMouseLeave, onClearGroup,
+  onDragStart, onMouseEnter, onMouseLeave, onClearGroup, onEditCapacity,
 }) => {
-  const isComplete     = remaining <= 0;
+  const isStopped      = Boolean(
+    order.isStopped || 
+    ["STOPPED", "COMPLETED_WITH_SHORTFALL", "SHORT_CLOSED", "CANCELLED"].includes((order.status || "").toUpperCase()) ||
+    /Permanently Stopped|Short Closed|Stopped:/i.test(order.remarks || "")
+  );
+  const isComplete     = remaining <= 0 || isStopped;
   const hasAllocations = allocatedQty > 0;
   const remainingPct   = order.targetQty > 0 ? Math.max(0, remaining / order.targetQty) : 0;
+  const prodPct        = order.targetQty > 0 ? Math.min(100, Math.round((order.producedQty / order.targetQty) * 100)) : 0;
 
   return (
     <div
-      draggable
+      draggable={!isStopped}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onDragStart={(e) => {
+        if (isStopped) {
+          e.preventDefault();
+          toast.warning(`"${order.productName}" is stopped / short-closed and cannot be assigned.`, { autoClose: 3000 });
+          return;
+        }
         e.dataTransfer.effectAllowed = "copyMove";
         e.dataTransfer.setData("orderId", order.id);
         e.dataTransfer.setData("text/plain", order.id);
@@ -196,35 +210,31 @@ const OrderCard: React.FC<OrderCardProps> = ({
       onDragEnd={() => onDragStart("")}
       className={`
         group relative flex items-center justify-between gap-2 p-2 rounded-lg border transition-all duration-150 select-none
-        cursor-grab active:cursor-grabbing overflow-hidden
+        ${isStopped ? "cursor-not-allowed opacity-75 bg-card-2/30 border-line" : "cursor-grab active:cursor-grabbing border-line bg-card hover:border-primary/40 hover:bg-card-2/60 shadow-xs"}
         ${isDragging ? "opacity-35 scale-[0.97]" : ""}
-        ${isHovered  ? "ring-1 ring-primary/50 border-primary shadow-xs" : ""}
-        ${isComplete
-          ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50"
-          : "border-line bg-card hover:border-primary/40 hover:bg-card-2/60 shadow-xs"}
+        ${isHovered && !isStopped ? "ring-1 ring-primary/50 border-primary shadow-xs" : ""}
       `}
     >
-      {/* Left accent */}
-      <div
-        className={`absolute left-0 inset-y-0 w-1 rounded-l ${
-          isComplete ? "bg-emerald-400" : hasAllocations ? "bg-primary" : "bg-line-soft"
-        }`}
-      />
-
-      <div className="pl-1.5 flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1">
           <span
-            className={`text-[11px] font-bold truncate leading-snug ${
-              isComplete ? "text-emerald-400" : "text-ink"
-            }`}
+            className="text-[11px] font-bold truncate leading-snug text-ink"
             title={order.productName}
           >
             {order.productName}
           </span>
+          {isStopped && (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 shrink-0"
+              title="Production stopped / Short closed"
+            >
+              <FaStopCircle size={7} /> Stopped
+            </span>
+          )}
         </div>
         {!isComplete && isCarriedForward && (
           <div
-            className="flex items-center gap-1 text-[8.5px] font-bold text-amber-400/90 mt-0.5"
+            className="flex items-center gap-1 text-[8.5px] font-bold text-amber-500 dark:text-amber-400/90 mt-0.5"
             title={`Produced ${order.producedQty.toLocaleString()} + planned ${order.plannedElsewhere.toLocaleString()} of ${order.targetQty.toLocaleString()} in other weeks — pending amount carried forward`}
           >
             <FaHistory size={7} />
@@ -233,8 +243,14 @@ const OrderCard: React.FC<OrderCardProps> = ({
         )}
         <div className="flex items-center justify-between text-[9.5px] text-ink-muted mt-0.5">
           <span>Target: <strong className="text-ink font-semibold">{order.targetQty.toLocaleString()}</strong></span>
-          {isComplete ? (
-            <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+          {isStopped ? (
+            order.producedQty > 0 ? (
+              <span>Prod: <strong className="text-ink font-semibold">{order.producedQty.toLocaleString()}</strong></span>
+            ) : (
+              <span className="text-ink-muted text-[9px] font-medium">Closed</span>
+            )
+          ) : isComplete ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
               <FaCheckCircle size={8} /> Done
             </span>
           ) : (
@@ -244,12 +260,38 @@ const OrderCard: React.FC<OrderCardProps> = ({
         {/* Mini progress bar */}
         <div className="mt-1 h-[2px] w-full bg-line-soft rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${isComplete ? "bg-emerald-400" : "bg-primary/60"}`}
-            style={{ width: `${Math.round((1 - remainingPct) * 100)}%` }}
+            className={`h-full rounded-full transition-all ${isStopped ? "bg-slate-400 dark:bg-slate-600" : isComplete ? "bg-emerald-500" : "bg-primary/60"}`}
+            style={{ width: `${isStopped ? prodPct : Math.round((1 - remainingPct) * 100)}%` }}
           />
         </div>
-        <div className="text-[8.5px] text-ink-muted mt-0.5">
-          Cap: <strong className="text-ink">{order.capacityPerShift.toLocaleString()}</strong>/shift
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {order.capacityPerShift > 0 ? (
+            <div className="text-[8.5px] text-ink-muted flex items-center gap-1 flex-wrap">
+              <span>Cap: <strong className="text-ink">{order.capacityPerShift.toLocaleString()}</strong>/shift</span>
+              {order.hasCustomCapacity && !order.hasHistoricalCapacity && (
+                <span className="text-[7.5px] font-semibold px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Custom</span>
+              )}
+              {onEditCapacity && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onEditCapacity(order); }}
+                  className="text-ink-muted hover:text-primary p-0.5 rounded cursor-pointer"
+                  title="Change planned quantity per shift"
+                >
+                  <FaPencilAlt size={7.5} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEditCapacity?.(order); }}
+              className="text-[8.5px] font-bold text-ink-muted hover:text-ink bg-card-2 hover:bg-card px-1.5 py-0.5 rounded border border-line-soft flex items-center gap-1 cursor-pointer transition-colors"
+              title="Set planned quantity per shift"
+            >
+              <span>Cap not set — Click to set</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -304,7 +346,8 @@ const DropCell: React.FC<DropCellProps> = ({
   const isInvalidDrop = isOver && isDraggingAny && (!isMachineMatch || isLocked);
 
   let cellCls = "";
-  if      (isLocked && assignment) cellCls = "border-amber-500/40 bg-amber-500/8 cursor-default";
+  if      (assignment?.isStopped) cellCls = "border border-rose-500/30 dark:border-rose-500/40 bg-rose-500/5 dark:bg-rose-500/10 cursor-default";
+  else if (isLocked && assignment) cellCls = "border border-dotted border-line-soft/80 bg-card-2/25 cursor-default opacity-85";
   else if (isInvalidDrop) cellCls = "border-red-500/50 bg-red-500/8 cursor-not-allowed";
   else if (isSwapTarget)  cellCls = "border-amber-400 bg-amber-500/15 ring-1 ring-amber-400/60 scale-[1.02] z-10 shadow-md";
   else if (isSelfMove)    cellCls = "border-primary/60 bg-primary/12 ring-1 ring-primary/30";
@@ -314,18 +357,19 @@ const DropCell: React.FC<DropCellProps> = ({
   if (!assignment) {
     return (
       <div
+        title={isLocked ? "Production started, cannot be changed" : undefined}
         onDragEnter={isLocked ? undefined : onDragEnter}
         onDragOver={isLocked ? undefined : onDragOver}
         onDragLeave={isLocked ? undefined : onDragLeave}
         onDrop={isLocked ? undefined : onDrop}
         className={`
-          relative h-[62px] rounded-lg border border-dashed transition-all duration-150 flex items-center justify-center select-none
-          ${isLocked ? "border-amber-500/25 bg-amber-500/5 cursor-default" : (cellCls || "border-line-soft/40 hover:border-line-soft hover:bg-card-2/30")}
+          relative h-[62px] rounded-lg border transition-all duration-150 flex items-center justify-center select-none
+          ${isLocked ? "border-dotted border-line-soft/40 bg-card-2/15 cursor-default" : `border-dashed ${cellCls || "border-line-soft/40 hover:border-line-soft hover:bg-card-2/30"}`}
         `}
       >
         {isLocked ? (
-          <span className="text-[9px] font-bold tracking-wider uppercase text-amber-500/70 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded">
-            RM Issued
+          <span className="text-[8.5px] font-semibold tracking-wider uppercase text-ink-muted/50">
+            Locked
           </span>
         ) : isOver && isMachineMatch ? (
           <span className="text-[10px] font-bold text-primary animate-pulse">+ Drop here</span>
@@ -340,26 +384,29 @@ const DropCell: React.FC<DropCellProps> = ({
 
   return (
     <div
-      draggable={!isLocked}
+      title={assignment.isStopped ? (assignment.stopReason ? `Stopped: ${assignment.stopReason}` : "Production Stopped") : isLocked ? "Production started, cannot be changed" : undefined}
+      draggable={!isLocked && !assignment.isStopped}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onDragEnter={isLocked ? undefined : onDragEnter}
-      onDragOver={isLocked ? undefined : onDragOver}
-      onDragLeave={isLocked ? undefined : onDragLeave}
-      onDrop={isLocked ? undefined : onDrop}
-      onDragStart={isLocked ? undefined : (e) => {
+      onDragEnter={isLocked || assignment.isStopped ? undefined : onDragEnter}
+      onDragOver={isLocked || assignment.isStopped ? undefined : onDragOver}
+      onDragLeave={isLocked || assignment.isStopped ? undefined : onDragLeave}
+      onDrop={isLocked || assignment.isStopped ? undefined : onDrop}
+      onDragStart={isLocked || assignment.isStopped ? undefined : (e) => {
         e.dataTransfer.effectAllowed = "copyMove";
         e.dataTransfer.setData("orderId", assignment.orderId);
         e.dataTransfer.setData("text/plain", assignment.orderId);
         onDragStartAssignment?.(assignment.orderId);
       }}
-      onDragEnd={isLocked ? undefined : onDragEndAssignment}
+      onDragEnd={isLocked || assignment.isStopped ? undefined : onDragEndAssignment}
       className={`
-        group/cell relative h-[62px] rounded-lg border px-2 py-1 flex flex-col justify-between transition-all duration-150 select-none
+        group/cell relative h-[62px] rounded-lg px-2 py-1 flex flex-col justify-between transition-all duration-150 select-none
         overflow-hidden shadow-2xs
-        ${isLocked
-          ? (cellCls || "border-amber-500/40 bg-amber-500/8 cursor-default")
-          : (`cursor-grab active:cursor-grabbing ${cellCls || "border-line bg-card hover:border-primary/50 hover:bg-card-2/80"}`)
+        ${assignment.isStopped
+          ? (cellCls || "border border-rose-500/30 dark:border-rose-500/40 bg-rose-500/5 dark:bg-rose-500/10 cursor-default")
+          : isLocked
+          ? (cellCls || "border border-dotted border-line-soft/80 bg-card-2/25 cursor-default opacity-85")
+          : (`border cursor-grab active:cursor-grabbing ${cellCls || "border-line bg-card hover:border-primary/50 hover:bg-card-2/80"}`)
         }
       `}
     >
@@ -370,14 +417,21 @@ const DropCell: React.FC<DropCellProps> = ({
           {assignment.orderId}
         </span>
         <div className="flex items-center gap-1 shrink-0">
-          {isLocked && (
+          {assignment.isStopped ? (
             <span
-              title="RM issued — this shift is locked"
-              className="text-[7px] font-black tracking-widest uppercase text-amber-500 border border-amber-500/40 bg-amber-500/15 px-1 py-px rounded leading-none"
+              title={assignment.stopReason ? `Stopped: ${assignment.stopReason}` : "Production Stopped"}
+              className="text-[7.5px] font-bold tracking-wider uppercase text-rose-600 dark:text-rose-400 bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 px-1.5 py-0.5 rounded flex items-center gap-0.5"
             >
-              RM
+              <FaStopCircle size={7} /> Stop
             </span>
-          )}
+          ) : isLocked ? (
+            <span
+              title="Production started, cannot be changed"
+              className="text-[7.5px] font-semibold tracking-wider uppercase text-ink-muted/60 bg-card-2/40 border border-dotted border-line-soft/60 px-1.5 py-0.5 rounded"
+            >
+              Locked
+            </span>
+          ) : null}
           {assignment.seqNo && (
             <span className="text-[8px] font-mono font-extrabold text-ink-muted/70 bg-card-2 px-1 rounded">
               #{assignment.seqNo}
@@ -391,12 +445,12 @@ const DropCell: React.FC<DropCellProps> = ({
         {assignment.productName}
       </div>
 
-      {/* Footer: assigned qty + remove button (hidden when locked) */}
+      {/* Footer: assigned qty + remove button (hidden when locked or stopped) */}
       <div className="flex items-center justify-between gap-1">
-        <span className="text-[9.5px] font-extrabold text-primary">
+        <span className={`text-[9.5px] font-extrabold ${assignment.isStopped ? "text-ink font-bold" : isLocked ? "text-primary/75" : "text-primary"}`}>
           {assignment.qty.toLocaleString()} <span className="text-[8px] font-normal text-ink-muted">pcs</span>
         </span>
-        {!isLocked && (
+        {!isLocked && !assignment.isStopped && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onClear(); }}
@@ -431,16 +485,11 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Redux state ──────────────────────────────────────────────────────────
   const rawMachines = useAppSelector((state: any) => state.machines?.data);
-  const rawShifts   = useAppSelector((state: any) => state.shifts?.data);
 
   const machines: Array<{ machineId: string; machineName: string }> = useMemo(() => {
     const list = Array.isArray(rawMachines) ? rawMachines : (rawMachines?.machines ?? []);
     return list.filter((m: any) => m.isActive !== false);
   }, [rawMachines]);
-
-  const shifts: Array<{ shiftCode: string; shiftName: string }> = useMemo(() => {
-    return Array.isArray(rawShifts) ? rawShifts : [];
-  }, [rawShifts]);
 
   const urlWeek = (location.state as any)?.weekStart || searchParams.get("week");
   const passedIsEdit = Boolean((location.state as any)?.isEdit);
@@ -453,18 +502,23 @@ const DailyPlanCreate: React.FC = () => {
   const [selectedMachineFilter, setSelectedMachineFilter] = useState<string>("ALL");
   const [isEditMode,     setIsEditMode]     = useState<boolean>(passedIsEdit);
   const [rmIssuedDates,  setRmIssuedDates]  = useState<Set<string>>(new Set());
+  const [lockedCellKeys, setLockedCellKeys] = useState<Set<CellKey>>(new Set());
 
   // ── Data loading state ───────────────────────────────────────────────────
   const [productionOrders, setProductionOrders] = useState<BoardOrder[]>([]);
   const [loadingOrders,    setLoadingOrders]    = useState(false);
   const [isSubmitting,     setIsSubmitting]     = useState(false);
 
+  // ── Shift Capacity Modal State ──────────────────────────────────────────
+  const [capacityModalOrder, setCapacityModalOrder] = useState<BoardOrder | null>(null);
+  const [pendingDropTarget,  setPendingDropTarget]  = useState<{ machineId: string; day: DayName; shift: ShiftSlot } | null>(null);
+  const [shiftCapacityInput, setShiftCapacityInput] = useState<string>("");
+
   const weekEnd = addDays(weekStart, 5);
 
-  // ── Load machines + shifts on mount ─────────────────────────────────────
+  // ── Load machines on mount ──────────────────────────────────────────────
   useEffect(() => {
     dispatch(fetchMachines());
-    dispatch(fetchShifts());
   }, [dispatch]);
 
   // ── Load production orders + existing daily plans for selected week ──────
@@ -502,6 +556,24 @@ const DailyPlanCreate: React.FC = () => {
         dailyPlanService.getRmIssuedDates(weekStart).catch(() => []),
       ]);
 
+      // ── Extract daily plans and week plans for this week ─────
+      const passedPlans = (location.state as any)?.existingPlans;
+      const extractPlans = (res: any): any[] => {
+        if (Array.isArray(res)) return res;                           // direct array
+        if (Array.isArray(res?.data)) return res.data;               // { data: [...] }
+        if (Array.isArray(res?.data?.dailyPlans)) return res.data.dailyPlans; // { data: { dailyPlans: [...] } }
+        if (Array.isArray(res?.dailyPlans)) return res.dailyPlans;   // { dailyPlans: [...] }
+        if (Array.isArray(passedPlans)) return passedPlans;
+        return [];
+      };
+      const allDailyPlans: any[] = extractPlans(dailyPlansRes);
+
+      const curWeekDates = DAY_NAMES.map((_, i) => addDays(weekStart, i));
+      const existingWeekPlans = allDailyPlans.filter((p: any) => {
+        const pDate = normalizeDateStr(p.productionDate);
+        return p.status !== "CANCELLED" && curWeekDates.includes(pDate);
+      });
+
       // Flatten and attach machine name (exclude DRAFT status orders)
       const flat = results.flatMap((items, idx) =>
         items
@@ -529,14 +601,38 @@ const DailyPlanCreate: React.FC = () => {
         return productColors[key];
       };
 
+      // Helper to detect stopped order
+      const detectOrderStopped = (orderId: string, poStatus?: string, poRemarks?: string) => {
+        const statusUpper = (poStatus || "").toUpperCase();
+        if (["COMPLETED_WITH_SHORTFALL", "STOPPED", "CANCELLED", "SHORT_CLOSED"].includes(statusUpper)) {
+          return true;
+        }
+        if (/Permanently Stopped|Short Closed|Stopped:/i.test(poRemarks || "")) {
+          return true;
+        }
+        return existingWeekPlans.some((p: any) => {
+          if (p.productionOrderId !== orderId) return false;
+          const pStatus = (p.status || "").toUpperCase();
+          const pRemarks = p.remarks || "";
+          return (
+            ["STOPPED", "COMPLETED_WITH_SHORTFALL", "SHORT_CLOSED"].includes(pStatus) ||
+            /Permanently Stopped|Short Closed|Stopped:/i.test(pRemarks) ||
+            /Permanently Stopped|Short Closed|Stopped:/i.test(p.productionOrder?.remarks || "")
+          );
+        });
+      };
+
       const orders: BoardOrder[] = flat.map((item, i) => {
         const machineName =
           machines.find((m) => m.machineId === (item.machineId ?? ""))?.machineName ??
           item.machineId ?? "Unknown";
         const cap = capacities[i];
-        const capacityPerShift = cap
-          ? Number(cap.newCapacity ?? cap.capacity ?? 1000)
-          : 1000;
+        const hasHistoricalCapacity = Boolean(cap && (Number(cap.newCapacity || 0) > 0 || Number(cap.capacity || 0) > 0));
+        const capacityPerShift = hasHistoricalCapacity
+          ? Number(cap.newCapacity ?? cap.capacity)
+          : 0;
+
+        const isStopped = detectOrderStopped(item.productionOrderId, item.status, item.remarks);
 
         return {
           id:               item.productionOrderId,
@@ -550,33 +646,18 @@ const DailyPlanCreate: React.FC = () => {
           plannedElsewhere: item.plannedElsewhere ?? 0,
           hadPriorPlan:     item.hadPriorPlan ?? false,
           isOverdue:        item.isOverdue ?? false,
+          isStopped,
           capacityPerShift,
+          hasHistoricalCapacity,
+          hasCustomCapacity: false,
           uom:              item.uom,
           color:            getColorForProduct(item.productName || item.productionOrderId),
-          status:           item.status,
+          status:           isStopped ? "COMPLETED_WITH_SHORTFALL" : item.status,
           remarks:          item.remarks,
         };
       });
 
       // ── Pre-populate boardMap from existing daily plans for this week ─────
-      // Backend returns: { success, data: { dailyPlans: [...], total, page, limit }, message }
-      // So response.data (= dailyPlansRes) is { success, data: { dailyPlans: [...] } }
-      const passedPlans = (location.state as any)?.existingPlans;
-      const extractPlans = (res: any): any[] => {
-        if (Array.isArray(res)) return res;                           // direct array
-        if (Array.isArray(res?.data)) return res.data;               // { data: [...] }
-        if (Array.isArray(res?.data?.dailyPlans)) return res.data.dailyPlans; // { data: { dailyPlans: [...] } }
-        if (Array.isArray(res?.dailyPlans)) return res.dailyPlans;   // { dailyPlans: [...] }
-        if (Array.isArray(passedPlans)) return passedPlans;
-        return [];
-      };
-      const allDailyPlans: any[] = extractPlans(dailyPlansRes);
-
-      const curWeekDates = DAY_NAMES.map((_, i) => addDays(weekStart, i));
-      const existingWeekPlans = allDailyPlans.filter((p: any) => {
-        const pDate = normalizeDateStr(p.productionDate);
-        return p.status !== "CANCELLED" && curWeekDates.includes(pDate);
-      });
 
       // Build set of production orders already assigned a plan this week (any day)
       const poIdsInDailyPlans = new Set<string>();
@@ -603,6 +684,8 @@ const DailyPlanCreate: React.FC = () => {
           const machineObj = machines.find((m) => m.machineId === plan.machineId);
           const machineName = machineObj?.machineName || plan.machine?.machineName || plan.machineId || "Machine";
 
+          const existingPlanCap = Number(plan.plannedQty || 0);
+          const isStopped = detectOrderStopped(orderId, po?.status || plan.status, po?.remarks || plan.remarks);
           orders.push({
             id:               orderId,
             productName:      pName,
@@ -615,12 +698,30 @@ const DailyPlanCreate: React.FC = () => {
             plannedElsewhere: 0,
             hadPriorPlan:     false,
             isOverdue:        false,
-            capacityPerShift: 1000,
+            isStopped,
+            capacityPerShift: existingPlanCap,
+            hasHistoricalCapacity: false,
+            hasCustomCapacity: existingPlanCap > 0,
             uom:              po?.uom || "pcs",
             color:            getColorForProduct(pName || orderId),
-            status:           po?.status || plan.status,
+            status:           isStopped ? "COMPLETED_WITH_SHORTFALL" : (po?.status || plan.status),
             remarks:          po?.remarks || plan.remarks || "",
           });
+        }
+      });
+
+      // Populate capacityPerShift from existing plan if not already set from history
+      existingWeekPlans.forEach((plan: any) => {
+        const order = orders.find((o) => o.id === plan.productionOrderId);
+        if (order) {
+          if (!order.isStopped && detectOrderStopped(order.id, order.status, order.remarks)) {
+            order.isStopped = true;
+            order.status = "COMPLETED_WITH_SHORTFALL";
+          }
+          if (order.capacityPerShift <= 0 && Number(plan.plannedQty || 0) > 0) {
+            order.capacityPerShift = Number(plan.plannedQty);
+            order.hasCustomCapacity = true;
+          }
         }
       });
 
@@ -636,7 +737,7 @@ const DailyPlanCreate: React.FC = () => {
           return true; // Keep orders currently planned on this week's board
         }
         const isFullyDone = Math.max(0, o.targetQty - o.producedQty - o.plannedElsewhere) <= 0;
-        const isTerminalStatus = ["COMPLETED", "READY_FOR_DISPATCH", "CLOSED", "COMPLETED_WITH_SHORTFALL", "CANCELLED", "DISPATCHED"].includes(
+        const isTerminalStatus = ["COMPLETED", "READY_FOR_DISPATCH", "CLOSED", "COMPLETED_WITH_SHORTFALL", "STOPPED", "SHORT_CLOSED", "CANCELLED", "DISPATCHED"].includes(
           (o.status || "").toUpperCase()
         );
         const isAlreadyAssigned = isFullyDone || isTerminalStatus || poIdsInDailyPlans.has(o.id);
@@ -650,23 +751,26 @@ const DailyPlanCreate: React.FC = () => {
         setIsEditMode(true);
         const orderSeqMap: Record<string, number> = {};
         const initialBoardMap: Record<CellKey, CellAssignment> = {};
+        const initialLockedCellKeys = new Set<CellKey>();
+        const issuedDatesSet = new Set((issuedDatesArr || []).map((d: string) => normalizeDateStr(d)));
 
         // Sort plans chronologically by date and shift
         const sortedPlans = [...existingWeekPlans].sort((a, b) => {
           const dateDiff = new Date(normalizeDateStr(a.productionDate)).getTime() - new Date(normalizeDateStr(b.productionDate)).getTime();
           if (dateDiff !== 0) return dateDiff;
-          const slotA = getShiftSlot(a, shifts);
-          const slotB = getShiftSlot(b, shifts);
+          const slotA = getShiftSlot(a);
+          const slotB = getShiftSlot(b);
           return (slotA === "DAY" ? 0 : 1) - (slotB === "DAY" ? 0 : 1);
         });
 
+        const orderCumMap: Record<string, number> = {};
         sortedPlans.forEach((plan: any) => {
           const planDate = normalizeDateStr(plan.productionDate);
           if (!planDate) return;
           const dayIdx = curWeekDates.indexOf(planDate);
           if (dayIdx < 0) return;
           const dayName = DAY_NAMES[dayIdx];
-          const slot: ShiftSlot = getShiftSlot(plan, shifts);
+          const slot: ShiftSlot = getShiftSlot(plan);
           const machineId = plan.machineId || plan.machine?.machineId;
           const orderId = plan.productionOrderId;
           const order = orders.find((o) => o.id === orderId);
@@ -675,20 +779,77 @@ const DailyPlanCreate: React.FC = () => {
           const k = cellKey(machineId, dayName, slot);
           orderSeqMap[orderId] = (orderSeqMap[orderId] || 0) + 1;
 
+          // Check if this specific plan was stopped
+          const planStatus = String(plan.status || "").toUpperCase();
+          const planRemarks = String(plan.remarks || "");
+          let planStopReason: string | null = null;
+          if (/Permanently Stopped|Short Closed|Stopped:/i.test(planRemarks)) {
+            const parts = planRemarks.split("|");
+            const reasonPart = parts[parts.length - 1] || "";
+            planStopReason = reasonPart
+              .replace(/Permanently Stopped:/i, "")
+              .replace(/Short Closed:/i, "")
+              .replace(/Stopped:/i, "")
+              .replace(/Cancelled:/i, "")
+              .trim();
+          }
+
+          const isPlanDirectStop =
+            ["STOPPED", "COMPLETED_WITH_SHORTFALL", "SHORT_CLOSED"].includes(planStatus) ||
+            Boolean(planStopReason);
+
+          // If order is stopped, determine if this plan is the stopped shift
+          const isOrderStopped = Boolean(order?.isStopped);
+          const allPlansForOrder = sortedPlans.filter((p: any) => p.productionOrderId === orderId);
+          const lastPlanForOrder = allPlansForOrder[allPlansForOrder.length - 1];
+          const isLastOfStoppedOrder = isOrderStopped && lastPlanForOrder?.dailyPlanId === plan.dailyPlanId;
+
+          const cellIsStopped = isPlanDirectStop || isLastOfStoppedOrder;
+          if (cellIsStopped && !planStopReason && order?.remarks) {
+            const parts = order.remarks.split("|");
+            const reasonPart = parts[parts.length - 1] || "";
+            planStopReason = reasonPart
+              .replace(/Permanently Stopped:/i, "")
+              .replace(/Short Closed:/i, "")
+              .replace(/Stopped:/i, "")
+              .replace(/Cancelled:/i, "")
+              .trim() || "Stopped";
+          }
+
+          // Lock this specific cell if stopped, RM issued, or production started
+          if (cellIsStopped || issuedDatesSet.has(planDate) || plan.isLocked || plan.status === "IN_PROGRESS" || plan.status === "COMPLETED") {
+            initialLockedCellKeys.add(k);
+          }
+
+          const targetQty = Number(plan.productionOrder?.targetQty || order?.targetQty || 0);
+          const rawQty = Number(plan.plannedQty || 0);
+          const currentCum = orderCumMap[orderId] || 0;
+
+          let cellQty = rawQty;
+          if (targetQty > 0) {
+            cellQty = Math.min(rawQty, Math.max(0, targetQty - currentCum));
+          }
+          orderCumMap[orderId] = currentCum + cellQty;
+
           initialBoardMap[k] = {
             orderId,
             productName: pName,
-            qty: Number(plan.plannedQty || 0),
-            targetQty: Number(plan.productionOrder?.targetQty || order?.targetQty || 0),
+            qty: cellQty,
+            targetQty,
             color: order?.color || getColorForProduct(pName || orderId),
             seqNo: orderSeqMap[orderId],
+            status: plan.status,
+            isStopped: cellIsStopped,
+            stopReason: planStopReason || (cellIsStopped ? "Stopped" : null),
           };
         });
 
         setBoardMap(initialBoardMap);
+        setLockedCellKeys(initialLockedCellKeys);
       } else {
         setIsEditMode(false);
         setBoardMap({});
+        setLockedCellKeys(new Set());
       }
     } catch (err) {
       console.error("Failed to load machine programs:", err);
@@ -696,7 +857,7 @@ const DailyPlanCreate: React.FC = () => {
     } finally {
       setLoadingOrders(false);
     }
-  }, [machines, weekStart, shifts, location.state]);
+  }, [machines, weekStart, location.state]);
 
   useEffect(() => {
     if (machines.length) loadOrders();
@@ -721,12 +882,26 @@ const DailyPlanCreate: React.FC = () => {
   // never exceed — using raw order.targetQty there would re-plan quantity
   // that's already produced or already scheduled elsewhere.
   const trueRemainingFor = useCallback((order: BoardOrder) => {
+    if (
+      order.isStopped || 
+      ["COMPLETED_WITH_SHORTFALL", "STOPPED", "CANCELLED", "SHORT_CLOSED"].includes((order.status || "").toUpperCase()) ||
+      /Permanently Stopped|Short Closed|Stopped:/i.test(order.remarks || "")
+    ) {
+      return 0;
+    }
     return Math.max(0, order.targetQty - order.producedQty - order.plannedElsewhere);
   }, []);
 
   // Same, minus whatever's freshly placed on THIS week's board — this is the
   // live "Rem" figure shown on each Program List card.
   const remainingFor = useCallback((order: BoardOrder) => {
+    if (
+      order.isStopped || 
+      ["COMPLETED_WITH_SHORTFALL", "STOPPED", "CANCELLED", "SHORT_CLOSED"].includes((order.status || "").toUpperCase()) ||
+      /Permanently Stopped|Short Closed|Stopped:/i.test(order.remarks || "")
+    ) {
+      return 0;
+    }
     const allocatedQty = orderStats[order.id]?.allocatedQty ?? 0;
     return Math.max(0, trueRemainingFor(order) - allocatedQty);
   }, [orderStats, trueRemainingFor]);
@@ -810,19 +985,14 @@ const DailyPlanCreate: React.FC = () => {
     if (hoverKey === key) setHoverKey("");
   };
 
-  const handleDrop = (machineId: string, day: DayName, shift: ShiftSlot) => (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const orderId = e.dataTransfer.getData("orderId") || e.dataTransfer.getData("text/plain") || draggingId;
-    const order   = productionOrders.find((o) => o.id === orderId);
-    if (!order) { setHoverKey(""); setDraggingId(""); return; }
-
-    if (order.machineId !== machineId) {
-      const targetMachineName = machines.find((m) => m.machineId === machineId)?.machineName ?? machineId;
-      toast.error(
-        `"${order.productName}" belongs to ${order.machineName}. Cannot assign to ${targetMachineName}.`,
-        { position: "top-right", autoClose: 3500 }
-      );
+  const executeDrop = (order: BoardOrder, machineId: string, day: DayName, shift: ShiftSlot) => {
+    const isOrderStopped = Boolean(
+      order.isStopped || 
+      ["STOPPED", "COMPLETED_WITH_SHORTFALL", "SHORT_CLOSED", "CANCELLED"].includes((order.status || "").toUpperCase()) ||
+      /Permanently Stopped|Short Closed|Stopped:/i.test(order.remarks || "")
+    );
+    if (isOrderStopped) {
+      toast.warning(`"${order.productName}" is stopped / short-closed and cannot be assigned.`, { autoClose: 3500 });
       setHoverKey(""); setDraggingId(""); return;
     }
 
@@ -830,33 +1000,26 @@ const DailyPlanCreate: React.FC = () => {
     const targetAssignment = boardMap[targetKey];
     const targetOrderId    = targetAssignment?.orderId;
 
-    // Helper: check if an order has any locked cells (RM issued dates)
-    const hasLockedCells = (oid: string) =>
-      Object.keys(boardMap).some((k) => {
-        if (boardMap[k as CellKey]?.orderId !== oid) return false;
-        const [, d] = k.split("__");
-        const cd = dayDates[d as DayName];
-        return Boolean(cd && rmIssuedDates.has(cd));
-      });
+    const isCellLocked = (k: string) => {
+      return lockedCellKeys.has(k as CellKey);
+    };
+
+    // Block dropping or swapping directly onto a locked cell
+    if (isCellLocked(targetKey)) {
+      toast.error(
+        "Production started, cannot be changed.",
+        { position: "top-right", autoClose: 3500 }
+      );
+      setHoverKey(""); setDraggingId(""); return;
+    }
 
     // ── SWAP ─────────────────────────────────────────────────────────────
     if (targetOrderId && targetOrderId !== order.id) {
       const targetOrder = productionOrders.find((o) => o.id === targetOrderId);
-
-      // Block swap when either side has locked cells — swap moves the whole order
-      if (hasLockedCells(order.id)) {
-        toast.error(
-          `Cannot swap: "${order.productName}" has locked shifts (RM already issued).`,
-          { position: "top-right", autoClose: 3500 }
-        );
-        setHoverKey(""); setDraggingId(""); return;
-      }
-      if (hasLockedCells(targetOrderId)) {
-        toast.error(
-          `Cannot swap: "${targetOrder?.productName || targetOrderId}" has locked shifts (RM already issued).`,
-          { position: "top-right", autoClose: 3500 }
-        );
-        setHoverKey(""); setDraggingId(""); return;
+      if (!targetOrder) {
+        setHoverKey("");
+        setDraggingId("");
+        return;
       }
 
       const sortByCellOrder = (a: string, b: string) => {
@@ -868,65 +1031,121 @@ const DailyPlanCreate: React.FC = () => {
         );
       };
 
-      const sourceCells = Object.keys(boardMap).filter((k) => boardMap[k as CellKey]?.orderId === order.id).sort(sortByCellOrder);
-      const targetCells = Object.keys(boardMap).filter((k) => boardMap[k as CellKey]?.orderId === targetOrderId).sort(sortByCellOrder);
+      // Only consider UNLOCKED cells for swapping — locked shifts remain strictly in place
+      const sourceUnlockedCells = Object.keys(boardMap)
+        .filter((k) => {
+          const [mId] = k.split("__");
+          return mId === machineId && boardMap[k as CellKey]?.orderId === order.id && !isCellLocked(k);
+        })
+        .sort(sortByCellOrder);
 
-      const targetStartKey   = targetCells[0] || targetKey;
-      const [, tStartDay, tStartShift] = targetStartKey.split("__");
-      const sourceStartKey   = sourceCells[0];
-      const sourceStartDay   = sourceStartKey ? (sourceStartKey.split("__")[1] as DayName)   : null;
-      const sourceStartShift = sourceStartKey ? (sourceStartKey.split("__")[2] as ShiftSlot) : null;
+      const targetUnlockedCells = Object.keys(boardMap)
+        .filter((k) => {
+          const [mId] = k.split("__");
+          return mId === machineId && boardMap[k as CellKey]?.orderId === targetOrderId && !isCellLocked(k);
+        })
+        .sort(sortByCellOrder);
 
+      // Clear ONLY the unlocked cells of both orders on this machine from nextMap
       const nextMap = { ...boardMap };
       Object.keys(nextMap).forEach((k) => {
+        const [mId] = k.split("__");
+        if (mId !== machineId) return;
         const oid = nextMap[k as CellKey]?.orderId;
-        if (oid === order.id || oid === targetOrderId) delete nextMap[k as CellKey];
+        if ((oid === order.id || oid === targetOrderId) && !isCellLocked(k)) {
+          delete nextMap[k as CellKey];
+        }
       });
 
-      const srcStartIdx = CELL_ORDER.findIndex((c) => c.day === tStartDay && c.shift === tStartShift);
-      let srcRem = trueRemainingFor(order); let srcSeq = 1;
-      for (let i = 0; i < CELL_ORDER.length && srcRem > 0; i++) {
-        const { day: d, shift: s } = CELL_ORDER[(srcStartIdx + i) % CELL_ORDER.length];
-        const k = cellKey(machineId, d, s);
-        if (nextMap[k]) continue;
-        const qty = Math.min(srcRem, order.capacityPerShift);
-        nextMap[k] = { orderId: order.id, productName: order.productName, qty, targetQty: order.targetQty, color: order.color, seqNo: srcSeq++ };
-        srcRem -= qty;
-      }
+      // Helper function to place an order's shifts as a single continuous block
+      const placeOrderShifts = (
+        ord: BoardOrder,
+        startCellIdx: number
+      ): number => {
+        let orderLockedQty = 0;
+        let orderLockedCount = 0;
+        Object.keys(boardMap).forEach((k) => {
+          const [mId] = k.split("__");
+          if (mId === machineId && boardMap[k as CellKey]?.orderId === ord.id && isCellLocked(k)) {
+            orderLockedQty += boardMap[k as CellKey]?.qty || 0;
+            orderLockedCount++;
+          }
+        });
 
-      if (targetOrder) {
-        let tgtStartIdx = 0;
-        if (sourceStartDay && sourceStartShift) {
-          tgtStartIdx = CELL_ORDER.findIndex((c) => c.day === sourceStartDay && c.shift === sourceStartShift);
-          if (tgtStartIdx === -1) tgtStartIdx = 0;
-        } else {
-          const firstEmpty = CELL_ORDER.findIndex((c) => !nextMap[cellKey(machineId, c.day, c.shift)]);
-          tgtStartIdx = firstEmpty !== -1 ? firstEmpty : 0;
-        }
-        let tgtRem = trueRemainingFor(targetOrder); let tgtSeq = 1;
-        for (let i = 0; i < CELL_ORDER.length && tgtRem > 0; i++) {
-          const { day: d, shift: s } = CELL_ORDER[(tgtStartIdx + i) % CELL_ORDER.length];
+        let rem = Math.max(0, trueRemainingFor(ord) - orderLockedQty);
+        let seq = orderLockedCount + 1;
+        let nextAvailableIdx = startCellIdx;
+
+        for (let i = startCellIdx; i < CELL_ORDER.length && rem > 0; i++) {
+          const { day: d, shift: s } = CELL_ORDER[i];
           const k = cellKey(machineId, d, s);
-          if (nextMap[k]) continue;
-          const qty = Math.min(tgtRem, targetOrder.capacityPerShift);
-          nextMap[k] = { orderId: targetOrder.id, productName: targetOrder.productName, qty, targetQty: targetOrder.targetQty, color: targetOrder.color, seqNo: tgtSeq++ };
-          tgtRem -= qty;
+          if (nextMap[k] || isCellLocked(k)) continue;
+
+          const qty = Math.min(rem, ord.capacityPerShift);
+          nextMap[k] = {
+            orderId: ord.id,
+            productName: ord.productName,
+            qty,
+            targetQty: ord.targetQty,
+            color: ord.color,
+            seqNo: seq++,
+          };
+          rem -= qty;
+          nextAvailableIdx = i + 1;
         }
+
+        return nextAvailableIdx;
+      };
+
+      // Determine the two orders' execution order
+      let firstOrd: BoardOrder;
+      let secondOrd: BoardOrder;
+      let startIdx: number;
+
+      if (sourceUnlockedCells.length > 0 && targetUnlockedCells.length > 0) {
+        const [, sDay, sShift] = sourceUnlockedCells[0].split("__");
+        const [, tDay, tShift] = targetUnlockedCells[0].split("__");
+        const sourceStartIdx = CELL_ORDER.findIndex((c) => c.day === sDay && c.shift === sShift);
+        const targetStartIdx = CELL_ORDER.findIndex((c) => c.day === tDay && c.shift === tShift);
+
+        startIdx = Math.min(sourceStartIdx, targetStartIdx);
+
+        if (sourceStartIdx < targetStartIdx) {
+          // Invert sequence so targetOrder comes first
+          firstOrd = targetOrder;
+          secondOrd = order;
+        } else {
+          // Invert sequence so order comes first
+          firstOrd = order;
+          secondOrd = targetOrder;
+        }
+      } else {
+        const [, tDay, tShift] = (targetUnlockedCells[0] || targetKey).split("__");
+        startIdx = CELL_ORDER.findIndex((c) => c.day === tDay && c.shift === tShift);
+        if (startIdx === -1) startIdx = 0;
+        firstOrd = order;
+        secondOrd = targetOrder;
       }
 
-      setBoardMap(nextMap); setHoverKey(""); setDraggingId("");
-      if (targetOrder) toast.info(`Swapped: "${order.productName}" ⇄ "${targetOrder.productName}"`, { autoClose: 2000 });
+      // 1. Place the first order as a complete contiguous group
+      const nextStartIdx = placeOrderShifts(firstOrd, startIdx);
+
+      // 2. Place the second order as a complete contiguous group immediately after
+      placeOrderShifts(secondOrd, nextStartIdx);
+
+      setBoardMap(nextMap);
+      setHoverKey("");
+      setDraggingId("");
+      toast.info(`Swapped: "${order.productName}" ⇄ "${targetOrder.productName}"`, { autoClose: 2000 });
       return;
     }
 
     // ── Normal drop / re-position ─────────────────────────────────────────
     const nextMap = { ...boardMap };
-    // Preserve locked cells (RM issued dates); only remove unlocked cells of this order
+    // Preserve locked cells; only remove unlocked cells of this order
     Object.keys(nextMap).forEach((k) => {
       if (nextMap[k as CellKey]?.orderId !== order.id) return;
-      const [, d] = k.split("__");
-      const cd = dayDates[d as DayName];
-      if (!rmIssuedDates.has(cd)) delete nextMap[k as CellKey];
+      if (!lockedCellKeys.has(k as CellKey)) delete nextMap[k as CellKey];
     });
 
     // Subtract already-locked qty so we only fill the remaining unissued portion
@@ -947,7 +1166,7 @@ const DailyPlanCreate: React.FC = () => {
     for (let i = startIdx; i < CELL_ORDER.length && remaining > 0; i++) {
       const { day: d, shift: s } = CELL_ORDER[i];
       const k = cellKey(machineId, d, s);
-      if (nextMap[k]) continue;
+      if (nextMap[k] || isCellLocked(k)) continue;
       const qty = Math.min(remaining, order.capacityPerShift);
       toFill.push({ key: k, qty, seqNo: seqNo++ });
       remaining -= qty;
@@ -964,15 +1183,102 @@ const DailyPlanCreate: React.FC = () => {
     setBoardMap(nextMap); setHoverKey(""); setDraggingId("");
   };
 
+  const handleDrop = (machineId: string, day: DayName, shift: ShiftSlot) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const orderId = e.dataTransfer.getData("orderId") || e.dataTransfer.getData("text/plain") || draggingId;
+    const order   = productionOrders.find((o) => o.id === orderId);
+    if (!order) { setHoverKey(""); setDraggingId(""); return; }
+
+    const isOrderStopped = Boolean(
+      order.isStopped || 
+      ["STOPPED", "COMPLETED_WITH_SHORTFALL", "SHORT_CLOSED", "CANCELLED"].includes((order.status || "").toUpperCase()) ||
+      /Permanently Stopped|Short Closed|Stopped:/i.test(order.remarks || "")
+    );
+    if (isOrderStopped) {
+      toast.warning(`"${order.productName}" is stopped / short-closed and cannot be assigned.`, { autoClose: 3500 });
+      setHoverKey(""); setDraggingId(""); return;
+    }
+
+    if (order.machineId !== machineId) {
+      const targetMachineName = machines.find((m) => m.machineId === machineId)?.machineName ?? machineId;
+      toast.error(
+        `"${order.productName}" belongs to ${order.machineName}. Cannot assign to ${targetMachineName}.`,
+        { position: "top-right", autoClose: 3500 }
+      );
+      setHoverKey(""); setDraggingId(""); return;
+    }
+
+    // Check if shift planned capacity is defined
+    if (order.capacityPerShift <= 0 && !order.hasCustomCapacity) {
+      setPendingDropTarget({ machineId, day, shift });
+      setCapacityModalOrder(order);
+      setShiftCapacityInput("");
+      setHoverKey("");
+      setDraggingId("");
+      return;
+    }
+
+    executeDrop(order, machineId, day, shift);
+  };
+
+  const handleOpenCapacityModal = (order: BoardOrder) => {
+    setCapacityModalOrder(order);
+    setShiftCapacityInput(order.capacityPerShift > 0 ? String(order.capacityPerShift) : "");
+    setPendingDropTarget(null);
+  };
+
+  const handleConfirmCapacity = () => {
+    if (!capacityModalOrder) return;
+    const num = Number(shiftCapacityInput);
+    if (!num || isNaN(num) || num <= 0) {
+      toast.error("Please enter a valid shift planned quantity (greater than 0)");
+      return;
+    }
+
+    const updatedOrder: BoardOrder = {
+      ...capacityModalOrder,
+      capacityPerShift: num,
+      hasCustomCapacity: true,
+    };
+
+    setProductionOrders((prev) =>
+      prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+    );
+
+    if (pendingDropTarget) {
+      executeDrop(updatedOrder, pendingDropTarget.machineId, pendingDropTarget.day, pendingDropTarget.shift);
+      setPendingDropTarget(null);
+    } else {
+      // Re-allocate any existing unlocked cells for this order with the new capacity
+      const currentCells = Object.keys(boardMap).filter((k) => boardMap[k as CellKey]?.orderId === updatedOrder.id);
+      if (currentCells.length > 0) {
+        const sortedCells = currentCells.sort((a, b) => {
+          const [, dA, sA] = a.split("__");
+          const [, dB, sB] = b.split("__");
+          return (
+            CELL_ORDER.findIndex((c) => c.day === dA && c.shift === sA) -
+            CELL_ORDER.findIndex((c) => c.day === dB && c.shift === sB)
+          );
+        });
+        const firstCell = sortedCells[0];
+        const [mId, d, s] = firstCell.split("__") as [string, DayName, ShiftSlot];
+        executeDrop(updatedOrder, mId, d, s);
+      }
+    }
+
+    toast.success(`Shift planned quantity set to ${num.toLocaleString()} pcs for ${updatedOrder.productName}`);
+    setCapacityModalOrder(null);
+    setShiftCapacityInput("");
+  };
+
   const handleClearOrderGroup = (orderId: string) => {
     let hadLocked = false;
     setBoardMap((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((k) => {
         if (next[k as CellKey].orderId !== orderId) return;
-        const [, d] = k.split("__");
-        const cellDate = dayDates[d as DayName];
-        if (rmIssuedDates.has(cellDate)) {
+        if (lockedCellKeys.has(k as CellKey)) {
           hadLocked = true; // keep locked cells intact
         } else {
           delete next[k as CellKey];
@@ -981,7 +1287,7 @@ const DailyPlanCreate: React.FC = () => {
       return next;
     });
     if (hadLocked) {
-      toast.warning("Some shifts are locked (RM already issued) and cannot be removed.", { autoClose: 3000 });
+      toast.warning("Production started, cannot be changed.", { autoClose: 3000 });
     }
     if (hoveredOrderId === orderId) setHoveredOrderId("");
   };
@@ -989,10 +1295,8 @@ const DailyPlanCreate: React.FC = () => {
   const handleClear = (key: CellKey) => {
     // Safety guard: locked cells should never reach here (DropCell hides the X button),
     // but we double-check to prevent bypassing the lock via keyboard or other means.
-    const [, d] = key.split("__");
-    const cellDate = dayDates[d as DayName];
-    if (rmIssuedDates.has(cellDate)) {
-      toast.warning("This shift is locked — Raw Material has already been issued.", { autoClose: 3000 });
+    if (lockedCellKeys.has(key)) {
+      toast.warning("Production started, cannot be changed.", { autoClose: 3000 });
       return;
     }
     const targetOrderId = boardMap[key]?.orderId;
@@ -1007,9 +1311,7 @@ const DailyPlanCreate: React.FC = () => {
     setBoardMap((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((k) => {
-        const [, d] = k.split("__");
-        const cellDate = dayDates[d as DayName];
-        if (!rmIssuedDates.has(cellDate)) delete next[k as CellKey];
+        if (!lockedCellKeys.has(k as CellKey)) delete next[k as CellKey];
       });
       return next;
     });
@@ -1018,13 +1320,10 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Save / Confirm ────────────────────────────────────────────────────────
 
-  // Map board slot "DAY"/"NIGHT" → real shift codes from DB
+  // Static slots: "DAY" and "NIGHT"
   const getShiftId = useCallback((slotCode: ShiftSlot): string => {
-    if (!shifts.length) return slotCode;
-    return slotCode === "DAY"
-      ? (shifts[0]?.shiftCode ?? slotCode)
-      : (shifts[1]?.shiftCode ?? shifts[0]?.shiftCode ?? slotCode);
-  }, [shifts]);
+    return slotCode;
+  }, []);
 
   const buildPlanItems = useCallback(() => {
     return Object.entries(boardMap).map(([key, cell]) => {
@@ -1107,7 +1406,7 @@ const DailyPlanCreate: React.FC = () => {
                   {isEditMode ? "Edit Daily Production Plan" : "Daily Production Plan"}
                 </h1>
                 {isEditMode && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-card-2 text-ink border border-line-soft">
                     Editing Week: {shortDate(weekStart)} – {shortDate(weekEnd)}
                   </span>
                 )}
@@ -1264,13 +1563,13 @@ const DailyPlanCreate: React.FC = () => {
                           const assignment = boardMap[key] ?? null;
                           const isGroupHov = !!(assignment && hoveredOrderId === assignment.orderId);
                           const cellDate   = dayDates[day];
-                          const isLocked   = rmIssuedDates.has(cellDate);
+                          const isLocked   = Boolean(assignment && lockedCellKeys.has(key));
                           return (
                             <td
                               key={key}
                               className="border border-line p-1 align-top overflow-hidden"
                               style={{ background: rowBg }}
-                              title={isLocked ? "🔒 Raw Material has been issued — this shift is locked and cannot be changed" : undefined}
+                              title={isLocked ? "Production started, cannot be changed" : undefined}
                             >
                               <DropCell
                                 assignment={assignment}
@@ -1314,7 +1613,7 @@ const DailyPlanCreate: React.FC = () => {
               {!loadingOrders && productionOrders.length > 0 && (
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   fullyDone === productionOrders.length
-                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                     : "bg-primary/10 text-primary border border-primary/20"
                 }`}>
                   {Math.round((fullyDone / productionOrders.length) * 100)}%
@@ -1377,13 +1676,13 @@ const DailyPlanCreate: React.FC = () => {
                 const allDone = machineDone === orders.length;
                 return (
                   <div key={machine.machineId} className="bg-card-2/60 border border-line rounded-xl overflow-hidden shadow-xs flex flex-col">
-                    <div className={`flex items-center justify-between px-3 py-2 shrink-0 border-b border-line ${allDone ? "bg-emerald-500/10" : "bg-card-2"}`}>
-                      <span className={`text-[11.5px] font-bold ${allDone ? "text-emerald-400" : "text-ink"}`}>
+                    <div className="flex items-center justify-between px-3 py-2 shrink-0 border-b border-line bg-card-2">
+                      <span className="text-[11.5px] font-bold text-ink">
                         {machine.machineName}
                       </span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         allDone
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                           : "bg-primary/10 text-primary border border-primary/20"
                       }`}>
                         {allDone ? "✓ Done" : `${machineDone}/${orders.length}`}
@@ -1406,6 +1705,7 @@ const DailyPlanCreate: React.FC = () => {
                             onMouseEnter={() => setHoveredOrderId(order.id)}
                             onMouseLeave={() => setHoveredOrderId("")}
                             onClearGroup={() => handleClearOrderGroup(order.id)}
+                            onEditCapacity={handleOpenCapacityModal}
                           />
                         );
                       })}
@@ -1418,11 +1718,10 @@ const DailyPlanCreate: React.FC = () => {
 
           {/* Warning footer */}
           {!loadingOrders && hasUnallocated && productionOrders.length > 0 && (
-            <div className="sticky bottom-0 z-10 bg-card border-t border-line px-3 py-2 mt-auto">
-              <div className="flex items-start gap-1.5 text-[9.5px] text-amber-400">
-                <FaExclamationTriangle size={9} className="mt-0.5 shrink-0" />
-                <span>Drag cards to assign shifts. Unassigned orders will not be planned.</span>
-              </div>
+            <div className="sticky bottom-0 z-10 bg-card border-t border-line px-3 py-2 mt-auto text-center">
+              <p className="text-[9.5px] text-ink-subtle leading-tight">
+                Drag cards to assign shifts. Unassigned orders will not be planned.
+              </p>
             </div>
           )}
         </div>
@@ -1454,6 +1753,97 @@ const DailyPlanCreate: React.FC = () => {
           />
         )}
       </div>
+
+      {/* ══ Shift Planned Quantity Configuration Modal ══════════════ */}
+      <CommonModal
+        show={Boolean(capacityModalOrder)}
+        onHide={() => {
+          setCapacityModalOrder(null);
+          setPendingDropTarget(null);
+          setShiftCapacityInput("");
+        }}
+        title="Set Shift Planned Quantity"
+        maxWidth="md"
+        footer={
+          <div className="flex items-center justify-end gap-2.5">
+            <CustomButton
+              text="Cancel"
+              variant="secondary"
+              onClick={() => {
+                setCapacityModalOrder(null);
+                setPendingDropTarget(null);
+                setShiftCapacityInput("");
+              }}
+            />
+            <CustomButton
+              text={pendingDropTarget ? "Confirm & Assign" : "Save Capacity"}
+              variant="primary"
+              onClick={handleConfirmCapacity}
+              disabled={!shiftCapacityInput || Number(shiftCapacityInput) <= 0}
+            />
+          </div>
+        }
+      >
+        {capacityModalOrder && (
+          <div className="flex flex-col gap-4 text-xs">
+            <div className="bg-card-2/70 border border-line-soft rounded-xl p-3.5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-ink-subtle font-semibold">Production Order:</span>
+                <span className="font-mono font-bold text-ink">{capacityModalOrder.id}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-subtle font-semibold">Product:</span>
+                <span className="font-bold text-ink">{capacityModalOrder.productName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-subtle font-semibold">Machine:</span>
+                <span className="font-bold text-ink">{capacityModalOrder.machineName}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-line-soft/60 pt-2">
+                <span className="text-ink-subtle font-semibold">Order Target Qty:</span>
+                <span className="font-bold text-primary text-sm">
+                  {capacityModalOrder.targetQty.toLocaleString()} pcs
+                </span>
+              </div>
+            </div>
+
+            {!capacityModalOrder.hasHistoricalCapacity && (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 dark:text-amber-400 text-xs">
+                <FaExclamationTriangle size={14} className="shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  This product has no historical shift record on this machine.
+                  Please specify the planned quantity per shift to allocate across the schedule.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-ink">
+                Planned Quantity per Shift (pcs) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                autoFocus
+                value={shiftCapacityInput}
+                onChange={(e) => setShiftCapacityInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleConfirmCapacity();
+                  }
+                }}
+                placeholder="e.g. 1500"
+                className="w-full h-10 px-3 rounded-lg border border-line bg-card text-ink text-sm font-semibold outline-none focus:border-primary focus:ring-1 focus:ring-primary no-spinner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="text-[11px] text-ink-subtle">
+                This value applies only to this plan schedule. It will not write to the database as a historical record.
+              </span>
+            </div>
+          </div>
+        )}
+      </CommonModal>
 
     </div>
   );

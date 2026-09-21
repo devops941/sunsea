@@ -10,6 +10,7 @@ export interface HourlyEntryItem {
   startHour24?: number;
   endHour24?: number;
   operatorName?: string;
+  operationName?: string;
   qtyProduced?: number | "";
   rejectQty?: number | "";
   goodQty?: number | "";
@@ -185,18 +186,34 @@ const DailyReportMachineCard: React.FC<DailyReportMachineCardProps> = ({
         ),
       },
       {
+        header: "EFFICIENCY",
+        align: "center",
+        render: (row) => {
+          const cap = Number(row.plannedCapacity || row.shotCounter || 0);
+          const produced = Number(row.perfectPcs !== undefined ? row.perfectPcs : row.actualProduction || 0);
+          const effNum = cap > 0 ? Math.round((produced / cap) * 100) : 0;
+          return (
+            <span className="font-mono font-bold text-xs text-indigo-500 dark:text-indigo-400">
+              {row.efficiency ? `${Math.round(Number(row.efficiency))}%` : `${effNum}%`}
+            </span>
+          );
+        },
+      },
+      {
         header: "STATUS",
         align: "center",
         width: "110px",
         render: (row) => {
-          if (!row.status || row.status === "—" || row.status === "-" || row.actualProduction === 0) {
+          const cap = Number(row.plannedCapacity || row.shotCounter || 0);
+          const produced = Number(row.perfectPcs !== undefined ? row.perfectPcs : row.actualProduction || 0);
+          if (cap === 0 && produced === 0) {
             return <span className="text-ink-subtle font-mono text-xs">—</span>;
           }
-          const { statusText, customColor } = getPlanStatusInfo(row.plannedCapacity, row.actualProduction);
+          const { statusText, customColor } = getPlanStatusInfo(cap, produced);
           return (
             <StatusBadge
               status="CUSTOM"
-              customText={row.status || statusText}
+              customText={row.status && row.status !== "—" ? row.status : statusText}
               customColor={row.statusColor || customColor}
             />
           );

@@ -11,7 +11,6 @@ import {
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
-import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { fetchDailyPlans, updateDailyPlan, dailyPlanCreated, dailyPlanUpdated, dailyPlanDeleted } from "../../../features/daily-plans/dailyPlanSlice";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -26,6 +25,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
 import { usePermission } from "../../../hooks/usePermission";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import DailyPlanViewModal from "../components/DailyPlanViewModal";
 import DailyRawMaterialIssueModal from "../components/DailyRawMaterialIssueModal";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -93,7 +93,6 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   const { data: machines }   = useAppSelector((state: any) => state.machines);
   const { data: dailyPlans } = useAppSelector((state: any) => state.dailyPlans);
-  const { data: shifts }     = useAppSelector((state: any) => state.shifts);
 
   // ── Board state ───────────────────────────────────────────
   const [boardWeek,    setBoardWeek]    = useState<string>(getTodayMonday());
@@ -180,7 +179,6 @@ const DailyProductionPlanningPage: React.FC = () => {
   // ── Data loading ──────────────────────────────────────────
   useEffect(() => {
     dispatch(fetchMachines({ limit: 1000 }));
-    dispatch(fetchShifts());
   }, [dispatch]);
 
   const loadDailyPlans = useCallback(() => {
@@ -227,42 +225,44 @@ const DailyProductionPlanningPage: React.FC = () => {
     return m;
   }, [boardWeekDates]);
 
-  const boardShiftMap = useMemo(() => {
-    const sl = Array.isArray(shifts) ? [...shifts].sort((a: any, b: any) => Number(a.id || 0) - Number(b.id || 0)) : [];
-    const dayShift = sl.find((s: any) => {
-      const name = `${s.shiftName} ${s.shiftCode}`.toLowerCase();
-      return name.includes("morning") || name.includes("day") || name.includes("shift 1") || name.includes("shift-1") || name.includes("s1") || name.includes("sht001");
-    }) || sl[0];
-    const nightShift = sl.find((s: any) => {
-      const name = `${s.shiftName} ${s.shiftCode}`.toLowerCase();
-      return name.includes("evening") || name.includes("night") || name.includes("shift 2") || name.includes("shift-2") || name.includes("s2") || name.includes("sht002");
-    }) || sl[1] || sl[0];
-
-    return { DAY: dayShift?.shiftCode ?? "SHT001", NIGHT: nightShift?.shiftCode ?? "SHT002" };
-  }, [shifts]);
-
   const boardMap = useMemo(() => {
     const map: Record<string, Record<DayName, Record<ShiftSlot, any[]>>> = {};
-    const toSlot: Record<string, ShiftSlot> = { [boardShiftMap.DAY]: "DAY", [boardShiftMap.NIGHT]: "NIGHT" };
     allPlans.forEach((plan: any) => {
       const planDate = plan.productionDate?.split("T")[0];
       if (!planDate) return;
+
+      // Unstarted plans for stopped/closed POs should be omitted from the board so the slot shows empty (-)
+      const poStatus = plan.productionOrder?.status;
+      const isClosedPO = ["COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "STOPPED", "CANCELLED"].includes(poStatus);
+      const isUnstartedStatus = ["DRAFT", "PLANNED", "APPROVED"].includes(plan.status);
+      const produced = calcProduced(plan);
+      if (isClosedPO && isUnstartedStatus && produced === 0) return;
+
       const dayIdx = boardWeekDates.indexOf(planDate);
       if (dayIdx < 0) return;
       const dayName = DAY_NAMES[dayIdx];
       const shiftStr = `${plan.shiftId || ""} ${plan.shift?.shiftName || ""} ${plan.shift?.shiftCode || ""}`.toLowerCase();
-      const isNight = shiftStr.includes("night") || shiftStr.includes("eve") || shiftStr.includes("second") || shiftStr.includes("2") || plan.shiftId === boardShiftMap.NIGHT;
-      const slot: ShiftSlot = isNight ? "NIGHT" : (toSlot[plan.shiftId] ?? "DAY");
+      const isNight = shiftStr.includes("night") || shiftStr.includes("eve") || shiftStr.includes("second") || shiftStr.includes("2") || plan.shiftId === "NIGHT";
+      const slot: ShiftSlot = isNight ? "NIGHT" : "DAY";
       const mid = plan.machineId;
       if (!map[mid]) { map[mid] = {} as any; DAY_NAMES.forEach((d) => { map[mid][d] = { DAY: [], NIGHT: [] }; }); }
       map[mid][dayName][slot].push(plan);
     });
     return map;
-  }, [allPlans, boardWeekDates, boardShiftMap]);
+  }, [allPlans, boardWeekDates]);
 
   // Stats based on selected week
   const weekPlans = useMemo(() =>
-    allPlans.filter((p: any) => boardWeekDates.includes(p.productionDate?.split("T")[0]))
+    allPlans.filter((p: any) => {
+      const planDate = p.productionDate?.split("T")[0];
+      if (!boardWeekDates.includes(planDate)) return false;
+      const poStatus = p.productionOrder?.status;
+      const isClosedPO = ["COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "STOPPED", "CANCELLED"].includes(poStatus);
+      const isUnstartedStatus = ["DRAFT", "PLANNED", "APPROVED"].includes(p.status);
+      const produced = calcProduced(p);
+      if (isClosedPO && isUnstartedStatus && produced === 0) return false;
+      return true;
+    })
   , [allPlans, boardWeekDates]);
 
   const stats = useMemo(() => ({
@@ -280,8 +280,11 @@ const DailyProductionPlanningPage: React.FC = () => {
   // on — the chronologically LAST shift that already has real activity (logged hours, or
   // currently in progress), never an earlier already-finished shift or a future empty one.
   const lastActivePlanIdByPO = useMemo(() => {
-    const shiftStartTime = new Map<string, string>();
-    (Array.isArray(shifts) ? shifts : []).forEach((s: any) => shiftStartTime.set(s.shiftCode, s.startTime || "00:00"));
+    const getShiftTime = (sId?: string) => {
+      if (!sId) return "08:00";
+      const s = sId.toUpperCase();
+      return (s.includes("NIGHT") || s.includes("2")) ? "20:00" : "08:00";
+    };
 
     const byPO = new Map<string, any[]>();
     allPlans.forEach((p: any) => {
@@ -296,22 +299,21 @@ const DailyProductionPlanningPage: React.FC = () => {
         const dateA = normalizeDateStr(a.productionDate);
         const dateB = normalizeDateStr(b.productionDate);
         if (dateA !== dateB) return dateA < dateB ? -1 : 1;
-        const timeA = shiftStartTime.get(a.shiftId) || "00:00";
-        const timeB = shiftStartTime.get(b.shiftId) || "00:00";
+        const timeA = getShiftTime(a.shiftId);
+        const timeB = getShiftTime(b.shiftId);
         return timeA < timeB ? -1 : timeA > timeB ? 1 : 0;
       });
 
-      // Prefer the last shift that has real activity (entries logged, or currently running)
-      let lastActive = [...sorted].reverse().find((p: any) => countLoggedEntries(p) > 0 || p.status === "IN_PROGRESS");
-      // If nothing has started yet, fall back to the latest still-schedulable shift so Stop
-      // stays available somewhere rather than disappearing entirely.
-      if (!lastActive) {
-        lastActive = [...sorted].reverse().find((p: any) => p.status === "PLANNED" || p.status === "IN_PROGRESS");
+      // Prefer the last shift that has real activity (entries logged, produced > 0, or currently running)
+      let lastActive = [...sorted].reverse().find((p: any) => countLoggedEntries(p) > 0 || calcProduced(p) > 0 || p.status === "IN_PROGRESS");
+      // If no shift has production activity logged yet, allow Stop on the first shift of the PO
+      if (!lastActive && sorted.length > 0) {
+        lastActive = sorted[0];
       }
       if (lastActive) result.set(poId, lastActive.dailyPlanId);
     });
     return result;
-  }, [allPlans, shifts]);
+  }, [allPlans]);
 
   // ── Handlers ──────────────────────────────────────────────
   const handleCardClick = useCallback((plan: any) => {
@@ -366,6 +368,16 @@ const DailyProductionPlanningPage: React.FC = () => {
       }
     },
     onExport:  () => document.querySelector<HTMLButtonElement>("[data-export-btn]")?.click(),
+  });
+
+  useFormShortcuts({
+    onSave: () => {
+      if (showStopModal && !isStopping) {
+        confirmStopProduction();
+      } else if (showStatusModal) {
+        confirmStatusChange();
+      }
+    },
   });
 
   const openCreateForm = () => {
@@ -425,10 +437,12 @@ const DailyProductionPlanningPage: React.FC = () => {
     try {
       const logged = countLoggedEntries(stopPlan);
       const remarks = stopPlan.remarks ? `${stopPlan.remarks} | Permanently Stopped: ${stopReason.trim()}` : `Permanently Stopped: ${stopReason.trim()}`;
-      // Must go through POST_PRODUCTION (matching the working shortClosePO trigger in
-      // HourlyWorkReportCreate.tsx) — sending "COMPLETED" directly skips the
-      // cascade-stop-sibling-plans logic in daily-plan.service.ts entirely.
-      const payload: any = { status: "STOPPED", remarks, plannedHours: logged > 0 ? logged : stopPlan.plannedHours, shortClosePO: true };
+      const payload: any = {
+        status: "STOPPED",
+        remarks,
+        plannedHours: logged > 0 ? logged : stopPlan.plannedHours,
+        shortClosePO: true,
+      };
       await dispatch(updateDailyPlan({ id: stopPlan.dailyPlanId, data: payload })).unwrap();
       const poTarget = Number(stopPlan?.productionOrder?.targetQty || 0);
       const poProduced = Number(stopPlan?.productionOrder?.producedQty || 0);
@@ -466,7 +480,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col min-h-[calc(100vh-100px)] flex-1 w-full">
       <div className="w-full bg-card rounded-2xl shadow-sm border border-line flex flex-col flex-1 overflow-hidden">
 
         {/* ── Header ──────────────────────────────────────── */}
@@ -478,7 +492,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             {can("daily-machine-planning.view") && (
               <CustomButton text="Daily Report" icon={FaChartBar} onClick={() =>
-                navigate("/daily-machine-planning/report", { state: { dailyPlans, machines, shifts } })
+                navigate("/daily-machine-planning/report", { state: { dailyPlans, machines } })
               } />
             )}
             {can("daily-machine-planning.create") && (
@@ -538,9 +552,9 @@ const DailyProductionPlanningPage: React.FC = () => {
                 {[
                   { label: "Draft", dot: "bg-amber-500" },
                   { label: "Planned", dot: "bg-sky-500" },
-                  { label: "In Progress", dot: "bg-indigo-500" },
+                  // { label: "In Progress", dot: "bg-indigo-500" },
                   { label: "Completed", dot: "bg-emerald-500" },
-                  { label: "Stopped", dot: "bg-rose-500" },
+                  { label: "Stopped", dot: "bg-red-500" },
                   { label: "RM Issued", dot: "bg-violet-500" },
                 ].map(({ label, dot }) => (
                   <span key={label} className="flex items-center gap-1.5 text-[9.5px] font-semibold text-slate-600 dark:text-ink-subtle">
@@ -556,8 +570,14 @@ const DailyProductionPlanningPage: React.FC = () => {
                       icon={FaBoxOpen}
                       variant="secondary"
                       onClick={() => {
-                        const d = new Date();
-                        setDailyRmIssueDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+                        let targetDate = boardWeek;
+                        if (selectedDay !== "ALL" && dayDates[selectedDay]) {
+                          targetDate = dayDates[selectedDay];
+                        } else {
+                          const firstPlanned = boardWeekDates.find((d) => plannedDates.includes(d));
+                          if (firstPlanned) targetDate = firstPlanned;
+                        }
+                        setDailyRmIssueDate(targetDate);
                         setShowDailyRmIssueModal(true);
                       }}
                     />
@@ -630,38 +650,42 @@ const DailyProductionPlanningPage: React.FC = () => {
                 <FaEye className="text-sky-400 shrink-0" size={13} />
                 <span>View Hourly Entries & Details</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const p = contextMenu.plan;
-                  setContextMenu(null);
-                  handleCardClick(p);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-ink hover:bg-emerald-500/15 hover:text-emerald-400 rounded-lg transition-colors cursor-pointer text-left"
-              >
-                <FaPencilAlt className="text-emerald-400 shrink-0" size={12} />
-                <span>Enter / Edit Hourly Log</span>
-              </button>
             </div>
 
-            {/* {can("daily-machine-planning.delete") && (contextMenu.plan.status === "PLANNED" || contextMenu.plan.status === "IN_PROGRESS" || contextMenu.plan.status === "COMPLETED") && lastActivePlanIdByPO.get(contextMenu.plan.productionOrderId) === contextMenu.plan.dailyPlanId && (
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const p = contextMenu.plan;
-                    setContextMenu(null);
-                    setStopPlan(p);
-                    setShowStopModal(true);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/15 rounded-lg transition-colors cursor-pointer text-left"
-                >
-                  <FaStop className="text-rose-400 shrink-0" size={12} />
-                  <span>Stop Production Plan</span>
-                </button>
-              </div>
-            )} */}
+            {(() => {
+              const plan = contextMenu.plan;
+              const poStatus = plan?.productionOrder?.status;
+              const isAlreadyStopped =
+                ["STOPPED", "SHORT_CLOSED", "CANCELLED"].includes(plan?.status) ||
+                ["COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "STOPPED", "CANCELLED"].includes(poStatus) ||
+                Boolean(plan?.remarks?.includes("Permanently Stopped")) ||
+                Boolean(plan?.remarks?.includes("Short Closed"));
+
+              if (
+                !can("daily-machine-planning.edit") ||
+                isAlreadyStopped ||
+                lastActivePlanIdByPO.get(plan.productionOrderId) !== plan.dailyPlanId
+              ) {
+                return null;
+              }
+
+              return (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContextMenu(null);
+                      setStopPlan(plan);
+                      setShowStopModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/15 rounded-lg transition-colors cursor-pointer text-left"
+                  >
+                    <FaStop className="text-rose-400 shrink-0" size={12} />
+                    <span>Stop Production Plan</span>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -669,7 +693,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         <CommonModal
           show={showStopModal}
           onHide={() => { setShowStopModal(false); setStopPlan(null); }}
-          title={<div className="flex items-center gap-2.5"><span className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500"><FaStop size={12} /></span><span className="text-base font-bold text-ink">Stop Production Plan</span></div>}
+          title="Stop Production Plan"
           maxWidth="3xl"
           footer={<div className="flex items-center justify-end gap-2.5"><CustomButton text="Cancel" variant="secondary" onClick={() => { setShowStopModal(false); setStopPlan(null); }} disabled={isStopping} /><CustomButton text={isStopping ? "Stopping..." : "Stop Production"} variant="danger" onClick={confirmStopProduction} disabled={isStopping || !stopReason.trim()} /></div>}
         >
@@ -678,51 +702,58 @@ const DailyProductionPlanningPage: React.FC = () => {
               <div className="text-sm flex flex-col gap-4">
                 <div>
                   <p className="mb-2 text-ink-muted leading-relaxed">You are about to stop plan <strong className="text-ink font-mono bg-card-2 px-2 py-0.5 rounded border border-line-soft">{stopPlan?.dailyPlanId}</strong> prematurely.</p>
-                  <div className="text-xs text-ink-subtle bg-card-2/60 p-3 rounded-xl border border-line-soft flex items-start gap-2.5">
-                    <FaInfoCircle className="text-amber-400 shrink-0 mt-0.5" size={14} />
-                    <span>Logged entries: <strong className="text-amber-400">{countLoggedEntries(stopPlan)}</strong>. Planned hours will be adjusted.</span>
-                  </div>
                   {(() => {
                     const poTarget = Number(stopPlan?.productionOrder?.targetQty || 0);
-                    const poProduced = Number(stopPlan?.productionOrder?.producedQty || 0);
+                    const totalProducedAllPlans = allPlans
+                      .filter((p: any) => p.productionOrderId === stopPlan?.productionOrderId)
+                      .reduce((sum: number, p: any) => sum + calcProduced(p), 0);
+                    const poProduced = Math.max(Number(stopPlan?.productionOrder?.producedQty || 0), totalProducedAllPlans);
                     const poCancelled = Math.max(0, poTarget - poProduced);
                     if (poTarget <= 0) return null;
                     return (
-                      <div className="text-xs bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl flex items-start gap-2.5 mt-2">
-                        <FaExclamationTriangle className="text-rose-400 shrink-0 mt-0.5" size={14} />
-                        <span className="text-rose-300">
-                          This Production Order will close at <strong className="text-rose-400">{poProduced.toLocaleString()}</strong> of its <strong>{poTarget.toLocaleString()}</strong> pcs target.
-                          {poCancelled > 0 && <> The remaining <strong className="text-rose-400">{poCancelled.toLocaleString()} pcs</strong> will be cancelled — every not-yet-run shift for this order is stopped too, and this order can't be scheduled again later.</>}
+                      <div className="text-xs bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/30 p-3 rounded-xl flex items-start gap-2.5 mt-2">
+                        <FaExclamationTriangle className="text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" size={14} />
+                        <span className="text-rose-700 dark:text-rose-300 leading-relaxed">
+                          This Production Order will close at <strong className="text-rose-800 dark:text-rose-200 font-bold">{poProduced.toLocaleString()}</strong> of its <strong>{poTarget.toLocaleString()}</strong> pcs target.
+                          {poCancelled > 0 && <> The remaining <strong className="text-rose-800 dark:text-rose-200 font-bold">{poCancelled.toLocaleString()} pcs</strong> will be cancelled — every not-yet-run shift for this order is stopped too, and this order can't be scheduled again later.</>}
                         </span>
                       </div>
                     );
                   })()}
                 </div>
                 {(() => {
-                  const rel = allPlans.filter((p: any) => p.productionOrderId === stopPlan?.productionOrderId && p.dailyPlanId !== stopPlan?.dailyPlanId).sort((a: any, b: any) => new Date(a.productionDate).getTime() - new Date(b.productionDate).getTime());
+                  const rel = allPlans
+                    .filter((p: any) => p.productionOrderId === stopPlan?.productionOrderId)
+                    .sort((a: any, b: any) => {
+                      const dateA = a.productionDate?.split("T")[0] || "";
+                      const dateB = b.productionDate?.split("T")[0] || "";
+                      if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+                      const isNightA = (a.shiftId || "").toUpperCase().includes("NIGHT") || (a.shift?.shiftName || "").toUpperCase().includes("NIGHT");
+                      const isNightB = (b.shiftId || "").toUpperCase().includes("NIGHT") || (b.shift?.shiftName || "").toUpperCase().includes("NIGHT");
+                      return isNightA === isNightB ? 0 : isNightA ? 1 : -1;
+                    });
                   if (!rel.length) return null;
                   const hCols: DataTableColumn<any>[] = [
-                    { header: "Date",    render: (r) => <span className="text-ink-subtle">{r.productionDate?.split("T")[0] || "—"}</span> },
-                    { header: "Plan ID", render: (r) => <span className="font-mono text-ink-muted">{r.dailyPlanId}</span> },
+                    { header: "Date",    render: (r) => <span className="text-ink-subtle font-medium">{r.productionDate?.split("T")[0] || "—"}</span> },
+                    { header: "Shift",   render: (r) => <span className="text-ink font-semibold">{r.shift?.shiftName || r.shiftId || "—"}</span> },
+                    { header: "Machine", render: (r) => <span className="text-ink font-semibold">{r.machine?.machineName || r.machineId || "—"}</span> },
                     { header: "Planned", accessor: "plannedQty", align: "right" },
-                    { header: "Produced", align: "right", render: (r) => <span className="text-cyan-400">{calcProduced(r)}</span> },
+                    { header: "Produced", align: "right", render: (r) => <span className="text-cyan-600 dark:text-cyan-400 font-bold">{calcProduced(r)}</span> },
                     { header: "Status",  align: "center", render: (r) => <span className="text-[10px] font-bold px-2 py-0.5 bg-card-2 border border-line-soft rounded text-ink-muted">{r.status.replace(/_/g, " ")}</span> },
                   ];
-                  return <div className="bg-card-2/40 border border-line-soft rounded-xl p-3.5"><h6 className="font-bold text-ink-subtle text-xs uppercase tracking-wider mb-2.5">Production Order History</h6><div className="max-h-36 overflow-y-auto rounded-lg border border-line-soft"><DataTable columns={hCols} data={rel} rowKey={(r) => r.dailyPlanId} density="compact" /></div></div>;
+                  return (
+                    <div className="bg-card-2/40 border border-line-soft rounded-xl p-3.5">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <h6 className="font-bold text-ink-subtle text-xs uppercase tracking-wider">Production Order History ({rel.length} Shifts)</h6>
+                        <span className="text-[10px] text-ink-subtle font-medium">Scroll to view all shifts</span>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto rounded-lg border border-line-soft custom-scrollbar">
+                        <DataTable columns={hCols} data={rel} rowKey={(r) => r.dailyPlanId} density="compact" />
+                      </div>
+                    </div>
+                  );
                 })()}
                 <TextArea label="Reason for Stopping" name="stopReason" value={stopReason} onChange={(e) => setStopReason(e.target.value)} placeholder="e.g. Urgent production order PO-XXX required on this machine" rows={3} required />
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-extrabold uppercase tracking-[0.5px] text-ink">Stop Action</label>
-                  <div className="border rounded-xl p-3.5 flex flex-col border-rose-500 bg-rose-500/10 ring-1 ring-rose-500/30">
-                    <div className="flex items-center gap-2.5 font-semibold text-sm">
-                      <FaStop className="text-rose-400 shrink-0" size={12} />
-                      <span className="text-rose-400">Permanent Stop (Close PO)</span>
-                    </div>
-                    <span className="text-xs text-ink-subtle mt-2 pl-6 leading-relaxed">
-                      Stops this plan, cancels every remaining not-yet-run shift for this Production Order, and closes it out at whatever quantity was actually produced.
-                    </span>
-                  </div>
-                </div>
               </div>
             );
           })()}
@@ -752,36 +783,38 @@ const DailyProductionPlanningPage: React.FC = () => {
             title="New Daily Plan"
             maxWidth="sm"
             footer={
-              <div className="flex items-center justify-end gap-2 w-full">
-                <button
-                  type="button"
+              <div className="flex items-center justify-end gap-2.5 w-full">
+                <CustomButton
+                  text="Cancel"
+                  variant="secondary"
                   onClick={() => setShowWeekSelectModal(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-line text-ink-subtle hover:text-ink hover:bg-card-2 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
+                />
                 {weekCheckLoading && (
                   <span className="text-xs text-ink-subtle flex items-center gap-1.5 px-3">
                     <FaSpinner className="animate-spin" size={11} /> Checking…
                   </span>
                 )}
                 {weekCheckResult && !weekCheckResult.exists && (
-                  <button
-                    type="button"
-                    onClick={() => { setShowWeekSelectModal(false); navigate(`/daily-production-plans/create?week=${weekCheckResult!.weekStart}`); }}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-primary text-white hover:bg-primary/90 transition-all cursor-pointer"
-                  >
-                    <FaPlus size={10} /> Create Plan
-                  </button>
+                  <CustomButton
+                    text="Create Plan"
+                    icon={FaPlus}
+                    onClick={() => {
+                      setShowWeekSelectModal(false);
+                      navigate(`/daily-production-plans/create?week=${weekCheckResult!.weekStart}`);
+                    }}
+                  />
                 )}
                 {weekCheckResult && weekCheckResult.exists && (
-                  <button
-                    type="button"
-                    onClick={() => { setShowWeekSelectModal(false); navigate(`/daily-production-plans/create?week=${weekCheckResult!.weekStart}`, { state: { weekStart: weekCheckResult!.weekStart, isEdit: true } }); }}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-sky-500 text-white hover:bg-sky-400 transition-all cursor-pointer"
-                  >
-                    <FaEye size={10} /> View / Edit Plan
-                  </button>
+                  <CustomButton
+                    text="View / Edit Plan"
+                    icon={FaEye}
+                    onClick={() => {
+                      setShowWeekSelectModal(false);
+                      navigate(`/daily-production-plans/create?week=${weekCheckResult!.weekStart}`, {
+                        state: { weekStart: weekCheckResult!.weekStart, isEdit: true },
+                      });
+                    }}
+                  />
                 )}
               </div>
             }
@@ -790,7 +823,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
               {/* Date picker */}
               <div>
-                <label className="block text-xs font-semibold text-ink-subtle mb-1.5">
+                <label className="block text-xs font-semibold text-ink mb-1.5">
                   Select any date within the planning week
                 </label>
                 <DatePickerCalendar
@@ -814,11 +847,11 @@ const DailyProductionPlanningPage: React.FC = () => {
               {/* Status badge */}
               {!weekCheckLoading && weekCheckResult && (
                 weekCheckResult.exists ? (
-                  <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-amber-500/30 bg-amber-500/8">
-                    <FaExclamationTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 dark:bg-amber-500/8">
+                    <FaExclamationTriangle size={13} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div>
-                      <div className="text-xs font-bold text-amber-400">Already Planned</div>
-                      <div className="text-[11px] text-ink-subtle mt-0.5">
+                      <div className="text-xs font-bold text-amber-600 dark:text-amber-400">Already Planned</div>
+                      <div className="text-[11px] text-ink font-medium mt-0.5 leading-snug">
                         {weekCheckResult.planCount} shift{weekCheckResult.planCount !== 1 ? "s" : ""} exist
                         {weekCheckResult.machines.length > 0 ? ` across ${weekCheckResult.machines.length} machine${weekCheckResult.machines.length !== 1 ? "s" : ""}` : ""}.
                         {" "}Use "View / Edit Plan" to modify.
@@ -826,11 +859,11 @@ const DailyProductionPlanningPage: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/8">
-                    <FaCheckCircle size={13} className="text-emerald-400 shrink-0" />
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-500/8">
+                    <FaCheckCircle size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-emerald-400">Week Available</div>
-                      <div className="text-[11px] text-ink-subtle mt-0.5">No plan found for this week. Ready to create.</div>
+                      <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Week Available</div>
+                      <div className="text-[11px] text-ink font-medium mt-0.5 leading-snug">No plan found for this week. Ready to create.</div>
                     </div>
                   </div>
                 )

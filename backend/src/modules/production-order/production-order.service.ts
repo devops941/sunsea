@@ -489,7 +489,6 @@ class ProductionOrderService {
         Machine: true,
         dailyProductionPlans: {
           include: {
-            shift: true,
             machine: true,
             hourlyProductions: true,
           },
@@ -497,10 +496,9 @@ class ProductionOrderService {
         },
         weeklyMachinePrograms: {
           include: {
-            shift: true,
             machine: true,
             dailyProductionPlans: {
-              include: { shift: true, machine: true, hourlyProductions: true },
+              include: { machine: true, hourlyProductions: true },
             },
           },
         },
@@ -701,6 +699,15 @@ class ProductionOrderService {
 
     return {
       ...order,
+      weeklyMachinePrograms: Array.isArray(order.weeklyMachinePrograms)
+        ? order.weeklyMachinePrograms.map((w: any) => ({
+            ...w,
+            shift: {
+              shiftCode: w.shiftId,
+              shiftName: w.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+            },
+          }))
+        : [],
       productItemId: order.productItemId.toString(),
       products,
       createdUserName,
@@ -1553,11 +1560,11 @@ class ProductionOrderService {
             { weekStartDate: { lte: end } },
             { weekStartDate: null },
           ],
-          // COMPLETED_WITH_SHORTFALL is deliberately excluded alongside CANCELLED/DISPATCHED/DRAFT:
+          // COMPLETED_WITH_SHORTFALL, STOPPED, SHORT_CLOSED are deliberately excluded alongside CANCELLED/DISPATCHED/DRAFT:
           // unlike an order that's merely behind schedule (which SHOULD keep resurfacing, per the
-          // comment above), a shortfall order was explicitly force-stopped/closed via "Permanent
+          // comment above), a shortfall/stopped order was explicitly force-stopped/closed via "Permanent
           // Stop" — its remaining qty must never be schedulable again.
-          status: { notIn: ["CANCELLED", "DISPATCHED", "DRAFT", "COMPLETED_WITH_SHORTFALL"] },
+          status: { notIn: ["CANCELLED", "DISPATCHED", "DRAFT", "COMPLETED_WITH_SHORTFALL", "STOPPED", "SHORT_CLOSED"] },
         },
         include: {
           productItem: { select: { productName: true, productCode: true } },
@@ -1575,7 +1582,7 @@ class ProductionOrderService {
       const orders = await prisma.productionOrder.findMany({
         where: {
           machineMachineId: machineId,
-          status: { notIn: ["CANCELLED", "DISPATCHED", "DRAFT", "COMPLETED_WITH_SHORTFALL"] },
+          status: { notIn: ["CANCELLED", "DISPATCHED", "DRAFT", "COMPLETED_WITH_SHORTFALL", "STOPPED", "SHORT_CLOSED"] },
         },
         include: {
           productItem: { select: { productName: true, productCode: true } },

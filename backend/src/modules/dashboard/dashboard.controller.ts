@@ -169,7 +169,7 @@ const dashboardController = {
             plannedQty: true,
             priority: true,
             machine: { select: { machineName: true } },
-            shift: { select: { shiftName: true } },
+            shiftId: true,
             productionOrder: {
               select: {
                 productionOrderId: true,
@@ -181,7 +181,7 @@ const dashboardController = {
             weeklyMachineProgram: {
               select: {
                 machine: { select: { machineName: true } },
-                shift: { select: { shiftName: true } },
+                shiftId: true,
               },
             },
           },

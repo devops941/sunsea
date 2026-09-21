@@ -95,20 +95,9 @@ class DailyPlanService {
       throw new ApiError(404, `Machine with ID ${data.machineId} not found`);
     }
 
-    // 4. Validation: Shift must exist
-    const shift = await prisma.shift.findUnique({
-      where: { shiftCode: data.shiftId },
-    });
-    if (!shift) {
-      throw new ApiError(404, `Shift with ID ${data.shiftId} not found`);
-    }
-
-    // Validate Machine & Shift Active status
+    // Machine validation
     if (!machine.isActive) {
       throw new ApiError(400, `Machine ${machine.machineName} (${data.machineId}) is currently inactive and cannot be planned`);
-    }
-    if (!shift.isActive) {
-      throw new ApiError(400, `Shift ${shift.shiftName} (${data.shiftId}) is currently inactive and cannot be planned`);
     }
 
     // Validate Machine operational status — cannot plan on a broken/under-maintenance machine
@@ -266,20 +255,9 @@ class DailyPlanService {
       throw new ApiError(404, `Machine with ID ${checkMachineId} not found`);
     }
 
-    // 4. Verify Shift exists
-    const shift = await prisma.shift.findUnique({
-      where: { shiftCode: checkShiftId },
-    });
-    if (!shift) {
-      throw new ApiError(404, `Shift with ID ${checkShiftId} not found`);
-    }
-
-    // Validate Machine & Shift Active status
+    // Validate Machine Active status
     if (!machine.isActive) {
       throw new ApiError(400, `Machine ${machine.machineName} (${checkMachineId}) is currently inactive and cannot be planned`);
-    }
-    if (!shift.isActive) {
-      throw new ApiError(400, `Shift ${shift.shiftName} (${checkShiftId}) is currently inactive and cannot be planned`);
     }
 
     // Validate Machine operational status — cannot plan on a broken/under-maintenance machine
@@ -356,8 +334,129 @@ class DailyPlanService {
         updatedBy: userId,
       };
 
-      // Handle dynamic post-production steps
-      if (
+      // Handle permanent stop (Short-close / Stop Production Plan)
+      const isPermanentStop = Boolean(
+        data.shortClosePO ||
+        (data.remarks && data.remarks.includes("Permanently Stopped"))
+      );
+
+      if (isPermanentStop) {
+        updateData.status = "STOPPED";
+        const productionOrderFull = await tx.productionOrder.findUnique({
+          where: { productionOrderId: checkProductionOrderId },
+          include: { productItem: { include: { productionSteps: { orderBy: { stepOrder: "asc" } } } } },
+        });
+
+        if (productionOrderFull) {
+          // 1. Close this weekly program
+          if (checkWeeklyProgramId) {
+            await tx.weeklyMachineProgram.update({
+              where: { weeklyProgramId: checkWeeklyProgramId },
+              data: { status: "COMPLETED" },
+            }).catch(() => {});
+          }
+
+          // 2. Compute accurate net produced quantity from hourly productions
+          const hpAgg = await tx.hourlyProduction.aggregate({
+            where: { productionOrderId: checkProductionOrderId },
+            _sum: { totalQtyProduced: true, totalRejectQty: true },
+          });
+          const netProduced = Math.max(
+            0,
+            Number(hpAgg._sum.totalQtyProduced || 0) - Number(hpAgg._sum.totalRejectQty || 0)
+          );
+          const finalProduced = netProduced > 0 ? netProduced : Number(productionOrderFull.producedQty || 0);
+          const targetQty = Number(productionOrderFull.targetQty || 0);
+          const permanentStopStatus = targetQty > 0 && finalProduced >= targetQty
+            ? "READY_FOR_DISPATCH"
+            : "COMPLETED_WITH_SHORTFALL";
+
+          // Extract clean stop reason
+          let stopReasonOnly = "No reason provided";
+          if (data.remarks) {
+            const parts = data.remarks.split("Stopped:");
+            if (parts.length > 1) {
+              stopReasonOnly = parts[parts.length - 1].trim();
+            } else {
+              const parts2 = data.remarks.split(":");
+              stopReasonOnly = parts2.length > 1 ? parts2[parts2.length - 1].trim() : data.remarks.trim();
+            }
+          }
+
+          // Update PO status, producedQty, remarks
+          await tx.productionOrder.update({
+            where: { productionOrderId: checkProductionOrderId },
+            data: {
+              status: permanentStopStatus,
+              producedQty: finalProduced,
+              remarks: data.remarks || `Permanently Stopped: ${stopReasonOnly}`,
+            },
+          });
+
+          // 3. Cascade clean other daily plans for this PO:
+          // Unstarted future shifts (0 production logs) are completely removed from DB & board
+          const otherActiveDPs = await tx.dailyProductionPlan.findMany({
+            where: {
+              productionOrderId: checkProductionOrderId,
+              dailyPlanId: { not: dailyPlanId },
+            },
+            include: {
+              hourlyProductions: true,
+            },
+          });
+
+          for (const dp of otherActiveDPs) {
+            const dpProduced = dp.hourlyProductions.reduce(
+              (sum: number, hp: any) => sum + Number(hp.totalQtyProduced || 0),
+              0
+            );
+            const hasProduction = dp.hourlyProductions.length > 0 || dpProduced > 0;
+            if (!hasProduction) {
+              // Delete unstarted daily plan so slots are freed on board & PO details
+              await tx.dailyPlanOperator.deleteMany({ where: { dailyPlanId: dp.dailyPlanId } });
+              await tx.hourlyProduction.deleteMany({ where: { dailyPlanId: dp.dailyPlanId } });
+              await tx.dailyProductionPlan.delete({ where: { dailyPlanId: dp.dailyPlanId } });
+              if (dp.weeklyProgramId) {
+                const siblingCount = await tx.dailyProductionPlan.count({
+                  where: { weeklyProgramId: dp.weeklyProgramId },
+                });
+                if (siblingCount === 0) {
+                  await tx.weeklyMachineProgram.delete({
+                    where: { weeklyProgramId: dp.weeklyProgramId },
+                  }).catch(() => {});
+                }
+              }
+            } else {
+              // Shift had production activity
+              await tx.dailyProductionPlan.update({
+                where: { dailyPlanId: dp.dailyPlanId },
+                data: { status: "STOPPED" },
+              });
+              if (dp.weeklyProgramId) {
+                await tx.weeklyMachineProgram.update({
+                  where: { weeklyProgramId: dp.weeklyProgramId },
+                  data: { status: "COMPLETED" },
+                }).catch(() => {});
+              }
+            }
+          }
+
+          // Audit log
+          const cancelledQty = targetQty > finalProduced ? targetQty - finalProduced : 0;
+          await StatusSyncService.logHistory(
+            tx, checkProductionOrderId, productionOrderFull.status, permanentStopStatus, userId,
+            data.remarks || `Production force-stopped (Permanent Stop). All unstarted planned shifts removed.`, "PERMANENT_STOP",
+            {
+              stopReason: stopReasonOnly,
+              stopAction: "PERMANENT_STOP",
+              producedQuantity: finalProduced,
+              cancelledQuantity: cancelledQty,
+              user: userId,
+              dateTime: new Date().toISOString()
+            }
+          );
+        }
+      } else if (
         (data.status === "COMPLETED" || data.status === "NEXT_STEP" || data.status === "POST_PRODUCTION")
       ) {
         const productionOrderFull = await tx.productionOrder.findUnique({
@@ -380,137 +479,14 @@ class DailyPlanService {
             }
 
             if (productionOrderFull.status !== "POST_PRODUCTION" && productionOrderFull.status !== "READY_FOR_DISPATCH" && productionOrderFull.status !== "COMPLETED" && productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "COMPLETED_WITH_SHORTFALL" && productionOrderFull.status !== "CLOSED") {
-              if (data.shortClosePO) {
-                // ── PERMANENT STOP ──────────────────────────────────────────
-                // 1. Close this weekly program
-                await tx.weeklyMachineProgram.update({
-                  where: { weeklyProgramId: checkWeeklyProgramId },
-                  data: { status: "COMPLETED" },
-                });
-                // 2. Mark PO status — READY_FOR_DISPATCH if target met/exceeded, COMPLETED_WITH_SHORTFALL if under-produced
-                const targetQty = Number(productionOrderFull.targetQty || 0);
-                const producedQty = Number(productionOrderFull.producedQty || 0);
-                const permanentStopStatus = targetQty > 0 && producedQty >= targetQty
-                  ? "READY_FOR_DISPATCH"
-                  : "COMPLETED_WITH_SHORTFALL";
-                await tx.productionOrder.update({
-                  where: { productionOrderId: checkProductionOrderId },
-                  data: { status: permanentStopStatus },
-                });
-                // 3. Cascade-stop ALL other active DPs for this PO
-                const otherActiveDPs = await tx.dailyProductionPlan.findMany({
-                  where: {
-                    productionOrderId: checkProductionOrderId,
-                    dailyPlanId: { not: dailyPlanId },
-                    status: { in: ["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS"] },
-                  },
-                });
-                for (const dp of otherActiveDPs) {
-                  await tx.dailyProductionPlan.update({
-                    where: { dailyPlanId: dp.dailyPlanId },
-                    data: { status: "STOPPED" },
-                  });
-                  // Also lock that plan's weekly program
-                  if (dp.weeklyProgramId) {
-                    await tx.weeklyMachineProgram.update({
-                      where: { weeklyProgramId: dp.weeklyProgramId },
-                      data: { status: "COMPLETED" },
-                    });
-                  }
-                }
-
-                // Audit metadata details
-                let stopReasonOnly = "No reason provided";
-                if (data.remarks) {
-                  const parts = data.remarks.split("Stopped:");
-                  if (parts.length > 1) {
-                    stopReasonOnly = parts[parts.length - 1].trim();
-                  } else {
-                    stopReasonOnly = data.remarks;
-                  }
-                }
-                const cancelledQty = targetQty > producedQty ? targetQty - producedQty : 0;
-
-                await StatusSyncService.logHistory(
-                  tx, checkProductionOrderId, productionOrderFull.status, permanentStopStatus, userId,
-                  data.remarks || `Production force-stopped (Permanent Stop). All active plans closed. Proceeding to post-production.`, "PERMANENT_STOP",
-                  {
-                    stopReason: stopReasonOnly,
-                    stopAction: "PERMANENT_STOP",
-                    producedQuantity: producedQty,
-                    cancelledQuantity: cancelledQty,
-                    user: userId,
-                    dateTime: new Date().toISOString()
-                  }
-                );
-              } else {
-                await tx.productionOrder.update({
-                  where: { productionOrderId: checkProductionOrderId },
-                  data: { status: "POST_PRODUCTION" },
-                });
-                await StatusSyncService.logHistory(
-                  tx, checkProductionOrderId, productionOrderFull.status, "POST_PRODUCTION", userId,
-                  "Production completed. Entering post-production phase.", "POST_PRODUCTION_START"
-                );
-              }
-            } else if (data.shortClosePO) {
-              // PO is already in POST_PRODUCTION or PARTIAL_COMPLETED/COMPLETED_WITH_SHORTFALL — still close the weekly program and cascade-stop active DPs
-              await tx.weeklyMachineProgram.update({
-                where: { weeklyProgramId: checkWeeklyProgramId },
-                data: { status: "COMPLETED" },
+              await tx.productionOrder.update({
+                where: { productionOrderId: checkProductionOrderId },
+                data: { status: "POST_PRODUCTION" },
               });
-              const otherActiveDPs2 = await tx.dailyProductionPlan.findMany({
-                where: {
-                  productionOrderId: checkProductionOrderId,
-                  dailyPlanId: { not: dailyPlanId },
-                  status: { in: ["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS"] },
-                },
-              });
-              for (const dp of otherActiveDPs2) {
-                await tx.dailyProductionPlan.update({
-                  where: { dailyPlanId: dp.dailyPlanId },
-                  data: { status: "STOPPED" },
-                });
-                if (dp.weeklyProgramId) {
-                  await tx.weeklyMachineProgram.update({
-                    where: { weeklyProgramId: dp.weeklyProgramId },
-                    data: { status: "COMPLETED" },
-                  });
-                }
-              }
-              // Ensure PO gets correct stop status — READY_FOR_DISPATCH if target met, else COMPLETED_WITH_SHORTFALL
-              if (!["COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(productionOrderFull.status)) {
-                const stopTargetQty = Number(productionOrderFull.targetQty || 0);
-                const stopProducedQty = Number(productionOrderFull.producedQty || 0);
-                const fallbackStopStatus = stopTargetQty > 0 && stopProducedQty >= stopTargetQty
-                  ? "READY_FOR_DISPATCH"
-                  : "COMPLETED_WITH_SHORTFALL";
-                await tx.productionOrder.update({
-                  where: { productionOrderId: checkProductionOrderId },
-                  data: { status: fallbackStopStatus },
-                });
-
-                // Audit trail (this branch previously updated status silently, with no history entry)
-                let stopReasonOnly2 = "No reason provided";
-                if (data.remarks) {
-                  const parts2 = data.remarks.split("Stopped:");
-                  stopReasonOnly2 = parts2.length > 1 ? parts2[parts2.length - 1].trim() : data.remarks;
-                }
-                const cancelledQty2 = stopTargetQty > stopProducedQty ? stopTargetQty - stopProducedQty : 0;
-
-                await StatusSyncService.logHistory(
-                  tx, checkProductionOrderId, productionOrderFull.status, fallbackStopStatus, userId,
-                  data.remarks || `Production force-stopped (Permanent Stop). All active plans closed.`, "PERMANENT_STOP",
-                  {
-                    stopReason: stopReasonOnly2,
-                    stopAction: "PERMANENT_STOP",
-                    producedQuantity: stopProducedQty,
-                    cancelledQuantity: cancelledQty2,
-                    user: userId,
-                    dateTime: new Date().toISOString()
-                  }
-                );
-              }
+              await StatusSyncService.logHistory(
+                tx, checkProductionOrderId, productionOrderFull.status, "POST_PRODUCTION", userId,
+                "Production completed. Entering post-production phase.", "POST_PRODUCTION_START"
+              );
             }
           }
           else if (data.status === "NEXT_STEP" && existingPlan.status === "POST_PRODUCTION") {
@@ -981,6 +957,8 @@ class DailyPlanService {
       }
     }
 
+
+
     for (const item of items) {
       const [yyyy, mm, dd] = item.productionDate.split("-").map(Number);
       const prodDate = new Date(Date.UTC(yyyy, mm - 1, dd));
@@ -1160,7 +1138,6 @@ class DailyPlanService {
       },
       include: {
         machine: true,
-        shift: true,
         productionOrder: {
           include: {
             productItem: {
@@ -1216,16 +1193,13 @@ class DailyPlanService {
 
     const dayIssuedMap = issuedMapByDate.get(targetDateStr) || new Map<string, number>();
 
-    // Helper: Normalize shift label
+    // Helper: Normalize shift label to static Day or Night
     const getShiftLabel = (sId: string, sName?: string) => {
       const s = ((sName || "") + " " + (sId || "")).toUpperCase();
-      if (s.includes("DAY") || s.includes("MORNING") || s.includes("SHIFT1") || s.includes("SHIFT 1") || s.includes("S1")) {
-        return "Day";
-      }
-      if (s.includes("NIGHT") || s.includes("EVENING") || s.includes("SHIFT2") || s.includes("SHIFT 2") || s.includes("S2")) {
+      if (s.includes("NIGHT") || s.includes("EVENING") || s.includes("SHIFT2") || s.includes("SHIFT 2") || s.includes("S2") || s.includes("SHT002")) {
         return "Night";
       }
-      return sName || sId || "Shift";
+      return "Day";
     };
 
     // Helper: Convert product weight to KG
@@ -1248,7 +1222,13 @@ class DailyPlanService {
     const targetDayPlans = plans.filter((p) => {
       const pDateStr = p.productionDate.toISOString().split("T")[0];
       if (pDateStr !== targetDateStr) return false;
-      if (filterShiftId && p.shiftId !== filterShiftId) return false;
+      if (filterShiftId) {
+        const isNight = getShiftLabel(p.shiftId) === "Night";
+        const slot = isNight ? "NIGHT" : "DAY";
+        if (filterShiftId.toUpperCase() === "DAY" && slot !== "DAY") return false;
+        if (filterShiftId.toUpperCase() === "NIGHT" && slot !== "NIGHT") return false;
+        if (filterShiftId.toUpperCase() !== "DAY" && filterShiftId.toUpperCase() !== "NIGHT" && p.shiftId !== filterShiftId) return false;
+      }
       if (filterMachineId && p.machineId !== filterMachineId) return false;
       if (filterProductId) {
         const pId = String(p.productionOrder?.productItemId || p.productionOrder?.productItem?.id || "");
@@ -1354,9 +1334,10 @@ class DailyPlanService {
     }>();
 
     for (const plan of targetDayPlans) {
-      const shiftId = plan.shiftId;
-      const shiftName = plan.shift?.shiftName || shiftId;
-      const shiftLabel = getShiftLabel(shiftId, shiftName);
+      const isNight = getShiftLabel(plan.shiftId) === "Night";
+      const shiftId = isNight ? "NIGHT" : "DAY";
+      const shiftName = isNight ? "Night Shift" : "Day Shift";
+      const shiftLabel = isNight ? "Night" : "Day";
       const machineId = plan.machineId;
       const machineName = plan.machine?.machineName || machineId;
 
@@ -1660,7 +1641,7 @@ class DailyPlanService {
       }
 
       for (const [sId, sPlans] of shiftGroups.entries()) {
-        const sName = sPlans[0]?.shift?.shiftName || sId;
+        const sName = sPlans[0]?.shiftId === "NIGHT" ? "Night Shift" : "Day Shift";
         const sLabel = getShiftLabel(sId, sName);
         let sProdQty = 0;
         let sRmReq = 0;
@@ -1726,6 +1707,12 @@ class DailyPlanService {
         adjustmentNumber: i.adjustmentNumber,
         adjustmentDate: i.adjustmentDate,
         status: i.status,
+        items: (i.items || []).map((it) => ({
+          rawMaterialId: it.rawMaterialId,
+          qty: Math.abs(Number(it.difference || 0)),
+          difference: it.difference,
+          remarks: it.remarks,
+        })),
       })),
     };
   }
@@ -1734,19 +1721,39 @@ class DailyPlanService {
   async getRmIssuedDates(weekStart: string): Promise<string[]> {
     const [y, m, d] = weekStart.split("-").map(Number);
     const start = new Date(Date.UTC(y, m - 1, d));
-    const end   = new Date(Date.UTC(y, m - 1, d + 5, 23, 59, 59)); // Mon – Sat inclusive
+    const end   = new Date(Date.UTC(y, m - 1, d + 6, 23, 59, 59)); // Mon – Sun inclusive
+
+    const weekDates: string[] = [];
+    for (let offset = 0; offset <= 6; offset++) {
+      const cur = new Date(Date.UTC(y, m - 1, d + offset));
+      weekDates.push(cur.toISOString().split("T")[0]);
+    }
 
     const rows = await prisma.stockAdjustment.findMany({
       where: {
         adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
         sourceDocument: "DAILY_PLAN",
-        adjustmentDate: { gte: start, lte: end },
+        status: { not: "REJECTED" },
+        OR: [
+          { sourceDocId: { in: weekDates } },
+          { adjustmentDate: { gte: start, lte: end } },
+        ],
       },
-      select: { sourceDocId: true },
-      distinct: ["sourceDocId"],
+      select: { sourceDocId: true, adjustmentDate: true },
     });
 
-    return rows.map((r) => r.sourceDocId).filter(Boolean) as string[];
+    const result = new Set<string>();
+    for (const r of rows) {
+      if (r.sourceDocId && weekDates.includes(r.sourceDocId)) {
+        result.add(r.sourceDocId);
+      } else if (r.sourceDocId) {
+        result.add(r.sourceDocId);
+      } else if (r.adjustmentDate) {
+        result.add(r.adjustmentDate.toISOString().split("T")[0]);
+      }
+    }
+
+    return Array.from(result);
   }
 
   // ── Issue Raw Materials for a Day ────────────────────────────────────────
@@ -1775,7 +1782,7 @@ class DailyPlanService {
       const adjustment = await tx.stockAdjustment.create({
         data: {
           adjustmentNumber,
-          adjustmentDate: new Date(),
+          adjustmentDate: new Date(`${date}T00:00:00.000Z`),
           adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
           reason: `Daily production raw material issue for ${date}`,
           status: "APPROVED",
@@ -1882,7 +1889,6 @@ class DailyPlanService {
           },
         },
         machine: { select: { machineName: true } },
-        shift:   { select: { shiftName: true } },
       },
       orderBy: { productionDate: "asc" },
     });
@@ -1898,7 +1904,7 @@ class DailyPlanService {
       dailyPlanId:     p.dailyPlanId,
       productionDate:  p.productionDate.toISOString().split("T")[0],
       machineName:     p.machine?.machineName ?? p.machineId,
-      shiftName:       p.shift?.shiftName    ?? p.shiftId,
+      shiftName:       (p.shiftId === "NIGHT" ? "Night Shift" : p.shiftId === "DAY" ? "Day Shift" : p.shiftId),
       productName:     p.productionOrder?.productItem?.productName ?? "",
       plannedQty:      Number(p.plannedQty ?? 0),
       status:          p.status,

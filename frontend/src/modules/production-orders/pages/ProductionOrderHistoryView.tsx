@@ -8,6 +8,8 @@ import {
     FaTruck,
     FaWarehouse,
     FaCheckCircle,
+    FaExclamationTriangle,
+    FaStopCircle,
 } from "react-icons/fa";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -192,7 +194,21 @@ const ProductionOrderHistoryView: React.FC = () => {
     // ── Plans (shift-wise) ────────────────────────────────────────────────────
     const plans: any[] = useMemo(() => {
         if (!fullOrder?.dailyProductionPlans?.length) return [];
+        const isPOClosedOrStopped = ["COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "STOPPED", "CANCELLED"].includes(fullOrder?.status);
         return [...fullOrder.dailyProductionPlans]
+            .filter((plan: any) => {
+                if (isPOClosedOrStopped) {
+                    const hps = plan.hourlyProductions || [];
+                    const directGross = Number(plan.producedQty || plan.totalProducedQty || 0);
+                    let sumGross = directGross;
+                    hps.forEach((hp: any) => {
+                        sumGross += Number(hp.totalQtyProduced !== undefined ? hp.totalQtyProduced : hp.qtyProduced || 0);
+                    });
+                    const isUnstarted = ["DRAFT", "PLANNED", "APPROVED"].includes(plan.status);
+                    if (isUnstarted && sumGross === 0 && hps.length === 0) return false;
+                }
+                return true;
+            })
             .sort((a: any, b: any) => {
                 const dA = new Date(a.productionDate || 0).getTime();
                 const dB = new Date(b.productionDate || 0).getTime();
@@ -231,7 +247,22 @@ const ProductionOrderHistoryView: React.FC = () => {
                 const hourlyNetGood = Math.max(0, shiftGrossProduced - shiftReject);
 
                 const isPermanentStop = (fullOrder?.status === "COMPLETED_WITH_SHORTFALL") || (plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL");
-                // Extract stop reason from remarks (format: "Short Closed: reason | Stopped: reason")
+                const plannedQty = Number(plan.plannedQty || 0);
+
+                // Use actual net good produced quantity if production occurred; fallback to planned only if COMPLETED with zero production logs
+                const producedQty = shiftGrossProduced > 0 
+                    ? hourlyNetGood 
+                    : (plan.status === "COMPLETED" && !isPermanentStop ? plannedQty : 0);
+
+                // A COMPLETED plan that produced less than planned was stopped early → show shortfall status
+                let displayStatus = plan.status || "PLANNED";
+                if (displayStatus === "COMPLETED" && plannedQty > 0 && producedQty > 0 && producedQty < plannedQty) {
+                    displayStatus = "COMPLETED_WITH_SHORTFALL";
+                }
+
+                const isPlanStopped = displayStatus === "COMPLETED_WITH_SHORTFALL" || displayStatus === "STOPPED" || displayStatus === "SHORT_CLOSED";
+
+                // Extract stop reason from remarks only if this shift was stopped
                 const rawRemarks = plan.remarks || "";
                 let stopReason: string | null = null;
                 if (rawRemarks) {
@@ -245,17 +276,22 @@ const ProductionOrderHistoryView: React.FC = () => {
                         .trim();
                     if (cleaned) stopReason = cleaned;
                 }
-                const plannedQty = Number(plan.plannedQty || 0);
+                // Fall back to order remarks only for the stopped shift
+                if (isPlanStopped && !stopReason && isPermanentStop && fullOrder?.remarks) {
+                    const orderRemarks = fullOrder.remarks.split("|");
+                    const oPart = orderRemarks[orderRemarks.length - 1] || "";
+                    const oCleaned = oPart
+                        .replace(/Permanently Stopped:/i, "")
+                        .replace(/Short Closed:/i, "")
+                        .replace(/Stopped:/i, "")
+                        .replace(/Cancelled:/i, "")
+                        .trim();
+                    if (oCleaned) stopReason = oCleaned;
+                }
 
-                // Use actual net good produced quantity if production occurred; fallback to planned only if COMPLETED with zero production logs
-                const producedQty = shiftGrossProduced > 0 
-                    ? hourlyNetGood 
-                    : (plan.status === "COMPLETED" && !isPermanentStop ? plannedQty : 0);
-
-                // A COMPLETED plan that produced less than planned was stopped early → show shortfall status
-                let displayStatus = plan.status || "PLANNED";
-                if (displayStatus === "COMPLETED" && plannedQty > 0 && producedQty > 0 && producedQty < plannedQty) {
-                    displayStatus = "COMPLETED_WITH_SHORTFALL";
+                // If this plan completed normally, it was not stopped
+                if (!isPlanStopped) {
+                    stopReason = null;
                 }
 
                 const matchingProd = fullOrder?.products?.find((p: any) => p.productionOrderId === (plan.productionOrderId || plan.productionOrder?.productionOrderId));
@@ -566,21 +602,19 @@ const ProductionOrderHistoryView: React.FC = () => {
         },
         {
             header: "PRODUCTION STATUS",
-            width: "170px",
+            width: "240px",
             align: "center",
             render: (plan) => {
-                const isCompleted = plan.status === "COMPLETED" || (Number(plan.producedQty || 0) >= Number(plan.plannedQty || 0) && Number(plan.plannedQty || 0) > 0);
+                const isCompleted = (plan.status === "COMPLETED" || (Number(plan.producedQty || 0) >= Number(plan.plannedQty || 0) && Number(plan.plannedQty || 0) > 0)) && plan.status !== "COMPLETED_WITH_SHORTFALL" && plan.status !== "STOPPED";
                 const statusDisplay = isCompleted ? "COMPLETED" : (plan.status || "PENDING");
+                const showStopPill = (plan.status === "COMPLETED_WITH_SHORTFALL" || plan.status === "STOPPED" || plan.status === "SHORT_CLOSED") && Boolean(plan.stopReason);
                 return (
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center justify-center gap-2 py-0.5 whitespace-nowrap">
                         <StatusBadge status={statusDisplay} />
-                        {plan.stopReason && plan.status !== "COMPLETED" && (
-                            <div className="group relative flex items-center cursor-pointer">
-                                <FaInfoCircle className="text-rose-400 text-[13px]" />
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-900 dark:bg-slate-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-xl pointer-events-none border border-line/30">
-                                    <span className="font-bold text-amber-400 block mb-1">Stop Reason:</span>
-                                    <div className="leading-relaxed">{plan.stopReason}</div>
-                                </div>
+                        {showStopPill && (
+                            <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/25 dark:border-amber-500/30 max-w-[150px]" title={`Stop Reason: ${plan.stopReason}`}>
+                                <FaStopCircle className="text-[10px] shrink-0 text-amber-600 dark:text-amber-400" />
+                                <span className="truncate">{plan.stopReason}</span>
                             </div>
                         )}
                     </div>
@@ -963,6 +997,40 @@ const ProductionOrderHistoryView: React.FC = () => {
     const completionPercent = targetVal > 0 ? Math.min(100, Math.round((producedVal / targetVal) * 100)) : 0;
     const dispatchPercent = targetVal > 0 ? Math.min(100, Math.round((totalDispatchedQty / targetVal) * 100)) : 0;
 
+    const isStoppedOrder = ["COMPLETED_WITH_SHORTFALL", "STOPPED", "CANCELLED"].includes(fullOrder?.status || displayOrder?.status);
+    const orderStopReason = useMemo(() => {
+        // 1. From order remarks
+        const remarks = fullOrder?.remarks || displayOrder?.remarks || "";
+        if (remarks) {
+            const parts = remarks.split("|");
+            for (const p of [...parts].reverse()) {
+                const cleaned = p
+                    .replace(/Permanently Stopped:/i, "")
+                    .replace(/Short Closed:/i, "")
+                    .replace(/Stopped:/i, "")
+                    .replace(/Cancelled:/i, "")
+                    .trim();
+                if (cleaned) return cleaned;
+            }
+        }
+        // 2. From production order history
+        const stopHist = (fullOrder?.productionOrderHistories || []).find((h: any) =>
+            h.action === "PERMANENT_STOP" || h.toStatus === "COMPLETED_WITH_SHORTFALL" || h.toStatus === "STOPPED"
+        );
+        if (stopHist?.metadata?.stopReason) return stopHist.metadata.stopReason;
+        if (stopHist?.remarks) {
+            const cleaned = stopHist.remarks
+                .replace(/Permanently Stopped:/i, "")
+                .replace(/Production force-stopped \(Permanent Stop\)\.?/i, "")
+                .trim();
+            if (cleaned) return cleaned;
+        }
+        // 3. From any plan stopReason
+        const planWithReason = plans.find((p) => p.stopReason);
+        if (planWithReason?.stopReason) return planWithReason.stopReason;
+        return null;
+    }, [fullOrder, displayOrder, plans]);
+
     return (
         <div className="w-full flex-1 flex flex-col min-h-[calc(100vh-theme(spacing.24))] pb-6">
             <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden flex-1 flex flex-col">
@@ -989,6 +1057,43 @@ const ProductionOrderHistoryView: React.FC = () => {
                     <div className="m-5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-medium">
                         <FaInfoCircle className="text-lg flex-shrink-0" />
                         <span>One or more required raw materials have insufficient stock. Please create a Raw Material Order before proceeding to Weekly Machine Assignment.</span>
+                    </div>
+                )}
+
+                {/* Permanently Stopped alert */}
+                {isStoppedOrder && (
+                    <div className="mx-5 mb-0 mt-4 rounded-xl border border-amber-500/25 dark:border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                           
+                            <div>
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                    <span className="text-sm font-bold text-ink">
+                                        Production Order Permanently Stopped
+                                    </span>
+                                    <span className="inline-flex items-center text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md bg-amber-500/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/25 dark:border-amber-500/30">
+                                        Shortfall
+                                    </span>
+                                    <span className="text-xs text-ink-subtle hidden sm:inline">•</span>
+                                    <span className="text-xs font-medium text-ink-muted">
+                                        Remaining shifts cancelled
+                                    </span>
+                                </div>
+                                <div className="text-xs mt-1 text-ink-subtle leading-relaxed">
+                                    Produced <span className="font-semibold text-ink">{producedVal.toLocaleString("en-IN")}</span> of <span className="font-semibold text-ink">{targetVal.toLocaleString("en-IN")} pcs</span> target · Shortfall: <span className="font-semibold text-amber-600 dark:text-amber-400">{Math.max(0, targetVal - producedVal).toLocaleString("en-IN")} pcs ({targetVal > 0 ? Math.round(((targetVal - producedVal) / targetVal) * 100) : 0}%)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {orderStopReason && (
+                            <div className="flex items-center gap-2 shrink-0 bg-card border border-line px-3.5 py-1.5 rounded-xl shadow-xs self-start md:self-auto">
+                                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">
+                                    Stop Reason:
+                                </span>
+                                <span className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 dark:bg-amber-500/20 border border-amber-500/25 dark:border-amber-500/30 px-2.5 py-0.5 rounded-md font-mono">
+                                    {orderStopReason}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1049,7 +1154,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                     <span className="text-xs text-ink-subtle">shifts</span>
                                 </div>
                                 <span className="text-[11px] text-ink-subtle mt-2">
-                                    {plans.filter(p => p.status === "COMPLETED").length} completed
+                                    {plans.filter(p => ["COMPLETED", "COMPLETED_WITH_SHORTFALL"].includes(p.status)).length} completed
                                 </span>
                             </div>
                         </div>

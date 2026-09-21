@@ -207,7 +207,7 @@ const DailyPlanViewModal: React.FC<DailyPlanViewModalProps> = ({ show, onHide, p
         <FaIndustry className="text-white" size={14} />
       </div>
       <div>
-        <div className="text-base font-bold text-ink leading-tight">Daily Plan — {viewPlan?.dailyPlanId}</div>
+        <div className="text-base font-bold text-ink leading-tight">Daily Planaaaa — {viewPlan?.dailyPlanId}</div>
         <div className="text-xs text-ink-subtle mt-0.5">
           {fmtDate(viewPlan?.productionDate)} · {viewPlan?.machine?.machineName || viewPlan?.machineId} · {viewPlan?.shift?.shiftName || viewPlan?.shiftId}
         </div>
@@ -315,7 +315,7 @@ const DailyPlanViewModal: React.FC<DailyPlanViewModalProps> = ({ show, onHide, p
 
         {/* ── Hourly Production Logs ── */}
         <div>
-          <h6 className="text-sm font-bold text-ink-muted uppercase tracking-wider mb-3">Hourly Production Entries</h6>
+          <h6 className="text-sm font-bold text-ink-muted uppercase tracking-wider mb-3">Hourly Production Entrieaaaaas</h6>
           {loadingViewLogs ? (
             <div className="flex items-center justify-center gap-2 py-8 border border-line rounded-xl bg-card-2 text-ink-subtle text-sm">
               <div className="w-5 h-5 border-2 border-indigo-400/40 border-t-transparent rounded-full animate-spin" />

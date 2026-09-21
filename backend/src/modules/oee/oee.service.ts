@@ -172,7 +172,6 @@ class OeeService {
     const todayPlans = await prisma.dailyProductionPlan.findMany({
       where: { machineId, productionDate: prodDate },
       include: {
-        shift: { select: { shiftName: true, startTime: true, endTime: true } },
         productionOrder: { select: { productionOrderId: true, targetQty: true, producedQty: true } },
       },
     });
@@ -241,14 +240,10 @@ class OeeService {
 
     const dailyPlans = await prisma.dailyProductionPlan.findMany({
       where: { productionOrderId },
-      include: { shift: { select: { startTime: true, endTime: true, breakDuration: true } } },
     });
 
     const totalPlannedMinutes = dailyPlans.reduce((sum: number, p: any) => {
-      if (p.shift) {
-        return sum + shiftDurationMinutes(p.shift.startTime, p.shift.endTime) - (Number(p.shift.breakDuration) || 0);
-      }
-      return sum + Number(p.plannedHours || 0) * 60;
+      return sum + Number(p.plannedHours || 12) * 60;
     }, 0);
 
     const oee = calculateOeeMetrics({
@@ -303,7 +298,7 @@ class OeeService {
         operatorId: true,
         dailyProductionPlans: {
           where: { productionDate: prodDate },
-          select: { dailyPlanId: true, status: true, plannedHours: true, productionOrderId: true, shift: { select: { shiftName: true } } },
+          select: { dailyPlanId: true, status: true, plannedHours: true, productionOrderId: true, shiftId: true },
         },
         oeeSnapshots: {
           where: { productionDate: prodDate },
@@ -327,7 +322,7 @@ class OeeService {
         quality: latestOee ? Number(latestOee.quality) : null,
         activeProductionOrderId: activePlan?.productionOrderId ?? null,
         activePlanStatus: activePlan?.status ?? null,
-        currentShift: activePlan?.shift?.shiftName ?? null,
+        currentShift: activePlan?.shiftId === "NIGHT" ? "Night Shift" : activePlan?.shiftId === "DAY" ? "Day Shift" : (activePlan?.shiftId ?? null),
         todayPlannedHours: m.dailyProductionPlans?.reduce((sum: number, p: any) => sum + Number(p.plannedHours || 0), 0),
       };
     });
