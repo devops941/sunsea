@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { executeDeleteWithValidation } from "../../utils/deleteValidation";
+import { logAudit } from "../../utils/auditLog.util";
 
 function toNumberOrNull(value: any): number | null {
   if (value === undefined || value === null || value === "") return null;
@@ -47,7 +48,7 @@ class SalesProductService {
 
     const salesProductCode = await this.getNextSalesProductId();
 
-    return (prisma.salesProduct.create as any)({
+    const newSalesProduct = await (prisma.salesProduct.create as any)({
       data: {
         salesProductCode,
         salesProductName: cleanString(data.salesProductName, 160)!,
@@ -87,6 +88,9 @@ class SalesProductService {
       },
       include: includeDefaults,
     });
+
+    await logAudit("Sales Product", newSalesProduct.salesProductCode, "CREATE", userId, newSalesProduct.salesProductName);
+    return newSalesProduct;
   }
 
   async findAll(params: { search?: string } = {}) {
@@ -261,16 +265,21 @@ class SalesProductService {
       },
     });
 
-    return this.findById(id);
+    const updatedSalesProduct = await this.findById(id);
+    await logAudit("Sales Product", updatedSalesProduct.salesProductCode, "UPDATE", userId, updatedSalesProduct.salesProductName);
+    return updatedSalesProduct;
   }
 
-  async delete(id: bigint) {
+  async delete(id: bigint, userId?: string) {
     await this.findById(id);
 
-    return executeDeleteWithValidation(
+    const deletedSalesProduct = await executeDeleteWithValidation(
       () => prisma.salesProduct.delete({ where: { id } }),
       "Sales Product"
     );
+
+    await logAudit("Sales Product", deletedSalesProduct.salesProductCode, "DELETE", userId, deletedSalesProduct.salesProductName);
+    return deletedSalesProduct;
   }
 
   async getNextSalesProductId() {

@@ -97,9 +97,11 @@ class ProductController {
       const id = BigInt(
         String(req.params.id)
       );
+      const userId = req.user?.userId;
 
       await productService.delete(
-        id
+        id,
+        userId
       );
 
       getIO().emit("product:deleted", { id: id.toString() });

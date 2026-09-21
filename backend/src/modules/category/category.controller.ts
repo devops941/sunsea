@@ -59,7 +59,8 @@ class CategoryController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id as string, 10);
-    await categoryService.delete(id);
+    const userId = req.user?.userId;
+    await categoryService.delete(id, userId);
     getIO().emit("category:deleted", { id });
 
     return res.status(200).json(

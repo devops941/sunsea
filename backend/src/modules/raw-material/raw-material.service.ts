@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { executeDeleteWithValidation } from "../../utils/deleteValidation";
 import { CreateRawMaterialInput, UpdateRawMaterialInput } from "./raw-material.validation";
+import { logAudit } from "../../utils/auditLog.util";
 
 class RawMaterialService {
   async create(data: CreateRawMaterialInput, userId?: string) {
@@ -49,7 +50,8 @@ class RawMaterialService {
         } as any
       });
 
-
+      const entityName = rawMaterial.itemType === "WASTAGE" ? "Wastage Product" : "Raw Material";
+      await logAudit(entityName, rawMaterial.rawMaterialId, "CREATE", userId, rawMaterial.materialName);
 
       return rawMaterial;
     });
@@ -289,7 +291,10 @@ class RawMaterialService {
       data: updateData,
     });
 
-    return this.findById(rawMaterialId);
+    const updatedRawMaterial = await this.findById(rawMaterialId);
+    const entityName = updatedRawMaterial.itemType === "WASTAGE" ? "Wastage Product" : "Raw Material";
+    await logAudit(entityName, updatedRawMaterial.rawMaterialId, "UPDATE", userId, updatedRawMaterial.materialName);
+    return updatedRawMaterial;
   }
 
   async delete(rawMaterialId: string, userId?: string) {
@@ -307,10 +312,15 @@ class RawMaterialService {
     }
 
     // Hard Delete with Prisma error boundary
-    return executeDeleteWithValidation(
+    const deletedRawMaterial = await executeDeleteWithValidation(
       () => prisma.rawMaterial.delete({ where: { rawMaterialId } }),
-      "Raw Material"
+      "Item"
     );
+
+    const entityName = deletedRawMaterial.itemType === "WASTAGE" ? "Wastage Product" : "Raw Material";
+    await logAudit(entityName, deletedRawMaterial.rawMaterialId, "DELETE", userId, deletedRawMaterial.materialName);
+
+    return deletedRawMaterial;
   }
   async getNextRawMaterialId() {
     const lastItem = await prisma.rawMaterial.findFirst({

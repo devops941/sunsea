@@ -5,6 +5,7 @@ import { executeDeleteWithValidation } from "../../utils/deleteValidation";
 import { uploadToImageKit } from "../../utils/Imagekit";
 import fs from "fs";
 import path from "path";
+import { logAudit } from "../../utils/auditLog.util";
 
 function toNumberOrNull(value: any): number | null {
   if (value === undefined || value === null || value === "") return null;
@@ -156,7 +157,7 @@ class ProductService {
     }
 
     try {
-      return await (prisma.product.create as any)({
+      const newProduct = await (prisma.product.create as any)({
         data: {
           ...payload,
           ...(data.openingStockQty && data.openingStockStoreId
@@ -216,6 +217,9 @@ class ProductService {
           billOfMaterials: { include: { rawMaterial: true } },
         },
       });
+
+      await logAudit("Product", newProduct.productCode, "CREATE", userId, newProduct.productName);
+      return newProduct;
     } catch (err: any) {
       console.error("Product create failed. Payload keys:", Object.keys(payload));
       console.error("Prisma error:", err.message);
@@ -600,10 +604,12 @@ class ProductService {
       data: payload,
     });
 
-    return this.findById(id);
+    const updatedProduct = await this.findById(id);
+    await logAudit("Product", updatedProduct.productCode, "UPDATE", userId, updatedProduct.productName);
+    return updatedProduct;
   }
 
-  async delete(id: bigint) {
+  async delete(id: bigint, userId?: string) {
     await this.findById(id);
     const [
       salesCount,
@@ -644,7 +650,7 @@ class ProductService {
       );
     }
 
-    return executeDeleteWithValidation(
+    const deletedProduct = await executeDeleteWithValidation(
       () => prisma.$transaction(async (tx) => {
         await tx.finishedGoodsTransaction.deleteMany({ where: { productItemId: id } });
         await tx.finishedGoodsStock.deleteMany({ where: { productItemId: id } });
@@ -659,6 +665,9 @@ class ProductService {
       }),
       "Product"
     );
+
+    await logAudit("Product", deletedProduct.productCode, "DELETE", userId, deletedProduct.productName);
+    return deletedProduct;
   }
 
   async getNextProductId() {

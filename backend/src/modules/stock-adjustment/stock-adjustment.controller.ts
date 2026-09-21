@@ -69,7 +69,8 @@ export class StockAdjustmentController {
 
   static deleteStockAdjustment = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    await StockAdjustmentService.deleteStockAdjustment(id);
+    const userId = req.user?.userId;
+    await StockAdjustmentService.deleteStockAdjustment(id, userId);
     getIO().emit("stockAdjustment:deleted", { id });
     res.json({
       success: true,
