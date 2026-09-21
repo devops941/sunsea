@@ -4,26 +4,49 @@ import { CreateProductionWastageInput, UpdateProductionWastageInput } from "./pr
 
 class ProductionWastageService {
   private async enrichWithApprovedByUser(wastage: any) {
-    if (!wastage || !wastage.approvedBy) return wastage;
-    const user = await prisma.user.findUnique({
-      where: { userId: wastage.approvedBy },
-      select: { userId: true, fullName: true, username: true }
-    });
-    return { ...wastage, approvedByUser: user ?? null };
+    if (!wastage) return wastage;
+    const user = wastage.approvedBy
+      ? await prisma.user.findUnique({
+          where: { userId: wastage.approvedBy },
+          select: { userId: true, fullName: true, username: true }
+        })
+      : null;
+    const shift = wastage.shiftId
+      ? {
+          shiftCode: wastage.shiftId,
+          shiftName: wastage.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+          startTime: wastage.shiftId === "NIGHT" ? "21:00" : "09:00",
+          endTime: wastage.shiftId === "NIGHT" ? "09:00" : "21:00",
+        }
+      : null;
+    return { ...wastage, approvedByUser: user, shift: wastage.shift || shift };
   }
 
   private async enrichManyWithApprovedByUser(wastages: any[]) {
     const userIds = [...new Set(wastages.map((w: any) => w.approvedBy).filter(Boolean))];
-    if (userIds.length === 0) return wastages;
-    const users = await prisma.user.findMany({
-      where: { userId: { in: userIds } },
-      select: { userId: true, fullName: true, username: true }
+    let userMap = new Map();
+    if (userIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { userId: { in: userIds } },
+        select: { userId: true, fullName: true, username: true }
+      });
+      userMap = new Map(users.map((u) => [u.userId, u]));
+    }
+    return wastages.map((w: any) => {
+      const shift = w.shiftId
+        ? {
+            shiftCode: w.shiftId,
+            shiftName: w.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+            startTime: w.shiftId === "NIGHT" ? "21:00" : "09:00",
+            endTime: w.shiftId === "NIGHT" ? "09:00" : "21:00",
+          }
+        : null;
+      return {
+        ...w,
+        approvedByUser: w.approvedBy ? (userMap.get(w.approvedBy) ?? null) : null,
+        shift: w.shift || shift,
+      };
     });
-    const userMap = new Map(users.map((u) => [u.userId, u]));
-    return wastages.map((w: any) => ({
-      ...w,
-      approvedByUser: w.approvedBy ? (userMap.get(w.approvedBy) ?? null) : null
-    }));
   }
 
   private async generateWastageNo(): Promise<string> {
@@ -87,14 +110,6 @@ class ProductionWastageService {
     });
     if (!machine) {
       throw new ApiError(404, `Machine with ID ${data.machineId} not found`);
-    }
-
-    // 3. Verify Shift
-    const shift = await prisma.shift.findUnique({
-      where: { shiftCode: data.shiftId }
-    });
-    if (!shift) {
-      throw new ApiError(404, `Shift with Code ${data.shiftId} not found`);
     }
 
     // 4. Verify Product
@@ -162,7 +177,6 @@ class ProductionWastageService {
       include: {
         productionOrder: true,
         machine: true,
-        shift: true,
         product: { include: { category: true } },
         rawMaterial: { include: { category: true } },
         category: true,
@@ -200,7 +214,6 @@ class ProductionWastageService {
           }
         },
         machine: true,
-        shift: true,
         product: { include: { category: true } },
         rawMaterial: { include: { category: true } },
         category: true,
@@ -238,7 +251,6 @@ class ProductionWastageService {
           }
         },
         machine: true,
-        shift: true,
         product: { include: { category: true } },
         rawMaterial: { include: { category: true } },
         category: true,
@@ -292,7 +304,6 @@ class ProductionWastageService {
       include: {
         productionOrder: true,
         machine: true,
-        shift: true,
         product: { include: { category: true } },
         rawMaterial: { include: { category: true } },
         category: true,
@@ -331,7 +342,6 @@ class ProductionWastageService {
         include: {
           productionOrder: true,
           machine: true,
-          shift: true,
           product: { include: { category: true } },
           rawMaterial: { include: { category: true } },
           targetWastageProduct: true,
@@ -391,7 +401,6 @@ class ProductionWastageService {
       include: {
         productionOrder: true,
         machine: true,
-        shift: true,
         product: { include: { category: true } },
         rawMaterial: { include: { category: true } },
         category: true,

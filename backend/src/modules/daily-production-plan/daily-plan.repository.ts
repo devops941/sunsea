@@ -17,7 +17,6 @@ export class DailyPlanRepository {
           },
         },
         machine: true,
-        shift: true,
         hourlyProductions: {
           select: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true, totalDowntime: true, hourlyEntries: true }
         },
@@ -44,7 +43,6 @@ export class DailyPlanRepository {
           },
         },
         machine: true,
-        shift: true,
         hourlyProductions: {
           select: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true, totalDowntime: true, hourlyEntries: true }
         },
@@ -77,7 +75,6 @@ export class DailyPlanRepository {
           },
         },
         machine: true,
-        shift: true,
         carryForwardFrom: { select: { dailyPlanId: true, productionDate: true, shiftId: true } },
         carryForwardTo: { select: { dailyPlanId: true, productionDate: true, shiftId: true } },
       },
@@ -138,7 +135,6 @@ export class DailyPlanRepository {
           },
         },
         machine: true,
-        shift: true,
         hourlyProductions: {
           select: { totalQtyProduced: true, totalRejectQty: true, totalScrapQty: true, totalDowntime: true, hourlyEntries: true }
         },

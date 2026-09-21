@@ -116,12 +116,6 @@ const GoodsDispatchList: React.FC = () => {
 
   const columns: DataTableColumn<any>[] = [
     {
-      header: "Dispatch No",
-      width: "130px",
-      accessor: "dispatchNumber",
-      render: (item: any) => <span className="font-bold text-ink tracking-tight">{item.dispatchNumber}</span>,
-    },
-    {
       header: "DC No",
       width: "120px",
       accessor: "dcNumber",
@@ -192,7 +186,7 @@ const GoodsDispatchList: React.FC = () => {
             <SearchInput
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by Dispatch No, DC No, Vehicle, Driver..."
+              placeholder="Search by DC No, Vehicle, Driver..."
             />
             <FilterPopover
               activeFilterCount={activeFilterCount}

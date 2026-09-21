@@ -35,6 +35,8 @@ export interface BusyItemsTableProps<T = any> {
   onChange?: (rows: T[]) => void;
   emptyRow?: T;
   visibleRows?: number;
+  /** Maximum number of rows allowed in the table. */
+  maxRows?: number;
   /** Height (px) of each data row. Default 32. Use a larger value (e.g. 44) when cells contain form inputs. */
   rowHeight?: number;
   showTotals?: TotalCell[];
@@ -147,7 +149,7 @@ function isInputAtRightBoundary(input: HTMLInputElement): boolean {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function BusyItemsTable<T extends Record<string, any>>({
-  columns, rows, onChange, emptyRow, visibleRows = 10, rowHeight, showTotals, billSundry,
+  columns, rows, onChange, emptyRow, visibleRows = 10, maxRows, rowHeight, showTotals, billSundry,
   editable = true, className = "", onAdd, onRemove,
   isRowDeletable, rowDeleteDisabledMessage,
   renderExpandedRow, expandedIndex, onExpandToggle, expandable = false, canExpand,
@@ -171,15 +173,17 @@ function BusyItemsTable<T extends Record<string, any>>({
   }, [rows, onChange, onRemove]);
 
   const doAdd = useCallback(() => {
+    if (maxRows !== undefined && rows.length >= maxRows) return;
     if (onAdd) { onAdd(); return; }
     if (emptyRow && onChange) onChange([...rows, { ...emptyRow }]);
-  }, [rows, onChange, emptyRow, onAdd]);
+  }, [rows, onChange, emptyRow, onAdd, maxRows]);
 
   // Extra empty rows appended purely by keyboard navigation: arrowing Down past the last
   // visible row grows the grid (Busy-style) instead of leaving it. Arrows stay inside the
   // table; only Tab exits to the next field (e.g. Narration).
   const [extraRows, setExtraRows] = useState(0);
-  const count = Math.max(rows.length, visibleRows) + extraRows;
+  const rawCount = Math.max(rows.length, visibleRows) + extraRows;
+  const count = maxRows !== undefined ? Math.min(maxRows, rawCount) : rawCount;
   const colCount = columns.length + (expandable ? 1 : 0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -187,13 +191,10 @@ function BusyItemsTable<T extends Record<string, any>>({
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // Only auto-append when the real rows already fill the visible window. While the
-    // table is padded with empty placeholder rows (rows.length < visibleRows), scrolling
-    // to the bottom — e.g. when ArrowDown scrolls the last empty row into view — must NOT
-    // spawn a phantom row; the caret should instead move to the next field (Narration).
+    if (maxRows !== undefined && rows.length >= maxRows) return;
     if (rows.length < visibleRows) return;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 2) doAdd();
-  }, [doAdd, rows.length, visibleRows]);
+  }, [doAdd, rows.length, visibleRows, maxRows]);
 
   // Find last column that actually contains user-editable inputs (e.g. not read-only total)
   const lastEditableCol = useMemo(() => {
@@ -358,7 +359,7 @@ function BusyItemsTable<T extends Record<string, any>>({
           setTimeout(() => focus(r + 1, c), 30);
         } else if (r < count - 1) {
           focus(r + 1, c);
-        } else {
+        } else if (maxRows === undefined || count < maxRows) {
           // At the last visible row: keep the caret INSIDE the grid and grow it by one
           // empty row (Busy-style), rather than jumping to the next field. Leaving the
           // grid for Narration etc. is done with Tab, never with the arrow keys.

@@ -21,7 +21,6 @@ import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderI
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createHourlyProduction, updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
-import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
@@ -45,6 +44,13 @@ const getUomOptions = (baseUom: string) => {
 };
 
 
+const formatHourAmPm = (hour24: number): string => {
+    const h = hour24 % 24;
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${String(h12).padStart(2, '0')}:00 ${ampm}`;
+};
+
 const HourlyWorkReportCreate: React.FC = () => {
     const navigate = useNavigate();
     const locationState = useLocation();
@@ -52,7 +58,6 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     // Redux State
     const { data: machines } = useAppSelector((state) => state.machines);
-    const { data: shifts } = useAppSelector((state: any) => state.shifts || { data: [] });
 
     // State for selectors
     const [machineId, setMachineId] = useState("");
@@ -157,7 +162,6 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     useEffect(() => {
         dispatch(fetchMachines());
-        dispatch(fetchShifts());
         // Fetch WASTAGE stores (for Wastage Products section)
         apiClient.get(config.store.base, { params: { storeCategory: "WASTAGE", limit: 100 } }).then(res => {
             const data = res.data?.data;
@@ -400,50 +404,21 @@ const HourlyWorkReportCreate: React.FC = () => {
         }
     }, [hourIndex, existingLogs]);
 
-    // Shift timing for hour slots generation
-    const shiftTiming = useMemo(() => {
-        if (locationState.state?.startTime && locationState.state?.endTime) {
-            return {
-                startTime: locationState.state.startTime,
-                endTime: locationState.state.endTime
-            };
-        }
-        const selectedShift = shifts.find((s: any) => s.shiftCode === shiftId);
-        if (selectedShift) {
-            return {
-                startTime: selectedShift.startTime,
-                endTime: selectedShift.endTime
-            };
-        }
-        return null;
-    }, [locationState.state, shifts, shiftId]);
-
+    // Static Shift timing (12 hours per shift: Day = 09:00 AM - 09:00 PM, Night = 09:00 PM - 09:00 AM)
     const hourOptions = useMemo(() => {
-        let baseOptions: { label: string; value: string; disabled?: boolean }[];
-        if (!shiftTiming?.startTime || !shiftTiming?.endTime) {
-            baseOptions = Array.from({ length: 24 }, (_, i) => ({
-                label: `Hour ${i + 1}`,
+        const isNight = (shiftId || "").toUpperCase().includes("NIGHT");
+        const startHour = isNight ? 21 : 9;
+        const totalHours = 12;
+
+        const baseOptions = Array.from({ length: totalHours }, (_, i) => {
+            const slotStartH = (startHour + i) % 24;
+            const slotEndH = (startHour + i + 1) % 24;
+            const timeSlot = `${formatHourAmPm(slotStartH)} – ${formatHourAmPm(slotEndH)}`;
+            return {
+                label: `Hour ${i + 1} (${timeSlot})`,
                 value: String(i + 1)
-            }));
-        } else {
-            const [startH, startM] = shiftTiming.startTime.split(":").map(Number);
-            const [endH, endM] = shiftTiming.endTime.split(":").map(Number);
-
-            const startMinutes = startH * 60 + startM;
-            let endMinutes = endH * 60 + endM;
-
-            if (endMinutes <= startMinutes) {
-                endMinutes += 24 * 60;
-            }
-
-            const totalMinutes = endMinutes - startMinutes;
-            const hours = Math.floor(totalMinutes / 60);
-
-            baseOptions = Array.from({ length: hours }, (_, i) => ({
-                label: `Hour ${i + 1}`,
-                value: String(i + 1)
-            }));
-        }
+            };
+        });
 
         const filledIndices = existingLogs.map(log => Number(log.hourIndex));
         const maxFilled = filledIndices.length > 0 ? Math.max(...filledIndices) : 0;
@@ -466,7 +441,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                 disabled
             };
         });
-    }, [shiftTiming, existingLogs, editingLogId, activePlan]);
+    }, [shiftId, existingLogs, editingLogId, activePlan]);
 
     const isFinalHour = hourOptions.length > 0 && Number(hourIndex) === hourOptions.length;
 
@@ -965,7 +940,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     value={selectedDailyPlanId}
                                     required
                                     options={dailyPlans.map((dp) => ({
-                                        label: `${dp.dailyPlanId} — PO: ${dp.productionOrderId} — Date: ${dp.productionDate?.split("T")[0]} — Machine: ${dp.machineId} — Shift: ${dp.shiftId}`,
+                                        label: `${dp.dailyPlanId} — PO: ${dp.productionOrderId} — Date: ${dp.productionDate?.split("T")[0]} — Machine: ${dp.machineId} — Shift: ${(dp.shiftId || "").toUpperCase().includes("NIGHT") ? "Night Shift" : "Day Shift"}`,
                                         value: dp.dailyPlanId
                                     }))}
                                     onChange={(e) => handleDailyPlanSelect(e.target.value)}
@@ -984,7 +959,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 value={machines.find((m: any) => m.machineId === machineId)?.machineName || machineId || "—"} disabled />
                             <TextInput horizontal label="Date" name="productionDate" value={productionDate || "—"} disabled />
                             <TextInput horizontal label="Shift" name="shiftId"
-                                value={shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId || "—"} disabled />
+                                value={(shiftId || "").toUpperCase().includes("NIGHT") ? "Night Shift" : (shiftId || "").toUpperCase().includes("DAY") ? "Day Shift" : (shiftId || "—")} disabled />
                         </div>
                     </div>
 
@@ -1465,7 +1440,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                             <FaClock className="text-indigo-400 mt-0.5 text-base flex-shrink-0" />
                             <div>
                                 <span className="text-ink-subtle text-xs block font-medium">Shift</span>
-                                <strong className="text-ink font-semibold">{newHighDetails?.shiftName}</strong>
+                                <strong className="text-ink font-semibold">{newHighDetails?.shiftName || ((newHighDetails?.shiftId || "").toUpperCase().includes("NIGHT") ? "Night Shift" : "Day Shift")}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">

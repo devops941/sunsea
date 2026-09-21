@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { usePermission } from "../../../hooks/usePermission";
 import { 
-  FaClock, 
   FaFilePdf
 } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -41,8 +40,6 @@ const DailyReportPage: React.FC = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
 
-  // Selected shift filter tab: "ALL" or specific shift identifier (shiftCode or shiftName)
-  const [selectedShiftTab, setSelectedShiftTab] = useState<string>("ALL");
   const [selectedMachineFilter, setSelectedMachineFilter] = useState<string>("ALL");
 
   // State for opening row detail modal
@@ -251,6 +248,7 @@ const DailyReportPage: React.FC = () => {
               hourIndex: hIdx,
               timeSlot: resolvedTimeSlot,
               operatorName: e.operatorName || hp.operatorName || "—",
+              operationName: e.operationName || e.operation || "",
               qtyProduced: qty,
               rejectQty: rej,
               goodQty: good,
@@ -310,10 +308,10 @@ const DailyReportPage: React.FC = () => {
       const rejectedPcs = hpTotalReject;
       const perfectPcs = Math.max(0, actualProduction - rejectedPcs);
       const pendingQty = Math.max(0, plannedCapacity - actualProduction);
-      const efficiency = plannedCapacity > 0 ? (actualProduction / plannedCapacity) * 100 : 0;
+      const efficiency = plannedCapacity > 0 ? (perfectPcs / plannedCapacity) * 100 : 0;
       
-      const { statusText, customColor } = getPlanStatusInfo(plannedCapacity, actualProduction);
-      const status = (hasHourlyEntries || actualProduction > 0) ? statusText : "—";
+      const { statusText, customColor } = getPlanStatusInfo(plannedCapacity, perfectPcs);
+      const status = plannedCapacity > 0 ? statusText : (actualProduction > 0 ? statusText : "—");
       
       totalPlannedCapacity += plannedCapacity;
       totalActualProduction += actualProduction;
@@ -458,21 +456,15 @@ const DailyReportPage: React.FC = () => {
     };
   }, [selectedDate, dailyPlans, hourlyProductions, machines, shifts]);
 
-  // Filter rows based on selected shift and machine filters
+  // Filter rows based on selected machine filter
   const filteredRows = useMemo(() => {
     return reportData.allRows.filter(row => {
-      if (selectedShiftTab !== "ALL") {
-        const matchesShift = row.shiftId === selectedShiftTab || 
-          row.shiftName.toLowerCase() === selectedShiftTab.toLowerCase() ||
-          shifts.find(s => (s.shiftCode === selectedShiftTab || s.id === selectedShiftTab) && s.shiftName.toLowerCase() === row.shiftName.toLowerCase());
-        if (!matchesShift) return false;
-      }
       if (selectedMachineFilter !== "ALL") {
         if (row.machineId !== selectedMachineFilter && row.machineName !== selectedMachineFilter) return false;
       }
       return true;
     });
-  }, [reportData.allRows, selectedShiftTab, selectedMachineFilter, shifts]);
+  }, [reportData.allRows, selectedMachineFilter]);
 
   // Group filtered rows by Machine (for machine-wise log sheet display)
   const machineWiseGroups = useMemo(() => {
@@ -531,66 +523,13 @@ const DailyReportPage: React.FC = () => {
         {/* ── Row 2: Date Selector (DatePickerCalendar component) + Shift Filter Tabs + Machine Filter Component ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-3 border-b border-line shrink-0 no-print">
           
-          {/* Left: DatePickerCalendar & Shift Tabs */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Component DatePickerCalendar */}
-            <div className="w-44">
-              <DatePickerCalendar 
-                name="reportDate"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-              />
-            </div>
-
-            {/* Shift Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-              <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider hidden sm:inline mr-1">
-                Shift:
-              </span>
-
-              {/* All Shifts Tab */}
-              <button
-                type="button"
-                onClick={() => setSelectedShiftTab("ALL")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                  selectedShiftTab === "ALL"
-                    ? "bg-accent text-white border-accent shadow-xs"
-                    : "bg-card-2 text-ink-subtle hover:text-ink border-line-soft hover:border-line"
-                }`}
-              >
-                <span>All Shifts</span>
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  selectedShiftTab === "ALL" ? "bg-white/20 text-white" : "bg-card text-ink-subtle border border-line-soft"
-                }`}>
-                  {reportData.allRows.length}
-                </span>
-              </button>
-
-              {/* Individual Shift Tabs */}
-              {reportData.shiftTabs.map((shiftTab) => {
-                const isActive = selectedShiftTab === shiftTab.id || selectedShiftTab.toLowerCase() === shiftTab.name.toLowerCase();
-                return (
-                  <button
-                    key={shiftTab.id}
-                    type="button"
-                    onClick={() => setSelectedShiftTab(shiftTab.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                      isActive
-                        ? "bg-accent text-white border-accent shadow-xs"
-                        : "bg-card-2 text-ink-subtle hover:text-ink border-line-soft hover:border-line"
-                    }`}
-                  >
-                    <FaClock className={isActive ? "text-white/80" : "text-ink-subtle"} size={10} />
-                    <span>{shiftTab.name}</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      isActive ? "bg-white/20 text-white" : "bg-card text-ink-subtle border border-line-soft"
-                    }`}>
-                      {shiftTab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          {/* Left: DatePickerCalendar */}
+          <div className="w-44">
+            <DatePickerCalendar 
+              name="reportDate"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
           </div>
 
           {/* Right: Machine Filter Dropdown using SelectInput Component */}
@@ -736,15 +675,17 @@ const DailyReportPage: React.FC = () => {
             >
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9", height: "26px" }}>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "left", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "10%", color: "#000000" }}>Shift</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "left", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "14%", color: "#000000" }}>Name</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "center", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "11%", color: "#000000" }}>Time (In / Out)</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "left", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "18%", color: "#000000" }}>Product Name</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "right", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "9%", color: "#000000" }}>Short Counter</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "right", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Rejected Pcs.</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "right", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Perfect Pcs.</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "right", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "9%", color: "#000000" }}>Rejected Wt</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "left", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "13%", color: "#000000" }}>Remarks</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Shift</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "12%", color: "#000000" }}>Name</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "center", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "10%", color: "#000000" }}>Time</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "16%", color: "#000000" }}>Product Name</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Target</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "7%", color: "#000000" }}>Reject</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Perfect</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "7%", color: "#000000" }}>Reject Wt</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "center", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Efficiency</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "center", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Status</th>
+                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Remarks</th>
                 </tr>
               </thead>
               <tbody>
@@ -783,6 +724,12 @@ const DailyReportPage: React.FC = () => {
                     <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#000000" }}>
                       {row.rejectedWeight}
                     </td>
+                    <td style={{ border: "1px solid #000000", padding: "3px 4px", textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#4338ca" }}>
+                      {row.efficiency ? `${Math.round(Number(row.efficiency))}%` : "—"}
+                    </td>
+                    <td style={{ border: "1px solid #000000", padding: "3px 4px", textAlign: "center", fontWeight: 700, color: row.status === "High" ? "#16a34a" : row.status === "Medium" ? "#d97706" : row.status === "Low" ? "#ea580c" : "#dc2626" }}>
+                      {row.status || "—"}
+                    </td>
                     <td style={{ border: "1px solid #000000", padding: "3px 6px", fontSize: "9.5px", color: "#000000" }}>
                       {row.downtimeMinutes > 0 && (
                         <span style={{ fontWeight: "bold", marginRight: "4px" }}>[{row.downtimeMinutes}m DT]</span>
@@ -806,7 +753,7 @@ const DailyReportPage: React.FC = () => {
                   <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#000000" }}>
                     {group.rows.reduce((sum, r) => sum + r.perfectPcs, 0).toLocaleString()}
                   </td>
-                  <td colSpan={2} style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "left", fontSize: "9.5px", color: "#000000" }}>
+                  <td colSpan={4} style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "left", fontSize: "9.5px", color: "#000000" }}>
                     Target: {group.rows.reduce((sum, r) => sum + r.shotCounter, 0).toLocaleString()} Pcs
                   </td>
                 </tr>

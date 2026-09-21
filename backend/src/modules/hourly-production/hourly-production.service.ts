@@ -101,15 +101,30 @@ async function syncProductionOrderQuantities(tx: any, productionOrderId: string)
   const goodProduced = Math.max(0, totalProduced - totalReject);
   const targetQty = Number(order.targetQty || 0);
 
+  // Check total dispatched so far for this PO
+  const allDispatches = await tx.goodsDispatchItem.aggregate({
+    where: {
+      productionOrderId,
+      dispatch: { status: { notIn: ["GATE_REJECTED", "STORE_REJECTED"] } },
+    },
+    _sum: { dispatchQty: true },
+  });
+  const totalDispatched = Number(allDispatches._sum?.dispatchQty || 0);
+
   // If target is met or exceeded, mark as COMPLETED
   if (targetQty > 0 && goodProduced >= targetQty) {
-    if (["READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
-      // Retain downstream dispatch statuses
+    if (totalDispatched >= targetQty) {
+      newStatus = "DISPATCHED";
+    } else if (["READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
+      // Target met but not fully dispatched → READY_FOR_DISPATCH
+      newStatus = "READY_FOR_DISPATCH";
     } else {
       newStatus = "COMPLETED";
     }
   } else if (goodProduced > 0) {
-    if (!["COMPLETED", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
+    if (goodProduced > totalDispatched && newStatus === "DISPATCHED") {
+      newStatus = "PARTIAL_COMPLETED";
+    } else if (!["COMPLETED", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
       newStatus = "IN_PROGRESS";
     }
   }
@@ -283,7 +298,7 @@ class HourlyProductionService {
 
       const operatorNames = Array.from(operatorNameSet).join(", ");
       const machine = await tx.machine.findUnique({ where: { machineId: data.machineId } });
-      const shift = await tx.shift.findUnique({ where: { shiftCode: data.shiftId } });
+      const shiftName = data.shiftId === "NIGHT" ? "Night Shift" : "Day Shift";
 
       // 2. Create Capacity History record
       await tx.productCapacityHistory.create({
@@ -365,7 +380,7 @@ class HourlyProductionService {
           machineId: data.machineId,
           machineName: machine?.machineName || data.machineId,
           shiftId: data.shiftId,
-          shiftName: shift?.shiftName || data.shiftId,
+          shiftName: shiftName,
           operators: operatorNames || "N/A",
           newCapacity: shiftActualProduction,
           previousCapacity: currentCapacity,
@@ -540,22 +555,8 @@ class HourlyProductionService {
       // 4. Sync production order target & produced quantities (aggregates ONLY status: 'COMPLETED' records)
       await syncProductionOrderQuantities(tx, data.productionOrderId);
 
-      // 5. Check shift duration and plan completion
-      const shift = await tx.shift.findUnique({
-        where: { shiftCode: data.shiftId }
-      });
-
-      let totalHours = 8;
-      if (shift && shift.startTime && shift.endTime) {
-        const [startH, startM] = shift.startTime.split(":").map(Number);
-        const [endH, endM] = shift.endTime.split(":").map(Number);
-        let startMinutes = startH * 60 + startM;
-        let endMinutes = endH * 60 + endM;
-        if (endMinutes <= startMinutes) {
-          endMinutes += 24 * 60;
-        }
-        totalHours = Math.floor((endMinutes - startMinutes) / 60);
-      }
+      // 5. Check shift duration and plan completion (Static 12-hour shifts)
+      const totalHours = 12;
 
       if (isShiftFinal) {
         if (weeklyProgram) {
@@ -911,7 +912,6 @@ class HourlyProductionService {
           }
         },
         machine: true,
-        shift: true,
         productionWastages: true,
       },
       orderBy: [
@@ -987,6 +987,12 @@ class HourlyProductionService {
 
       return {
         ...record,
+        shift: {
+          shiftCode: record.shiftId,
+          shiftName: record.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+          startTime: record.shiftId === "NIGHT" ? "21:00" : "09:00",
+          endTime: record.shiftId === "NIGHT" ? "09:00" : "21:00",
+        },
         // Top-level aliases for backwards compatibility
         qtyProduced: totalProduced,
         rejectQty: totalReject,
@@ -1021,7 +1027,6 @@ class HourlyProductionService {
           }
         },
         machine: true,
-        shift: true,
         productionWastages: true,
       },
     });
@@ -1038,6 +1043,12 @@ class HourlyProductionService {
 
     return {
       ...record,
+      shift: {
+        shiftCode: record.shiftId,
+        shiftName: record.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+        startTime: record.shiftId === "NIGHT" ? "21:00" : "09:00",
+        endTime: record.shiftId === "NIGHT" ? "09:00" : "21:00",
+      },
       qtyProduced: Number(record.totalQtyProduced),
       rejectQty: Number(record.totalRejectQty),
       scrapQty: Number(record.totalScrapQty),

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -15,6 +16,7 @@ import {
 
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
+import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
@@ -137,10 +139,11 @@ export const HourlyProductionEntryPage: React.FC = () => {
   const [poStats, setPoStats] = useState<{ targetQty: number; producedQty: number } | null>(null);
   const [previousShiftsGood, setPreviousShiftsGood] = useState<number>(0);
   const [totalWastageWeight, setTotalWastageWeight] = useState<string | number>("");
-  const [totalWastageUom, setTotalWastageUom] = useState<string>("kg");
+  const [totalWastageUom, setTotalWastageUom] = useState<string>("g");
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showNewRecordModal, setShowNewRecordModal] = useState(false);
   const [newRecordDetails, setNewRecordDetails] = useState<any>(null);
@@ -356,7 +359,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
         }
       } else {
         setTotalWastageWeight("");
-        setTotalWastageUom("kg");
+        setTotalWastageUom("g");
       }
 
       // Extract existing wastages (from productionWastages, wastages, or draftWastages)
@@ -758,7 +761,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 });
               }}
               placeholder="0"
-              className={`w-full text-right bg-transparent border-none outline-none text-xs font-bold ${
+              className={`w-full text-right bg-transparent border-none outline-none text-xs font-bold no-spinner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                 isNeg || isHourIncomplete ? "text-rose-500 ring-1 ring-rose-500 rounded px-1 bg-rose-500/10" : "text-ink"
               }`}
             />
@@ -802,7 +805,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 });
               }}
               placeholder="0"
-              className={`w-full text-right bg-transparent border-none outline-none text-xs font-bold ${
+              className={`w-full text-right bg-transparent border-none outline-none text-xs font-bold no-spinner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                 isRejExceeded || isNeg
                   ? "text-rose-500 ring-1 ring-rose-500 rounded px-1 bg-rose-500/10"
                   : "text-ink"
@@ -910,7 +913,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 });
               }}
               placeholder="0"
-              className={`w-full text-right bg-transparent border-none outline-none text-xs font-bold ${
+              className={`w-full text-right bg-transparent border-none outline-none text-xs font-bold no-spinner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                 isDtExceeded || isNeg || isDtIncomplete
                   ? "text-rose-500 ring-1 ring-rose-500 rounded px-1 bg-rose-500/10"
                   : "text-ink"
@@ -1010,6 +1013,18 @@ export const HourlyProductionEntryPage: React.FC = () => {
         const hasQty = row.quantity !== "";
         const isProductMissing = hasAttemptedSubmit && !hasProduct && hasQty;
 
+        const selectedInOtherRows = new Set(
+          wastages
+            .filter((_, i) => i !== idx)
+            .map((w) => String(w.targetWastageProductId || "").trim())
+            .filter(Boolean)
+        );
+
+        const rowOptions = rmScrapOptions.map((opt) => ({
+          ...opt,
+          disabled: selectedInOtherRows.has(String(opt.value)),
+        }));
+
         return (
           <div className="flex flex-col w-full justify-center">
             <div style={{ display: "contents" }} data-enter-opens-autocomplete="true">
@@ -1017,7 +1032,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 inline
                 name={`w-product-${idx}`}
                 value={row.targetWastageProductId}
-                options={rmScrapOptions}
+                options={rowOptions}
                 placeholder="Type to search raw material / scrap..."
                 disabled={isLocked}
                 onChange={(v) => {
@@ -1081,7 +1096,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 onChange={(e) => update({ quantity: e.target.value })}
                 placeholder="0"
                 disabled={isLocked}
-                className={`flex-1 min-w-0 bg-transparent text-[13px] outline-none border-none p-0 text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                className={`flex-1 min-w-0 bg-transparent text-[13px] outline-none border-none p-0 text-center font-bold no-spinner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                   isNeg
                     ? "text-rose-400 ring-1 ring-rose-500 rounded bg-rose-500/10"
                     : "text-ink"
@@ -1128,7 +1143,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
         />
       ),
     },
-  ], [isLocked, rawMaterials, wastageStores, rmScrapOptions, hasAttemptedSubmit]);
+  ], [isLocked, rawMaterials, wastageStores, rmScrapOptions, hasAttemptedSubmit, wastages]);
 
   // ── Live Shift Summary Calculations ────────────────────────────
   const summary = useMemo(() => {
@@ -1169,7 +1184,11 @@ export const HourlyProductionEntryPage: React.FC = () => {
       }
     });
 
-    const plannedQty = Number(dailyPlan?.plannedQty || 0);
+    const rawPlanned = Number(dailyPlan?.plannedQty || 0);
+    const poTarget = Number(poStats?.targetQty || dailyPlan?.productionOrder?.targetQty || 0);
+    const plannedQty = poTarget > 0
+      ? Math.min(rawPlanned, Math.max(0, poTarget - previousShiftsGood))
+      : rawPlanned;
     const completionPct = plannedQty > 0 ? Math.min(100, Math.round((totalGood / plannedQty) * 100)) : 0;
     const balanceQty = Math.max(0, plannedQty - totalGood);
 
@@ -1206,7 +1225,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
       pendingEntries,
       byProduct,
     };
-  }, [rows, dailyPlan?.plannedQty, dailyPlan?.productionOrderId, weekProductOptions]);
+  }, [rows, dailyPlan?.plannedQty, dailyPlan?.productionOrderId, weekProductOptions, poStats?.targetQty, dailyPlan?.productionOrder?.targetQty, previousShiftsGood]);
 
   // Once a shift has entries against more than one product, fetch each additional
   // product's own highest-capacity-on-record too (the initial load only fetches it for
@@ -1301,7 +1320,8 @@ export const HourlyProductionEntryPage: React.FC = () => {
 
     });
 
-    // 3. Check Wastages Table — only block on negatives (qty=0 is allowed)
+    // 3. Check Wastages Table — only block on negatives (qty=0 is allowed) & duplicate items
+    const seenWastageRmIds = new Set<string>();
     wastages.forEach((w, idx) => {
       const isNegative = w.quantity !== "" && Number(w.quantity) < 0;
       if (isNegative) {
@@ -1312,10 +1332,24 @@ export const HourlyProductionEntryPage: React.FC = () => {
           type: "error",
         });
       }
+
+      const rmId = String(w.targetWastageProductId || "").trim();
+      if (rmId) {
+        if (seenWastageRmIds.has(rmId)) {
+          const rmObj = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === rmId);
+          errors.push({
+            id: `wastage-${idx}-duplicate`,
+            location: `Wastage Row #${idx + 1}`,
+            message: `Duplicate raw material "${rmObj?.materialName || rmId}" selected. Each raw material can only be added once.`,
+            type: "error",
+          });
+        }
+        seenWastageRmIds.add(rmId);
+      }
     });
 
     return errors;
-  }, [rows, wastages, totalWastageWeight]);
+  }, [rows, wastages, totalWastageWeight, rawMaterials]);
 
   // ── Form Validation ─────────────────────────────────────────────
   const validateShiftData = (isSubmittingShift: boolean = false): { isValid: boolean; error?: string } => {
@@ -1554,8 +1588,68 @@ export const HourlyProductionEntryPage: React.FC = () => {
     } finally {
       setIsSaving(false);
       setShowSubmitModal(false);
+      setShowSaveModal(false);
     }
   };
+
+  const saveModalDialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showSaveModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSaveModal(false);
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const buttons = Array.from(
+          saveModalDialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not([disabled])") ?? []
+        );
+        if (buttons.length < 2) return;
+
+        const activeIdx = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        if (activeIdx === -1) return;
+
+        e.preventDefault();
+        const nextIdx = e.key === "ArrowRight"
+          ? (activeIdx + 1) % buttons.length
+          : (activeIdx - 1 + buttons.length) % buttons.length;
+        buttons[nextIdx].focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showSaveModal]);
+
+  useFormShortcuts({
+    onSave: () => {
+      if (isSaving || !can("hourly_productions.create") || isLocked) return;
+      if (showSubmitModal) {
+        setShowSubmitModal(false);
+        handleSaveAll(true);
+      } else if (showSaveModal) {
+        setHasAttemptedSubmit(true);
+        const validation = validateShiftData(true);
+        if (!validation.isValid) {
+          setShowSaveModal(false);
+          toast.error(validation.error || "Please fill all mandatory fields before completing shift.");
+          setTimeout(() => {
+            const firstInvalid = document.querySelector<HTMLElement>(".border-rose-500, input:invalid, select:invalid");
+            firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+            firstInvalid?.focus();
+          }, 100);
+          return;
+        }
+        setShowSaveModal(false);
+        handleSaveAll(true);
+      } else {
+        setShowSaveModal(true);
+      }
+    },
+  });
 
   const poTargetQty = Number(poStats?.targetQty || dailyPlan?.productionOrder?.targetQty || 0);
 
@@ -1725,6 +1819,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
             }}
             rowHeight={48}
             visibleRows={12}
+            maxRows={12}
             editable={false}
             showTotals={[
               { colKey: "timeSlot", value: <span className="font-bold uppercase tracking-wider text-xs">TOTAL:</span> },
@@ -1752,7 +1847,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
               <QuantityInput
                 name="totalWastageWeight"
                 value={totalWastageWeight}
-                baseUoms="kg, g, t"
+                baseUoms="g, kg, t"
                 uom={totalWastageUom}
                 onUomChange={(uom) => setTotalWastageUom(uom)}
                 onChange={(e) => {
@@ -1831,7 +1926,14 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 text={isSaving ? "Saving..." : "Save Draft"}
                 variant="secondary"
                 icon={FaSave}
-                onClick={() => handleSaveAll(false)}
+                onClick={() => {
+                  const validation = validateShiftData(false);
+                  if (!validation.isValid) {
+                    toast.error(validation.error || "Please fix validation errors before saving.");
+                    return;
+                  }
+                  setShowSaveModal(true);
+                }}
                 disabled={isSaving || !can("hourly_productions.create")}
               />
               <CustomButton
@@ -1853,6 +1955,84 @@ export const HourlyProductionEntryPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── Save / Draft Options Modal (F2) ────────────────────────── */}
+      {showSaveModal && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setShowSaveModal(false)}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div
+            ref={saveModalDialogRef}
+            className="bg-card border border-line-soft rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 relative my-auto"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 text-center">
+              {/* Icon */}
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full mb-4 bg-accent/15 border border-accent/20">
+                <FaClock className="text-accent" size={24} />
+              </div>
+
+              <h5 className="text-lg font-bold mb-2 text-ink">
+                Save Hourly Production
+              </h5>
+
+              <p className="text-sm text-ink-muted mb-6">
+                Choose how you want to save this shift:
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <CustomButton
+                  text="Cancel"
+                  variant="secondary"
+                  onClick={() => setShowSaveModal(false)}
+                  disabled={isSaving}
+                  className="px-4"
+                />
+                <CustomButton
+                  text="Save as Draft"
+                  icon={FaSave}
+                  variant="secondary"
+                  onClick={() => {
+                    setShowSaveModal(false);
+                    handleSaveAll(false);
+                  }}
+                  disabled={isSaving}
+                  className="px-4 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                />
+                <CustomButton
+                  text="Save (Complete)"
+                  icon={FaCheckCircle}
+                  variant="primary"
+                  onClick={() => {
+                    setHasAttemptedSubmit(true);
+                    const validation = validateShiftData(true);
+                    if (!validation.isValid) {
+                      setShowSaveModal(false);
+                      toast.error(validation.error || "Please fill all mandatory fields before completing shift.");
+                      setTimeout(() => {
+                        const firstInvalid = document.querySelector<HTMLElement>(".border-rose-500, input:invalid, select:invalid");
+                        firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        firstInvalid?.focus();
+                      }, 100);
+                      return;
+                    }
+                    setShowSaveModal(false);
+                    handleSaveAll(true);
+                  }}
+                  disabled={isSaving}
+                  autoFocus
+                  className="px-4 font-bold"
+                />
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Submit Modal ────────────────────────────────────────── */}
       <CommonConfirmModal

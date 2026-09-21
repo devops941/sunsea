@@ -43,7 +43,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     IN_PROGRESS: { bg: '#e8f0fe', text: '#1a73e8' },               // Blue - actively being made
     ON_HOLD: { bg: '#fce8e6', text: '#d93025' },                   // Red - paused
     IN_PRODUCTION: { bg: '#dbeafe', text: '#1d4ed8' },             // Blue - in production
-    STOPPED: { bg: '#fee2e2', text: '#b91c1c' },                   // Red - stopped prematurely
+    STOPPED: { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },                   // Amber - stopped prematurely
     POST_PRODUCTION: { bg: '#ede9fe', text: '#5b21b6' },           // Lavender/Purple - Post Production / Finishing Stage
 
     // ========== COMPLETION & DISPATCH ==========
@@ -61,7 +61,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     COMPLETED: { bg: '#d1fae5', text: '#065f46' },                 // Green - Completed
     SHORT_CLOSED: { bg: '#ffedd5', text: '#c2410c' },              // Orange - closed without hitting target
     PARTIAL_COMPLETED: { bg: '#e0f2fe', text: '#0284c7' },         // Light Blue
-    COMPLETED_WITH_SHORTFALL: { bg: '#fee2e2', text: '#b91c1c' },  // Red-orange - Stopped with shortfall
+    COMPLETED_WITH_SHORTFALL: { bg: '#fef3c7', text: '#b45309' },  // Amber - Stopped with shortfall
     CANCELLED: { bg: '#f3e8ff', text: '#6b21a8' },                 // Purple - cancelled
 
     // ========== LEGACY/COMMON STATUSES (for other modules) ==========
@@ -123,7 +123,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
 
     return (
         <span
-            className={`status-pill ${className}`}
+            className={`status-pill ${normalizedStatus} ${className}`}
             title={title}
             style={{
                 backgroundColor: colorScheme.bg,

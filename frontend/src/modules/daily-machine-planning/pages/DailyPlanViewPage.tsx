@@ -242,9 +242,6 @@ const DailyPlanViewPage: React.FC = () => {
     <div className="p-4 md:p-6 bg-card">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <FaIndustry className="text-white" size={16} />
-          </div>
           <div>
             <h3 className="text-xl font-bold text-ink leading-tight">Daily Plan — {viewPlan.dailyPlanId}</h3>
             <p className="text-xs text-ink-subtle mt-0.5">{fmtDate(viewPlan.productionDate)} · {viewPlan.machine?.machineName || viewPlan.machineId} · {viewPlan.shift?.shiftName || viewPlan.shiftId}</p>

@@ -32,11 +32,7 @@ export class GoodsDispatchService {
     dateFrom?: string;
     dateTo?: string;
   }) {
-    const where: any = {
-      // Dispatch is only allowed after production is fully completed
-      // POST_PRODUCTION is still in-progress — dispatch only from READY_FOR_DISPATCH onwards
-      status: { in: ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
-    };
+    const where: any = {};
 
     if (filters.productItemId) where.productItemId = BigInt(filters.productItemId);
     if (filters.machineId) where.machineMachineId = filters.machineId;
@@ -57,9 +53,8 @@ export class GoodsDispatchService {
     const orders = await prisma.productionOrder.findMany({
       where: {
         ...where,
-        // ✅ Eligible for dispatch: production started and at least some qty produced
-        // IN_PROGRESS is set by syncProductionOrderQuantities when target not yet met
-        status: { in: ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
+        // ✅ Eligible for dispatch: any production order with recorded production
+        status: { in: ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED", "DISPATCHED"] },
       },
       include: {
         productItem: true,
@@ -161,7 +156,7 @@ export class GoodsDispatchService {
       }
 
       // ✅ STEP 7–8: IN_PRODUCTION and later statuses can be dispatched
-      if (!['IN_PROGRESS', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
+      if (!['IN_PROGRESS', 'IN_PRODUCTION', 'POST_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED', 'DISPATCHED'].includes(po.status)) {
         throw new ApiError(
           400,
           `Production Order ${item.productionOrderId} is not eligible for dispatch. Current status: ${po.status}`
@@ -342,10 +337,10 @@ export class GoodsDispatchService {
             });
             const totalDispatched = Number(allDispatches._sum.dispatchQty || 0);
 
-            const isFullyDispatched =
-              targetQty > 0 &&
-              (totalDispatched >= targetQty || (producedQty > 0 && totalDispatched >= producedQty));
             const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(poRecord.status);
+            const isFullyDispatched =
+              (targetQty > 0 && totalDispatched >= targetQty) ||
+              (isShortClosed && producedQty > 0 && totalDispatched >= producedQty);
             const newPoStatus = isFullyDispatched
               ? "DISPATCHED"
               : isShortClosed
@@ -725,10 +720,9 @@ export class GoodsDispatchService {
             const totalDispatched = Number(allDispatches._sum.dispatchQty || 0);
 
             const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(poRecord.status);
-            const isFullyDispatched = targetQty > 0 && (
-              totalDispatched >= targetQty ||
-              (producedQty > 0 && totalDispatched >= producedQty)
-            );
+            const isFullyDispatched =
+              (targetQty > 0 && totalDispatched >= targetQty) ||
+              (isShortClosed && producedQty > 0 && totalDispatched >= producedQty);
             const newPoStatus = isFullyDispatched ? "DISPATCHED" : (isShortClosed ? poRecord.status : "PARTIAL_COMPLETED");
 
             if (poRecord.status !== newPoStatus) {

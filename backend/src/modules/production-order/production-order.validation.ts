@@ -92,11 +92,6 @@ export const productionOrderBodyShape = z.object({
 
 export const createProductionOrderSchema = z.object({
   body: productionOrderBodyShape.superRefine((data, ctx) => {
-    if (data.dueDate && data.orderDate) {
-      if (new Date(data.dueDate) < new Date(data.orderDate)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Due date must be after order date", path: ["dueDate"] });
-      }
-    }
     if (data.weekStartDate && data.weekEndDate) {
       if (new Date(data.weekEndDate) < new Date(data.weekStartDate)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Week End Date must be on or after Week Start Date", path: ["weekEndDate"] });
@@ -110,11 +105,6 @@ export const updateProductionOrderSchema = z.object({
     .omit({ productionOrderId: true })
     .partial()
     .superRefine((data, ctx) => {
-      if (data.dueDate && data.orderDate) {
-        if (new Date(data.dueDate) < new Date(data.orderDate)) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Due date must be after order date", path: ["dueDate"] });
-        }
-      }
       if (data.weekStartDate && data.weekEndDate) {
         if (new Date(data.weekEndDate) < new Date(data.weekStartDate)) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Week End Date must be on or after Week Start Date", path: ["weekEndDate"] });

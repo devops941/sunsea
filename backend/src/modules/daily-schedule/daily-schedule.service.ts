@@ -48,7 +48,6 @@ class DailyScheduleService {
             productItem: true,
           },
         },
-        shift: true,
       },
     });
 
@@ -92,9 +91,10 @@ class DailyScheduleService {
       const shiftCode = prog.shiftId;
       if (!shiftCode) continue;
 
-      const shiftName = prog.shift?.shiftName || "Unknown Shift";
-      const startTime = prog.shift?.startTime || "00:00:00";
-      const endTime = prog.shift?.endTime || "00:00:00";
+      const isNight = shiftCode.toUpperCase().includes("NIGHT");
+      const shiftName = isNight ? "Night Shift" : "Day Shift";
+      const startTime = isNight ? "21:00:00" : "09:00:00";
+      const endTime = isNight ? "09:00:00" : "21:00:00";
 
       if (!dayObj.shiftsMap.has(shiftCode)) {
         dayObj.shiftsMap.set(shiftCode, {

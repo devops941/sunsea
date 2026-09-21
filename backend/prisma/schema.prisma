@@ -62,7 +62,7 @@ model Employee {
   presentPincode        String?
 
   // Section 6: Official Info
-     designation      String?
+  designation      String?
   employeeType     EmployeeType?
   employeeCategory EmployeeCategory?
   roleId           Int?
@@ -557,30 +557,24 @@ model SupplierAddress {
 }
 
 model Shift {
-  id                   Int                          @id @default(autoincrement())
-  shiftCode            String                       @unique
-  shiftName            String                       @unique
+  id                   Int                    @id @default(autoincrement())
+  shiftCode            String                 @unique
+  shiftName            String                 @unique
   startTime            String
   endTime              String
   breakDuration        Int?
-  gracePeriod          Int?                         @default(15)
-  isActive             Boolean                      @default(true)
-  createdAt            DateTime                     @default(now())
-  updatedAt            DateTime                     @updatedAt
-  createdBy            String?                      @map("created_by")
-  updatedBy            String?                      @map("updated_by")
-  editHistory          Json?                        @map("edit_history")
-  dailyProductionPlans DailyProductionPlan[]
-  HourlyProduction     HourlyProduction[]
-  productionWastages   ProductionWastage[]
-  WeeklyMachineProgram WeeklyMachineProgram[]
-  shiftRecords         ProductShiftRecord[]
+  gracePeriod          Int?                   @default(15)
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  createdBy            String?                @map("created_by")
+  updatedBy            String?                @map("updated_by")
+  editHistory          Json?                  @map("edit_history")
   employees            Employee[]
   attendanceRecords    AttendanceRecord[]
 
   @@map("shifts")
 }
-
 
 model ProductImage {
   id        BigInt  @id @default(autoincrement())
@@ -744,8 +738,8 @@ model Location {
 }
 
 model Machine {
-  machineId             String                       @id @map("machine_id") @db.VarChar(20)
-  machineName           String                       @map("machine_name") @db.VarChar(100)
+  machineId             String                 @id @map("machine_id") @db.VarChar(20)
+  machineName           String                 @map("machine_name") @db.VarChar(100)
   technologyType        TechnologyType?
   machineType           MachineType?
   targetTemperature     Decimal?                     @map("target_temperature") @db.Decimal(5, 2)
@@ -766,7 +760,7 @@ model Machine {
   dailyProductionPlans  DailyProductionPlan[]
   hourlyProductions     HourlyProduction[]
   oeeSnapshots          MachineOeeSnapshot[]
-  businessPlace         BusinessPlace?               @relation(fields: [businessPlaceId], references: [id])
+  businessPlace         BusinessPlace?         @relation(fields: [businessPlaceId], references: [id])
   productionOrders      ProductionOrder[]
   productionWastages    ProductionWastage[]
   weeklyMachinePrograms WeeklyMachineProgram[]
@@ -831,7 +825,6 @@ model StoreLocation {
   @@unique([storeId, locationCode])
   @@map("store_locations")
 }
-
 
 model RawMaterial {
   rawMaterialId           String                   @id @map("raw_material_id") @db.VarChar(20)
@@ -1056,7 +1049,6 @@ model WeeklyMachineProgram {
   machine              Machine?              @relation(fields: [machineId], references: [machineId])
   Product              Product?              @relation("ProductWeeklyPrograms", fields: [productId], references: [id])
   productionOrder      ProductionOrder       @relation(fields: [productionOrderId], references: [productionOrderId])
-  shift                Shift?                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
 
   @@unique([machineId, shiftId, weekStartDate, dayOfWeek, sequenceNo])
   @@index([productionOrderId])
@@ -1068,27 +1060,26 @@ model WeeklyMachineProgram {
 }
 
 model HourlyProduction {
-  hourlyProductionId BigInt               @id @default(autoincrement()) @map("hourly_production_id")
-  productionOrderId  String               @map("production_order_id") @db.VarChar(20)
-  productionDate     DateTime             @map("production_date") @db.Date
-  shiftId            String               @map("shift_id") @db.VarChar(20)
-  machineId          String               @map("machine_id") @db.VarChar(20)
-  totalQtyProduced   Decimal              @default(0) @map("total_qty_produced") @db.Decimal(14, 3)
-  totalRejectQty     Decimal              @default(0) @map("total_reject_qty") @db.Decimal(14, 3)
-  totalScrapQty      Decimal              @default(0) @map("total_scrap_qty") @db.Decimal(14, 3)
-  totalDowntime      Decimal              @default(0) @map("total_downtime") @db.Decimal(10, 2)
-  hourlyEntries      Json                 @default("[]") @map("hourly_entries")
-  remarks            String?              @db.VarChar(255)
-  operatorId         String?              @map("operator_id") @db.VarChar(20)
-  status             String?              @default("IN_PROGRESS") @db.VarChar(30)
-  dailyPlanId        String?              @map("daily_plan_id") @db.VarChar(50)
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
+  hourlyProductionId BigInt   @id @default(autoincrement()) @map("hourly_production_id")
+  productionOrderId  String   @map("production_order_id") @db.VarChar(20)
+  productionDate     DateTime @map("production_date") @db.Date
+  shiftId            String   @map("shift_id") @db.VarChar(20)
+  machineId          String   @map("machine_id") @db.VarChar(20)
+  totalQtyProduced   Decimal  @default(0) @map("total_qty_produced") @db.Decimal(14, 3)
+  totalRejectQty     Decimal  @default(0) @map("total_reject_qty") @db.Decimal(14, 3)
+  totalScrapQty      Decimal  @default(0) @map("total_scrap_qty") @db.Decimal(14, 3)
+  totalDowntime      Decimal  @default(0) @map("total_downtime") @db.Decimal(10, 2)
+  hourlyEntries      Json     @default("[]") @map("hourly_entries")
+  remarks            String?  @db.VarChar(255)
+  operatorId         String?  @map("operator_id") @db.VarChar(20)
+  status             String?  @default("IN_PROGRESS") @db.VarChar(30)
+  dailyPlanId        String?  @map("daily_plan_id") @db.VarChar(50)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   dailyPlan          DailyProductionPlan? @relation(fields: [dailyPlanId], references: [dailyPlanId])
   machine            Machine              @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
   productionOrder    ProductionOrder      @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
-  shift              Shift                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   productionWastages ProductionWastage[]
 
   @@unique([productionOrderId, productionDate, shiftId, machineId])
@@ -1124,7 +1115,6 @@ model DailyProductionPlan {
   carryForwardTo         DailyProductionPlan[] @relation("CarryForwardChain")
   machine                Machine               @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
   productionOrder        ProductionOrder       @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
-  shift                  Shift                 @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   weeklyMachineProgram   WeeklyMachineProgram  @relation(fields: [weeklyProgramId], references: [weeklyProgramId], onDelete: Cascade)
   hourlyProductions      HourlyProduction[]
   dailyPlanOperators     DailyPlanOperator[]
@@ -1460,7 +1450,6 @@ model ProductionWastage {
   product                Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   productionOrder        ProductionOrder   @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
   rawMaterial            RawMaterial?      @relation(fields: [rawMaterialId], references: [rawMaterialId])
-  shift                  Shift             @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   store                  Store?            @relation(fields: [storeId], references: [storeId])
   targetWastageProduct   RawMaterial?      @relation("TargetWastageProduct", fields: [targetWastageProductId], references: [rawMaterialId])
   category               Category?         @relation(fields: [categoryId], references: [id])
@@ -1756,7 +1745,6 @@ model ProductShiftRecord {
   product           Product         @relation(fields: [productId], references: [id])
   productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
   machine           Machine         @relation(fields: [machineId], references: [machineId])
-  shift             Shift           @relation(fields: [shiftId], references: [shiftCode])
 
   @@index([productId])
   @@index([machineId])

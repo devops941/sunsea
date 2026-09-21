@@ -52,10 +52,8 @@ class ShiftService {
       include: {
         _count: {
           select: {
-            dailyProductionPlans: true,
-            WeeklyMachineProgram: true,
-            HourlyProduction: true,
-            productionWastages: true,
+            employees: true,
+            attendanceRecords: true,
           }
         }
       }
@@ -63,7 +61,7 @@ class ShiftService {
 
     return shifts.map(shift => {
       const { _count, ...rest } = shift;
-      const isAssigned = _count.dailyProductionPlans > 0 || _count.WeeklyMachineProgram > 0 || _count.HourlyProduction > 0 || _count.productionWastages > 0;
+      const isAssigned = (_count?.employees || 0) > 0 || (_count?.attendanceRecords || 0) > 0;
       return {
         ...rest,
         isAssigned
@@ -232,10 +230,8 @@ class ShiftService {
       include: {
         _count: {
           select: {
-            dailyProductionPlans: true,
-            WeeklyMachineProgram: true,
-            HourlyProduction: true,
-            productionWastages: true,
+            employees: true,
+            attendanceRecords: true,
           }
         }
       }
@@ -245,10 +241,10 @@ class ShiftService {
       throw new ApiError(404, "Shift not found");
     }
 
-    const isAssigned = shift._count.dailyProductionPlans > 0 || shift._count.WeeklyMachineProgram > 0 || shift._count.HourlyProduction > 0 || shift._count.productionWastages > 0;
+    const isAssigned = (shift._count?.employees || 0) > 0 || (shift._count?.attendanceRecords || 0) > 0;
 
     if (isAssigned) {
-      throw new ApiError(400, "Shift is currently assigned and cannot be deleted");
+      throw new ApiError(400, "Shift is currently assigned to employees and cannot be deleted");
     }
 
     const deletedShift = await prisma.shift.delete({

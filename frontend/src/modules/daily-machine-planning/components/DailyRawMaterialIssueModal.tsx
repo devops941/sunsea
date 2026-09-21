@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "react-toastify";
-import { FaBoxOpen, FaExclamationTriangle, FaListAlt, FaClipboardList, FaSun, FaMoon } from "react-icons/fa";
+import { FaBoxOpen, FaExclamationTriangle, FaListAlt, FaClipboardList, FaCheckCircle } from "react-icons/fa";
 import type { RawMaterial } from "../../../features/raw-materials/types";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -71,9 +71,11 @@ interface IssueRow {
   storeName: string;
   currentStock: number;
   requiredQty: number;   // 0 for manually added rows
+  previouslyIssuedQty?: number;
   issuedQty: number;
   unit: string;
   isManual: boolean;     // true = user-added, false = from BOM
+  status?: string;
 }
 
 interface Props {
@@ -134,11 +136,10 @@ const convertToBaseUom = (qty: number, fromUnit: string, toUnit: string): number
 };
 
 const fmtShiftLabel = (s: string) => {
-  if (!s) return "";
+  if (!s) return "DAY";
   const u = s.toUpperCase();
-  if (u === "DAY" || u.includes("DAY")) return "DAY";
-  if (u === "NIGHT" || u.includes("NIGHT")) return "NIGHT";
-  return s;
+  if (u.includes("NIGHT") || u.includes("EVENING") || u.includes("S2") || u.includes("2") || u === "NIGHT") return "NIGHT";
+  return "DAY";
 };
 
 const fmtToday = () => {
@@ -184,16 +185,22 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
 
       const consolidated: any[] = data.dailyConsolidated || [];
       const legacyReqs: any[] = data.requirements || [];
+      const issuedFlag = data.alreadyIssued || false;
+      setAlreadyIssued(issuedFlag);
+      setIssueNumber(data.issueNumber || null);
 
       const reqs = consolidated.length > 0
         ? consolidated.map((c: any) => ({
             rawMaterialId: c.rawMaterialId,
             materialName: c.materialName,
             requiredQty: c.totalRequired,
+            previouslyIssuedQty: c.issuedQty ?? c.totalIssued ?? 0,
+            issuedQty: issuedFlag ? Math.max(0, c.pendingQty ?? 0) : c.totalRequired,
             currentStock: c.onHandQty ?? c.currentStock ?? 0,   // physical stock (not available = onHand - reserved)
             storeId: c.storeId || "",
             storeName: c.storeName || "",
             unit: c.uom || "KG",
+            status: c.status,
           }))
         : legacyReqs;
 
@@ -206,9 +213,11 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
         storeName: r.storeName,
         currentStock: r.currentStock,
         requiredQty: r.requiredQty,
-        issuedQty: r.requiredQty,
+        previouslyIssuedQty: r.previouslyIssuedQty ?? 0,
+        issuedQty: r.issuedQty ?? 0,
         unit: r.unit,
         isManual: false,
+        status: r.status,
       })));
 
       setPlanCount(data.planCount || 0);
@@ -281,13 +290,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
         setProductBreakdown(data.productBreakdown || []);
       }
 
-      const issuedFlag = data.alreadyIssued || false;
-      setAlreadyIssued(issuedFlag);
-      setIssueNumber(data.issueNumber || null);
-
-      // Second-time issue: clear BOM pre-fill and go straight to Issue tab
       if (issuedFlag) {
-        setIssueRows([]);
         setActiveTab("issue");
       } else {
         setActiveTab("detail");
@@ -325,9 +328,22 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
   const addManualRow = useCallback(() => {
     setIssueRows((prev) => [
       ...prev,
-      { _id: `manual_${Date.now()}`, rawMaterialId: "", materialName: "", storeId: "", storeName: "", currentStock: 0, requiredQty: 0, issuedQty: 0, unit: "", isManual: true },
+      { _id: `manual_${Date.now()}_${Math.random()}`, rawMaterialId: "", materialName: "", storeId: "", storeName: "", currentStock: 0, requiredQty: 0, issuedQty: 0, unit: "", isManual: true },
     ]);
   }, []);
+
+  const emptyIssueRow: IssueRow = useMemo(() => ({
+    _id: `manual_${Date.now()}`,
+    rawMaterialId: "",
+    materialName: "",
+    storeId: "",
+    storeName: "",
+    currentStock: 0,
+    requiredQty: 0,
+    issuedQty: 0,
+    unit: "",
+    isManual: true,
+  }), []);
 
   // ── Single unified Issue Summary columns ──────────────────────────────────
 
@@ -426,17 +442,37 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     {
       key: "requiredQty",
       header: "Required (BOM)",
-      width: "130px",
+      width: "125px",
       align: "right" as const,
       render: (row) => {
         if (row.isManual) return <span className="text-ink-subtle text-xs">—</span>;
         const reqUnit = normUnit(row.unit) || "kg";
-        return <span className="text-ink-subtle text-xs">{fmtQty(row.requiredQty)} {reqUnit}</span>;
+        return <span className="text-ink-subtle text-xs font-semibold">{fmtQty(row.requiredQty)} {reqUnit}</span>;
       },
     },
+    ...(alreadyIssued
+      ? [
+          {
+            key: "previouslyIssuedQty",
+            header: "Issued Qty",
+            width: "125px",
+            align: "right" as const,
+            render: (row: IssueRow) => {
+              const reqUnit = normUnit(row.unit) || "kg";
+              const qty = row.previouslyIssuedQty ?? 0;
+              return (
+                <span className="text-xs font-bold text-emerald-400 flex items-center justify-end gap-1">
+                  <FaCheckCircle size={11} className="text-emerald-400 shrink-0" />
+                  <span>{fmtQty(qty)} {reqUnit}</span>
+                </span>
+              );
+            },
+          },
+        ]
+      : []),
     {
       key: "issuedQty",
-      header: "Issue Qty & UOM",
+      header: alreadyIssued ? "Issue Additional" : "Issue Qty & UOM",
       width: "160px",
       align: "right" as const,
       render: (row, _i, update) => {
@@ -476,7 +512,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
       },
     },
     ];
-    return cols.filter((col) => !(alreadyIssued && col.key === "requiredQty"));
+    return cols;
   }, [allRawMaterials, issueRows, alreadyIssued]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -548,16 +584,19 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     }
   };
 
-  const uniqueShifts = [...new Set(planSummary.map((p) => p.shiftId))].sort(
-    (a, b) => fmtShiftLabel(a).localeCompare(fmtShiftLabel(b))
-  );
+  const dayPlans = useMemo(() => planSummary.filter((p) => fmtShiftLabel(p.shiftId) === "DAY"), [planSummary]);
+  const nightPlans = useMemo(() => planSummary.filter((p) => fmtShiftLabel(p.shiftId) === "NIGHT"), [planSummary]);
 
-  const dayPlans = planSummary.filter((p) => fmtShiftLabel(p.shiftId).toUpperCase().includes("DAY"));
-  const nightPlans = planSummary.filter((p) => fmtShiftLabel(p.shiftId).toUpperCase().includes("NIGHT"));
+  const uniqueShifts = useMemo(() => {
+    const s: string[] = [];
+    if (dayPlans.length > 0) s.push("DAY");
+    if (nightPlans.length > 0) s.push("NIGHT");
+    return s;
+  }, [dayPlans.length, nightPlans.length]);
 
-  const dayTotalQty = dayPlans.reduce((s, p) => s + p.plannedQty, 0);
-  const nightTotalQty = nightPlans.reduce((s, p) => s + p.plannedQty, 0);
-  const grandTotalQty = planSummary.reduce((s, p) => s + p.plannedQty, 0);
+  const dayTotalQty = useMemo(() => dayPlans.reduce((s, p) => s + p.plannedQty, 0), [dayPlans]);
+  const nightTotalQty = useMemo(() => nightPlans.reduce((s, p) => s + p.plannedQty, 0), [nightPlans]);
+  const grandTotalQty = useMemo(() => planSummary.reduce((s, p) => s + p.plannedQty, 0), [planSummary]);
 
   const buildProductTable = (prod: ProductBreakdown) => {
     type Row = Record<string, any>;
@@ -585,7 +624,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
 
     prod.plans.forEach((p) => {
       const mName = p.machineName || p.machineId;
-      const sName = p.shiftName || p.shiftId;
+      const sName = fmtShiftLabel(p.shiftId) === "NIGHT" ? "Night" : "Day";
 
       columns.push({
         key: `plan_${p.dailyPlanId}`,
@@ -642,11 +681,11 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
 
   const displayedProducts = (shiftFilter === "ALL"
     ? productBreakdown
-    : productBreakdown.filter((prod) => prod.plans.some((p) => p.shiftId === shiftFilter))
+    : productBreakdown.filter((prod) => prod.plans.some((p) => fmtShiftLabel(p.shiftId) === shiftFilter))
   ).map((prod) => {
     const plans = shiftFilter === "ALL"
       ? prod.plans
-      : prod.plans.filter((p) => p.shiftId === shiftFilter);
+      : prod.plans.filter((p) => fmtShiftLabel(p.shiftId) === shiftFilter);
     const bomItems = prod.bomItems.map((b) => ({
       ...b,
       totalRequired: plans.reduce((sum, p) => sum + (b.planQtys[p.dailyPlanId] ?? 0), 0),
@@ -714,13 +753,23 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
       maxWidth="6xl"
       footer={
         <div className="flex items-center justify-end gap-2.5">
-          <CustomButton text="Cancel" variant="secondary" onClick={onHide} disabled={issuing} />
-          {issueRows.filter(r => r.rawMaterialId).length > 0 && (
-            <CustomButton
-              text={issuing ? "Issuing..." : "Confirm Issue"}
-              onClick={handleIssue}
-              disabled={issuing || loading}
-            />
+          <CustomButton text={alreadyIssued ? "Close" : "Cancel"} variant="secondary" onClick={onHide} disabled={issuing} />
+          {alreadyIssued ? (
+            issueRows.some((r) => r.rawMaterialId && r.issuedQty > 0) && (
+              <CustomButton
+                text={issuing ? "Issuing..." : "Issue Additional Materials"}
+                onClick={handleIssue}
+                disabled={issuing || loading}
+              />
+            )
+          ) : (
+            issueRows.filter((r) => r.rawMaterialId).length > 0 && (
+              <CustomButton
+                text={issuing ? "Issuing..." : "Confirm Issue"}
+                onClick={handleIssue}
+                disabled={issuing || loading}
+              />
+            )
           )}
         </div>
       }
@@ -737,27 +786,56 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
           </div>
           <div className="flex items-center gap-3 mb-1">
             {planCount > 0 && <span className="text-xs font-bold text-ink-subtle bg-card border border-line-soft px-2.5 py-1.5 rounded-lg">{planCount} plans</span>}
-            {alreadyIssued && <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg">Already Issued</span>}
+            {alreadyIssued && (
+              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
+                <FaCheckCircle size={11} className="text-emerald-400" />
+                <span>Already Issued {issueNumber ? `(${issueNumber})` : ""}</span>
+              </span>
+            )}
           </div>
         </div>
 
-        {loading && <div className="text-center py-12 text-ink-subtle text-sm">Calculating requirements...</div>}
+        {!loading && planCount === 0 && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs text-amber-200">
+              <FaExclamationTriangle size={14} className="shrink-0 text-amber-400" />
+              <span>
+                No scheduled daily production plans found for <strong>{date}</strong>. Please select a date with scheduled plans, or add raw materials manually below to issue for this date.
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-ink uppercase tracking-wider">Manual Material Issue</span>
+              </div>
+              <BusyItemsTable
+                columns={issueRowColumns}
+                rows={issueRows}
+                onChange={(newRows) => setIssueRows(newRows)}
+                onAdd={addManualRow}
+                onRemove={(i) => setIssueRows((prev) => prev.filter((_, j) => j !== i))}
+                isRowDeletable={() => true}
+                editable
+                emptyRow={emptyIssueRow}
+                visibleRows={6}
+                rowHeight={44}
+              />
+            </div>
+          </div>
+        )}
 
         {!loading && planCount > 0 && (
           <>
             <div className="flex items-center gap-1 border-b border-line-soft">
-              {(alreadyIssued
-                ? [{ key: "issue", label: "Issue Raw Materials", icon: FaClipboardList }]
-                : [
-                    { key: "detail", label: "BOM Detail", icon: FaListAlt },
-                    { key: "issue", label: "Issue Raw Materials", icon: FaClipboardList },
-                  ]
-              ).map(({ key, label, icon: Icon }) => (
+              {[
+                { key: "detail", label: "BOM Detail", icon: FaListAlt },
+                { key: "issue", label: "Issue Raw Materials", icon: FaClipboardList },
+              ].map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setActiveTab(key as any)}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 transition-colors ${activeTab === key ? "border-primary text-primary" : "border-transparent text-ink-subtle hover:text-ink"}`}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${activeTab === key ? "border-primary text-primary" : "border-transparent text-ink-subtle hover:text-ink"}`}
                 >
                   <Icon size={11} />
                   {label}
@@ -771,19 +849,17 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                 <div className="flex items-center justify-between gap-3 flex-wrap bg-card-2 p-3.5 rounded-xl border border-line">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     {dayTotalQty > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-bold shadow-xs">
-                        <FaSun size={12} className="text-amber-500" />
-                        <span>Day Shift</span>
-                        <span className="font-mono text-[11px] font-extrabold bg-amber-500/20 px-2 py-0.5 rounded text-amber-900 dark:text-amber-200">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line text-xs font-semibold text-ink-subtle shadow-xs">
+                        <span>Day Shift:</span>
+                        <span className="font-mono text-[11px] font-extrabold text-ink">
                           {dayTotalQty.toLocaleString()} pcs
                         </span>
                       </div>
                     )}
                     {nightTotalQty > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-300 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-300 text-xs font-bold shadow-xs">
-                        <FaMoon size={12} className="text-indigo-500" />
-                        <span>Night Shift</span>
-                        <span className="font-mono text-[11px] font-extrabold bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-900 dark:text-indigo-200">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line text-xs font-semibold text-ink-subtle shadow-xs">
+                        <span>Night Shift:</span>
+                        <span className="font-mono text-[11px] font-extrabold text-ink">
                           {nightTotalQty.toLocaleString()} pcs
                         </span>
                       </div>
@@ -816,7 +892,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                             shiftFilter === s ? "bg-primary text-white shadow-xs font-bold" : "text-ink-subtle hover:text-ink"
                           }`}
                         >
-                          {fmtShiftLabel(s)}
+                          {s === "NIGHT" ? "Night" : "Day"}
                         </button>
                       ))}
                     </div>
@@ -834,10 +910,10 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                       const { columns, rows, showTotals } = buildProductTable(prod);
                       const prodPlannedQty = prod.plans.reduce((s, p) => s + p.plannedQty, 0);
                       const prodDayQty = prod.plans
-                        .filter((p) => fmtShiftLabel(p.shiftId).toUpperCase().includes("DAY"))
+                        .filter((p) => fmtShiftLabel(p.shiftId) === "DAY")
                         .reduce((s, p) => s + p.plannedQty, 0);
                       const prodNightQty = prod.plans
-                        .filter((p) => fmtShiftLabel(p.shiftId).toUpperCase().includes("NIGHT"))
+                        .filter((p) => fmtShiftLabel(p.shiftId) === "NIGHT")
                         .reduce((s, p) => s + p.plannedQty, 0);
 
                       return (
@@ -861,17 +937,20 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                                 </span>
                               )}
                               {prodDayQty > 0 && (
-                                <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                                  <FaSun size={10} className="text-amber-500" /> Day: {prodDayQty.toLocaleString()} pcs
+                                <span className="text-[11px] font-semibold text-ink-subtle bg-card-2 border border-line px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                                  <span>Day:</span>
+                                  <span className="font-mono text-[11px] font-bold text-ink">{prodDayQty.toLocaleString()} pcs</span>
                                 </span>
                               )}
                               {prodNightQty > 0 && (
-                                <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-300 dark:border-indigo-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                                  <FaMoon size={10} className="text-indigo-500" /> Night: {prodNightQty.toLocaleString()} pcs
+                                <span className="text-[11px] font-semibold text-ink-subtle bg-card-2 border border-line px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                                  <span>Night:</span>
+                                  <span className="font-mono text-[11px] font-bold text-ink">{prodNightQty.toLocaleString()} pcs</span>
                                 </span>
                               )}
-                              <span className="text-xs font-black text-primary bg-primary/10 border border-primary/25 px-3 py-1 rounded-lg">
-                                Total: {prodPlannedQty.toLocaleString()} pcs
+                              <span className="text-xs font-bold text-ink bg-card-2 border border-line px-3 py-1 rounded-lg flex items-center gap-1.5">
+                                <span className="text-ink-subtle font-semibold">Total:</span>
+                                <span className="font-mono text-xs font-extrabold text-primary">{prodPlannedQty.toLocaleString()} pcs</span>
                               </span>
                             </div>
                           </div>
@@ -899,6 +978,18 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             {/* ── TAB: Issue Summary — single unified table (BOM + manual rows) ── */}
             {activeTab === "issue" && (
               <div className="flex flex-col gap-3">
+                {alreadyIssued && (
+                  <div className="flex items-center justify-between gap-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-300">
+                    <div className="flex items-center gap-2">
+                      <FaCheckCircle size={14} className="shrink-0 text-emerald-400" />
+                      <span>
+                        Raw materials have already been issued for <strong>{date}</strong>
+                        {issueNumber ? ` (Issue Ref: ${issueNumber})` : ""}.
+                        Issued quantities are shown below. To issue extra material, enter the quantity in "Issue Additional".
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <BusyItemsTable
                   columns={issueRowColumns}
                   rows={issueRows}
@@ -907,7 +998,8 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                   onRemove={(i) => setIssueRows((prev) => prev.filter((_, j) => j !== i))}
                   isRowDeletable={() => true}
                   editable
-                  visibleRows={issueRows.length || 1}
+                  emptyRow={emptyIssueRow}
+                  visibleRows={6}
                   rowHeight={44}
                 />
 

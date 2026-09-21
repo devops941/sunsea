@@ -42,7 +42,6 @@ class ProductShiftRecordService {
           },
           include: {
             product: { select: { productName: true, productCode: true } },
-            shift: { select: { shiftName: true } },
             machine: { select: { machineName: true } },
             productionOrder: { select: { productionOrderId: true } },
           },
@@ -75,7 +74,15 @@ class ProductShiftRecordService {
       });
     }
 
-    return createdRecord;
+    return createdRecord
+      ? {
+          ...createdRecord,
+          shift: {
+            shiftCode: createdRecord.shiftId,
+            shiftName: createdRecord.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+          },
+        }
+      : null;
   }
 
   async findByProduct(productId: number) {
@@ -83,7 +90,6 @@ class ProductShiftRecordService {
       where: { productId },
       include: {
         product: { select: { productName: true, productCode: true } },
-        shift: { select: { shiftName: true, shiftCode: true } },
         machine: { select: { machineName: true } },
         productionOrder: {
           select: {
@@ -96,17 +102,31 @@ class ProductShiftRecordService {
       orderBy: { recordedDate: "desc" },
     });
 
-    return records;
+    return records.map((r) => ({
+      ...r,
+      shift: {
+        shiftCode: r.shiftId,
+        shiftName: r.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+      },
+    }));
   }
 
   async getHighestByProduct(productId: number) {
-    return prisma.productShiftRecord.findFirst({
+    const record = await prisma.productShiftRecord.findFirst({
       where: { productId, isHighest: true },
       include: {
-        shift: { select: { shiftName: true } },
         machine: { select: { machineName: true } },
       },
     });
+
+    if (!record) return null;
+    return {
+      ...record,
+      shift: {
+        shiftCode: record.shiftId,
+        shiftName: record.shiftId === "NIGHT" ? "Night Shift" : "Day Shift",
+      },
+    };
   }
 }
 

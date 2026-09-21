@@ -35,7 +35,7 @@ const formatUOM = (code: string | null | undefined) => {
   return lower === "ea" || lower === "each" || lower === "pieces" || lower === "piece" ? "pcs" : code;
 };
 
-const DISPATCH_ELIGIBLE_STATUSES = ["IN_PROGRESS", "IN_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"];
+const DISPATCH_ELIGIBLE_STATUSES = ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED", "DISPATCHED"];
 
 const GoodsDispatchCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -289,7 +289,6 @@ const GoodsDispatchCreate: React.FC = () => {
         ).unwrap();
         toast.success("Goods Dispatch updated successfully");
         setIsDirty(false);
-        navigate("/production/goods-dispatch");
         return;
       }
 

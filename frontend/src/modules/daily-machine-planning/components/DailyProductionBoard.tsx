@@ -24,13 +24,17 @@ export const STATUS_BOARD_DOT: Record<string, string> = {
 };
 
 export const calcProduced = (plan: any): number => {
-  if (!Array.isArray(plan?.hourlyProductions) || plan.hourlyProductions.length === 0) return 0;
-  return plan.hourlyProductions.reduce((s: number, h: any) => {
+  if (!plan) return 0;
+  if (!Array.isArray(plan.hourlyProductions) || plan.hourlyProductions.length === 0) {
+    return Number(plan.producedQty ?? plan.goodProduced ?? plan.totalGoodProduced ?? 0);
+  }
+  const hourlySum = plan.hourlyProductions.reduce((s: number, h: any) => {
     if (h.totalQtyProduced !== undefined) {
       return s + Math.max(0, Number(h.totalQtyProduced || 0) - Number(h.totalRejectQty || 0));
     }
     return s + Math.max(0, Number(h.qtyProduced || 0) - Number(h.rejectQty || 0));
   }, 0);
+  return hourlySum > 0 ? hourlySum : Number(plan.producedQty ?? plan.goodProduced ?? plan.totalGoodProduced ?? 0);
 };
 
 export const countLoggedEntries = (plan: any): number => {
@@ -64,8 +68,9 @@ export const hasDraftHourly = (plan: any): boolean => {
   });
 };
 
-interface DailyPlanCardProps {
+export interface DailyPlanCardProps {
   plan: any;
+  effectivePlanned?: number;
   dayDate: string;
   rmIssuedDates: Set<string>;
   onClick: (plan: any) => void;
@@ -74,23 +79,28 @@ interface DailyPlanCardProps {
 
 export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
   plan,
+  effectivePlanned,
   dayDate,
   rmIssuedDates,
   onClick,
   onContextMenu,
 }) => {
   const produced = calcProduced(plan);
-  const planned = Number(plan.plannedQty || 0);
-  const pct = planned > 0 ? Math.min(100, Math.round((produced / planned) * 100)) : 0;
+  const planned = effectivePlanned !== undefined ? effectivePlanned : Number(plan.plannedQty || 0);
+  const pct = planned > 0 ? Math.round((produced / planned) * 100) : 0;
+  const barWidth = Math.min(100, pct);
   const loggedCount = countLoggedEntries(plan);
+  const isStopped = Boolean(
+    ["STOPPED", "SHORT_CLOSED", "CANCELLED", "COMPLETED_WITH_SHORTFALL"].includes(String(plan.status || "").toUpperCase()) ||
+    /Permanently Stopped|Short Closed|Stopped:/i.test(plan.remarks || "")
+  );
   const isCompleted = plan.status === "COMPLETED";
-  const isStopped = plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || plan.status === "CANCELLED";
-  const isPostProd = plan.status === "POST_PRODUCTION";
+  const isPostProd = !isStopped && plan.status === "POST_PRODUCTION";
   const isDraft = !isCompleted && !isStopped && !isPostProd && (plan.status === "DRAFT" || hasDraftHourly(plan));
   const isInProgress = !isCompleted && !isStopped && !isPostProd && !isDraft && (plan.status === "IN_PROGRESS" || pct > 0);
 
   // Status-aware colors for high contrast in both Light and Dark themes
-  const cardStyles = isCompleted
+  const cardStyles = (isCompleted || (isStopped && pct > 0))
     ? {
         card: "bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-500/40 shadow-xs hover:border-emerald-500",
         po: "text-emerald-800 dark:text-emerald-300",
@@ -99,16 +109,6 @@ export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
         pct: "text-emerald-700 dark:text-emerald-400",
         track: "bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/30",
         bar: "bg-emerald-500",
-      }
-    : isStopped
-    ? {
-        card: "bg-rose-50/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-500/40 shadow-xs hover:border-rose-500",
-        po: "text-rose-800 dark:text-rose-300",
-        title: "text-rose-950 dark:text-rose-100",
-        pcs: "text-rose-800/80 dark:text-rose-300/80",
-        pct: "text-rose-700 dark:text-rose-400",
-        track: "bg-rose-100 dark:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/30",
-        bar: "bg-rose-500",
       }
     : isPostProd
     ? {
@@ -122,13 +122,13 @@ export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
       }
     : isDraft
     ? {
-        card: "bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-500/40 shadow-xs hover:border-amber-500",
-        po: "text-amber-800 dark:text-amber-300",
-        title: "text-amber-950 dark:text-amber-100",
-        pcs: "text-amber-800/80 dark:text-amber-300/80",
-        pct: "text-amber-700 dark:text-amber-400",
-        track: "bg-amber-100 dark:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/30",
-        bar: "bg-amber-500",
+        card: "bg-amber-500/[0.04] dark:bg-card border-dashed border-amber-500/40 dark:border-amber-500/35 shadow-xs hover:border-amber-400 hover:bg-amber-500/[0.08] dark:hover:bg-card-2/80 transition-all",
+        po: "text-amber-700 dark:text-amber-400/90",
+        title: "text-slate-900 dark:text-ink font-bold",
+        pcs: "text-slate-600 dark:text-ink-subtle",
+        pct: "text-amber-600 dark:text-amber-400 font-extrabold",
+        track: "bg-slate-200/70 dark:bg-card-2 border border-slate-300/40 dark:border-line-soft",
+        bar: "bg-amber-500/80",
       }
     : isInProgress
     ? {
@@ -150,10 +150,10 @@ export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
         bar: "bg-sky-500",
       };
 
-  const dot = isCompleted
+  const dot = isStopped
+    ? "bg-red-500 ring-1 ring-red-400/40"
+    : isCompleted
     ? "bg-emerald-500 ring-1 ring-emerald-400/50"
-    : isStopped
-    ? "bg-rose-500 ring-1 ring-rose-400/50"
     : isPostProd
     ? "bg-purple-500 ring-1 ring-purple-400/50"
     : isDraft
@@ -175,32 +175,29 @@ export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
           {plan.productionOrderId}
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
-          {isDraft && (
+          {isDraft ? (
             <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-xs"
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-xs"
               title={`Draft Saved (${loggedCount} hours recorded)`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
               Draft{loggedCount > 0 ? ` (${loggedCount}h)` : ""}
             </span>
+          ) : (
+            <span
+              className={`${isStopped ? "w-[5px] h-[5px]" : "w-1.5 h-1.5"} rounded-full shrink-0 ${dot}`}
+              title={
+                isCompleted
+                  ? "Production Completed (100%)"
+                  : isStopped
+                  ? "Production Stopped"
+                  : isPostProd
+                  ? "Post Production"
+                  : rmIssuedDates.has(dayDate)
+                  ? "RM Issued"
+                  : `Status: ${plan.status}`
+              }
+            />
           )}
-
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`}
-            title={
-              isCompleted
-                ? "Production Completed (100%)"
-                : isStopped
-                ? "Production Stopped"
-                : isPostProd
-                ? "Post Production"
-                : isDraft
-                ? "Draft Saved"
-                : rmIssuedDates.has(dayDate)
-                ? "RM Issued"
-                : `Status: ${plan.status}`
-            }
-          />
         </div>
       </div>
 
@@ -210,7 +207,9 @@ export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
 
       <div className="flex items-center justify-between gap-1 mb-1">
         <span className={`text-[9.5px] ${cardStyles.pcs}`}>
-          {planned.toLocaleString("en-IN")} pcs
+          {produced > 0 || loggedCount > 0
+            ? `${produced.toLocaleString("en-IN")} / ${planned.toLocaleString("en-IN")} pcs`
+            : `${planned.toLocaleString("en-IN")} pcs`}
         </span>
         <span className={`text-[10px] font-extrabold ${cardStyles.pct}`}>
           {pct}%
@@ -220,11 +219,66 @@ export const DailyPlanCard: React.FC<DailyPlanCardProps> = ({
       <div className={`w-full h-1.5 rounded-full overflow-hidden ${cardStyles.track}`}>
         <div
           className={`h-full rounded-full transition-all duration-300 ${cardStyles.bar}`}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${barWidth}%` }}
         />
       </div>
     </div>
   );
+};
+
+export const getEffectivePlannedQtyMap = (boardMap: Record<string, Record<DayName, Record<ShiftSlot, any[]>>>): Record<string, number> => {
+  const allPlans: any[] = [];
+  if (!boardMap) return {};
+  Object.values(boardMap).forEach((dayMap) => {
+    if (!dayMap) return;
+    Object.values(dayMap).forEach((slotMap) => {
+      if (!slotMap) return;
+      Object.values(slotMap).forEach((plans) => {
+        if (Array.isArray(plans)) {
+          allPlans.push(...plans);
+        }
+      });
+    });
+  });
+
+  const byPO: Record<string, any[]> = {};
+  allPlans.forEach((plan) => {
+    const poId = plan.productionOrderId;
+    if (!poId) return;
+    if (!byPO[poId]) byPO[poId] = [];
+    byPO[poId].push(plan);
+  });
+
+  const effectiveMap: Record<string, number> = {};
+
+  Object.entries(byPO).forEach(([_poId, plans]) => {
+    const sorted = [...plans].sort((a, b) => {
+      const dateA = a.productionDate?.split("T")[0] || "";
+      const dateB = b.productionDate?.split("T")[0] || "";
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const slotA = String(a.shiftId || "").toUpperCase().includes("NIGHT") ? 1 : 0;
+      const slotB = String(b.shiftId || "").toUpperCase().includes("NIGHT") ? 1 : 0;
+      return slotA - slotB;
+    });
+
+    const targetQty = Number(sorted[0]?.productionOrder?.targetQty || sorted[0]?.targetQty || 0);
+    let prevQty = 0;
+
+    sorted.forEach((plan) => {
+      const rawPlanned = Number(plan.plannedQty || 0);
+      let eff = rawPlanned;
+      if (targetQty > 0) {
+        eff = Math.min(rawPlanned, Math.max(0, targetQty - prevQty));
+      }
+      const key = plan.dailyPlanId || `${plan.productionOrderId}_${plan.productionDate}_${plan.shiftId}`;
+      effectiveMap[key] = eff;
+      const actualProduced = calcProduced(plan);
+      const usedQty = actualProduced > 0 ? actualProduced : eff;
+      prevQty += usedQty;
+    });
+  });
+
+  return effectiveMap;
 };
 
 export interface DailyProductionBoardProps {
@@ -246,9 +300,10 @@ export const DailyProductionBoard: React.FC<DailyProductionBoardProps> = ({
   onCardClick,
   onContextMenu,
 }) => {
+  const effectivePlannedMap = React.useMemo(() => getEffectivePlannedQtyMap(boardMap), [boardMap]);
   return (
-    <div className="flex-1 overflow-auto px-6 pb-6 pt-2">
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-line-soft bg-white dark:bg-card shadow-xs">
+    <div className="flex-1 overflow-auto px-6 pb-6 pt-2 flex flex-col">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-line-soft bg-white dark:bg-card shadow-xs flex-1">
         <table
           className="border-collapse text-xs w-full"
           style={{
@@ -278,21 +333,21 @@ export const DailyProductionBoard: React.FC<DailyProductionBoardProps> = ({
             </tr>
 
             {/* Shift Subheaders (Day / Night) */}
-            <tr className="bg-slate-50 dark:bg-card-2/80 border-b border-slate-200 dark:border-line">
-              <th className="sticky left-0 bg-slate-50 dark:bg-card-2/80 z-30 border-r border-slate-200 dark:border-line" />
+            <tr className="bg-slate-100/70 dark:bg-card-2/80 border-b border-slate-200 dark:border-line">
+              <th className="sticky left-0 bg-slate-100/70 dark:bg-card-2/80 z-30 border-r border-slate-200 dark:border-line" />
               {filteredDays.flatMap((day) =>
                 SHIFT_SLOTS.map((slot) => {
                   const isDay = slot === "DAY";
                   return (
                     <th
                       key={`${day}-${slot}`}
-                      className={`px-2 py-1.5 text-center text-[9.5px] font-bold uppercase tracking-wider ${
+                      className={`px-2 py-1.5 text-center text-[9.5px] font-bold uppercase tracking-wider text-ink ${
                         isDay
-                          ? "bg-amber-50/50 dark:bg-amber-950/15 text-amber-800 dark:text-amber-300 border-r border-dashed border-slate-200 dark:border-line-soft/40"
-                          : "bg-indigo-50/50 dark:bg-indigo-950/15 text-indigo-800 dark:text-indigo-300 border-r border-slate-200 dark:border-line"
+                          ? "border-r border-dashed border-slate-200 dark:border-line-soft/40"
+                          : "border-r border-slate-200 dark:border-line"
                       }`}
                     >
-                      {isDay ? "☀ Day" : "☾ Night"}
+                      {isDay ? "Day" : "Night"}
                     </th>
                   );
                 })
@@ -348,16 +403,20 @@ export const DailyProductionBoard: React.FC<DailyProductionBoardProps> = ({
                               </div>
                             ) : (
                               <div className="flex flex-col gap-1.5">
-                                {cellPlans.map((plan: any) => (
-                                  <DailyPlanCard
-                                    key={plan.dailyPlanId}
-                                    plan={plan}
-                                    dayDate={dayDates[day]}
-                                    rmIssuedDates={rmIssuedDates}
-                                    onClick={onCardClick}
-                                    onContextMenu={onContextMenu}
-                                  />
-                                ))}
+                                {cellPlans.map((plan: any) => {
+                                  const cardKey = plan.dailyPlanId || `${plan.productionOrderId}_${plan.productionDate}_${plan.shiftId}`;
+                                  return (
+                                    <DailyPlanCard
+                                      key={plan.dailyPlanId || cardKey}
+                                      plan={plan}
+                                      effectivePlanned={effectivePlannedMap[cardKey]}
+                                      dayDate={dayDates[day]}
+                                      rmIssuedDates={rmIssuedDates}
+                                      onClick={onCardClick}
+                                      onContextMenu={onContextMenu}
+                                    />
+                                  );
+                                })}
                               </div>
                             )}
                           </td>
