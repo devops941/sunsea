@@ -167,7 +167,7 @@ const GrnInvoiceViewPage: React.FC = () => {
         if (!selectedItem?.supplierId) { setSupplierBalance(null); return; }
         supplierService.fetchById(String(selectedItem.supplierId))
             .then((sup: any) => {
-                const bal = Number(sup.balanceAmount ?? sup.netBalance ?? sup.openingBalance ?? 0);
+                const bal = Math.abs(Number(sup.balanceAmount ?? sup.netBalance ?? sup.openingBalance ?? 0));
                 const bType = (sup.balanceType || sup.openingBalanceType || "").toString().toUpperCase();
                 setSupplierBalance({ amount: bal, type: bType.startsWith("D") ? "Dr" : bType.startsWith("C") ? "Cr" : "" });
             })

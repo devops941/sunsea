@@ -148,7 +148,7 @@ export const PurchaseReturnCreatePage: React.FC = () => {
     if (!selectedSupplier) return null;
     const name = selectedSupplier.displayName || selectedSupplier.legalName || "";
     const city = selectedSupplier.billingCity || "";
-    const bal = Number(selectedSupplier.balanceAmount ?? selectedSupplier.netBalance ?? selectedSupplier.openingBalance ?? 0);
+    const bal = Math.abs(Number(selectedSupplier.balanceAmount ?? selectedSupplier.netBalance ?? selectedSupplier.openingBalance ?? 0));
     const bType = (selectedSupplier.balanceType || selectedSupplier.openingBalanceType || "").toString().toUpperCase();
     const isCr = bType.startsWith("C");
     const balLabel = bal ? `₹${formatAmount(bal)} ${isCr ? "Cr" : "Dr"}` : "";
@@ -160,7 +160,7 @@ export const PurchaseReturnCreatePage: React.FC = () => {
     return suppliers.map((s: any) => {
       const name = s.displayName || s.legalName || String(s.id);
       const city = s.billingCity || "—";
-      const bal = Number(s.balanceAmount ?? s.netBalance ?? s.openingBalance ?? 0);
+      const bal = Math.abs(Number(s.balanceAmount ?? s.netBalance ?? s.openingBalance ?? 0));
       const bType = (s.balanceType || s.openingBalanceType || "").toString().toUpperCase();
       const isCr = bType.startsWith("C");
       const balLabel = bal ? `₹${formatAmount(bal)} ${isCr ? "Cr" : "Dr"}` : "";
