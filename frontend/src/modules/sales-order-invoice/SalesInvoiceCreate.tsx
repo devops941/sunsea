@@ -924,21 +924,21 @@ const SalesInvoiceForm: React.FC = () => {
     const cust = customersRaw.find((c) => String(c.id) === customerId);
     if (!cust) return false;
     const creditLimit = Number(cust.creditLimit || 0);
-    
+
     const rawOpenBal = Number(cust.balanceAmount ?? cust.netBalance ?? cust.openingBalance ?? 0);
     const rawBType = (cust.balanceType || cust.openingBalanceType || "").toString().toUpperCase();
-    
+
     // Convert to signed balance: Dr is positive, Cr is negative
     let currentSignedBal = (rawBType.startsWith("C") ? -1 : 1) * rawOpenBal;
-    
+
     if (isEditMode) {
       // Reverse current invoice amount from customer's current balance
       currentSignedBal -= originalInvoiceAmount;
     }
-    
+
     const newClosingBal = currentSignedBal + totals.grandTotal;
     const exceededBy = newClosingBal - creditLimit;
-    
+
     return exceededBy > 0 ? { exceededBy, remainingAmount: creditLimit - currentSignedBal } : false;
   }, [customersRaw, customerId, totals.grandTotal, isEditMode, originalInvoiceAmount]);
 
@@ -1648,6 +1648,7 @@ const SalesInvoiceForm: React.FC = () => {
                   error={errors.customerId}
                   options={customerAutocompleteOptions}
                   placeholder="Type to search customer..."
+                  preventOpenOnFocus
                   onChange={(val) => {
                     setCustomerId(val);
                     if (val) loadCustomerOrders(val);

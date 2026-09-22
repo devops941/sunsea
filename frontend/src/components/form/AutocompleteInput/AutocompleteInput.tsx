@@ -30,6 +30,7 @@ interface AutocompleteInputProps {
    *  so a single keystroke (or landing on the cell) reveals the list. */
   openOnFocus?: boolean;
   allowClear?: boolean;
+  preventOpenOnFocus?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -48,6 +49,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   dataNavDefault = false,
   autoFocus = false,
   openOnFocus = false,
+  preventOpenOnFocus = false,
   allowClear,
   onChange,
 }) => {
@@ -364,7 +366,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               if (disabled) return;
               setIsFocused(true);
               setSearch("");
-              if (!inline || openOnFocus) {
+              if ((!inline || openOnFocus) && !preventOpenOnFocus) {
                 updatePosition();
                 setOpen(true);
               }
@@ -372,8 +374,10 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
             onClick={() => {
               if (disabled) return;
               setIsFocused(true);
-              updatePosition();
-              setOpen(true);
+              if (!preventOpenOnFocus) {
+                updatePosition();
+                setOpen(true);
+              }
             }}
             onChange={(e) => {
               if (disabled) return;
