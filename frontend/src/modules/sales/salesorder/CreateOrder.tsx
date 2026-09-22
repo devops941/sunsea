@@ -40,7 +40,7 @@ const componentSchema = z.object({
 
 const orderItemSchema = z.object({
     salesProductId: z.string().min(1, "Sales product is required"),
-    orderQuantity: z.string(),
+    orderQuantity: z.string().refine(val => Number(val) > 0, "Quantity must be greater than 0"),
     unit: z.string().optional(),
     unitPrice: z.string().optional(),
     components: z.array(componentSchema),
@@ -889,11 +889,15 @@ const SalesOrderForm: React.FC = () => {
         }
     };
 
+    const onFormError = () => {
+        toast.error("Quantity must be greater than 0");
+    };
+
     // ─── Wire save shortcut (after cleanEmptyRows / onSubmit are defined) ──
     handleSaveRef.current = () => {
         if (!isSubmitting) {
             cleanEmptyRows();
-            handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))();
+            handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"), onFormError)();
         }
     };
 
@@ -1048,9 +1052,9 @@ const SalesOrderForm: React.FC = () => {
                             <>
                                 <CustomButton text="Clear" variant="danger" onClick={() => reset(isEditMode && editValuesRef.current ? editValuesRef.current : defaultValues)} disabled={isSubmitting} />
                                 {(!targetId || preloadedOrder?.status === "DRAFT") && (
-                                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"))(); }} disabled={isSubmitting} />
+                                    <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "draft"), onFormError)(); }} disabled={isSubmitting} />
                                 )}
-                                <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"))(); }} disabled={isSubmitting} />
+                                <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={() => { cleanEmptyRows(); handleSubmit((data) => onSubmit(data as unknown as SalesOrderFormValues, "order"), onFormError)(); }} disabled={isSubmitting} />
                             </>
                         )}
                     </div>
