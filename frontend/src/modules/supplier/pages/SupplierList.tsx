@@ -409,31 +409,45 @@ const SupplierList: React.FC = () => {
                                 header: "BALANCE",
                                 align: "right",
                                 render: (s: any) => {
-                                    const netBal = Number(
-                                        s.netBalance ??
-                                            (s.openingBalanceType === "CREDIT"
-                                                ? -Math.abs(s.openingBalance || 0)
-                                                : Math.abs(s.openingBalance || 0))
-                                    );
-                                    const amt = Math.abs(netBal);
+                                    let amt = 0;
+                                    let bType = "";
+
+                                    if (s.balanceType !== undefined && s.balanceType !== null && s.balanceType !== "") {
+                                        amt = Number(s.balanceAmount ?? Math.abs(s.netBalance ?? 0));
+                                        bType = s.balanceType;
+                                    } else {
+                                        const netBal = Number(
+                                            s.netBalance ??
+                                                (s.openingBalanceType === "DEBIT"
+                                                    ? -Math.abs(s.openingBalance || 0)
+                                                    : Math.abs(s.openingBalance || 0))
+                                        );
+                                        amt = Math.abs(netBal);
+                                        bType = netBal > 0 ? "Cr" : netBal < 0 ? "Dr" : "";
+                                    }
+
+                                    if (amt === 0 || !bType) {
+                                        return <span className="font-mono text-ink-muted">₹0.00</span>;
+                                    }
+
                                     const formattedAmt = amt.toLocaleString("en-IN", {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     });
-                                    if (netBal > 0) {
+
+                                    if (bType.toUpperCase() === "DR") {
                                         return (
                                             <span className="font-mono font-bold text-blue-400">
                                                 ₹{formattedAmt} Dr
                                             </span>
                                         );
-                                    } else if (netBal < 0) {
+                                    } else {
                                         return (
                                             <span className="font-mono font-bold text-emerald-400">
                                                 ₹{formattedAmt} Cr
                                             </span>
                                         );
                                     }
-                                    return <span className="font-mono text-ink-muted">₹0.00</span>;
                                 }
                             },
                             {

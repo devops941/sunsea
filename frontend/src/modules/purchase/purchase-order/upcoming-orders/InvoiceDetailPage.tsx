@@ -4,7 +4,7 @@ import { FaSave, FaUndo } from "react-icons/fa";
 import BusyItemsTable, { DEFAULT_SUNDRY_OPTIONS } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 import type { BusyColumn, SundryRow } from "../../../../components/form/OrderItemsTable/BusyItemsTable";
 import AutocompleteInput from "../../../../components/form/AutocompleteInput/AutocompleteInput";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import CustomButton from "../../../../components/ui/Button/Button";
@@ -73,6 +73,8 @@ const emptyItem = (): GRNItem => ({
 const InvoiceDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
+    const location = useLocation();
+    const preselectedPoId: string | undefined = (location.state as any)?.preselectedPoId || (location.state as any)?.preselectedOrderId;
     const isEditMode = Boolean(id);
     const dispatch = useAppDispatch();
     const { suppliers, loadSuppliers } = useSuppliers();
@@ -175,8 +177,21 @@ const InvoiceDetailPage: React.FC = () => {
                     }
                 })
                 .catch((err) => console.error("Failed to fetch next GRN number:", err));
+
+            if (preselectedPoId) {
+                purchaseOrderService.fetchById(preselectedPoId)
+                    .then((fullPo: any) => {
+                        if (!fullPo) return;
+                        setApprovedPOs((prev: any[]) => {
+                            const exists = prev.some((o: any) => String(o.id) === String(fullPo.id));
+                            return exists ? prev : [...prev, fullPo];
+                        });
+                        setForm((prev) => ({ ...prev, poId: String(fullPo.id) }));
+                    })
+                    .catch(() => { });
+            }
         }
-    }, [dispatch, loadSuppliers, loadActiveUOMs, id]);
+    }, [dispatch, loadSuppliers, loadActiveUOMs, id, preselectedPoId]);
 
     useEffect(() => {
         if (id) {
@@ -503,7 +518,7 @@ const InvoiceDetailPage: React.FC = () => {
         if (!form.supplierId) { setSupplierLiveBalance(null); return; }
         supplierService.fetchById(String(form.supplierId))
             .then((sup: any) => {
-                const bal = Number(sup.balanceAmount ?? sup.netBalance ?? sup.openingBalance ?? 0);
+                const bal = Math.abs(Number(sup.balanceAmount ?? sup.netBalance ?? sup.openingBalance ?? 0));
                 const bType = (sup.balanceType || sup.openingBalanceType || "").toString().toUpperCase();
                 setSupplierLiveBalance({ amount: bal, type: bType.startsWith("D") ? "Dr" : bType.startsWith("C") ? "Cr" : "" });
             })
@@ -721,7 +736,7 @@ const InvoiceDetailPage: React.FC = () => {
             const isSelected = String(s.id) === String(form.supplierId);
             const bal = isSelected && supplierLiveBalance
                 ? supplierLiveBalance.amount
-                : Number(s.balanceAmount ?? s.netBalance ?? s.openingBalance ?? 0);
+                : Math.abs(Number(s.balanceAmount ?? s.netBalance ?? s.openingBalance ?? 0));
             const bType = isSelected && supplierLiveBalance
                 ? supplierLiveBalance.type.charAt(0).toUpperCase()
                 : (s.balanceType || s.openingBalanceType || "").toString().toUpperCase();
