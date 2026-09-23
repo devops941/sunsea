@@ -12,6 +12,8 @@ export const generatePdfFromHtml = async (htmlContent: string): Promise<Buffer> 
         
         // Set HTML content
         await page.setContent(htmlContent, { waitUntil: 'load' });
+        // Give Tailwind CDN time to process and inject styles
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Generate PDF
         const pdfBuffer = await page.pdf({
