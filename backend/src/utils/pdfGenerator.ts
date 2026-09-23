@@ -11,7 +11,7 @@ export const generatePdfFromHtml = async (htmlContent: string): Promise<Buffer> 
         const page = await browser.newPage();
         
         // Set HTML content
-        await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+        await page.setContent(htmlContent, { waitUntil: 'load' });
         
         // Generate PDF
         const pdfBuffer = await page.pdf({
