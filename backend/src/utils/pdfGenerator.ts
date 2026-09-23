@@ -9,12 +9,11 @@ export const generatePdfFromHtml = async (htmlContent: string): Promise<Buffer> 
 
     try {
         const page = await browser.newPage();
-        
-        // Set HTML content
-        await page.setContent(htmlContent, { waitUntil: 'load' });
-        // Give Tailwind CDN time to process and inject styles
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
+
+        // Load HTML via a data URL so we can use networkidle0
+        const dataUrl = `data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`;
+        await page.goto(dataUrl, { waitUntil: 'networkidle0', timeout: 15000 });
+
         // Generate PDF
         const pdfBuffer = await page.pdf({
             format: 'A4',
