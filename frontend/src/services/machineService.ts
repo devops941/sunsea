@@ -2,7 +2,7 @@ import apiClient from "../api/apiClient";
 import config from "../api/config";
 
 export const machineService = {
-  getAll: async (params?: { search?: string; page?: number; limit?: number }) => {
+  getAll: async (params?: { search?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc" }) => {
     const response = await apiClient.get(config.machine.base, { params });
     return response.data?.data || response.data;
   },

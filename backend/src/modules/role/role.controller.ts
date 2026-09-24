@@ -27,8 +27,10 @@ export const getAllRoles = async (
   const page = req.query.page ? Number(req.query.page) : undefined;
   const limit = req.query.limit ? Number(req.query.limit) : undefined;
   const search = req.query.search ? String(req.query.search) : undefined;
+  const sortBy = req.query.sortBy ? String(req.query.sortBy) : undefined;
+  const sortOrder = req.query.sortOrder === "asc" || req.query.sortOrder === "desc" ? (req.query.sortOrder as "asc" | "desc") : undefined;
 
-  const { roles, total } = await roleService.getAllRoles(page, limit, search);
+  const { roles, total } = await roleService.getAllRoles(page, limit, search, sortBy, sortOrder);
 
   return res.status(200).json({
     success: true,

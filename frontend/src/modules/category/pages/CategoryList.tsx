@@ -1,11 +1,11 @@
 import { formatDate } from "../../../utils/dateUtils";
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Search } from "lucide-react";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -35,11 +35,6 @@ const TYPE_LABELS: Record<CategoryType, string> = {
   WASTAGE: "Wastage",
 };
 
-const TYPE_COLORS: Record<CategoryType, string> = {
-  PRODUCT: "bg-blue-500/15 text-blue-400",
-  RAW_MATERIAL: "bg-green-500/15 text-green-400",
-  WASTAGE: "bg-orange-500/15 text-orange-400",
-};
 
 const TypeBadge: React.FC<{ type: CategoryType }> = ({ type }) => (
   <span className="text-ink text-[13px] font-medium">
@@ -84,7 +79,14 @@ const CategoryList: React.FC = () => {
       try { localStorage.setItem(CATEGORY_SORT_KEY, next); } catch (_) {}
       return next;
     });
+    setCurrentPage(1);
   }, []);
+
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   const activeFilterCount = [
     typeFilter !== "ALL",
@@ -107,54 +109,36 @@ const CategoryList: React.FC = () => {
     setCurrentPage(1);
   }, []);
 
-  usePageShortcuts({
-    onRefresh: () => refresh(),
-    onDelete: () => setShowDeleteModal(true),
-    onNew: () => canCreate && navigate("/categories/create"),
-    onSort: () => toggleSortOrder(),
-  });
+
+  const cacheKey = `categories:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${typeFilter}:${activeFilter}:${sortOrder}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
-    const res = await categoryService.fetchAll({ limit: 10000 });
+    const res = await categoryService.fetchAll({
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+      search: debouncedSearch || undefined,
+      type: typeFilter !== "ALL" ? (typeFilter as CategoryType) : undefined,
+      isActive: activeFilter !== "ALL" ? activeFilter === "true" : undefined,
+      sortBy: sortOrder !== "default" ? "name" : undefined,
+      sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+    });
     const list = Array.isArray(res) ? res : (res?.categories || res?.data || []);
-    return { data: list, total: list.length };
-  }, []);
+    const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+    return { data: list, total };
+  }, [currentPage, debouncedSearch, typeFilter, activeFilter, sortOrder]);
 
-  const { data: allCategories, loading, refresh } = useListCache<Category>({
-    cacheKey: "categories:list",
+  const { data: categories, total, loading, refresh } = useListCache<Category>({
+    cacheKey,
     socketModule: "category",
     fetcher,
   });
 
-  const categories = useMemo(() => {
-    return allCategories.filter((item) => {
-      const matchesSearch = !searchTerm ||
-        item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = typeFilter === "ALL" || item.type === typeFilter;
-      const matchesActive = activeFilter === "ALL" ||
-        (activeFilter === "true" ? item.isActive : !item.isActive);
-      return matchesSearch && matchesType && matchesActive;
-    });
-  }, [allCategories, searchTerm, typeFilter, activeFilter]);
-
-  const sortedCategories = useMemo(() => {
-    if (sortOrder === "default") return categories;
-    return [...categories].sort((a, b) => {
-      const nameA = (a.name || "").toLowerCase();
-      const nameB = (b.name || "").toLowerCase();
-      return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-    });
-  }, [categories, sortOrder]);
-
-  const totalPages = Math.ceil(sortedCategories.length / ITEMS_PER_PAGE);
-  const paginatedCategories = sortedCategories.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
+  const paginatedCategories = categories;
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setCurrentPage(1);
   }, []);
 
 
@@ -199,13 +183,39 @@ const CategoryList: React.FC = () => {
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
     count: paginatedCategories.length,
     onEnter: (i) => { const item = paginatedCategories[i]; if (item) handleOpenView(item); },
+    onEdit: (i) => { const item = paginatedCategories[i]; if (item && canEdit) handleOpenEdit(item); },
     containerRef: tableRef,
   });
 
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onSort: () => toggleSortOrder(),
+    onDelete: () => {
+      if (!canDelete) return;
+      const item = paginatedCategories[focusedIndex];
+      if (item) {
+        setItemToDelete(item.id);
+        setShowDeleteModal(true);
+      }
+    },
+    onNew: () => canCreate && navigate("/categories/create"),
+    onExport: () => {
+      const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+      exportBtn?.click();
+    },
+  });
+
   const fetchCategoriesForExport = useCallback(async () => {
-    const res = await categoryService.fetchAll({ limit: 100000 });
+    const res = await categoryService.fetchAll({
+      limit: 100000,
+      search: debouncedSearch || undefined,
+      type: typeFilter !== "ALL" ? (typeFilter as CategoryType) : undefined,
+      isActive: activeFilter !== "ALL" ? activeFilter === "true" : undefined,
+      sortBy: sortOrder !== "default" ? "name" : undefined,
+      sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+    });
     return Array.isArray(res) ? res : (res?.categories || res?.data || []);
-  }, []);
+  }, [debouncedSearch, typeFilter, activeFilter, sortOrder]);
 
   const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
@@ -230,23 +240,17 @@ const CategoryList: React.FC = () => {
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               Categories
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                {sortedCategories.length}
+                {total ?? categories.length}
               </span>
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {/* Search */}
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
-              <input
-                type="text"
-                data-search-input
-                className="w-full pl-10 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
-                placeholder="Search by code or name..."
-                value={searchTerm}
-                onChange={handleSearch}
-              />
-            </div>
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search by code or name..."
+            />
 
             {/* Filter Popover */}
             <FilterPopover
@@ -354,15 +358,11 @@ const CategoryList: React.FC = () => {
               emptyMessage="No categories found."
               rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
               onRowClick={(item, i) => { setFocusedIndex(i); handleOpenView(item); }}
-              pagination={
-                totalPages > 1
-                  ? {
-                    currentPage,
-                    totalPages,
-                    onPageChange: (page) => setCurrentPage(page),
-                  }
-                  : undefined
-              }
+              pagination={{
+                currentPage,
+                totalPages,
+                onPageChange: (page) => setCurrentPage(page),
+              }}
               columns={[
                 {
                   header: "#",

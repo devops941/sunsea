@@ -108,6 +108,7 @@ const DepartmentList: React.FC = () => {
             } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
     // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
@@ -117,7 +118,7 @@ const DepartmentList: React.FC = () => {
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
                 return;
             }
-            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+            if (e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 toggleSortOrder();
             }
@@ -133,11 +134,14 @@ const DepartmentList: React.FC = () => {
         return () => clearTimeout(handler);
     }, [searchTerm]);
 
+    // Fetch data when page, search term, or sortOrder changes
     useEffect(() => {
         if (canViewDepartment) {
-            loadDepartments(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm);
+            const sb = sortOrder !== "default" ? "name" : undefined;
+            const so = sortOrder !== "default" ? sortOrder : undefined;
+            loadDepartments(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm, sb, so);
         }
-    }, [loadDepartments, currentPage, debouncedSearchTerm, canViewDepartment]);
+    }, [loadDepartments, currentPage, debouncedSearchTerm, sortOrder, canViewDepartment]);
 
     useEffect(() => {
         if (error) {
@@ -153,21 +157,8 @@ const DepartmentList: React.FC = () => {
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
-    // Client-side sorted departments based on persistent sortOrder
-    const sortedDepartments = useMemo(() => {
-        if (!departments || !Array.isArray(departments)) return [];
-        if (sortOrder === "default") return departments;
-
-        return [...departments].sort((a: any, b: any) => {
-            const nameA = (a.name || "").trim().toLowerCase();
-            const nameB = (b.name || "").trim().toLowerCase();
-            if (sortOrder === "asc") {
-                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-            } else {
-                return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-            }
-        });
-    }, [departments, sortOrder]);
+    // Departments are sorted across all total records in the database on the backend before pagination
+    const sortedDepartments = departments;
 
     const handleOpenAdd = () => {
         setEditMode(false);

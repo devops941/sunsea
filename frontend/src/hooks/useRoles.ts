@@ -10,17 +10,21 @@ export const useRoles = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | undefined>(undefined);
 
-  const cacheKey = `${CACHE_PREFIX}${page}:${limit}:${search}`;
+  const cacheKey = `${CACHE_PREFIX}${page}:${limit}:${search}:${sortBy || ""}:${sortOrder || ""}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await roleService.fetchAll({
       page,
       limit,
       search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
     });
     return { data: res.data || [], total: res.total || 0 };
-  }, [page, limit, search]);
+  }, [page, limit, search, sortBy, sortOrder]);
 
   const { data: rawRoles, total, loading, refreshing, refresh } = useListCache<Role>({
     cacheKey,
@@ -44,12 +48,14 @@ export const useRoles = () => {
     });
   }, [rawRoles]);
 
-  // Page calls loadRoles(page, limit, search) — just update state.
+  // Page calls loadRoles(page, limit, search, sortBy, sortOrder) — just update state.
   // cacheKey changes → useListCache checks cache → instant if cached, fetch if not.
-  const loadRoles = useCallback((p?: number, l?: number, s?: string) => {
+  const loadRoles = useCallback((p?: number, l?: number, s?: string, sb?: string, so?: "asc" | "desc") => {
     setPage(p || 1);
     setLimit(l || 15);
     setSearch(s || "");
+    setSortBy(sb);
+    setSortOrder(so);
   }, []);
 
   const addRole = useCallback(

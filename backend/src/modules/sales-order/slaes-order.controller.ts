@@ -183,16 +183,18 @@ class SalesOrderController {
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
-    private parseSortBy(value: unknown): "orderDate" | "createdAt" | "orderNo" | undefined {
+    private parseSortBy(value: unknown): "orderDate" | "createdAt" | "orderNo" | "customer" | "customerName" | "netAmount" | undefined {
         if (!value || typeof value !== "string") return undefined;
-        const v = value.toLowerCase();
-        return (v === "orderDate" || v === "createdAt" || v === "orderNo") ? v as any : undefined;
+        const trimmed = value.trim();
+        const validFields = ["orderDate", "createdAt", "orderNo", "customer", "customerName", "netAmount"];
+        const found = validFields.find(f => f.toLowerCase() === trimmed.toLowerCase());
+        return found as any;
     }
 
     private parseSortOrder(value: unknown): "asc" | "desc" | undefined {
         if (!value || typeof value !== "string") return undefined;
-        const v = value.toLowerCase();
-        return (v === "asc" || v === "desc") ? v as any : undefined;
+        const v = value.toLowerCase().trim();
+        return (v === "asc" || v === "desc") ? (v as any) : undefined;
     }
 
     private parseSalesOrderStatuses(value: unknown): SalesOrderStatus[] | undefined {

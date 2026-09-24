@@ -9,6 +9,7 @@ import type { RawMaterial } from "../../../features/raw-materials/types";
 import { usePermission } from "../../../hooks/usePermission";
 import { useListCache } from "../../../hooks/useListCache";
 import { storeService } from "../../../services/storeService";
+import { categoryService } from "../../../services/categoryService";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -35,10 +36,10 @@ const RawMaterialList: React.FC = () => {
     const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [categoryFilter, setCategoryFilter] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
-    const [activeFilter, setActiveFilter] = useState("");
+    const [draftCategoryFilter, setDraftCategoryFilter] = useState("");
     const [draftStoreFilter, setDraftStoreFilter] = useState("");
-    const [draftActiveFilter, setDraftActiveFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -61,29 +62,38 @@ const RawMaterialList: React.FC = () => {
             try { localStorage.setItem(RAWMAT_SORT_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
+
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
     const [selectedItem, setSelectedItem] = useState<RawMaterial | null>(null);
 
     const [stores, setStores] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
 
     const activeFilterCount = [
+        categoryFilter !== "",
         storeFilter !== "",
-        activeFilter !== "",
     ].filter(Boolean).length;
 
     const hasActiveFilters = activeFilterCount > 0;
 
     const handleApplyFilters = useCallback(() => {
+        setCategoryFilter(draftCategoryFilter);
         setStoreFilter(draftStoreFilter);
-        setActiveFilter(draftActiveFilter);
         setCurrentPage(1);
-    }, [draftStoreFilter, draftActiveFilter]);
+    }, [draftCategoryFilter, draftStoreFilter]);
 
     const handleClearFilters = useCallback(() => {
+        setDraftCategoryFilter("");
         setDraftStoreFilter("");
-        setDraftActiveFilter("");
+        setCategoryFilter("");
         setStoreFilter("");
-        setActiveFilter("");
         setCurrentPage(1);
     }, []);
 
@@ -95,14 +105,34 @@ const RawMaterialList: React.FC = () => {
         }).catch(() => {});
     }, []);
 
-    const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const res = await rawMaterialService.fetchAll({ itemType: "RAW_MATERIAL", limit: 10000 });
-        const list = Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
-        return { data: list, total: list.length };
+    // Fetch RAW_MATERIAL categories for filter dropdown
+    useEffect(() => {
+        categoryService.fetchAll({ type: "RAW_MATERIAL", isActive: true }).then((res: any) => {
+            const list = res?.categories ?? (Array.isArray(res) ? res : res?.data ?? []);
+            setCategories(Array.isArray(list) ? list : []);
+        }).catch(() => {});
     }, []);
 
-    const { data: allRawMaterials, loading, refresh } = useListCache<any>({
-        cacheKey: "rawMaterials:list",
+    const cacheKey = `rawMaterials:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${categoryFilter}:${storeFilter}:${sortOrder}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await rawMaterialService.fetchAll({
+            itemType: "RAW_MATERIAL",
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            categoryId: categoryFilter || undefined,
+            storeId: storeFilter || undefined,
+            sortBy: sortOrder !== "default" ? "materialName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
+        const list = Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
+        const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+        return { data: list, total };
+    }, [currentPage, debouncedSearch, categoryFilter, storeFilter, sortOrder]);
+
+    const { data: rawMaterials, total, loading, refresh } = useListCache<any>({
+        cacheKey,
         socketModule: "rawMaterial",
         fetcher,
     });
@@ -114,33 +144,13 @@ const RawMaterialList: React.FC = () => {
         onSort: () => toggleSortOrder(),
     });
 
-    const filteredData = useMemo(() => {
-        return allRawMaterials.filter((item: any) => {
-            const matchesSearch = !searchTerm ||
-                item.rawMaterialId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.materialName?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStore = !storeFilter || item.storeId === storeFilter;
-            const matchesActive = activeFilter === "" ||
-                (activeFilter === "true" ? item.isActive : !item.isActive);
-            return matchesSearch && matchesStore && matchesActive;
-        });
-    }, [allRawMaterials, searchTerm, storeFilter, activeFilter]);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
+    const paginatedData = rawMaterials;
 
-    const sortedData = useMemo(() => {
-        if (sortOrder === "default") return filteredData;
-        return [...filteredData].sort((a, b) => {
-            const nameA = (a.materialName || "").toLowerCase();
-            const nameB = (b.materialName || "").toLowerCase();
-            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        });
-    }, [filteredData, sortOrder]);
-
-    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
-    const total = sortedData.length;
-    const paginatedData = sortedData.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(e.target.value);
+        setCurrentPage(1);
+    }, []);
 
     const storeOptions = useMemo(
         () => [
@@ -150,9 +160,13 @@ const RawMaterialList: React.FC = () => {
         [stores]
     );
 
-    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-    }, []);
+    const categoryOptions = useMemo(
+        () => [
+            { label: "All Categories", value: "" },
+            ...(categories || []).map((c: any) => ({ label: c.name, value: String(c.id) })),
+        ],
+        [categories]
+    );
 
 
     const tableRef = useRef<HTMLDivElement>(null);
@@ -200,9 +214,17 @@ const RawMaterialList: React.FC = () => {
     };
 
     const fetchRawMaterialsForExport = useCallback(async () => {
-        const res = await rawMaterialService.fetchAll({ limit: 100000 });
+        const res = await rawMaterialService.fetchAll({
+            itemType: "RAW_MATERIAL",
+            limit: 100000,
+            search: debouncedSearch || undefined,
+            categoryId: categoryFilter || undefined,
+            storeId: storeFilter || undefined,
+            sortBy: sortOrder !== "default" ? "materialName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
         return Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
-    }, []);
+    }, [debouncedSearch, categoryFilter, storeFilter, sortOrder]);
 
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
@@ -329,7 +351,7 @@ const RawMaterialList: React.FC = () => {
                         <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
                             Raw Materials Management
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                {sortedData.length}
+                                {total ?? rawMaterials.length}
                             </span>
                         </h2>
                     </div>
@@ -345,13 +367,25 @@ const RawMaterialList: React.FC = () => {
                             activeFilterCount={activeFilterCount}
                             hasActiveFilters={hasActiveFilters}
                             onOpen={() => {
+                                setDraftCategoryFilter(categoryFilter);
                                 setDraftStoreFilter(storeFilter);
-                                setDraftActiveFilter(activeFilter);
                             }}
                             onApply={handleApplyFilters}
                             onClear={handleClearFilters}
                         >
                             <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Category
+                                    </label>
+                                    <SelectInput
+                                        name="categoryFilter"
+                                        value={draftCategoryFilter}
+                                        onChange={(e) => setDraftCategoryFilter(e.target.value)}
+                                        options={categoryOptions}
+                                        noMargin
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
                                         Store
@@ -361,22 +395,6 @@ const RawMaterialList: React.FC = () => {
                                         value={draftStoreFilter}
                                         onChange={(e) => setDraftStoreFilter(e.target.value)}
                                         options={storeOptions}
-                                        noMargin
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
-                                        Status
-                                    </label>
-                                    <SelectInput
-                                        name="activeFilter"
-                                        value={draftActiveFilter}
-                                        onChange={(e) => setDraftActiveFilter(e.target.value)}
-                                        options={[
-                                            { label: "All Status", value: "" },
-                                            { label: "Active", value: "true" },
-                                            { label: "Inactive", value: "false" },
-                                        ]}
                                         noMargin
                                     />
                                 </div>
@@ -406,22 +424,22 @@ const RawMaterialList: React.FC = () => {
                     <div className="flex items-center gap-2 px-6 py-2.5 border-b border-line flex-wrap">
                         <span className="text-xs text-ink-subtle">Active filters:</span>
 
+                        {categoryFilter && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Category: {categoryOptions.find((c) => c.value === categoryFilter)?.label || categoryFilter}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setCategoryFilter(""); setDraftCategoryFilter(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
                         {storeFilter && (
                             <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
                                 Store: {storeOptions.find((s) => s.value === storeFilter)?.label || storeFilter}
                                 <FaTimes
                                     className="cursor-pointer hover:text-indigo-200 ml-0.5"
                                     onClick={() => { setStoreFilter(""); setDraftStoreFilter(""); setCurrentPage(1); }}
-                                />
-                            </span>
-                        )}
-
-                        {activeFilter !== "" && (
-                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
-                                Status: {activeFilter === "true" ? "Active" : "Inactive"}
-                                <FaTimes
-                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
-                                    onClick={() => { setActiveFilter(""); setDraftActiveFilter(""); setCurrentPage(1); }}
                                 />
                             </span>
                         )}
@@ -444,9 +462,6 @@ const RawMaterialList: React.FC = () => {
                                 : undefined
                         }
                     />
-                    <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
-                        Total: {total} record(s)
-                    </div>
                 </div>
             </div>
 

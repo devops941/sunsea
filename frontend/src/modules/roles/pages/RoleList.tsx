@@ -25,7 +25,7 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 15;
 type SortOrder = "default" | "asc" | "desc";
 const SORT_STORAGE_KEY = "sunsea_role_sort_name";
 
@@ -118,6 +118,7 @@ const RoleList: React.FC = () => {
             } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
     // Debounce search term
@@ -128,12 +129,14 @@ const RoleList: React.FC = () => {
         return () => clearTimeout(handler);
     }, [searchTerm]);
 
-    // Fetch data when page or search term changes
+    // Fetch data when page, search term, or sortOrder changes
     useEffect(() => {
         if (canViewRole) {
-            loadRoles(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm);
+            const sb = sortOrder !== "default" ? "name" : undefined;
+            const so = sortOrder !== "default" ? sortOrder : undefined;
+            loadRoles(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm, sb, so);
         }
-    }, [loadRoles, currentPage, debouncedSearchTerm, canViewRole]);
+    }, [loadRoles, currentPage, debouncedSearchTerm, sortOrder, canViewRole]);
 
     useEffect(() => {
         if (error) {
@@ -149,21 +152,8 @@ const RoleList: React.FC = () => {
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
-    // Client-side sorted roles based on persistent sortOrder
-    const sortedRoles = useMemo(() => {
-        if (!roles || !Array.isArray(roles)) return [];
-        if (sortOrder === "default") return roles;
-
-        return [...roles].sort((a: any, b: any) => {
-            const nameA = (a.name || "").trim().toLowerCase();
-            const nameB = (b.name || "").trim().toLowerCase();
-            if (sortOrder === "asc") {
-                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-            } else {
-                return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-            }
-        });
-    }, [roles, sortOrder]);
+    // Roles are sorted across all total records in the database on the backend before pagination
+    const sortedRoles = roles;
 
     const handleOpenAdd = useCallback(() => {
         setEditMode(false);

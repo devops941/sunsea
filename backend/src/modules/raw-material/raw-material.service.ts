@@ -117,6 +117,22 @@ class RawMaterialService {
       }
     }
 
+    let orderBy: any = { createdAt: "desc" };
+    const validSortOrder: "asc" | "desc" = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy === "materialName" || sortBy === "name") {
+      orderBy = { materialName: validSortOrder };
+    } else if (sortBy === "rawMaterialId" || sortBy === "code" || sortBy === "id") {
+      orderBy = { rawMaterialId: validSortOrder };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    } else if (sortBy === "rate") {
+      orderBy = { rate: validSortOrder };
+    } else if (sortBy === "onHandQty") {
+      orderBy = { onHandQty: validSortOrder };
+    } else if (["materialName", "rawMaterialId", "createdAt", "updatedAt", "rate", "onHandQty", "baseUom", "status", "isActive"].includes(sortBy || "")) {
+      orderBy = { [sortBy as string]: validSortOrder };
+    }
+
     const queryOptions: any = {
       where: whereClause,
       include: {
@@ -124,7 +140,7 @@ class RawMaterialService {
         category: true,
         storeLocation: true,
       },
-      orderBy: { [sortBy]: sortOrder },
+      orderBy,
     };
 
     if (page !== undefined || limit !== undefined) {

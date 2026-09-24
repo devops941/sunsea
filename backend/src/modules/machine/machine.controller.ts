@@ -22,11 +22,13 @@ class MachineController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
-    const { search, page, limit } = req.query;
+    const { search, page, limit, sortBy, sortOrder } = req.query;
     const machines = await machineService.findAll({
       search: search as string | undefined,
       page: page ? parseInt(page as string, 10) : 1,
       limit: limit ? parseInt(limit as string, 10) : 15,
+      sortBy: sortBy as string | undefined,
+      sortOrder: (sortOrder as "asc" | "desc") || "desc",
     });
 
     return res.status(200).json(

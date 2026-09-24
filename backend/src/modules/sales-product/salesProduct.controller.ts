@@ -16,10 +16,26 @@ class SalesProductController {
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
     const search = req.query.search ? String(req.query.search) : undefined;
-    const salesProducts = await salesProductService.findAll({ search });
+    const isActive =
+      req.query.isActive === "true" ? true :
+        req.query.isActive === "false" ? false :
+          undefined;
+    const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    const sortBy = req.query.sortBy as string | undefined;
+    const sortOrder = req.query.sortOrder as "asc" | "desc" | undefined;
+
+    const result = await salesProductService.findAll({
+      search,
+      isActive,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    });
 
     return res.status(200).json(
-      new ApiResponse("Sales Products fetched successfully", salesProducts)
+      new ApiResponse("Sales Products fetched successfully", result)
     );
   });
 

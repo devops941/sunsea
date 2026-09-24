@@ -93,8 +93,22 @@ class SalesProductService {
     return newSalesProduct;
   }
 
-  async findAll(params: { search?: string } = {}) {
-    const { search } = params;
+  async findAll(params: {
+    search?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  } = {}) {
+    const {
+      search,
+      isActive,
+      page,
+      limit,
+      sortBy = "salesProductName",
+      sortOrder = "asc",
+    } = params;
     const whereClause: Prisma.SalesProductWhereInput = {};
 
     if (search) {
@@ -104,11 +118,49 @@ class SalesProductService {
       ];
     }
 
-    return prisma.salesProduct.findMany({
+    if (isActive !== undefined) {
+      whereClause.isActive = isActive;
+    }
+
+    let orderBy: any = { createdAt: "desc" };
+    const validSortOrder: "asc" | "desc" = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy === "salesProductName" || sortBy === "name") {
+      orderBy = { salesProductName: validSortOrder };
+    } else if (sortBy === "salesProductCode" || sortBy === "code" || sortBy === "id") {
+      orderBy = { salesProductCode: validSortOrder };
+    } else if (sortBy === "rate") {
+      orderBy = { rate: validSortOrder };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    } else if (["salesProductName", "salesProductCode", "createdAt", "updatedAt", "rate", "isActive"].includes(sortBy || "")) {
+      orderBy = { [sortBy as string]: validSortOrder };
+    }
+
+    const queryOptions: any = {
       where: whereClause,
       include: includeDefaults,
-      orderBy: { createdAt: "asc" },
-    });
+      orderBy,
+    };
+
+    if (page !== undefined || limit !== undefined) {
+      const p = page || 1;
+      const l = limit || 15;
+      queryOptions.skip = (p - 1) * l;
+      queryOptions.take = l;
+    }
+
+    const [salesProducts, total] = await Promise.all([
+      prisma.salesProduct.findMany(queryOptions),
+      prisma.salesProduct.count({ where: whereClause }),
+    ]);
+
+    return {
+      salesProducts,
+      total,
+      page: page || 1,
+      limit: limit || total,
+      totalPages: limit ? Math.ceil(total / limit) : 1,
+    };
   }
 
   async findById(id: bigint) {

@@ -108,6 +108,7 @@ model Employee {
   permanentDeductions        EmployeePermanentDeduction[]
   salesOrdersAsSource        SalesOrder[]                 @relation("SalesOrderSourceEmployee")
   dailyPlanOperators         DailyPlanOperator[]
+  shiftRecordOperators       ProductShiftRecordOperator[]
 
   @@index([departmentId])
   @@index([roleId])
@@ -1745,11 +1746,27 @@ model ProductShiftRecord {
   product           Product         @relation(fields: [productId], references: [id])
   productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
   machine           Machine         @relation(fields: [machineId], references: [machineId])
+  operators         ProductShiftRecordOperator[]
 
   @@index([productId])
   @@index([machineId])
   @@index([shiftId])
+  @@index([isHighest])
   @@map("product_shift_records")
+}
+
+model ProductShiftRecordOperator {
+  id                   BigInt             @id @default(autoincrement())
+  productShiftRecordId BigInt             @map("product_shift_record_id")
+  employeeId           BigInt             @map("employee_id")
+
+  productShiftRecord   ProductShiftRecord @relation(fields: [productShiftRecordId], references: [id], onDelete: Cascade)
+  employee             Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([productShiftRecordId, employeeId])
+  @@index([employeeId])
+  @@index([productShiftRecordId])
+  @@map("product_shift_record_operators")
 }
 
 model ProductCapacityHistory {

@@ -230,8 +230,26 @@ class ProductService {
     }
   }
 
-  async findAll(params: { search?: string; categoryId?: string } = {}) {
-    const { search, categoryId } = params;
+  async findAll(params: {
+    search?: string;
+    categoryId?: string;
+    isActive?: boolean;
+    productType?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  } = {}) {
+    const {
+      search,
+      categoryId,
+      isActive,
+      productType,
+      page,
+      limit,
+      sortBy = "productName",
+      sortOrder = "asc",
+    } = params;
     const whereClause: Prisma.ProductWhereInput = {};
 
     if (search) {
@@ -245,7 +263,29 @@ class ProductService {
       whereClause.categoryId = Number(categoryId);
     }
 
-    return prisma.product.findMany({
+    if (isActive !== undefined) {
+      whereClause.isActive = isActive;
+    }
+
+    if (productType) {
+      whereClause.productType = productType as any;
+    }
+
+    let orderBy: any = { createdAt: "desc" };
+    const validSortOrder: "asc" | "desc" = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy === "productName" || sortBy === "name") {
+      orderBy = { productName: validSortOrder };
+    } else if (sortBy === "productCode" || sortBy === "code" || sortBy === "id") {
+      orderBy = { productCode: validSortOrder };
+    } else if (sortBy === "rate") {
+      orderBy = { rate: validSortOrder };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    } else if (["productName", "productCode", "createdAt", "updatedAt", "rate", "isActive"].includes(sortBy || "")) {
+      orderBy = { [sortBy as string]: validSortOrder };
+    }
+
+    const queryOptions: any = {
       where: whereClause,
       include: {
         category: true,
@@ -255,10 +295,28 @@ class ProductService {
         billOfMaterials: { include: { rawMaterial: true } },
         capacityHistories: { orderBy: { createdAt: "desc" } },
       },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+      orderBy,
+    };
+
+    if (page !== undefined || limit !== undefined) {
+      const p = page || 1;
+      const l = limit || 15;
+      queryOptions.skip = (p - 1) * l;
+      queryOptions.take = l;
+    }
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany(queryOptions),
+      prisma.product.count({ where: whereClause }),
+    ]);
+
+    return {
+      products,
+      total,
+      page: page || 1,
+      limit: limit || total,
+      totalPages: limit ? Math.ceil(total / limit) : 1,
+    };
   }
 
   async findById(id: bigint) {

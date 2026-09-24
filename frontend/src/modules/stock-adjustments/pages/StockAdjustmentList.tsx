@@ -3,6 +3,7 @@ import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import {
   FaPlus,
+  FaTimes,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -11,7 +12,7 @@ import { useListCache, markStaleByPrefix } from "../../../hooks/useListCache";
 import { stockAdjustmentService } from "../../../services/stockAdjustmentService";
 import { usePermission } from "../../../hooks/usePermission";
 
-import { Search } from "lucide-react";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
@@ -203,7 +204,6 @@ const StockAdjustmentList: React.FC = () => {
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [adjustmentType, setAdjustmentType] = useState("");
   const [source, setSource] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -211,13 +211,12 @@ const StockAdjustmentList: React.FC = () => {
 
   // Draft filter states for popover
   const [draftStatus, setDraftStatus] = useState("");
-  const [draftAdjustmentType, setDraftAdjustmentType] = useState("");
   const [draftSource, setDraftSource] = useState("");
   const [draftDateFrom, setDraftDateFrom] = useState("");
   const [draftDateTo, setDraftDateTo] = useState("");
 
-  const hasActiveFilters = !!(status || adjustmentType || source || dateFrom || dateTo);
-  const activeFilterCount = [status, adjustmentType, source, dateFrom, dateTo].filter(Boolean).length;
+  const hasActiveFilters = !!(status || source || dateFrom || dateTo);
+  const activeFilterCount = [status, source, dateFrom, dateTo].filter(Boolean).length;
 
   // Debounce search — 300 ms
   useEffect(() => {
@@ -228,13 +227,12 @@ const StockAdjustmentList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const cacheKey = `${SA_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${status}:${adjustmentType}:${source}:${dateFrom}:${dateTo}`;
+  const cacheKey = `${SA_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${status}:${source}:${dateFrom}:${dateTo}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await stockAdjustmentService.fetchAll({
       search: debouncedSearch,
       status,
-      adjustmentType,
       source,
       dateFrom,
       dateTo,
@@ -244,7 +242,7 @@ const StockAdjustmentList: React.FC = () => {
     const list = Array.isArray(res) ? res : (res.data || []);
     const tot = Array.isArray(res) ? res.length : (res.meta?.total || res.total || list.length);
     return { data: list, total: tot };
-  }, [debouncedSearch, status, adjustmentType, source, dateFrom, dateTo, currentPage]);
+  }, [debouncedSearch, status, source, dateFrom, dateTo, currentPage]);
 
   const { data, total, loading, refresh } = useListCache({
     cacheKey,
@@ -264,29 +262,25 @@ const StockAdjustmentList: React.FC = () => {
 
   const handleOpenFilter = useCallback(() => {
     setDraftStatus(status);
-    setDraftAdjustmentType(adjustmentType);
     setDraftSource(source);
     setDraftDateFrom(dateFrom);
     setDraftDateTo(dateTo);
-  }, [status, adjustmentType, source, dateFrom, dateTo]);
+  }, [status, source, dateFrom, dateTo]);
 
   const handleApplyFilters = useCallback(() => {
     setStatus(draftStatus);
-    setAdjustmentType(draftAdjustmentType);
     setSource(draftSource);
     setDateFrom(draftDateFrom);
     setDateTo(draftDateTo);
     setCurrentPage(1);
-  }, [draftStatus, draftAdjustmentType, draftSource, draftDateFrom, draftDateTo]);
+  }, [draftStatus, draftSource, draftDateFrom, draftDateTo]);
 
   const handleClearFilters = useCallback(() => {
     setDraftStatus("");
-    setDraftAdjustmentType("");
     setDraftSource("");
     setDraftDateFrom("");
     setDraftDateTo("");
     setStatus("");
-    setAdjustmentType("");
     setSource("");
     setDateFrom("");
     setDateTo("");
@@ -337,17 +331,11 @@ const StockAdjustmentList: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {/* Search */}
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" size={15} />
-              <input
-                type="text"
-                data-search-input
-                className="w-full pl-9 pr-4 py-2 bg-card-2 border border-line-soft rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
-                placeholder="Search by No, Reason, PO..."
-                value={searchTerm}
-                onChange={handleSearch}
-              />
-            </div>
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search by No, Reason, PO..."
+            />
 
             {/* Filter Popover */}
             <FilterPopover
@@ -367,10 +355,10 @@ const StockAdjustmentList: React.FC = () => {
                     value={draftSource}
                     onChange={(e) => setDraftSource(e.target.value)}
                     options={[
-                      { value: "PRODUCTION", label: "Production (PO / PMI)" },
-                      { value: "PURCHASE", label: "Purchase (GRN / Bill)" },
-                      { value: "SALES", label: "Sales (Dispatch / Return)" },
-                      { value: "MANUAL", label: "Manual Adjustment" },
+                      { value: "PRODUCTION", label: "Production" },
+                      { value: "PURCHASE", label: "Purchase" },
+                      { value: "SALES", label: "Sales" },
+                      { value: "MANUAL", label: "Manual" },
                     ]}
                     defaultOptionLabel="All Sources"
                     noMargin
@@ -392,30 +380,6 @@ const StockAdjustmentList: React.FC = () => {
                       { value: "REJECTED", label: "Rejected" },
                     ]}
                     defaultOptionLabel="All Statuses"
-                    noMargin
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
-                    Adjustment Type
-                  </label>
-                  <SelectInput
-                    name="draftAdjustmentType"
-                    value={draftAdjustmentType}
-                    onChange={(e) => setDraftAdjustmentType(e.target.value)}
-                    options={[
-                      { value: "PRODUCTION_MATERIAL_ISSUE", label: "Production Material Issue" },
-                      { value: "PRODUCTION_MATERIAL_RETURN", label: "Production Material Return" },
-                      { value: "STOCK_INCREASE", label: "Stock Increase" },
-                      { value: "STOCK_DECREASE", label: "Stock Decrease" },
-                      { value: "DAMAGE", label: "Damage" },
-                      { value: "SCRAP", label: "Scrap" },
-                      { value: "OPENING_STOCK", label: "Opening Stock" },
-                      { value: "MANUAL_CORRECTION", label: "Manual Correction" },
-                      { value: "OTHER", label: "Other" },
-                    ]}
-                    defaultOptionLabel="All Types"
                     noMargin
                   />
                 </div>
@@ -456,36 +420,47 @@ const StockAdjustmentList: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Source Filter Tabs */}
-        <div className="px-5 py-2.5 border-b border-line bg-card-2/40 flex items-center gap-2 overflow-x-auto">
-          {[
-            { key: "", label: "All Sources" },
-            { key: "PRODUCTION", label: "Production" },
-            { key: "PURCHASE", label: "Purchase" },
-            { key: "SALES", label: "Sales" },
-            { key: "MANUAL", label: "Manual" },
-          ].map((tab) => {
-            const isActive = (source || "") === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => {
-                  setSource(tab.key);
-                  setDraftSource(tab.key);
-                  setCurrentPage(1);
-                }}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "bg-card text-ink-subtle hover:text-ink hover:bg-card-2 border border-line-soft"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* Active filter chips */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 px-6 py-2.5 border-b border-line flex-wrap">
+            <span className="text-xs text-ink-subtle">Active filters:</span>
+
+            {source && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Source: {
+                  source === "PRODUCTION" ? "Production" :
+                  source === "PURCHASE" ? "Purchase" :
+                  source === "SALES" ? "Sales" :
+                  source === "MANUAL" ? "Manual" : source
+                }
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => { setSource(""); setDraftSource(""); setCurrentPage(1); }}
+                />
+              </span>
+            )}
+
+            {status && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Status: {status}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => { setStatus(""); setDraftStatus(""); setCurrentPage(1); }}
+                />
+              </span>
+            )}
+
+            {(dateFrom || dateTo) && (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                Date: {dateFrom || "Start"} to {dateTo || "End"}
+                <FaTimes
+                  className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                  onClick={() => { setDateFrom(""); setDraftDateFrom(""); setDateTo(""); setDraftDateTo(""); setCurrentPage(1); }}
+                />
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Table */}
         <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">

@@ -97,13 +97,14 @@ const ShiftList: React.FC = () => {
             try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
     useEffect(() => {
         const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
             const target = e.target as HTMLElement;
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+            if (e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 toggleSortOrder();
             }
@@ -112,13 +113,29 @@ const ShiftList: React.FC = () => {
         return () => window.removeEventListener("keydown", handleSortShortcut);
     }, [toggleSortOrder]);
 
-    const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const list = await shiftService.fetchAll();
-        return { data: list, total: list.length };
-    }, []);
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
 
-    const { data, loading, refresh } = useListCache<Shift>({
-        cacheKey: "shifts:list",
+    const cacheKey = `shifts:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${sortOrder}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await shiftService.fetchAll({
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            sortBy: sortOrder !== "default" ? "shiftName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+        return { data: list, total };
+    }, [currentPage, debouncedSearch, sortOrder]);
+
+    const { data, total, loading, refresh } = useListCache<Shift>({
+        cacheKey,
         socketModule: "shift",
         fetcher,
     });
@@ -139,27 +156,18 @@ const ShiftList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    const filteredData = useMemo(() => {
-        return data.filter(item =>
-            item.shiftCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.shiftName.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [data, searchTerm]);
-
-    const sortedData = useMemo(() => {
-        if (sortOrder === "default") return filteredData;
-        return [...filteredData].sort((a, b) => {
-            const nameA = (a.shiftName || "").trim().toLowerCase();
-            const nameB = (b.shiftName || "").trim().toLowerCase();
-            return sortOrder === "asc"
-                ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
-                : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+    const fetchShiftsForExport = useCallback(async () => {
+        const res = await shiftService.fetchAll({
+            search: debouncedSearch || undefined,
+            sortBy: sortOrder !== "default" ? "shiftName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
         });
-    }, [filteredData, sortOrder]);
+        return Array.isArray(res) ? res : (res?.data || []);
+    }, [debouncedSearch, sortOrder]);
 
-    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = sortedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedData = data;
 
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
         count: paginatedData.length,
@@ -169,7 +177,7 @@ const ShiftList: React.FC = () => {
     });
 
     // CSV Export Configuration
-    const { csvData, csvColumns, csvFilename } = useMemo(() => {
+    const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
             { header: "Shift Code", accessor: (item: any) => item.shiftCode },
             { header: "Shift Name", accessor: (item: any) => item.shiftName },
@@ -180,11 +188,10 @@ const ShiftList: React.FC = () => {
             { header: "Status", accessor: (item: any) => (item.isActive ? "ACTIVE" : "INACTIVE") },
         ];
         return {
-            csvData: data,
             csvColumns: columns,
             csvFilename: `Shift_List_${new Date().toISOString().split("T")[0]}.csv`,
         };
-    }, [data]);
+    }, []);
 
     const handleCloseViewModal = useCallback(() => {
         setShowViewModal(false);
@@ -238,7 +245,7 @@ const ShiftList: React.FC = () => {
                             <h2 className="text-base font-bold text-ink flex items-center gap-2">
                                 Shift Management
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                    {sortedData.length}
+                                    {total ?? data.length}
                                 </span>
                             </h2>
                         </div>
@@ -256,7 +263,7 @@ const ShiftList: React.FC = () => {
                             </div>
                             {canExportShift && (
                                 <ExportCSVButton
-                                    data={csvData}
+                                    fetchData={fetchShiftsForExport}
                                     columns={csvColumns}
                                     filename={csvFilename}
                                     text="Export"

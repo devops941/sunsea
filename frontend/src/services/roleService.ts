@@ -3,11 +3,17 @@ import config from "../api/config";
 import type { Role, CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
 
 export const roleService = {
-  fetchAll: async (options?: { page?: number; limit?: number; search?: string }): Promise<{ data: Role[]; total: number }> => {
+  fetchAll: async (options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  }): Promise<{ data: Role[]; total: number }> => {
     const response = await apiClient.get(config.role.base, { params: options });
     return {
       data: response.data?.data || response.data,
-      total: response.data?.meta?.total || (response.data?.data || response.data).length,
+      total: response.data?.meta?.total ?? (response.data?.data || response.data).length,
     };
   },
 

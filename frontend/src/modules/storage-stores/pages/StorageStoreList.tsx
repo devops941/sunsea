@@ -1,5 +1,4 @@
-import { formatDate } from "../../../utils/dateUtils";
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
@@ -73,7 +72,14 @@ const StorageStoreList: React.FC = () => {
             try { localStorage.setItem(STORE_SORT_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
+
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
 
     const activeFilterCount = [
         storeCategoryFilter !== "",
@@ -96,18 +102,6 @@ const StorageStoreList: React.FC = () => {
         setCurrentPage(1);
     }, []);
 
-    const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const res = await storeService.fetchAll({ limit: 10000 });
-        const list = Array.isArray(res) ? res : (res?.stores || res?.data || []);
-        return { data: list, total: list.length };
-    }, []);
-
-    const { data: allStores, loading, refresh } = useListCache<any>({
-        cacheKey: "stores:list",
-        socketModule: "store",
-        fetcher,
-    });
-
     usePageShortcuts({
         onRefresh: () => refresh(),
         onDelete: () => setShowDeleteModal(true),
@@ -115,35 +109,35 @@ const StorageStoreList: React.FC = () => {
         onSort: () => toggleSortOrder(),
     });
 
-    const filteredStores = useMemo(() => {
-        return allStores.filter((item: any) => {
-            const matchesSearch = !searchTerm ||
-                item.storeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.storeName?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = !storeCategoryFilter || item.storeCategory === storeCategoryFilter;
-            const matchesActive = activeFilter === "" ||
-                (activeFilter === "true" ? item.isActive : !item.isActive);
-            return matchesSearch && matchesCategory && matchesActive;
-        });
-    }, [allStores, searchTerm, storeCategoryFilter, activeFilter]);
+    const cacheKey = `stores:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${storeCategoryFilter}:${activeFilter}:${sortOrder}`;
 
-    const sortedStores = useMemo(() => {
-        if (sortOrder === "default") return filteredStores;
-        return [...filteredStores].sort((a, b) => {
-            const nameA = (a.storeName || "").toLowerCase();
-            const nameB = (b.storeName || "").toLowerCase();
-            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await storeService.fetchAll({
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            storeCategory: storeCategoryFilter || undefined,
+            isActive: activeFilter !== "" ? activeFilter === "true" : undefined,
+            sortBy: sortOrder !== "default" ? "storeName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
         });
-    }, [filteredStores, sortOrder]);
+        const list = Array.isArray(res) ? res : (res?.stores || res?.data || []);
+        const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+        return { data: list, total };
+    }, [currentPage, debouncedSearch, storeCategoryFilter, activeFilter, sortOrder]);
 
-    const totalPages = Math.ceil(sortedStores.length / ITEMS_PER_PAGE);
-    const paginatedStores = sortedStores.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    const { data: stores, total, loading, refresh } = useListCache<any>({
+        cacheKey,
+        socketModule: "store",
+        fetcher,
+    });
+
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
+    const paginatedStores = stores;
 
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
+        setCurrentPage(1);
     }, []);
 
 
@@ -188,9 +182,16 @@ const StorageStoreList: React.FC = () => {
     };
 
     const fetchStoresForExport = useCallback(async () => {
-        const res = await storeService.fetchAll({ limit: 100000 });
+        const res = await storeService.fetchAll({
+            limit: 100000,
+            search: debouncedSearch || undefined,
+            storeCategory: storeCategoryFilter || undefined,
+            isActive: activeFilter !== "" ? activeFilter === "true" : undefined,
+            sortBy: sortOrder !== "default" ? "storeName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
         return Array.isArray(res) ? res : (res?.stores || res?.data || []);
-    }, []);
+    }, [debouncedSearch, storeCategoryFilter, activeFilter, sortOrder]);
 
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
@@ -222,7 +223,7 @@ const StorageStoreList: React.FC = () => {
                         <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
                             Store Management
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                {sortedStores.length}
+                                {total ?? stores.length}
                             </span>
                         </h2>
                     </div>
@@ -450,7 +451,6 @@ const StorageStoreList: React.FC = () => {
                                             return selectedItem.locationDesc;
                                         })(),
                                     },
-                                    { label: "Cost Method", value: selectedItem.costMethod || "N/A" },
                                 ],
                             },
                             {
@@ -459,13 +459,6 @@ const StorageStoreList: React.FC = () => {
                                     {
                                         label: "Status",
                                         value: selectedItem.isActive ? "Active" : "Inactive",
-                                    },
-                                    { label: "GST Place", value: selectedItem.gstPlace || "N/A" },
-                                    {
-                                        label: "Created At",
-                                        value: selectedItem.createdAt
-                                            ? formatDate(selectedItem.createdAt)
-                                            : "N/A",
                                     },
                                 ],
                             },

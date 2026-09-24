@@ -3,10 +3,30 @@ import { returnsService } from "./returns.service";
 import { createSalesReturnSchema, createPurchaseReturnSchema } from "./returns.types";
 
 class ReturnsController {
+  private parseSortBy(value: unknown): "customer" | "customerName" | "supplier" | "supplierName" | "returnNo" | "returnDate" | "grandTotal" | "createdAt" | undefined {
+    if (!value || typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    const validFields = ["customer", "customerName", "supplier", "supplierName", "returnNo", "returnDate", "grandTotal", "createdAt"];
+    const found = validFields.find((f) => f.toLowerCase() === trimmed.toLowerCase());
+    return found as any;
+  }
+
+  private parseSortOrder(value: unknown): "asc" | "desc" | undefined {
+    if (!value || typeof value !== "string") return undefined;
+    const v = value.toLowerCase().trim();
+    return v === "asc" || v === "desc" ? (v as any) : undefined;
+  }
+
   async getSalesReturns(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.query.companyId as string | undefined;
-      const data = await returnsService.getSalesReturns(companyId);
+      const sortBy = this.parseSortBy(req.query.sortBy);
+      const sortOrder = this.parseSortOrder(req.query.sortOrder);
+      const data = await returnsService.getSalesReturns({
+        companyId,
+        sortBy,
+        sortOrder,
+      });
       return res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -73,7 +93,13 @@ class ReturnsController {
   async getPurchaseReturns(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.query.companyId as string | undefined;
-      const data = await returnsService.getPurchaseReturns(companyId);
+      const sortBy = this.parseSortBy(req.query.sortBy);
+      const sortOrder = this.parseSortOrder(req.query.sortOrder);
+      const data = await returnsService.getPurchaseReturns({
+        companyId,
+        sortBy,
+        sortOrder,
+      });
       return res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

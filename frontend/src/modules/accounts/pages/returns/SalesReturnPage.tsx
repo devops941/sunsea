@@ -69,14 +69,14 @@ export const SalesReturnPage: React.FC = () => {
     });
   }, []);
 
-  // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
+  // Shortcut key (Alt+S) to toggle alphabetical sort (F6 is handled by usePageShortcuts)
   useEffect(() => {
     const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
         return;
       }
-      if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+      if (e.altKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         toggleSortOrder();
       }
@@ -85,18 +85,21 @@ export const SalesReturnPage: React.FC = () => {
     return () => window.removeEventListener("keydown", handleSortShortcut);
   }, [toggleSortOrder]);
 
-  const cacheKey = `accounts:sales-returns`;
+  const cacheKey = `accounts:sales-returns:${sortOrder}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     try {
-      const rData = await returnService.fetchSalesReturns();
+      const rData = await returnService.fetchSalesReturns({
+        sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "customer" : undefined,
+        sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+      });
       const list = rData || [];
       return { data: list, total: list.length };
     } catch (err: any) {
       toast.error(err?.message || "Failed to load sales returns");
       throw err;
     }
-  }, []);
+  }, [sortOrder]);
 
   const { data: returns, loading, refresh } = useListCache<SalesReturn>({
     cacheKey,
@@ -153,21 +156,7 @@ export const SalesReturnPage: React.FC = () => {
     });
   }, [returns, searchTerm, appliedFilters]);
 
-  // Client-side sorted returns based on sortOrder
-  const sortedReturns = useMemo(() => {
-    if (!filteredReturns || !Array.isArray(filteredReturns)) return [];
-    if (sortOrder === "default") return filteredReturns;
-
-    return [...filteredReturns].sort((a: any, b: any) => {
-      const nameA = (a.customer?.firmName || a.customer?.displayName || a.returnNo || "").trim().toLowerCase();
-      const nameB = (b.customer?.firmName || b.customer?.displayName || b.returnNo || "").trim().toLowerCase();
-      if (sortOrder === "asc") {
-        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-      } else {
-        return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-      }
-    });
-  }, [filteredReturns, sortOrder]);
+  const sortedReturns = filteredReturns || [];
 
   // ── Table keyboard navigation (Arrow keys, Enter to view, E to edit) ────
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
@@ -196,13 +185,16 @@ export const SalesReturnPage: React.FC = () => {
 
   const fetchSalesReturnsForExport = useCallback(async () => {
     try {
-      const list = await returnService.fetchSalesReturns();
+      const list = await returnService.fetchSalesReturns({
+        sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "customer" : undefined,
+        sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+      });
       if (Array.isArray(list) && list.length > 0) return list;
     } catch (e) {
       console.warn("fetchSalesReturns failed, using current returns:", e);
     }
     return Array.isArray(returns) ? returns : [];
-  }, [returns]);
+  }, [returns, sortOrder]);
 
   const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
@@ -258,13 +250,18 @@ export const SalesReturnPage: React.FC = () => {
       headerNode: (
         <button
           type="button"
-          onClick={toggleSortOrder}
-          className="flex items-center gap-1.5 hover:text-ink transition-colors cursor-pointer group/sort text-left uppercase tracking-wider text-[13px] font-bold"
-          title="Click to sort by customer name (or press F6 / Alt+S)"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSortOrder();
+          }}
+          className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-wider text-[13px] font-bold outline-none hover:opacity-90 transition-opacity"
+          title={`Sort by Customer: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
         >
-          <span>CUSTOMER</span>
+          <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+            CUSTOMER
+          </span>
           <span
-            className={`p-0.5 rounded transition-transform ${
+            className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
               sortOrder === "asc" || sortOrder === "desc"
                 ? "bg-primary/20 text-primary scale-110"
                 : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"

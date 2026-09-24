@@ -415,6 +415,8 @@ class SalesInvoiceService {
     customerId?: string;
     fromDate?: string;
     toDate?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
     companyId: string;
   }) {
     const page = params.page || 1;
@@ -447,12 +449,31 @@ class SalesInvoiceService {
       }
     }
 
+    const validSortOrder: "asc" | "desc" = params.sortOrder === "asc" ? "asc" : "desc";
+    let orderBy: any = { createdAt: "desc" };
+
+    if (params.sortBy === "customer" || params.sortBy === "customerName") {
+      orderBy = { customer: { displayName: validSortOrder } };
+    } else if (params.sortBy === "invoiceNo") {
+      orderBy = { invoiceNo: validSortOrder };
+    } else if (params.sortBy === "invoiceDate") {
+      orderBy = { invoiceDate: validSortOrder };
+    } else if (params.sortBy === "grandTotal" || params.sortBy === "netAmount") {
+      orderBy = { grandTotal: validSortOrder };
+    } else if (params.sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    } else if (params.sortOrder && !params.sortBy) {
+      orderBy = { customer: { displayName: validSortOrder } };
+    } else if (params.sortBy) {
+      orderBy = { [params.sortBy]: validSortOrder };
+    }
+
     const [invoices, total] = await Promise.all([
       prisma.salesInvoice.findMany({
         where: whereClause,
         skip,
         take: pageSize,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           customer: {
             select: {

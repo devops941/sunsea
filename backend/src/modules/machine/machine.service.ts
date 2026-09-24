@@ -62,15 +62,27 @@ class MachineService {
     }
   }
 
-  async findAll(params?: { search?: string; page?: number; limit?: number }) {
-    const { search, page = 1, limit = 15 } = params || {};
+  async findAll(params?: { search?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc" }) {
+    const { search, page = 1, limit = 15, sortBy, sortOrder = "desc" } = params || {};
 
     const where: any = {};
     if (search) {
       where.OR = [
         { machineId: { contains: search, mode: "insensitive" } },
         { machineName: { contains: search, mode: "insensitive" } },
+        { manufacturer: { contains: search, mode: "insensitive" } },
+        { modelNumber: { contains: search, mode: "insensitive" } },
       ];
+    }
+
+    let orderBy: any = { createdAt: "desc" };
+    const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
+    if (sortBy === "machineName" || sortBy === "name") {
+      orderBy = { machineName: validSortOrder };
+    } else if (sortBy === "machineId" || sortBy === "id" || sortBy === "code") {
+      orderBy = { machineId: validSortOrder };
+    } else if (["createdAt", "capacityPerHour", "targetPerHour", "status"].includes(sortBy || "")) {
+      orderBy = { [sortBy as string]: validSortOrder };
     }
 
     const [total, data] = await Promise.all([
@@ -79,7 +91,7 @@ class MachineService {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
       }),
     ]);
 

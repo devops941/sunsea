@@ -44,11 +44,44 @@ class ShiftService {
     return createdShift;
   }
 
-  async findAll() {
-    const shifts = await prisma.shift.findMany({
-      orderBy: {
-        id: "asc",
-      },
+  async findAll(options?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    isActive?: boolean;
+  }) {
+    const { search, page, limit, sortBy, sortOrder = "asc", isActive } = options || {};
+
+    const where: any = {};
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    }
+    if (search) {
+      where.OR = [
+        { shiftCode: { contains: search, mode: "insensitive" } },
+        { shiftName: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    let orderBy: any = { id: "asc" };
+    const validSortOrder = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy === "shiftName" || sortBy === "name") {
+      orderBy = { shiftName: validSortOrder };
+    } else if (sortBy === "shiftCode" || sortBy === "code") {
+      orderBy = { shiftCode: validSortOrder };
+    } else if (sortBy === "startTime") {
+      orderBy = { startTime: validSortOrder };
+    } else if (sortBy === "endTime") {
+      orderBy = { endTime: validSortOrder };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    }
+
+    const queryOptions: any = {
+      where,
+      orderBy,
       include: {
         _count: {
           select: {
@@ -57,9 +90,19 @@ class ShiftService {
           }
         }
       }
-    });
+    };
 
-    return shifts.map(shift => {
+    if (page && limit) {
+      queryOptions.skip = (page - 1) * limit;
+      queryOptions.take = limit;
+    }
+
+    const [shifts, total] = await Promise.all([
+      prisma.shift.findMany(queryOptions),
+      prisma.shift.count({ where }),
+    ]);
+
+    const mapped = (shifts as any[]).map(shift => {
       const { _count, ...rest } = shift;
       const isAssigned = (_count?.employees || 0) > 0 || (_count?.attendanceRecords || 0) > 0;
       return {
@@ -67,6 +110,17 @@ class ShiftService {
         isAssigned
       };
     });
+
+    if (page && limit) {
+      return {
+        data: mapped,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    return mapped;
   }
 
   async findById(id: number) {

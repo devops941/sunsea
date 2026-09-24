@@ -64,6 +64,7 @@ const MachineList: React.FC = () => {
             try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
     // F6 / Alt+S direct listener
@@ -71,7 +72,7 @@ const MachineList: React.FC = () => {
         const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
             const target = e.target as HTMLElement;
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+            if (e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 toggleSortOrder();
             }
@@ -80,19 +81,29 @@ const MachineList: React.FC = () => {
         return () => window.removeEventListener("keydown", handleSortShortcut);
     }, [toggleSortOrder]);
 
-    const fetchMachinesForExport = useCallback(async () => {
-        const res = await machineService.getAll({ limit: 100000 });
-        return Array.isArray(res) ? res : (res?.machines || res?.data || []);
-    }, []);
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
+    const cacheKey = `machines:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${sortOrder}`;
 
     const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const res = await machineService.getAll({ limit: 10000 });
-        const list = Array.isArray(res) ? res : (res?.machines || res?.data || []);
-        return { data: Array.isArray(list) ? list : [], total: res?.total ?? (Array.isArray(list) ? list.length : 0) };
-    }, []);
+        const res = await machineService.getAll({
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            sortBy: sortOrder !== "default" ? "machineName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
+        const list = Array.isArray(res) ? res : (res?.data || res?.machines || []);
+        const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+        return { data: Array.isArray(list) ? list : [], total };
+    }, [currentPage, debouncedSearch, sortOrder]);
 
-    const { data: machines, loading, refresh } = useListCache<any>({
-        cacheKey: "machines:list",
+    const { data: machines, total, loading, refresh } = useListCache<any>({
+        cacheKey,
         socketModule: "machine",
         fetcher,
     });
@@ -108,33 +119,19 @@ const MachineList: React.FC = () => {
         },
     });
 
-    // Client-side filtered data
-    const filteredData = useMemo(() => {
-        if (!searchTerm) return machines;
-        const term = searchTerm.toLowerCase();
-        return machines.filter((m: any) =>
-            m.machineId?.toLowerCase().includes(term) ||
-            m.machineName?.toLowerCase().includes(term) ||
-            m.technologyType?.toLowerCase().includes(term) ||
-            m.machineType?.toLowerCase().includes(term)
-        );
-    }, [machines, searchTerm]);
-
-    // Client-side sorted data
-    const sortedData = useMemo(() => {
-        if (sortOrder === "default") return filteredData;
-        return [...filteredData].sort((a: any, b: any) => {
-            const nameA = (a.machineName || "").trim().toLowerCase();
-            const nameB = (b.machineName || "").trim().toLowerCase();
-            return sortOrder === "asc"
-                ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
-                : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+    const fetchMachinesForExport = useCallback(async () => {
+        const res = await machineService.getAll({
+            limit: 100000,
+            search: debouncedSearch || undefined,
+            sortBy: sortOrder !== "default" ? "machineName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
         });
-    }, [filteredData, sortOrder]);
+        return Array.isArray(res) ? res : (res?.machines || res?.data || []);
+    }, [debouncedSearch, sortOrder]);
 
-    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = sortedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedData = machines;
 
     // ── Table keyboard navigation ─────────────────────────────────────────────
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
@@ -219,7 +216,7 @@ const MachineList: React.FC = () => {
                         <h2 className="text-base font-bold text-ink flex items-center gap-2">
                             Machine Management
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                {sortedData.length}
+                                {total ?? machines.length}
                             </span>
                         </h2>
                     </div>

@@ -85,14 +85,15 @@ const SupplierList: React.FC = () => {
             try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
-    // F6 / Alt+S direct listener (mirrors CustomerListPage pattern)
+    // Alt+S direct listener (F6 is handled by usePageShortcuts)
     useEffect(() => {
         const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
             const target = e.target as HTMLElement;
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+            if (e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 toggleSortOrder();
             }
@@ -101,20 +102,38 @@ const SupplierList: React.FC = () => {
         return () => window.removeEventListener("keydown", handleSortShortcut);
     }, [toggleSortOrder]);
 
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
     const fetchSuppliersForExport = useCallback(async () => {
         const res = await supplierService.fetchAll({ page: 1, limit: 100000 });
         const list = res?.suppliers || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
         return Array.isArray(list) ? list : [];
     }, []);
 
-    const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const res = await supplierService.fetchAll({ limit: 10000 });
-        const list = res?.suppliers || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
-        return { data: list, total: list.length };
-    }, []);
+    const cacheKey = `suppliers:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${appliedFilters.status}:${sortOrder}`;
 
-    const { data: allSuppliers, loading, refresh } = useListCache<any>({
-        cacheKey: "suppliers:list",
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await supplierService.fetchAll({
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            status: appliedFilters.status || undefined,
+            sortBy: sortOrder !== "default" ? "name" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
+        const list = res?.suppliers || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+        const total = res?.total ?? (Array.isArray(list) ? list.length : 0);
+        return { data: list, total };
+    }, [currentPage, debouncedSearch, appliedFilters.status, sortOrder]);
+
+    const { data: rawSuppliers, total, loading, refresh } = useListCache<any>({
+        cacheKey,
         socketModule: "supplier",
         fetcher,
     });
@@ -130,42 +149,11 @@ const SupplierList: React.FC = () => {
         },
     });
 
-    // Client-side filtered suppliers
-    const filteredSuppliers = useMemo(() => {
-        let result = allSuppliers || [];
-        if (appliedFilters.status) {
-            result = result.filter((s: any) => s.status?.toLowerCase() === appliedFilters.status.toLowerCase());
-        }
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            result = result.filter((s: any) =>
-                s.supplierCode?.toLowerCase().includes(term) ||
-                s.legalName?.toLowerCase().includes(term) ||
-                s.displayName?.toLowerCase().includes(term) ||
-                s.contactPerson?.toLowerCase().includes(term) ||
-                s.gstin?.toLowerCase().includes(term) ||
-                (typeof s.mobile === "string" && s.mobile.toLowerCase().includes(term))
-            );
-        }
-        return result;
-    }, [allSuppliers, appliedFilters, searchTerm]);
-
-    // Client-side sorted suppliers
-    const suppliers = useMemo(() => {
-        if (!filteredSuppliers || !Array.isArray(filteredSuppliers)) return [];
-        if (sortOrder === "default") return filteredSuppliers;
-        return [...filteredSuppliers].sort((a: any, b: any) => {
-            const nameA = (a.legalName || a.displayName || "").trim().toLowerCase();
-            const nameB = (b.legalName || b.displayName || "").trim().toLowerCase();
-            return sortOrder === "asc"
-                ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
-                : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-        });
-    }, [filteredSuppliers, sortOrder]);
-
-    const totalPages = Math.ceil(suppliers.length / ITEMS_PER_PAGE);
+    // Suppliers are sorted across all total records in the database on the backend before pagination
+    const suppliers = rawSuppliers ?? [];
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedSuppliers = suppliers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedSuppliers = suppliers;
 
     // ── Table keyboard navigation ─────────────────────────────────────────────
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({

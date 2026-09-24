@@ -131,8 +131,10 @@ class CustomerService {
     status?: string;
     customerTypeId?: number;
     customerGradeId?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) {
-    const { search, page = 1, limit = 10, status, customerTypeId, customerGradeId } = params;
+    const { search, page = 1, limit = 10, status, customerTypeId, customerGradeId, sortBy, sortOrder } = params;
 
     const whereClause: any = {};
 
@@ -157,10 +159,21 @@ class CustomerService {
       whereClause.customerGradeId = customerGradeId;
     }
 
+    let orderBy: any = { createdAt: "desc" };
+    if (sortBy === "name" || sortBy === "firmName") {
+      orderBy = { firmName: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "customerCode") {
+      orderBy = { customerCode: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "status") {
+      orderBy = { status: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: sortOrder === "asc" ? "asc" : "desc" };
+    }
+
     const [customers, total] = await Promise.all([
       prisma.customer.findMany({
         where: whereClause,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
         include: { addresses: true, customerType: true, customerGrade: true }

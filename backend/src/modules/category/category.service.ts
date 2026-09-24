@@ -88,6 +88,16 @@ class CategoryService {
       whereClause.isActive = isActive;
     }
 
+    let orderBy: any = { createdAt: "desc" };
+    const validSortOrder: "asc" | "desc" = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy === "name" || sortBy === "categoryName") {
+      orderBy = { name: validSortOrder };
+    } else if (sortBy === "code" || sortBy === "categoryCode") {
+      orderBy = { code: validSortOrder };
+    } else if (["createdAt", "updatedAt", "type", "isActive"].includes(sortBy || "")) {
+      orderBy = { [sortBy as string]: validSortOrder };
+    }
+
     const queryOptions: any = {
       where: whereClause,
       include: {
@@ -98,7 +108,7 @@ class CategoryService {
           },
         },
       },
-      orderBy: { [sortBy]: sortOrder },
+      orderBy,
     };
 
     if (page !== undefined || limit !== undefined) {

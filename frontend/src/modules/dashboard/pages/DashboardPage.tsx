@@ -23,7 +23,7 @@ import {
   FaArrowUp, FaArrowDown, FaHandHoldingUsd, FaFileInvoiceDollar,
   FaUniversity, FaWarehouse, FaCheckCircle, FaTimesCircle, FaSync, FaMapMarkerAlt, FaTimes, FaTv,
   FaChartBar, FaChartPie, FaListUl, FaArrowLeft, FaArrowRight, FaPlus, FaSearch, FaBox,
-  FaBell, FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaChevronRight,
+  FaBell, FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaChevronRight, FaTrophy,
 } from "react-icons/fa";
 import { LuLayoutDashboard } from "react-icons/lu";
 import { FiTrendingUp, FiTrendingDown, FiMoreVertical } from "react-icons/fi";
@@ -34,7 +34,6 @@ import { DashboardStatCard } from "../components/DashboardStatCard";
 import SalesPurchaseTrendChart from "../components/SalesPurchaseTrendChart";
 import { SalesPersonLiveMap } from "../components/SalesPersonLiveMap";
 import { InventoryStockIntelligence } from "../components/InventoryStockIntelligence";
-import { WorkforceShiftAttendance } from "../components/WorkforceShiftAttendance";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../../components/ui/chart";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -767,7 +766,7 @@ const DashboardPage: React.FC = () => {
                 {/* Card Header */}
                 <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
                       <FaCalendarCheck className="text-xs" />
                     </div>
                     <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
@@ -780,6 +779,17 @@ const DashboardPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Highest Production Records Leaderboard Button */}
+                    <button
+                      type="button"
+                      onClick={() => navigate("/reports/highest-production")}
+                      title="Highest Production List (Leaderboard)"
+                      className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold transition-all duration-200 shadow-xs cursor-pointer bg-amber-50 hover:bg-amber-100/90 text-amber-800 border-amber-300/80 hover:border-amber-400 active:scale-95 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 dark:text-amber-300 dark:border-amber-500/30 dark:hover:border-amber-500/50"
+                    >
+                      <FaTrophy className="text-[10px] text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+                      <span className="hidden sm:inline">Highest Records</span>
+                    </button>
+
                     {/* Day / Week / Month Filter Tabs */}
                     <div className="flex items-center gap-0.5 bg-card-2 p-0.5 rounded-lg border border-line-soft">
                       {(["day", "week", "month"] as const).map((p) => (
@@ -799,11 +809,11 @@ const DashboardPage: React.FC = () => {
 
                     {isDashboardLoading ? (
                       <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-ink-muted border border-line-soft uppercase tracking-wider shrink-0">
-                        <FaSync className="animate-spin text-emerald-400 text-[8px]" /> Loading...
+                        <FaSync className="animate-spin text-emerald-600 dark:text-emerald-400 text-[8px]" /> Loading...
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                         {todayStats.tasksList.length} Tasks
                       </span>
                     )}
@@ -835,7 +845,6 @@ const DashboardPage: React.FC = () => {
                       const linkedPo = safe(productionOrders).find((po: any) => po.productionOrderId === task.productionOrderId || po.id === task.productionOrderId);
                       const productName = task.product?.productName || task.productName || task.productionOrder?.productItem?.productName || task.productionOrder?.product?.productName || linkedPo?.productItem?.productName || linkedPo?.product?.productName || linkedPo?.productName || "No Product Linked";
                       const machineName = task.machine?.machineName || task.machineName || task.weeklyProgram?.machine?.machineName || task.weeklyMachineProgram?.machine?.machineName || `Plan #${task.dailyPlanId || task.id || i + 1}`;
-                      const shiftName = task.shift?.shiftName || task.shiftName || task.weeklyProgram?.shift?.shiftName || task.weeklyMachineProgram?.shift?.shiftName || "General Shift";
 
                       const rawDate = task.productionDate || task.date || task.createdAt;
                       const dateObj = rawDate ? new Date(rawDate) : null;
@@ -858,9 +867,6 @@ const DashboardPage: React.FC = () => {
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[12px] font-bold text-ink truncate">{machineName}</span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-card text-ink-muted border border-line-soft">
-                                  {shiftName}
-                                </span>
                                 {dateText && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                     {dateText}
@@ -1914,18 +1920,7 @@ const DashboardPage: React.FC = () => {
           allProducts={allProducts}
           isParentLoading={isDashboardLoading}
         />
-
-        {/* ══════════════════════════════════════════════════════
-           ROW 5  –  WORKFORCE & SHIFT ATTENDANCE SNAPSHOT
-           ══════════════════════════════════════════════════════ */}
-        {/* <WorkforceShiftAttendance
-          employeesCount={employeesCount}
-          dailyPlans={dailyPlans}
-          weeklyPrograms={weeklyPrograms}
-          isParentLoading={isDashboardLoading}
-        /> */}
       </div>
-
     </div>
   );
 };

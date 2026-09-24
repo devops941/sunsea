@@ -142,6 +142,7 @@ const AllSalesOrderList: React.FC = () => {
             try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) { }
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
     const REMARKS_STORAGE_KEY = "sunsea_salesorder_estimate_remarks";
@@ -399,7 +400,7 @@ const AllSalesOrderList: React.FC = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const cacheKey = `${CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${fromDate}:${toDate}:${customerGradeId}:${customerTypeId}:${orderSource}`;
+    const cacheKey = `${CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${fromDate}:${toDate}:${customerGradeId}:${customerTypeId}:${orderSource}:${sortOrder}`;
 
     const fetcher = useCallback(async (_signal: AbortSignal) => {
         const response = await salesOrderService.fetchAll({
@@ -411,9 +412,11 @@ const AllSalesOrderList: React.FC = () => {
             customerGradeId: customerGradeId || undefined,
             customerTypeId: customerTypeId || undefined,
             orderSource: orderSource || undefined,
+            sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "customer" : undefined,
+            sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
         });
         return { data: response.data || [], total: response.total ?? 0 };
-    }, [currentPage, debouncedSearch, fromDate, toDate, customerGradeId, customerTypeId, orderSource]);
+    }, [currentPage, debouncedSearch, fromDate, toDate, customerGradeId, customerTypeId, orderSource, sortOrder]);
 
     const { data, total, loading, refresh } = useListCache({
         cacheKey,
@@ -422,17 +425,7 @@ const AllSalesOrderList: React.FC = () => {
         enabled: can("sales-orders.view"),
     });
 
-    // Client-side sort on the current page
-    const sortedData = useMemo(() => {
-        if (!data || !Array.isArray(data)) return [];
-        if (sortOrder === "default") return data;
-        return [...data].sort((a: any, b: any) => {
-            const nameA = (a.customer?.displayName || a.customer?.firmName || a.customerName || "").trim().toLowerCase();
-            const nameB = (b.customer?.displayName || b.customer?.firmName || b.customerName || "").trim().toLowerCase();
-            if (sortOrder === "asc") return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-            return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-        });
-    }, [data, sortOrder]);
+    const sortedData = data || [];
 
     const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
 
@@ -487,9 +480,20 @@ const AllSalesOrderList: React.FC = () => {
     }, [navigate]);
 
     const fetchSalesOrdersForExport = useCallback(async () => {
-        const res = await salesOrderService.fetchAll({ page: 1, pageSize: 100000 });
+        const res = await salesOrderService.fetchAll({
+            page: 1,
+            pageSize: 100000,
+            search: debouncedSearch || undefined,
+            fromDate: fromDate || undefined,
+            toDate: toDate || undefined,
+            customerGradeId: customerGradeId || undefined,
+            customerTypeId: customerTypeId || undefined,
+            orderSource: orderSource || undefined,
+            sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "customer" : undefined,
+            sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+        });
         return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-    }, []);
+    }, [debouncedSearch, fromDate, toDate, customerGradeId, customerTypeId, orderSource, sortOrder]);
 
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
@@ -533,7 +537,12 @@ const AllSalesOrderList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Sales Order Management</h2>
+                        <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+                            Sales Order Management
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {total ?? sortedData?.length}
+                            </span>
+                        </h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">

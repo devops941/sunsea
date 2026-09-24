@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { FaPlus, FaTimes, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
@@ -30,9 +30,17 @@ const SalesProductList: React.FC = () => {
     const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [activeFilter, setActiveFilter] = useState("");
     const [draftActiveFilter, setDraftActiveFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
@@ -52,6 +60,7 @@ const SalesProductList: React.FC = () => {
             try { localStorage.setItem(SALESPRODUCT_SORT_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
     const activeFilterCount = [
@@ -72,13 +81,24 @@ const SalesProductList: React.FC = () => {
     }, []);
 
     const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const data = await salesProductService.fetchAll();
-        const list = Array.isArray(data) ? data : [];
-        return { data: list, total: list.length };
-    }, []);
+        const params: any = {
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            isActive: activeFilter === "" ? undefined : activeFilter === "true",
+        };
+        if (sortOrder === "asc" || sortOrder === "desc") {
+            params.sortBy = "salesProductName";
+            params.sortOrder = sortOrder;
+        }
+        const res = await salesProductService.fetchAll(params);
+        const list = Array.isArray(res) ? res : res?.salesProducts || [];
+        const totalCount = res?.total ?? list.length;
+        return { data: list, total: totalCount };
+    }, [currentPage, debouncedSearch, activeFilter, sortOrder]);
 
-    const { data: allSalesProducts, loading, refresh } = useListCache<any>({
-        cacheKey: "salesProducts:list",
+    const { data: salesProducts, total, loading, refresh } = useListCache<any>({
+        cacheKey: `salesProducts:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${activeFilter}:${sortOrder}`,
         socketModule: "salesProduct",
         fetcher,
     });
@@ -90,34 +110,20 @@ const SalesProductList: React.FC = () => {
         onSort: () => toggleSortOrder(),
     });
 
-    const salesProducts = useMemo(() => {
-        return allSalesProducts.filter((p: any) => {
-            const matchesSearch = !searchTerm ||
-                p.salesProductName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.salesProductCode?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesActive = activeFilter === "" ||
-                (activeFilter === "true" ? p.isActive : !p.isActive);
-            return matchesSearch && matchesActive;
-        });
-    }, [allSalesProducts, searchTerm, activeFilter]);
-
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     }, []);
 
-    const sortedSalesProducts = useMemo(() => {
-        if (sortOrder === "default") return salesProducts;
-        return [...salesProducts].sort((a, b) => {
-            const nameA = (a.salesProductName || "").toLowerCase();
-            const nameB = (b.salesProductName || "").toLowerCase();
-            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        });
-    }, [salesProducts, sortOrder]);
+    const totalPages = Math.max(1, Math.ceil((total || 0) / ITEMS_PER_PAGE));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
 
-    const totalPages = Math.ceil(sortedSalesProducts.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = sortedSalesProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
 
     const handleOpenAdd = useCallback(() => navigate("/sales-products/create"), [navigate]);
     const handleOpenEdit = useCallback((item: any) => {
@@ -132,7 +138,7 @@ const SalesProductList: React.FC = () => {
     const tableRef = useRef<HTMLDivElement>(null);
 
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
-        count: paginatedData.length,
+        count: salesProducts.length,
         onEnter: () => {},
         containerRef: tableRef,
     });
@@ -154,9 +160,17 @@ const SalesProductList: React.FC = () => {
     };
 
     const fetchSalesProductsForExport = useCallback(async () => {
-        const res = await salesProductService.fetchAll();
-        return Array.isArray(res) ? res : [];
-    }, []);
+        const params: any = {
+            search: debouncedSearch || undefined,
+            isActive: activeFilter === "" ? undefined : activeFilter === "true",
+        };
+        if (sortOrder === "asc" || sortOrder === "desc") {
+            params.sortBy = "salesProductName";
+            params.sortOrder = sortOrder;
+        }
+        const res = await salesProductService.fetchAll(params);
+        return Array.isArray(res) ? res : res?.salesProducts || [];
+    }, [debouncedSearch, activeFilter, sortOrder]);
 
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
@@ -255,7 +269,7 @@ const SalesProductList: React.FC = () => {
                         <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
                             Sales Product
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                {sortedSalesProducts.length}
+                                {total ?? salesProducts.length}
                             </span>
                         </h2>
                     </div>
@@ -332,21 +346,18 @@ const SalesProductList: React.FC = () => {
                 <div ref={tableRef} tabIndex={0} data-table-nav className="outline-none">
                     <DataTable
                         columns={columns}
-                        data={paginatedData}
+                        data={salesProducts}
                         rowKey={(row) => row.id}
                         loading={loading}
                         emptyMessage="No sales products found."
                         rowClassName={(_, i) => i === focusedIndex ? "bg-primary/8" : ""}
                         onRowClick={(_, i) => setFocusedIndex(i)}
                         pagination={totalPages > 1 ? {
-                            currentPage,
+                            currentPage: safeCurrentPage,
                             totalPages,
                             onPageChange: setCurrentPage,
                         } : undefined}
                     />
-                    <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
-                        Total: {salesProducts.length} record(s)
-                    </div>
                 </div>
             </div>
 

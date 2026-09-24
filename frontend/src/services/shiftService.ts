@@ -3,8 +3,8 @@ import config from "../api/config";
 import type { Shift, CreateShiftDto, UpdateShiftDto } from "../features/shifts/types";
 
 export const shiftService = {
-  fetchAll: async (): Promise<Shift[]> => {
-    const response = await apiClient.get(config.shift.base);
+  fetchAll: async (params?: { search?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; isActive?: boolean }): Promise<any> => {
+    const response = await apiClient.get(config.shift.base, { params });
     return response.data?.data || response.data || [];
   },
 

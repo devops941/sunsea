@@ -38,8 +38,25 @@ class PurchaseOrderController {
         );
     });
 
+    private parseSortBy(value: unknown): "supplier" | "supplierName" | "poNumber" | "orderNo" | "poDate" | "orderDate" | "totalAmount" | "netAmount" | "createdAt" | undefined {
+        if (!value || typeof value !== "string") return undefined;
+        const trimmed = value.trim();
+        const validFields = ["supplier", "supplierName", "poNumber", "orderNo", "poDate", "orderDate", "totalAmount", "netAmount", "createdAt"];
+        const found = validFields.find((f) => f.toLowerCase() === trimmed.toLowerCase());
+        return found as any;
+    }
+
+    private parseSortOrder(value: unknown): "asc" | "desc" | undefined {
+        if (!value || typeof value !== "string") return undefined;
+        const v = value.toLowerCase().trim();
+        return v === "asc" || v === "desc" ? (v as any) : undefined;
+    }
+
     findAll = asyncHandler(async (req: Request, res: Response) => {
         const { page, pageSize, search, status, fromDate, toDate } = req.query;
+        const sortBy = this.parseSortBy(req.query.sortBy);
+        const sortOrder = this.parseSortOrder(req.query.sortOrder);
+
         const result = await purchaseOrderService.getAllPurchaseOrders({
             page: page ? Number(page) : undefined,
             pageSize: pageSize ? Number(pageSize) : undefined,
@@ -47,6 +64,8 @@ class PurchaseOrderController {
             status: status as string,
             fromDate: fromDate as string,
             toDate: toDate as string,
+            sortBy,
+            sortOrder,
         });
 
         return res.status(200).json(

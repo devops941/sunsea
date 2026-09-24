@@ -3,7 +3,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { employeeService } from "../../services/employeeService";
 import type { Employee, EmployeeState, CreateEmployeeDto, UpdateEmployeeDto } from "./types";
 
-export const fetchEmployees = createAsyncThunk("employees/fetchAll", async (params: { search?: string; departmentId?: string | number; roleId?: string | number; status?: string; page?: number; limit?: number } | undefined, { rejectWithValue }) => {
+export const fetchEmployees = createAsyncThunk("employees/fetchAll", async (params: { search?: string; departmentId?: string | number; roleId?: string | number; status?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc" } | undefined, { rejectWithValue }) => {
   try {
     return await employeeService.fetchAll(params);
   } catch (error: any) {

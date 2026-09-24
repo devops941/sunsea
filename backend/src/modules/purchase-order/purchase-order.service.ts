@@ -258,6 +258,8 @@ class PurchaseOrderService {
         status?: string;
         fromDate?: string;
         toDate?: string;
+        sortBy?: string;
+        sortOrder?: "asc" | "desc";
     }) {
         const page = query?.page;
         const pageSize = query?.pageSize;
@@ -298,9 +300,26 @@ class PurchaseOrderService {
 
         const total = await prisma.purchaseOrder.count({ where });
 
+        const validSortOrder: "asc" | "desc" = query?.sortOrder === "asc" ? "asc" : "desc";
+        let orderBy: any = { createdAt: "desc" };
+
+        if (query?.sortBy === "supplier" || query?.sortBy === "supplierName") {
+            orderBy = { supplier: { legalName: validSortOrder } };
+        } else if (query?.sortBy === "poNumber" || query?.sortBy === "orderNo") {
+            orderBy = { poNumber: validSortOrder };
+        } else if (query?.sortBy === "poDate" || query?.sortBy === "orderDate") {
+            orderBy = { poDate: validSortOrder };
+        } else if (query?.sortBy === "totalAmount" || query?.sortBy === "netAmount") {
+            orderBy = { totalAmount: validSortOrder };
+        } else if (query?.sortBy === "createdAt") {
+            orderBy = { createdAt: validSortOrder };
+        } else if (query?.sortBy) {
+            orderBy = { [query.sortBy]: validSortOrder };
+        }
+
         const findOptions: any = {
             where,
-            orderBy: { createdAt: "desc" },
+            orderBy,
             include: {
                 supplier: {
                     select: {

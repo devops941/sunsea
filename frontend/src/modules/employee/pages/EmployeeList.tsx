@@ -98,6 +98,7 @@ const Employeelist: React.FC = () => {
         } catch (_) {}
       }
     }
+    setCurrentPage(1);
   }, [sortField, sortOrder]);
 
   // F6 / Alt+S direct listener for Name sort shortcut
@@ -105,7 +106,7 @@ const Employeelist: React.FC = () => {
     const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-      if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+      if (e.altKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         toggleSort("fullName");
       }
@@ -132,10 +133,26 @@ const Employeelist: React.FC = () => {
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Debounced search term
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const fetchEmployeesForExport = useCallback(async () => {
-    const res = await employeeService.fetchAll({ limit: 100000, includeDrafts: true });
+    const res = await employeeService.fetchAll({
+      limit: 100000,
+      includeDrafts: true,
+      search: debouncedSearch || undefined,
+      roleId: appliedRoleId || undefined,
+      departmentId: appliedDeptId || undefined,
+      status: appliedStatus || undefined,
+      sortBy: sortOrder !== "default" && sortField ? sortField : undefined,
+      sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+    });
     return Array.isArray(res) ? res : (res?.employees || res?.data || []);
-  }, []);
+  }, [debouncedSearch, appliedRoleId, appliedDeptId, appliedStatus, sortField, sortOrder]);
 
   // Load roles and departments for filter dropdowns
   useEffect(() => {
@@ -152,15 +169,28 @@ const Employeelist: React.FC = () => {
     }).catch(() => { });
   }, []);
 
-  // Fetch employees (cached)
-  const fetcher = useCallback(async (_signal: AbortSignal) => {
-    const res = await employeeService.fetchAll({ limit: 10000, includeDrafts: true });
-    const list = Array.isArray(res) ? res : (res.employees || res.data || []);
-    return { data: list, total: res.total || list.length };
-  }, []);
+  const cacheKey = `employees:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${appliedRoleId}:${appliedDeptId}:${appliedStatus}:${sortField}:${sortOrder}`;
 
-  const { data: employees, loading, refresh } = useListCache<any>({
-    cacheKey: "employees:list",
+  // Fetch employees (cached, backend-sorted across total records)
+  const fetcher = useCallback(async (_signal: AbortSignal) => {
+    const res = await employeeService.fetchAll({
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+      search: debouncedSearch || undefined,
+      roleId: appliedRoleId || undefined,
+      departmentId: appliedDeptId || undefined,
+      status: appliedStatus || undefined,
+      includeDrafts: true,
+      sortBy: sortOrder !== "default" && sortField ? sortField : undefined,
+      sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+    });
+    const list = Array.isArray(res) ? res : (res?.employees || res?.data || []);
+    const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+    return { data: list, total };
+  }, [currentPage, debouncedSearch, appliedRoleId, appliedDeptId, appliedStatus, sortField, sortOrder]);
+
+  const { data: employees, total, loading, refresh } = useListCache<any>({
+    cacheKey,
     socketModule: "employee",
     fetcher,
   });
@@ -176,43 +206,9 @@ const Employeelist: React.FC = () => {
     },
   });
 
-  // Client-side filtered employees
-  const filteredEmployees = useMemo(() => {
-    return employees.filter((emp: any) => {
-      const matchesSearch = !searchTerm ||
-        emp.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.empCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.mobile?.includes(searchTerm);
-      const matchesRole = !appliedRoleId || String(emp.roleId || emp.role?.id || emp.user?.roleId) === appliedRoleId;
-      const matchesDept = !appliedDeptId || String(emp.departmentId) === appliedDeptId;
-      const matchesStatus = !appliedStatus || emp.status === appliedStatus;
-      return matchesSearch && matchesRole && matchesDept && matchesStatus;
-    });
-  }, [employees, searchTerm, appliedRoleId, appliedDeptId, appliedStatus]);
-
-  // Client-side sorted employees
-  const sortedEmployees = useMemo(() => {
-    if (sortOrder === "default" || !sortField) return filteredEmployees;
-    return [...filteredEmployees].sort((a: any, b: any) => {
-      if (sortField === "empCode") {
-        const codeA = (a.empCode || "").trim();
-        const codeB = (b.empCode || "").trim();
-        return sortOrder === "asc"
-          ? codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: "base" })
-          : codeB.localeCompare(codeA, undefined, { numeric: true, sensitivity: "base" });
-      } else {
-        const nameA = (a.fullName || "").trim().toLowerCase();
-        const nameB = (b.fullName || "").trim().toLowerCase();
-        return sortOrder === "asc"
-          ? nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" })
-          : nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-      }
-    });
-  }, [filteredEmployees, sortField, sortOrder]);
-
-  const totalPages = Math.ceil(sortedEmployees.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedEmployees = sortedEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedEmployees = employees;
 
   // ── Table keyboard navigation ─────────────────────────────────────────────
   const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
@@ -438,7 +434,7 @@ const Employeelist: React.FC = () => {
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               Employee Management
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                {sortedEmployees.length}
+                {total ?? employees.length}
               </span>
             </h2>
           </div>

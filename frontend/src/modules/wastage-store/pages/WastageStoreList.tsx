@@ -9,6 +9,7 @@ import { useListCache } from "../../../hooks/useListCache";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useTableKeyboardNav } from "../../../hooks/useTableKeyboardNav";
 import { storeService } from "../../../services/storeService";
+import { categoryService } from "../../../services/categoryService";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -35,10 +36,10 @@ const WastageStoreList: React.FC = () => {
     const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [categoryFilter, setCategoryFilter] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
-    const [activeFilter, setActiveFilter] = useState("");
+    const [draftCategoryFilter, setDraftCategoryFilter] = useState("");
     const [draftStoreFilter, setDraftStoreFilter] = useState("");
-    const [draftActiveFilter, setDraftActiveFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -49,6 +50,7 @@ const WastageStoreList: React.FC = () => {
     const [selectedItem, setSelectedItem] = useState<RawMaterial | null>(null);
 
     const [stores, setStores] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
 
     const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
         try {
@@ -64,26 +66,33 @@ const WastageStoreList: React.FC = () => {
             try { localStorage.setItem(WASTAGE_SORT_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
     const activeFilterCount = [
+        categoryFilter !== "",
         storeFilter !== "",
-        activeFilter !== "",
     ].filter(Boolean).length;
 
     const hasActiveFilters = activeFilterCount > 0;
 
     const handleApplyFilters = useCallback(() => {
+        setCategoryFilter(draftCategoryFilter);
         setStoreFilter(draftStoreFilter);
-        setActiveFilter(draftActiveFilter);
         setCurrentPage(1);
-    }, [draftStoreFilter, draftActiveFilter]);
+    }, [draftCategoryFilter, draftStoreFilter]);
 
     const handleClearFilters = useCallback(() => {
+        setDraftCategoryFilter("");
         setDraftStoreFilter("");
-        setDraftActiveFilter("");
+        setCategoryFilter("");
         setStoreFilter("");
-        setActiveFilter("");
         setCurrentPage(1);
     }, []);
 
@@ -95,14 +104,34 @@ const WastageStoreList: React.FC = () => {
         }).catch(() => {});
     }, []);
 
-    const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const res = await rawMaterialService.fetchAll({ itemType: "WASTAGE", limit: 10000 });
-        const list = Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
-        return { data: list, total: list.length };
+    // Fetch WASTAGE categories for filter dropdown
+    useEffect(() => {
+        categoryService.fetchAll({ type: "WASTAGE", isActive: true }).then((res: any) => {
+            const list = res?.categories ?? (Array.isArray(res) ? res : res?.data ?? []);
+            setCategories(Array.isArray(list) ? list : []);
+        }).catch(() => {});
     }, []);
 
-    const { data: allWastageItems, loading, refresh } = useListCache<any>({
-        cacheKey: "wastageStore:list",
+    const cacheKey = `wastageStore:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${categoryFilter}:${storeFilter}:${sortOrder}`;
+
+    const fetcher = useCallback(async (_signal: AbortSignal) => {
+        const res = await rawMaterialService.fetchAll({
+            itemType: "WASTAGE",
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            categoryId: categoryFilter || undefined,
+            storeId: storeFilter || undefined,
+            sortBy: sortOrder !== "default" ? "materialName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
+        const list = Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
+        const total = Array.isArray(res) ? res.length : (res?.total ?? list.length);
+        return { data: list, total };
+    }, [currentPage, debouncedSearch, categoryFilter, storeFilter, sortOrder]);
+
+    const { data: wastageItems, total, loading, refresh } = useListCache<any>({
+        cacheKey,
         socketModule: "rawMaterial",
         fetcher,
     });
@@ -114,33 +143,13 @@ const WastageStoreList: React.FC = () => {
         onSort: () => toggleSortOrder(),
     });
 
-    const filteredData = useMemo(() => {
-        return allWastageItems.filter((item: any) => {
-            const matchesSearch = !searchTerm ||
-                item.rawMaterialId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.materialName?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStore = !storeFilter || item.storeId === storeFilter;
-            const matchesActive = activeFilter === "" ||
-                (activeFilter === "true" ? item.isActive : !item.isActive);
-            return matchesSearch && matchesStore && matchesActive;
-        });
-    }, [allWastageItems, searchTerm, storeFilter, activeFilter]);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
+    const paginatedData = wastageItems;
 
-    const sortedData = useMemo(() => {
-        if (sortOrder === "default") return filteredData;
-        return [...filteredData].sort((a, b) => {
-            const nameA = (a.materialName || "").toLowerCase();
-            const nameB = (b.materialName || "").toLowerCase();
-            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        });
-    }, [filteredData, sortOrder]);
-
-    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
-    const total = sortedData.length;
-    const paginatedData = sortedData.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(e.target.value);
+        setCurrentPage(1);
+    }, []);
 
     const storeOptions = useMemo(
         () => [
@@ -150,9 +159,13 @@ const WastageStoreList: React.FC = () => {
         [stores]
     );
 
-    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-    }, []);
+    const categoryOptions = useMemo(
+        () => [
+            { label: "All Categories", value: "" },
+            ...(categories || []).map((c: any) => ({ label: c.name, value: String(c.id) })),
+        ],
+        [categories]
+    );
 
 
     const tableRef = useRef<HTMLDivElement>(null);
@@ -200,9 +213,17 @@ const WastageStoreList: React.FC = () => {
     };
 
     const fetchWastageForExport = useCallback(async () => {
-        const res = await rawMaterialService.fetchAll({ itemType: "WASTAGE", limit: 100000 });
+        const res = await rawMaterialService.fetchAll({
+            itemType: "WASTAGE",
+            limit: 100000,
+            search: debouncedSearch || undefined,
+            categoryId: categoryFilter || undefined,
+            storeId: storeFilter || undefined,
+            sortBy: sortOrder !== "default" ? "materialName" : undefined,
+            sortOrder: sortOrder !== "default" ? sortOrder : undefined,
+        });
         return Array.isArray(res) ? res : (res?.rawMaterials || res?.data || []);
-    }, []);
+    }, [debouncedSearch, categoryFilter, storeFilter, sortOrder]);
 
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
@@ -288,9 +309,9 @@ const WastageStoreList: React.FC = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
                         <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
-                            Wastage Products
+                          Raw Material Wastage
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                {sortedData.length}
+                                {total ?? wastageItems.length}
                             </span>
                         </h2>
                     </div>
@@ -306,13 +327,25 @@ const WastageStoreList: React.FC = () => {
                             activeFilterCount={activeFilterCount}
                             hasActiveFilters={hasActiveFilters}
                             onOpen={() => {
+                                setDraftCategoryFilter(categoryFilter);
                                 setDraftStoreFilter(storeFilter);
-                                setDraftActiveFilter(activeFilter);
                             }}
                             onApply={handleApplyFilters}
                             onClear={handleClearFilters}
                         >
                             <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Category
+                                    </label>
+                                    <SelectInput
+                                        name="categoryFilter"
+                                        value={draftCategoryFilter}
+                                        onChange={(e) => setDraftCategoryFilter(e.target.value)}
+                                        options={categoryOptions}
+                                        noMargin
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
                                         Store
@@ -322,22 +355,6 @@ const WastageStoreList: React.FC = () => {
                                         value={draftStoreFilter}
                                         onChange={(e) => setDraftStoreFilter(e.target.value)}
                                         options={storeOptions}
-                                        noMargin
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
-                                        Status
-                                    </label>
-                                    <SelectInput
-                                        name="activeFilter"
-                                        value={draftActiveFilter}
-                                        onChange={(e) => setDraftActiveFilter(e.target.value)}
-                                        options={[
-                                            { label: "All Status", value: "" },
-                                            { label: "Active", value: "true" },
-                                            { label: "Inactive", value: "false" },
-                                        ]}
                                         noMargin
                                     />
                                 </div>
@@ -367,22 +384,22 @@ const WastageStoreList: React.FC = () => {
                     <div className="flex items-center gap-2 px-6 py-2.5 border-b border-line flex-wrap">
                         <span className="text-xs text-ink-subtle">Active filters:</span>
 
+                        {categoryFilter && (
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
+                                Category: {categoryOptions.find((c) => c.value === categoryFilter)?.label || categoryFilter}
+                                <FaTimes
+                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
+                                    onClick={() => { setCategoryFilter(""); setDraftCategoryFilter(""); setCurrentPage(1); }}
+                                />
+                            </span>
+                        )}
+
                         {storeFilter && (
                             <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
                                 Store: {storeOptions.find((s) => s.value === storeFilter)?.label || storeFilter}
                                 <FaTimes
                                     className="cursor-pointer hover:text-indigo-200 ml-0.5"
                                     onClick={() => { setStoreFilter(""); setDraftStoreFilter(""); setCurrentPage(1); }}
-                                />
-                            </span>
-                        )}
-
-                        {activeFilter !== "" && (
-                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-medium">
-                                Status: {activeFilter === "true" ? "Active" : "Inactive"}
-                                <FaTimes
-                                    className="cursor-pointer hover:text-indigo-200 ml-0.5"
-                                    onClick={() => { setActiveFilter(""); setDraftActiveFilter(""); setCurrentPage(1); }}
                                 />
                             </span>
                         )}
@@ -405,9 +422,6 @@ const WastageStoreList: React.FC = () => {
                                 : undefined
                         }
                     />
-                    <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
-                        Total: {total} record(s)
-                    </div>
                 </div>
             </div>
 
