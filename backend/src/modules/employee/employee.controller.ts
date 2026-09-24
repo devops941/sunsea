@@ -161,7 +161,7 @@ class EmployeeController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
-    const { search, departmentId, roleId, status, page, limit, includeDrafts } = req.query;
+    const { search, departmentId, roleId, status, page, limit, includeDrafts, sortBy, sortOrder } = req.query;
 
     const employees = await employeeService.findAll({
       search: search as string | undefined,
@@ -171,6 +171,8 @@ class EmployeeController {
       includeDrafts: includeDrafts === "true",
       page: page ? parseInt(page as string, 10) : 1,
       limit: limit ? parseInt(limit as string, 10) : 10,
+      sortBy: sortBy as string | undefined,
+      sortOrder: (sortOrder as "asc" | "desc") || "desc",
     });
 
     return res.status(200).json(new ApiResponse("Employees fetched successfully", employees));

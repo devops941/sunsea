@@ -78,16 +78,17 @@ const CustomerListPage: React.FC = () => {
       } catch (_) {}
       return next;
     });
+    setCurrentPage(1);
   }, []);
 
-  // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
+  // Shortcut key (Alt+S) to toggle alphabetical sort (F6 is handled by usePageShortcuts)
   useEffect(() => {
     const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
         return;
       }
-      if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+      if (e.altKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         toggleSortOrder();
       }
@@ -125,7 +126,7 @@ const CustomerListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const cacheKey = `${CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${appliedFilters.status}:${appliedFilters.customerTypeId}:${appliedFilters.customerGradeId}`;
+  const cacheKey = `${CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${appliedFilters.status}:${appliedFilters.customerTypeId}:${appliedFilters.customerGradeId}:${sortOrder}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await customerService.fetchAll({
@@ -135,9 +136,11 @@ const CustomerListPage: React.FC = () => {
       status:          appliedFilters.status        || undefined,
       customerTypeId:  appliedFilters.customerTypeId  ? Number(appliedFilters.customerTypeId)  : undefined,
       customerGradeId: appliedFilters.customerGradeId ? Number(appliedFilters.customerGradeId) : undefined,
+      sortBy:          sortOrder !== "default" ? "name" : undefined,
+      sortOrder:       sortOrder !== "default" ? sortOrder : undefined,
     });
     return { data: res.customers || [], total: res.total || 0 };
-  }, [debouncedSearch, currentPage, appliedFilters]);
+  }, [debouncedSearch, currentPage, appliedFilters, sortOrder]);
 
   const { data: rawCustomers, total, loading, refresh } = useListCache({
     cacheKey,
@@ -146,21 +149,8 @@ const CustomerListPage: React.FC = () => {
     enabled: can("customers.view"),
   });
 
-  // Client-side sorted customers based on persistent sortOrder
-  const customers = useMemo(() => {
-    if (!rawCustomers || !Array.isArray(rawCustomers)) return [];
-    if (sortOrder === "default") return rawCustomers;
-
-    return [...rawCustomers].sort((a: any, b: any) => {
-      const nameA = (a.firmName || a.customerName || a.companyName || "").trim().toLowerCase();
-      const nameB = (b.firmName || b.customerName || b.companyName || "").trim().toLowerCase();
-      if (sortOrder === "asc") {
-        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-      } else {
-        return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-      }
-    });
-  }, [rawCustomers, sortOrder]);
+  // Customers are sorted across all total records in the database on the backend before pagination
+  const customers = rawCustomers ?? [];
 
   usePageShortcuts({
     onRefresh: () => refresh(),

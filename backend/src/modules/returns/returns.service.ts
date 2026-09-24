@@ -16,7 +16,44 @@ class ReturnsService {
   }
 
   // --- SALES RETURN ---
-  async getSalesReturns(companyId?: string) {
+  async getSalesReturns(
+    params?:
+      | {
+          companyId?: string;
+          sortBy?: string;
+          sortOrder?: "asc" | "desc";
+        }
+      | string
+  ) {
+    let companyId: string | undefined;
+    let sortBy: string | undefined;
+    let sortOrder: "asc" | "desc" | undefined;
+
+    if (typeof params === "string") {
+      companyId = params;
+    } else if (params) {
+      companyId = params.companyId;
+      sortBy = params.sortBy;
+      sortOrder = params.sortOrder;
+    }
+
+    const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
+    let orderBy: any = { createdAt: "desc" };
+
+    if (sortBy === "customer" || sortBy === "customerName") {
+      orderBy = { customer: { firmName: validSortOrder } };
+    } else if (sortBy === "returnNo") {
+      orderBy = { returnNo: validSortOrder };
+    } else if (sortBy === "returnDate") {
+      orderBy = { returnDate: validSortOrder };
+    } else if (sortBy === "grandTotal") {
+      orderBy = { grandTotal: validSortOrder };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    } else if (sortBy) {
+      orderBy = { [sortBy]: validSortOrder };
+    }
+
     return prisma.salesReturn.findMany({
       where: companyId ? { companyId } : undefined,
       include: {
@@ -24,6 +61,7 @@ class ReturnsService {
           select: {
             id: true,
             firmName: true,
+            displayName: true,
             customerCode: true,
             customerGradeId: true,
             customerGrade: { select: { id: true, name: true } },
@@ -32,7 +70,7 @@ class ReturnsService {
         salesInvoice: { select: { id: true, invoiceNo: true } },
         items: { include: { product: { select: { id: true, productName: true } } } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy,
     });
   }
 
@@ -259,15 +297,52 @@ class ReturnsService {
   }
 
   // --- PURCHASE RETURN ---
-  async getPurchaseReturns(companyId?: string) {
+  async getPurchaseReturns(
+    params?:
+      | {
+          companyId?: string;
+          sortBy?: string;
+          sortOrder?: "asc" | "desc";
+        }
+      | string
+  ) {
+    let companyId: string | undefined;
+    let sortBy: string | undefined;
+    let sortOrder: "asc" | "desc" | undefined;
+
+    if (typeof params === "string") {
+      companyId = params;
+    } else if (params) {
+      companyId = params.companyId;
+      sortBy = params.sortBy;
+      sortOrder = params.sortOrder;
+    }
+
+    const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
+    let orderBy: any = { createdAt: "desc" };
+
+    if (sortBy === "supplier" || sortBy === "supplierName") {
+      orderBy = { supplier: { legalName: validSortOrder } };
+    } else if (sortBy === "returnNo") {
+      orderBy = { returnNo: validSortOrder };
+    } else if (sortBy === "returnDate") {
+      orderBy = { returnDate: validSortOrder };
+    } else if (sortBy === "grandTotal") {
+      orderBy = { grandTotal: validSortOrder };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: validSortOrder };
+    } else if (sortBy) {
+      orderBy = { [sortBy]: validSortOrder };
+    }
+
     return prisma.purchaseReturn.findMany({
       where: companyId ? { companyId } : undefined,
       include: {
-        supplier: { select: { id: true, legalName: true, supplierCode: true } },
+        supplier: { select: { id: true, legalName: true, displayName: true, supplierCode: true } },
         grnInvoice: { select: { id: true, invoiceNo: true } },
         items: { include: { rawMaterial: { select: { rawMaterialId: true, materialName: true } } } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy,
     });
   }
 

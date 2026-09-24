@@ -11,4 +11,15 @@ export const productShiftRecordService = {
     const response = await apiClient.post(config.productShiftRecord.base, data);
     return response.data;
   },
+
+  fetchLeaderboard: async (date?: string): Promise<any> => {
+    const params = date ? { date } : {};
+    const response = await apiClient.get(`${config.productShiftRecord.base}/leaderboard`, { params });
+    return response.data?.data || response.data;
+  },
+
+  resetLeaderboardCounts: async (): Promise<any> => {
+    const response = await apiClient.post(`${config.productShiftRecord.base}/leaderboard/reset`);
+    return response.data?.data || response.data;
+  },
 };

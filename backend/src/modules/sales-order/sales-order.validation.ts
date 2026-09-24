@@ -301,7 +301,7 @@ export const salesOrderQuerySchema = z.object({
         sortBy: z
             .string()
             .optional()
-            .transform((val) => (val && ["orderDate", "createdAt", "orderNo"].includes(val) ? (val as any) : "createdAt")),
+            .transform((val) => (val && ["orderDate", "createdAt", "orderNo", "customer", "customerName", "netAmount"].includes(val) ? (val as any) : "createdAt")),
 
         sortOrder: z
             .string()

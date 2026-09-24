@@ -161,6 +161,8 @@ export interface SalesOrderQueryParams {
     customerGradeId?: number | string;
     customerTypeId?: number | string;
     quotationOnly?: boolean;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
 }
 
 export interface OrderStatusSummary {

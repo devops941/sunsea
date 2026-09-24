@@ -1,6 +1,6 @@
 import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { FaPlus } from "react-icons/fa";
+import { FaPlus, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -22,6 +22,8 @@ import { usePermission } from "../../../../hooks/usePermission";
 
 
 const ITEMS_PER_PAGE = 15;
+type SortOrder = "default" | "asc" | "desc";
+const SORT_STORAGE_KEY = "sunsea_grn_invoice_sort";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -73,31 +75,58 @@ const InvoiceList: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
 
     const tableRef = useRef<HTMLDivElement>(null);
-    const [sortAsc, setSortAsc] = useState(false);
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        try {
+            const saved = localStorage.getItem(SORT_STORAGE_KEY);
+            if (saved === "asc" || saved === "desc") return saved as SortOrder;
+        } catch (_) {}
+        return "default";
+    });
+
+    const toggleSortOrder = useCallback(() => {
+        setSortOrder((prev) => {
+            const next: SortOrder = prev === "default" ? "asc" : prev === "asc" ? "desc" : "default";
+            try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
+            return next;
+        });
+        setCurrentPage(1);
+    }, []);
+
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+    const cacheKey = `grnInvoices:list:${sortOrder}`;
+
     const fetchInvoicesForExport = useCallback(async () => {
-        const response = await grnInvoiceService.fetchAll({ page: 1, pageSize: 100000 });
+        const response = await grnInvoiceService.fetchAll({
+            page: 1,
+            pageSize: 100000,
+            sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "supplier" : undefined,
+            sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+        });
         const list = response?.data || (Array.isArray(response) ? response : []);
         return Array.isArray(list) ? list : [];
-    }, []);
+    }, [sortOrder]);
 
     const fetcher = useCallback(async (_signal: AbortSignal) => {
-        const response = await grnInvoiceService.fetchAll({ pageSize: 10000 });
+        const response = await grnInvoiceService.fetchAll({
+            pageSize: 10000,
+            sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "supplier" : undefined,
+            sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+        });
         const list = response?.data || (Array.isArray(response) ? response : []);
         return { data: list, total: response?.total || list.length };
-    }, []);
+    }, [sortOrder]);
 
     const { data: allInvoices, loading, refresh } = useListCache<any>({
-        cacheKey: "grnInvoices:list",
+        cacheKey,
         socketModule: "grnInvoice",
         fetcher,
     });
 
     usePageShortcuts({
         onRefresh: () => refresh(),
-        onSort: () => setSortAsc((prev) => !prev),
+        onSort: () => toggleSortOrder(),
         onDelete: () => setShowDeleteModal(true),
         onNew: () => { if (can("invoice.create")) navigate("/invoice/create"); },
     });
@@ -112,14 +141,7 @@ const InvoiceList: React.FC = () => {
         );
     }, [allInvoices, searchTerm]);
 
-    const sortedData = useMemo(() => {
-        if (!sortAsc) return filteredData;
-        return [...filteredData].sort((a, b) => {
-            const aName = (a.supplier?.legalName || a.supplier?.displayName || a.grnNumber || "").toLowerCase();
-            const bName = (b.supplier?.legalName || b.supplier?.displayName || b.grnNumber || "").toLowerCase();
-            return aName.localeCompare(bName);
-        });
-    }, [filteredData, sortAsc]);
+    const sortedData = filteredData;
 
     const data = sortedData.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
@@ -234,6 +256,26 @@ const InvoiceList: React.FC = () => {
                         { header: "GRN DATE", render: (item) => formatDate(item.grnDate) },
                         {
                             header: "SUPPLIER",
+                            headerNode: (
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); toggleSortOrder(); }}
+                                    title={`Sort by Supplier: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
+                                    className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-[1.5px] outline-none hover:opacity-90 transition-opacity"
+                                >
+                                    <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+                                        SUPPLIER
+                                    </span>
+                                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${sortOrder === "asc" || sortOrder === "desc" ? "bg-primary/20 text-primary scale-110" : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"}`}>
+                                        {sortOrder === "asc" ? <FaArrowUp size={10} /> : sortOrder === "desc" ? <FaArrowDown size={10} /> : <FaSort size={10} />}
+                                    </span>
+                                    {sortOrder !== "default" && (
+                                        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+                                            {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                                        </span>
+                                    )}
+                                </button>
+                            ),
                             render: (item) => item.supplier?.displayName || item.supplier?.legalName || "N/A",
                         },
                         {

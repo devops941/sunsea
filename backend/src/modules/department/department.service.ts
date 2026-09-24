@@ -43,13 +43,26 @@ export const createDepartmentService =
   };
 
 export const getAllDepartmentsService =
-  async (page?: number, limit?: number, search?: string) => {
+  async (
+    page?: number,
+    limit?: number,
+    search?: string,
+    sortBy?: string,
+    sortOrder?: "asc" | "desc"
+  ) => {
     const where: any = {};
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
         { description: { contains: search, mode: "insensitive" } },
       ];
+    }
+
+    let orderBy: any = { createdAt: "desc" };
+    if (sortBy === "name") {
+      orderBy = { name: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: sortOrder === "asc" ? "asc" : "desc" };
     }
 
     if (page !== undefined && limit !== undefined) {
@@ -62,7 +75,7 @@ export const getAllDepartmentsService =
           },
           skip,
           take: limit,
-          orderBy: { createdAt: "desc" },
+          orderBy,
         }),
         prisma.department.count({ where }),
       ]);
@@ -76,9 +89,7 @@ export const getAllDepartmentsService =
           select: { employees: true }
         }
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy,
     });
     return { departments, total: departments.length };
   };

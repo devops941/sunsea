@@ -216,8 +216,10 @@ class EmployeeService {
     includeDrafts?: boolean;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) {
-    const { search, departmentId, roleId, status, includeDrafts, page = 1, limit = 10 } = params;
+    const { search, departmentId, roleId, status, includeDrafts, page = 1, limit = 10, sortBy, sortOrder = "desc" } = params;
 
     const where: any = {};
 
@@ -246,11 +248,26 @@ class EmployeeService {
       ];
     }
 
+    const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
+    let orderBy: any = { createdAt: "desc" };
+
+    if (sortBy) {
+      if (sortBy === "department") {
+        orderBy = { department: { name: validSortOrder } };
+      } else if (sortBy === "role") {
+        orderBy = { role: { name: validSortOrder } };
+      } else if (sortBy === "shift") {
+        orderBy = { shift: { shiftName: validSortOrder } };
+      } else if (["fullName", "empCode", "createdAt", "dateOfJoining", "status", "mobile", "email"].includes(sortBy)) {
+        orderBy = { [sortBy]: validSortOrder };
+      }
+    }
+
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
         where,
         include: { user: { include: { role: true } }, role: true, department: true, shift: true, payrollConfig: true },
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),

@@ -130,8 +130,10 @@ class SupplierService {
     limit: number;
     search?: string;
     status?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) {
-    const { page, limit, search, status } = params;
+    const { page, limit, search, status, sortBy, sortOrder } = params;
     const offset = (page - 1) * limit;
 
     const where: Prisma.SupplierWhereInput = {
@@ -146,12 +148,23 @@ class SupplierService {
       }),
     };
 
+    let orderBy: Prisma.SupplierOrderByWithRelationInput = { createdAt: "desc" };
+    if (sortBy === "name" || sortBy === "legalName") {
+      orderBy = { legalName: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "supplierCode") {
+      orderBy = { supplierCode: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "status") {
+      orderBy = { status: sortOrder === "desc" ? "desc" : "asc" };
+    } else if (sortBy === "createdAt") {
+      orderBy = { createdAt: sortOrder === "asc" ? "asc" : "desc" };
+    }
+
     const [suppliers, total] = await Promise.all([
       supplierRepository.findMany({
         where,
         skip: offset,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
       }),
       supplierRepository.count(where),
     ]);

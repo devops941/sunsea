@@ -4,7 +4,7 @@ import type { MachineState } from "./types";
 
 export const fetchMachines = createAsyncThunk(
   "machines/fetchAll",
-  async (params: { search?: string; page?: number; limit?: number } | undefined, { rejectWithValue }) => {
+  async (params: { search?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc" } | undefined, { rejectWithValue }) => {
     try {
       return await machineService.getAll(params);
     } catch (error: any) {

@@ -989,6 +989,7 @@ export const sidebarItems: SidebarItem[] = [
           { title: "Purchase Reports", path: "/reports/purchase", permission: "purchase-reports.view" },
           { title: "Inventory Reports", path: "/reports/inventory", permission: "inventory-reports.view" },
           { title: "Production Reports", path: "/reports/production", permission: "production-reports.view" },
+          { title: "Highest Production List", path: "/reports/highest-production", permission: "production-reports.view" },
           // { title: "Audit Reports", path: "/reports/audit", permission: "audit-reports.view" },
         ],
       },
@@ -1008,6 +1009,7 @@ export const sidebarItems: SidebarItem[] = [
       "/reports/purchase",
       "/reports/inventory",
       "/reports/production",
+      "/reports/highest-production",
       "/reports/audit",
     ],
     permissionAny: [

@@ -166,7 +166,7 @@ const QuotationList: React.FC = () => {
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
                 return;
             }
-            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+            if (e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 toggleSortOrder();
             }

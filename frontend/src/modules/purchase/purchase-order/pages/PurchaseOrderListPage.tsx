@@ -60,6 +60,7 @@ const PurchaseOrderListPage: React.FC = () => {
       try { localStorage.setItem(SORT_STORAGE_KEY, next); } catch (_) {}
       return next;
     });
+    setCurrentPage(1);
   }, []);
 
   const [showViewModal, setShowViewModal] = useState(false);
@@ -84,19 +85,30 @@ const PurchaseOrderListPage: React.FC = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
+  const cacheKey = `purchaseOrders:list:${sortOrder}`;
+
   const fetchPOsForExport = useCallback(async () => {
-    const response = await purchaseOrderService.fetchAll({ page: 1, pageSize: 100000 });
+    const response = await purchaseOrderService.fetchAll({
+      page: 1,
+      pageSize: 100000,
+      sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "supplier" : undefined,
+      sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+    });
     return Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
-  }, []);
+  }, [sortOrder]);
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
-    const response = await purchaseOrderService.fetchAll({ pageSize: 10000 });
+    const response = await purchaseOrderService.fetchAll({
+      pageSize: 10000,
+      sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "supplier" : undefined,
+      sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+    });
     const list = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
     return { data: list, total: response?.total || list.length };
-  }, []);
+  }, [sortOrder]);
 
   const { data: allPurchaseOrders, loading, refresh } = useListCache<any>({
-    cacheKey: "purchaseOrders:list",
+    cacheKey,
     socketModule: "purchaseOrder",
     fetcher,
   });
@@ -113,15 +125,7 @@ const PurchaseOrderListPage: React.FC = () => {
     });
   }, [allPurchaseOrders, searchTerm, statusFilter, fromDate, toDate]);
 
-  const sortedPOs = useMemo(() => {
-    if (sortOrder === "default") return purchaseOrders;
-    return [...purchaseOrders].sort((a: any, b: any) => {
-      const nameA = (a.supplier?.supplierName || a.supplier?.legalName || "").trim().toLowerCase();
-      const nameB = (b.supplier?.supplierName || b.supplier?.legalName || "").trim().toLowerCase();
-      if (sortOrder === "asc") return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-      return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-    });
-  }, [purchaseOrders, sortOrder]);
+  const sortedPOs = purchaseOrders;
 
   const totalPages = Math.ceil(sortedPOs.length / ITEMS_PER_PAGE);
   const paginatedPOs = sortedPOs.slice(

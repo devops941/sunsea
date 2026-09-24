@@ -511,6 +511,8 @@ class GrnInvoiceService {
         search?: string;
         supplierId?: number;
         storeId?: string;
+        sortBy?: string;
+        sortOrder?: "asc" | "desc";
     }) {
         const page = params.page || 1;
         const pageSize = params.pageSize || 10;
@@ -531,6 +533,27 @@ class GrnInvoiceService {
 
         if (params.storeId) {
             where.storeId = params.storeId;
+        }
+
+        const validSortOrder: "asc" | "desc" = params.sortOrder === "asc" ? "asc" : "desc";
+        let orderBy: any = { createdAt: "desc" };
+
+        if (params.sortBy === "supplier" || params.sortBy === "supplierName") {
+            orderBy = { supplier: { legalName: validSortOrder } };
+        } else if (params.sortBy === "invoiceNo") {
+            orderBy = { invoiceNo: validSortOrder };
+        } else if (params.sortBy === "grnNumber") {
+            orderBy = { grnNumber: validSortOrder };
+        } else if (params.sortBy === "invoiceDate") {
+            orderBy = { invoiceDate: validSortOrder };
+        } else if (params.sortBy === "grnDate") {
+            orderBy = { grnDate: validSortOrder };
+        } else if (params.sortBy === "netAmount") {
+            orderBy = { netAmount: validSortOrder };
+        } else if (params.sortBy === "createdAt") {
+            orderBy = { createdAt: validSortOrder };
+        } else if (params.sortBy) {
+            orderBy = { [params.sortBy]: validSortOrder };
         }
 
         const [data, total] = await Promise.all([
@@ -554,7 +577,7 @@ class GrnInvoiceService {
                         },
                     },
                 },
-                orderBy: { createdAt: "desc" },
+                orderBy,
             }),
             prisma.grnInvoice.count({ where }),
         ]);

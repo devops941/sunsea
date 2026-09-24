@@ -410,7 +410,6 @@ const SalesProductForm: React.FC = () => {
 
                 <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="px-6 py-4 space-y-4" noValidate>
                     <div>
-                        <h6 className="text-xs font-bold text-ink uppercase tracking-wide mb-2.5 pb-1.5 border-b border-line-soft">Basic Information</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <TextInput
                                 label="Sales Product Name"

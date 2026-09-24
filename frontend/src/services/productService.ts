@@ -18,12 +18,33 @@ const mapProduct = (p: any): Product => {
 };
 
 export const productService = {
-  fetchAll: async (params?: { search?: string }): Promise<Product[]> => {
+  fetchAll: async (params?: {
+    search?: string;
+    categoryId?: string;
+    isActive?: boolean;
+    productType?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  }): Promise<any> => {
     const response = await apiClient.get(config.product.base, {
       params
     });
-    const list = response.data?.data || response.data;
-    return Array.isArray(list) ? list.map(mapProduct) : [];
+    const resData = response.data?.data || response.data;
+    if (resData && Array.isArray(resData.products)) {
+      if (params?.page !== undefined || params?.limit !== undefined || params?.sortBy !== undefined) {
+        return {
+          ...resData,
+          products: resData.products.map(mapProduct),
+        };
+      }
+      return resData.products.map(mapProduct);
+    }
+    if (Array.isArray(resData)) {
+      return resData.map(mapProduct);
+    }
+    return resData;
   },
 
   fetchById: async (id: string): Promise<Product> => {

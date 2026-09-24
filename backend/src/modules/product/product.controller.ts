@@ -34,13 +34,31 @@ class ProductController {
     ) => {
       const search = req.query.search ? String(req.query.search) : undefined;
       const categoryId = req.query.categoryId ? String(req.query.categoryId) : undefined;
-      const products =
-        await productService.findAll({ search, categoryId });
+      const isActive =
+        req.query.isActive === "true" ? true :
+          req.query.isActive === "false" ? false :
+            undefined;
+      const productType = req.query.productType ? String(req.query.productType) : undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const sortBy = req.query.sortBy as string | undefined;
+      const sortOrder = req.query.sortOrder as "asc" | "desc" | undefined;
+
+      const result = await productService.findAll({
+        search,
+        categoryId,
+        isActive,
+        productType,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+      });
 
       return res.status(200).json(
         new ApiResponse(
           "Products fetched successfully",
-          products
+          result
         )
       );
     }

@@ -44,33 +44,25 @@ const PRODUCT_SORT_KEY = "sunsea_product_sort_name";
 
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
-    const productFetcher = useCallback(async (_signal: AbortSignal) => {
-        const list = await productService.fetchAll();
-        return { data: Array.isArray(list) ? list : [], total: Array.isArray(list) ? list.length : 0 };
-    }, []);
-
-    const { data: products, loading, refresh } = useListCache<any>({
-        cacheKey: "products:list",
-        socketModule: "product",
-        fetcher: productFetcher,
-    });
-    const { can } = usePermission();
-
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState<any>(null);
-    const [capacityRecords, setCapacityRecords] = useState<any[]>([]);
-    const [loadingCapacity, setLoadingCapacity] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
     const location = useLocation();
     const searchParams = new URLSearchParams(location.search);
     const initialSearch = searchParams.get("search") || "";
 
+    const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState(initialSearch);
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
     const [categoryFilter, setCategoryFilter] = useState("");
     const [activeFilter, setActiveFilter] = useState("");
     const [draftCategoryFilter, setDraftCategoryFilter] = useState("");
     const [draftActiveFilter, setDraftActiveFilter] = useState("");
     const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
         try {
@@ -86,7 +78,38 @@ const ProductList: React.FC = () => {
             try { localStorage.setItem(PRODUCT_SORT_KEY, next); } catch (_) {}
             return next;
         });
+        setCurrentPage(1);
     }, []);
+
+    const productFetcher = useCallback(async (_signal: AbortSignal) => {
+        const params: any = {
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearch || undefined,
+            categoryId: categoryFilter || undefined,
+            isActive: activeFilter === "" ? undefined : activeFilter === "true",
+        };
+        if (sortOrder === "asc" || sortOrder === "desc") {
+            params.sortBy = "productName";
+            params.sortOrder = sortOrder;
+        }
+        const res = await productService.fetchAll(params);
+        const list = Array.isArray(res) ? res : res?.products || [];
+        const totalCount = res?.total ?? list.length;
+        return { data: list, total: totalCount };
+    }, [currentPage, debouncedSearch, categoryFilter, activeFilter, sortOrder]);
+
+    const { data: products, total, loading, refresh } = useListCache<any>({
+        cacheKey: `products:list:${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${categoryFilter}:${activeFilter}:${sortOrder}`,
+        socketModule: "product",
+        fetcher: productFetcher,
+    });
+    const { can } = usePermission();
+
+    const [showViewModal, setShowViewModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [capacityRecords, setCapacityRecords] = useState<any[]>([]);
+    const [loadingCapacity, setLoadingCapacity] = useState(false);
 
     const activeFilterCount = [
         categoryFilter !== "",
@@ -172,17 +195,6 @@ const ProductList: React.FC = () => {
         }).catch(() => {});
     }, []);
 
-    const filteredProducts = useMemo(() => {
-        return products.filter((p: any) => {
-            const matchesSearch = !searchTerm ||
-                p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.productCode?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = !categoryFilter || String(p.categoryId) === categoryFilter;
-            const matchesActive = activeFilter === "" ||
-                (activeFilter === "true" ? p.isActive : !p.isActive);
-            return matchesSearch && matchesCategory && matchesActive;
-        });
-    }, [products, searchTerm, categoryFilter, activeFilter]);
     useSocketSync("productCapacityHistory", undefined, () => {
         if (showViewModal && selectedProduct) {
             productCapacityHistoryService.fetchByProduct(Number(selectedProduct.id))
@@ -351,21 +363,21 @@ const ProductList: React.FC = () => {
         }
     };
 
-    const sortedProducts = useMemo(() => {
-        if (sortOrder === "default") return filteredProducts;
-        return [...filteredProducts].sort((a, b) => {
-            const nameA = (a.productName || "").toLowerCase();
-            const nameB = (b.productName || "").toLowerCase();
-            return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        });
-    }, [filteredProducts, sortOrder]);
-
-    const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ITEMS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil((total || 0) / ITEMS_PER_PAGE));
     const safeCurrentPage = Math.min(currentPage, totalPages);
     const fetchProductsForExport = useCallback(async () => {
-        const res = await productService.fetchAll();
-        return Array.isArray(res) ? res : [];
-    }, []);
+        const params: any = {
+            search: debouncedSearch || undefined,
+            categoryId: categoryFilter || undefined,
+            isActive: activeFilter === "" ? undefined : activeFilter === "true",
+        };
+        if (sortOrder === "asc" || sortOrder === "desc") {
+            params.sortBy = "productName";
+            params.sortOrder = sortOrder;
+        }
+        const res = await productService.fetchAll(params);
+        return Array.isArray(res) ? res : res?.products || [];
+    }, [debouncedSearch, categoryFilter, activeFilter, sortOrder]);
 
     const getProductCategoryName = useCallback((prod: any) => {
         if (!prod) return "N/A";
@@ -399,11 +411,10 @@ const ProductList: React.FC = () => {
     }, [getProductCategoryName]);
 
     const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedProducts = sortedProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
-        count: paginatedProducts.length,
-        onEnter: (i) => { const item = paginatedProducts[i]; if (item) handleView(item); },
+        count: products.length,
+        onEnter: (i) => { const item = products[i]; if (item) handleView(item); },
         containerRef: tableRef,
     });
 
@@ -496,7 +507,7 @@ const ProductList: React.FC = () => {
                             <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
                                 Production Product
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
-                                    {filteredProducts.length}
+                                    {total ?? products.length}
                                 </span>
                             </h2>
                         </div>
@@ -555,7 +566,7 @@ const ProductList: React.FC = () => {
 
                             {can("products.export") && (
                                 <ExportCSVButton
-                                    data={products}
+                                    fetchData={fetchProductsForExport}
                                     columns={csvColumns}
                                     filename={csvFilename}
                                     text="Export"
@@ -596,7 +607,7 @@ const ProductList: React.FC = () => {
                     <div ref={tableRef} tabIndex={0} data-table-nav className="p-0 outline-none">
                         <DataTable
                             columns={columns}
-                            data={paginatedProducts}
+                            data={products}
                             rowKey={(row) => row.id}
                             loading={loading}
                             emptyMessage="No products found."

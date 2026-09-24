@@ -9,17 +9,21 @@ export const useDepartments = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | undefined>(undefined);
 
-  const cacheKey = `${CACHE_PREFIX}${page}:${limit}:${search}`;
+  const cacheKey = `${CACHE_PREFIX}${page}:${limit}:${search}:${sortBy || ""}:${sortOrder || ""}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     const res = await departmentService.fetchAll({
       page,
       limit,
       search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
     });
     return { data: res.data || [], total: res.total || 0 };
-  }, [page, limit, search]);
+  }, [page, limit, search, sortBy, sortOrder]);
 
   const { data: departments, total, loading, refreshing, refresh } = useListCache<Department>({
     cacheKey,
@@ -27,10 +31,12 @@ export const useDepartments = () => {
     fetcher,
   });
 
-  const loadDepartments = useCallback((p?: number, l?: number, s?: string) => {
+  const loadDepartments = useCallback((p?: number, l?: number, s?: string, sb?: string, so?: "asc" | "desc") => {
     setPage(p || 1);
     setLimit(l || 15);
     setSearch(s || "");
+    setSortBy(sb);
+    setSortOrder(so);
   }, []);
 
   const addDepartment = useCallback(

@@ -100,9 +100,22 @@ export interface CreatePurchaseReturnDto {
   }[];
 }
 
+export interface SalesReturnQueryParams {
+  companyId?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export interface PurchaseReturnQueryParams {
+  companyId?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
 export const returnService = {
-  fetchSalesReturns: async (companyId?: string): Promise<SalesReturn[]> => {
-    const response = await apiClient.get("/returns/sales", { params: { companyId } });
+  fetchSalesReturns: async (params?: string | SalesReturnQueryParams): Promise<SalesReturn[]> => {
+    const finalParams = typeof params === "string" ? { companyId: params } : params;
+    const response = await apiClient.get("/returns/sales", { params: finalParams });
     return response.data?.data || [];
   },
 
@@ -121,8 +134,9 @@ export const returnService = {
     return response.data?.data;
   },
 
-  fetchPurchaseReturns: async (companyId?: string): Promise<PurchaseReturn[]> => {
-    const response = await apiClient.get("/returns/purchase", { params: { companyId } });
+  fetchPurchaseReturns: async (params?: string | PurchaseReturnQueryParams): Promise<PurchaseReturn[]> => {
+    const finalParams = typeof params === "string" ? { companyId: params } : params;
+    const response = await apiClient.get("/returns/purchase", { params: finalParams });
     return response.data?.data || [];
   },
 

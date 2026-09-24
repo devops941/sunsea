@@ -2,9 +2,27 @@ import apiClient from "../api/apiClient";
 import config from "../api/config";
 
 export const salesProductService = {
-  fetchAll: async (search?: string) => {
-    const response = await apiClient.get(config.salesProduct.base, { params: { search } });
-    return response.data?.data || response.data;
+  fetchAll: async (params?: {
+    search?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  } | string): Promise<any> => {
+    const queryParams = typeof params === "string" ? { search: params } : params;
+    const response = await apiClient.get(config.salesProduct.base, { params: queryParams });
+    const resData = response.data?.data || response.data;
+    if (resData && Array.isArray(resData.salesProducts)) {
+      if (typeof params === "object" && (params?.page !== undefined || params?.limit !== undefined || params?.sortBy !== undefined)) {
+        return resData;
+      }
+      return resData.salesProducts;
+    }
+    if (Array.isArray(resData)) {
+      return resData;
+    }
+    return resData;
   },
 
   fetchById: async (id: number | string) => {

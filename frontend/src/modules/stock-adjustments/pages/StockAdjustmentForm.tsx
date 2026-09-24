@@ -1144,9 +1144,7 @@ const StockAdjustmentForm: React.FC = () => {
         <form ref={formRef} onSubmit={(e) => e.preventDefault()} onKeyDown={handleFormKeyDown} className="px-5 py-4 space-y-4" noValidate>
           {/* Section 1: Adjustment Information */}
           <div className="mb-4">
-            <div className="mb-4 pb-1.5 border-b border-line">
-              <h3 className="text-xs font-bold text-ink uppercase tracking-wider">Adjustment Details</h3>
-            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block mb-2 text-xs font-bold text-ink-muted uppercase tracking-wider">

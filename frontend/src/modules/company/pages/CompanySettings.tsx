@@ -36,6 +36,8 @@ const CompanySettings: React.FC = () => {
   const [originalFormData, setOriginalFormData] = useState<UpdateCompanyDto>({});
   const [errors, setErrors] = useState<any>({});
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
   const handleFormKeyDown = useFormKeyboardNav(formRef);
@@ -96,6 +98,7 @@ const CompanySettings: React.FC = () => {
   }, [company, loading]);
 
   const isDirty = useMemo(() => {
+    if (isSubmitted) return false;
     if (!originalFormData.legalName && !originalFormData.email) return false;
     const formKeys: (keyof UpdateCompanyDto)[] = [
       "legalName", "shortName", "gstin", "currencyCode", "phone",
@@ -109,7 +112,7 @@ const CompanySettings: React.FC = () => {
     const filesChanged = !!(formData as any).logoFile || !!(formData as any).faviconFile;
 
     return fieldsChanged || phonesChanged || filesChanged;
-  }, [formData, originalFormData, phones, originalPhones]);
+  }, [isSubmitted, formData, originalFormData, phones, originalPhones]);
 
   const isDirtyRef = useRef(isDirty);
   useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
@@ -195,6 +198,7 @@ const CompanySettings: React.FC = () => {
     if (!validate() || !company) return;
 
     try {
+      setIsSubmitting(true);
       const submitData = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
         if (key === "logoFile") {
@@ -214,13 +218,28 @@ const CompanySettings: React.FC = () => {
         }
       });
 
+      const isOnboarding = location.pathname === "/company/create" || !company.isOnboarded;
+
       await dispatch(updateCompany({ id: company.id, data: submitData as any })).unwrap();
-      toast.success(company.isOnboarded ? "Company updated successfully!" : "Onboarding completed successfully!");
-      navigate(-1);
+      await dispatch(fetchCompany());
+
+      setIsSubmitted(true);
+      setOriginalFormData({ ...formData });
+      setOriginalPhones([...phones]);
+
+      toast.success(isOnboarding ? "Onboarding completed successfully!" : "Company updated successfully!");
+
+      if (isOnboarding) {
+        navigate("/dashboard", { replace: true });
+      } else {
+        navigate(-1);
+      }
     } catch (err: any) {
       toast.error(err?.message || err || "Failed to update company");
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [canEdit, validate, company, formData, phones, dispatch, navigate]);
+  }, [canEdit, validate, company, formData, phones, dispatch, navigate, location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,8 +264,11 @@ const CompanySettings: React.FC = () => {
   const handleDiscard = useCallback(() => {
     setSaveConfirmOpen(false);
     if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; }
+    if (location.pathname === "/company/create" || !company?.isOnboarded) {
+      return;
+    }
     navigate(-1);
-  }, [navigate]);
+  }, [navigate, location.pathname, company]);
 
   const handleSaveFromModal = useCallback(() => {
     setSaveConfirmOpen(false);
@@ -303,12 +325,15 @@ const CompanySettings: React.FC = () => {
         lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
         setSaveConfirmOpen(true);
       } else {
+        if (location.pathname === "/company/create" || !company?.isOnboarded) {
+          return;
+        }
         navigate(-1);
       }
     };
     window.addEventListener("keydown", handleEsc, { capture: true });
     return () => window.removeEventListener("keydown", handleEsc, { capture: true });
-  }, [handleResume, navigate]);
+  }, [handleResume, navigate, location.pathname, company]);
 
   if (loading && !company) return <CommonLoader text="Loading Company Settings..." fullScreen={false} />;
 
@@ -420,7 +445,7 @@ const CompanySettings: React.FC = () => {
               </div>
 
               <div className="flex justify-end px-6 py-5 border-t border-line-soft">
-                <Button text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
+                <Button text={isSubmitting ? "Completing..." : "Complete Onboarding"} icon={FaSave} type="submit" disabled={loading || isSubmitting} className="py-3 px-8 text-lg" />
               </div>
             </form>
           </div>
@@ -560,7 +585,7 @@ const CompanySettings: React.FC = () => {
           {/* Footer */}
           {canEdit && (
             <div className="flex justify-end px-6 py-4 border-t border-line">
-              <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
+              <Button text={isSubmitting ? "Saving..." : (isEditMode ? "Save Changes" : "Create Company")} icon={FaSave} type="submit" disabled={loading || isSubmitting} />
             </div>
           )}
         </form>

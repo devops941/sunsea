@@ -1,7 +1,7 @@
 import { formatDate } from "../../../../utils/dateUtils";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaBoxes, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
+import { FaBoxes, FaPlus, FaTimes, FaTrash, FaSort, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
 import { supplierService } from "../../../../services/supplierService";
@@ -48,6 +48,9 @@ const DEFAULT_FILTERS: FilterState = {
   status: "",
 };
 
+type SortOrder = "default" | "asc" | "desc";
+const SORT_STORAGE_KEY = "sunsea_purchase_return_sort";
+
 export const PurchaseReturnPage: React.FC = () => {
   const navigate = useNavigate();
   const { can } = usePermission();
@@ -89,12 +92,53 @@ export const PurchaseReturnPage: React.FC = () => {
   const [narration, setNarration] = useState<string>("");
   const [returnRows, setReturnRows] = useState<FormReturnRow[]>([]);
 
-  const cacheKey = `accounts:purchase-returns`;
+  // ── Alphabetical / Column Sorting with localStorage persistence ──────────
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_STORAGE_KEY);
+      if (saved === "asc" || saved === "desc") return saved;
+    } catch (_) {}
+    return "default";
+  });
+
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder((prev) => {
+      let next: SortOrder = "default";
+      if (prev === "default") next = "asc";
+      else if (prev === "asc") next = "desc";
+      else next = "default";
+      try {
+        localStorage.setItem(SORT_STORAGE_KEY, next);
+      } catch (_) {}
+      return next;
+    });
+  }, []);
+
+  // Shortcut key (Alt+S) to toggle alphabetical sort (F6 is handled by usePageShortcuts)
+  useEffect(() => {
+    const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (e.altKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        toggleSortOrder();
+      }
+    };
+    window.addEventListener("keydown", handleSortShortcut);
+    return () => window.removeEventListener("keydown", handleSortShortcut);
+  }, [toggleSortOrder]);
+
+  const cacheKey = `accounts:purchase-returns:${sortOrder}`;
 
   const fetcher = useCallback(async (_signal: AbortSignal) => {
     try {
       const [rData, sRes, mRes, stRes] = await Promise.all([
-        returnService.fetchPurchaseReturns(),
+        returnService.fetchPurchaseReturns({
+          sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "supplier" : undefined,
+          sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+        }),
         supplierService.fetchAll({ limit: 1000 }),
         rawMaterialService.fetchAll(),
         storeService.fetchAll({ limit: 100 }),
@@ -111,14 +155,23 @@ export const PurchaseReturnPage: React.FC = () => {
       toast.error(err?.message || "Failed to load purchase returns");
       throw err;
     }
-  }, []);
+  }, [sortOrder]);
 
   const { data: returns, loading, refreshing, refresh } = useListCache<PurchaseReturn>({
     cacheKey,
     socketModule: "purchaseReturn",
     fetcher,
   });
-// F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
+
+  usePageShortcuts({
+    onRefresh: () => refresh(),
+    onSort: () => toggleSortOrder(),
+    onNew: () => setShowModal(true),
+    onExport: () => {
+      const exportBtn = document.querySelector<HTMLButtonElement>("[data-export-btn], button:has(svg):has(span)");
+      exportBtn?.click();
+    },
+  });
 
   useSocketSync("grnInvoice", undefined, refresh);
   useSocketSync("supplier", undefined, refresh);
@@ -370,13 +423,16 @@ export const PurchaseReturnPage: React.FC = () => {
 
   const fetchPurchaseReturnsForExport = useCallback(async () => {
     try {
-      const list = await returnService.fetchPurchaseReturns();
+      const list = await returnService.fetchPurchaseReturns({
+        sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "supplier" : undefined,
+        sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+      });
       if (Array.isArray(list) && list.length > 0) return list;
     } catch (e) {
       console.warn("fetchPurchaseReturns failed, using current returns:", e);
     }
     return Array.isArray(returns) ? returns : [];
-  }, [returns]);
+  }, [returns, sortOrder]);
 
   const { csvColumns, csvFilename } = useMemo(() => {
     const columns = [
@@ -438,6 +494,41 @@ export const PurchaseReturnPage: React.FC = () => {
     },
     {
       header: "SUPPLIER",
+      headerNode: (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSortOrder();
+          }}
+          className="flex items-center gap-1.5 cursor-pointer select-none group/sort bg-transparent border-none p-0 text-inherit font-inherit uppercase tracking-wider text-[13px] font-bold outline-none hover:opacity-90 transition-opacity"
+          title={`Sort by Supplier: ${sortOrder === "default" ? "Default" : sortOrder === "asc" ? "A → Z" : "Z → A"} (F6)`}
+        >
+          <span className={sortOrder !== "default" ? "text-primary font-black" : "group-hover/sort:text-ink transition-colors"}>
+            SUPPLIER
+          </span>
+          <span
+            className={`inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-200 ${
+              sortOrder === "asc" || sortOrder === "desc"
+                ? "bg-primary/20 text-primary scale-110"
+                : "text-ink-subtle/60 group-hover/sort:text-ink group-hover/sort:bg-card-2"
+            }`}
+          >
+            {sortOrder === "asc" ? (
+              <FaArrowUp size={10} />
+            ) : sortOrder === "desc" ? (
+              <FaArrowDown size={10} />
+            ) : (
+              <FaSort size={10} />
+            )}
+          </span>
+          {sortOrder !== "default" && (
+            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-primary text-white tracking-tighter shadow-xs">
+              {sortOrder === "asc" ? "A-Z" : "Z-A"}
+            </span>
+          )}
+        </button>
+      ),
       render: (item) => (
         <span className="font-semibold text-ink">
           {item.supplier?.legalName || (item.supplier as any)?.displayName || "—"}

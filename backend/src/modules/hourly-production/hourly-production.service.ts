@@ -254,28 +254,35 @@ class HourlyProductionService {
     const productId = order.productItemId;
     const shiftActualProduction = Math.round(Number(shiftTotalProduced || 0));
 
-    // Get the latest capacity for this product and machine
-    const latestCapacityRecord = await tx.productCapacityHistory.findFirst({
+    // Get the all-time highest record for THIS PRODUCT across all machines
+    const currentHighestRecord = await tx.productShiftRecord.findFirst({
       where: {
         productId,
-        machineId: data.machineId,
+        isHighest: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { achievedQty: "desc" },
     });
 
-    const currentCapacity = latestCapacityRecord
-      ? Math.round(Number(latestCapacityRecord.newCapacity))
+    const currentCapacity = currentHighestRecord
+      ? Math.round(Number(currentHighestRecord.achievedQty))
       : Math.round(Number(order.productItem?.capacityLitres || 0));
 
     if (shiftActualProduction > 0 && (currentCapacity === 0 || shiftActualProduction > currentCapacity)) {
       // 1. Gather all operators involved in this shift
       const operatorNameSet = new Set<string>();
+      const operatorEmpIdSet = new Set<bigint>();
 
       // From hourly entries
       if (Array.isArray(hourlyEntriesList)) {
         hourlyEntriesList.forEach((e: any) => {
           if (e.operatorName && typeof e.operatorName === "string") {
             e.operatorName.split(",").map((s: string) => s.trim()).filter(Boolean).forEach((name: string) => operatorNameSet.add(name));
+          }
+          if (e.operatorId) {
+            try {
+              const parsed = BigInt(e.operatorId);
+              operatorEmpIdSet.add(parsed);
+            } catch (_) {}
           }
         });
       }
@@ -284,19 +291,40 @@ class HourlyProductionService {
       if (dailyPlan?.selectedOperatorIds) {
         try {
           const opIds = String(dailyPlan.selectedOperatorIds).split(",").map((id: string) => id.trim()).filter(Boolean);
-          const emps = await tx.employee.findMany({
-            where: { id: { in: opIds.map((id: string) => BigInt(id)) } },
-            select: { fullName: true }
-          });
-          emps.forEach((e: any) => {
-            if (e.fullName) operatorNameSet.add(e.fullName.trim());
+          opIds.forEach((id: string) => {
+            try {
+              operatorEmpIdSet.add(BigInt(id));
+            } catch (_) {}
           });
         } catch (err) {
-          console.error("Failed to parse operator names", err);
+          console.error("Failed to parse operator ids", err);
         }
       }
 
+      // Match employees by ID or Name or EmpCode
+      const empOrConditions: any[] = [];
+      if (operatorEmpIdSet.size > 0) {
+        empOrConditions.push({ id: { in: Array.from(operatorEmpIdSet) } });
+      }
+      if (operatorNameSet.size > 0) {
+        const names = Array.from(operatorNameSet);
+        empOrConditions.push({ fullName: { in: names } });
+        empOrConditions.push({ empCode: { in: names } });
+      }
+
+      const matchedEmployees = empOrConditions.length > 0
+        ? await tx.employee.findMany({
+            where: { OR: empOrConditions },
+            select: { id: true, empCode: true, fullName: true },
+          })
+        : [];
+
+      matchedEmployees.forEach((e: any) => {
+        if (e.fullName) operatorNameSet.add(e.fullName.trim());
+      });
+
       const operatorNames = Array.from(operatorNameSet).join(", ");
+      const operatorCodes = matchedEmployees.map((e: any) => e.empCode).join(", ");
       const machine = await tx.machine.findUnique({ where: { machineId: data.machineId } });
       const shiftName = data.shiftId === "NIGHT" ? "Night Shift" : "Day Shift";
 
@@ -331,7 +359,43 @@ class HourlyProductionService {
         });
       }
 
-      // 3. Update Product table with new capacity
+      // 3. Mark previous active highest records for THIS PRODUCT across all machines as isHighest: false
+      // This ensures that when a new high is hit for this product, previous record holders lose the title
+      await tx.productShiftRecord.updateMany({
+        where: {
+          productId,
+          isHighest: true,
+        },
+        data: { isHighest: false },
+      });
+
+      // 4. Create new ProductShiftRecord with isHighest: true
+      const newShiftRecord = await tx.productShiftRecord.create({
+        data: {
+          productId,
+          productionOrderId: data.productionOrderId,
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          achievedQty: shiftActualProduction,
+          targetQty: currentCapacity > 0 ? currentCapacity : Number(dailyPlan?.plannedQty || 0),
+          recordedDate: prodDate,
+          operatorIds: operatorCodes || operatorNames || null,
+          isHighest: true,
+        },
+      });
+
+      // 5. Link all involved shift operators in ProductShiftRecordOperator
+      if (matchedEmployees.length > 0) {
+        await (tx as any).productShiftRecordOperator.createMany({
+          data: matchedEmployees.map((emp: any) => ({
+            productShiftRecordId: newShiftRecord.id,
+            employeeId: emp.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      // 6. Update Product table with new capacity
       await tx.product.update({
         where: { id: productId },
         data: { capacityLitres: shiftActualProduction },
@@ -817,6 +881,8 @@ class HourlyProductionService {
         getIO().emit("inventory:stockUpdated", { type: "hourly_production" });
         if (result.newHighReached && result.newHighDetails) {
           getIO().emit("productCapacityHistory:created", result.newHighDetails);
+          getIO().emit("productShiftRecord:created", result.newHighDetails);
+          getIO().emit("productShiftRecord:leaderboardUpdated", { date: data.productionDate });
           getIO().emit("dailyPlan:updated", { machineId: data.machineId });
           getIO().emit("product:updated", { productId: result.productId });
         }

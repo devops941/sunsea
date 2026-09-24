@@ -21,6 +21,18 @@ class ProductShiftRecordController {
     const highest = await productShiftRecordService.getHighestByProduct(productId);
     return res.status(200).json(new ApiResponse("Records fetched", { records, highest }));
   }
+
+  async getLeaderboard(req: Request, res: Response) {
+    const { date } = req.query;
+    const result = await productShiftRecordService.getLeaderboard(date as string | undefined);
+    return res.status(200).json(new ApiResponse("Leaderboard fetched successfully", result));
+  }
+
+  async resetLeaderboard(req: Request, res: Response) {
+    const result = await productShiftRecordService.resetLeaderboardCounts();
+    getIO().emit("productShiftRecord:leaderboardUpdated", { reset: true });
+    return res.status(200).json(new ApiResponse("Leaderboard counts reset successfully", result));
+  }
 }
 
 export default new ProductShiftRecordController();

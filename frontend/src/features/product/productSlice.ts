@@ -8,7 +8,8 @@ export const fetchProducts = createAsyncThunk(
   async (arg: string | { search?: string; categoryId?: string } | undefined, { rejectWithValue }) => {
     const params = typeof arg === "string" || arg === undefined ? { search: arg } : arg;
     try {
-      return await productService.fetchAll(params);
+      const res = await productService.fetchAll(params);
+      return Array.isArray(res) ? res : (res?.products || []);
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Failed to fetch products");
     }

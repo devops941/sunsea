@@ -56,7 +56,7 @@ class SalesInvoiceController {
     }
     const companyId = company.id;
 
-    const { page, pageSize, search, customerId, fromDate, toDate } = req.query;
+    const { page, pageSize, search, customerId, fromDate, toDate, sortBy, sortOrder } = req.query;
 
     const result = await salesInvoiceService.getAllSalesInvoices({
       page: page ? Number(page) : undefined,
@@ -65,6 +65,8 @@ class SalesInvoiceController {
       customerId: customerId as string,
       fromDate: fromDate as string,
       toDate: toDate as string,
+      sortBy: sortBy as string,
+      sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? (sortOrder as "asc" | "desc") : undefined,
       companyId,
     });
 

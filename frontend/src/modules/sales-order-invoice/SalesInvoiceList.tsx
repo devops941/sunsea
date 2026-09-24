@@ -95,16 +95,17 @@ const SalesInvoiceList: React.FC = () => {
             } catch (_) { }
             return next;
         });
+        setCurrentPage(1);
     }, []);
 
-    // Shortcut key (F6 or Alt+S) to toggle alphabetical sort
+    // Shortcut key (Alt+S) to toggle alphabetical sort (F6 is handled by usePageShortcuts)
     useEffect(() => {
         const handleSortShortcut = (e: globalThis.KeyboardEvent) => {
             const target = e.target as HTMLElement;
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
                 return;
             }
-            if (e.key === "F6" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+            if (e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 toggleSortOrder();
             }
@@ -119,16 +120,18 @@ const SalesInvoiceList: React.FC = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const cacheKey = `${INVOICE_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}`;
+    const cacheKey = `${INVOICE_CACHE_PREFIX}${currentPage}:${ITEMS_PER_PAGE}:${debouncedSearch}:${sortOrder}`;
 
     const fetcher = useCallback(async (_signal: AbortSignal) => {
         const response = await salesInvoiceService.fetchAll({
             page: currentPage,
             pageSize: ITEMS_PER_PAGE,
             search: debouncedSearch || undefined,
+            sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "customer" : undefined,
+            sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
         });
         return { data: response.data || [], total: response.total ?? 0 };
-    }, [currentPage, debouncedSearch]);
+    }, [currentPage, debouncedSearch, sortOrder]);
 
     const { data: rawData, total, loading, refresh } = useListCache({
         cacheKey,
@@ -137,21 +140,7 @@ const SalesInvoiceList: React.FC = () => {
         enabled: can("sales-invoices.view"),
     });
 
-    // Client-side sorted invoices based on sortOrder
-    const data = useMemo(() => {
-        if (!rawData || !Array.isArray(rawData)) return [];
-        if (sortOrder === "default") return rawData;
-
-        return [...rawData].sort((a: any, b: any) => {
-            const nameA = (a.customer?.displayName || a.customer?.firmName || a.invoiceNo || "").trim().toLowerCase();
-            const nameB = (b.customer?.displayName || b.customer?.firmName || b.invoiceNo || "").trim().toLowerCase();
-            if (sortOrder === "asc") {
-                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-            } else {
-                return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
-            }
-        });
-    }, [rawData, sortOrder]);
+    const data = rawData || [];
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -317,9 +306,15 @@ const SalesInvoiceList: React.FC = () => {
     };
 
     const fetchSalesInvoicesForExport = useCallback(async () => {
-        const res = await salesInvoiceService.fetchAll({ page: 1, pageSize: 100000 });
+        const res = await salesInvoiceService.fetchAll({
+            page: 1,
+            pageSize: 100000,
+            search: debouncedSearch || undefined,
+            sortBy: (sortOrder === "asc" || sortOrder === "desc") ? "customer" : undefined,
+            sortOrder: (sortOrder === "asc" || sortOrder === "desc") ? sortOrder : undefined,
+        });
         return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-    }, []);
+    }, [debouncedSearch, sortOrder]);
 
     const { csvColumns, csvFilename } = useMemo(() => {
         const columns = [
@@ -443,7 +438,12 @@ const SalesInvoiceList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">Sales Invoice List</h2>
+                        <h2 className="text-2xl font-bold text-ink flex items-center gap-2">
+                            Sales Invoice List
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs dark:bg-slate-800/90 dark:text-slate-200 dark:border dark:border-slate-700/60">
+                                {total ?? data?.length}
+                            </span>
+                        </h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">

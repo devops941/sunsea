@@ -109,6 +109,18 @@ class StoreService {
       whereClause.isActive = isActive;
     }
 
+    let orderBy: any = { createdAt: "desc" };
+    const validSortOrder: "asc" | "desc" = sortOrder === "desc" ? "desc" : "asc";
+    if (sortBy === "storeName" || sortBy === "name") {
+      orderBy = { storeName: validSortOrder };
+    } else if (sortBy === "storeId" || sortBy === "code") {
+      orderBy = { storeId: validSortOrder };
+    } else if (sortBy === "storeCategory" || sortBy === "category") {
+      orderBy = { storeCategory: validSortOrder };
+    } else if (["storeName", "storeId", "storeCategory", "status", "isActive", "createdAt", "updatedAt"].includes(sortBy || "")) {
+      orderBy = { [sortBy as string]: validSortOrder };
+    }
+
     const queryOptions: any = {
       where: whereClause,
       include: {
@@ -125,9 +137,7 @@ class StoreService {
           },
         },
       },
-      orderBy: {
-        [sortBy]: sortOrder,
-      },
+      orderBy,
     };
 
     if (page !== undefined || limit !== undefined) {

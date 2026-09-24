@@ -19,8 +19,16 @@ class ShiftController {
   );
 
   findAll = asyncHandler(
-    async (_req: Request, res: Response) => {
-      const shifts = await shiftService.findAll();
+    async (req: Request, res: Response) => {
+      const { search, page, limit, sortBy, sortOrder, isActive } = req.query;
+      const shifts = await shiftService.findAll({
+        search: search as string | undefined,
+        page: page ? parseInt(page as string, 10) : undefined,
+        limit: limit ? parseInt(limit as string, 10) : undefined,
+        sortBy: sortBy as string | undefined,
+        sortOrder: sortOrder as "asc" | "desc" | undefined,
+        isActive: isActive !== undefined ? isActive === "true" : undefined,
+      });
       return res.status(200).json(
         new ApiResponse("Shifts fetched successfully", shifts)
       );

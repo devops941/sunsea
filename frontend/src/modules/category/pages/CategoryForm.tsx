@@ -68,7 +68,6 @@ const initialFormState: FormData = {
 
 const CategoryForm: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { id: idParam } = useParams<{ id: string }>();
   const dispatch = useDispatch<AppDispatch>();
 

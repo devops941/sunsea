@@ -143,6 +143,7 @@ const SalesReportsCenter = lazy(() => import("../modules/reports/pages/SalesRepo
 const PurchaseReportsCenter = lazy(() => import("../modules/reports/pages/PurchaseReportsCenter"));
 const InventoryReportsCenter = lazy(() => import("../modules/reports/pages/InventoryReportsCenter"));
 const ProductionReportsCenter = lazy(() => import("../modules/reports/pages/ProductionReportsCenter"));
+const HighestProductionLeaderboardPage = lazy(() => import("../modules/reports/pages/HighestProductionLeaderboardPage"));
 
 // ===========================================================================
 // SALES
@@ -399,6 +400,7 @@ const AppRoutes = () => {
               </Route>
               <Route element={<ProtectedRoute permission="production-reports.view" />}>
                 <Route path="/reports/production" element={<ProductionReportsCenter />} />
+                <Route path="/reports/highest-production" element={<HighestProductionLeaderboardPage />} />
               </Route>
 
               {/* ---------- Sales ---------- */}

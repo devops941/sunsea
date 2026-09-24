@@ -347,7 +347,22 @@ class SalesOrderService {
 
         const gstWhere = conditions.length > 0 ? { AND: conditions } : {};
 
-        const gstOrderBy = { [query.sortBy]: query.sortOrder };
+        const validSortOrder: "asc" | "desc" = query.sortOrder === "asc" ? "asc" : "desc";
+        let gstOrderBy: any = { createdAt: "desc" };
+
+        if (query.sortBy === "customer" || query.sortBy === "customerName") {
+            gstOrderBy = { customer: { displayName: validSortOrder } };
+        } else if (query.sortBy === "orderNo") {
+            gstOrderBy = { orderNo: validSortOrder };
+        } else if (query.sortBy === "orderDate") {
+            gstOrderBy = { orderDate: validSortOrder };
+        } else if (query.sortBy === "netAmount") {
+            gstOrderBy = { netAmount: validSortOrder };
+        } else if (query.sortBy === "createdAt") {
+            gstOrderBy = { createdAt: validSortOrder };
+        } else if (query.sortBy) {
+            gstOrderBy = { [query.sortBy]: validSortOrder };
+        }
 
         try {
             const [rows, total] = await Promise.all([

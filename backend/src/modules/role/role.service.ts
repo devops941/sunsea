@@ -34,7 +34,13 @@ const SUPER_ADMIN_FILTER = [
   { name: { contains: "superadmin", mode: "insensitive" } },
 ];
 
-export const getAllRoles = async (page?: number, limit?: number, search?: string) => {
+export const getAllRoles = async (
+  page?: number,
+  limit?: number,
+  search?: string,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc"
+) => {
   const where: any = {
     NOT: SUPER_ADMIN_FILTER,
   };
@@ -49,6 +55,17 @@ export const getAllRoles = async (page?: number, limit?: number, search?: string
     delete where.NOT; // replaced by AND above
   }
 
+  let orderBy: any = { createdAt: "desc" };
+  if (sortBy === "name") {
+    orderBy = { name: sortOrder === "desc" ? "desc" : "asc" };
+  } else if (sortBy === "code") {
+    orderBy = { code: sortOrder === "desc" ? "desc" : "asc" };
+  } else if (sortBy === "status") {
+    orderBy = { status: sortOrder === "desc" ? "desc" : "asc" };
+  } else if (sortBy === "createdAt") {
+    orderBy = { createdAt: sortOrder === "asc" ? "asc" : "desc" };
+  }
+
   if (page !== undefined && limit !== undefined) {
     const skip = (page - 1) * limit;
     const [roles, total] = await Promise.all([
@@ -56,7 +73,7 @@ export const getAllRoles = async (page?: number, limit?: number, search?: string
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
       }),
       prisma.role.count({ where }),
     ]);
@@ -65,9 +82,7 @@ export const getAllRoles = async (page?: number, limit?: number, search?: string
 
   const roles = await prisma.role.findMany({
     where,
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy,
   });
   return { roles, total: roles.length };
 };

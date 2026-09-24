@@ -11,6 +11,8 @@ export const customerService = {
     status?: string;
     customerTypeId?: number;
     customerGradeId?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }): Promise<{ customers: Customer[]; total: number; page: number; totalPages: number }> => {
     const response = await apiClient.get(config.customer.base, {
       params: {
@@ -20,6 +22,8 @@ export const customerService = {
         status: params?.status,
         customerTypeId: params?.customerTypeId,
         customerGradeId: params?.customerGradeId,
+        sortBy: params?.sortBy,
+        sortOrder: params?.sortOrder,
       },
     });
     const data = response.data?.data || response.data;

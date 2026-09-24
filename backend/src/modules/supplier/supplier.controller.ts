@@ -47,12 +47,16 @@ class SupplierController {
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search ? String(req.query.search) : undefined;
       const status = req.query.status ? String(req.query.status) : undefined;
+      const sortBy = req.query.sortBy ? String(req.query.sortBy) : undefined;
+      const sortOrder = req.query.sortOrder === "asc" || req.query.sortOrder === "desc" ? (req.query.sortOrder as "asc" | "desc") : undefined;
 
       const result = await supplierService.getAllSuppliers({
         page,
         limit,
         search,
         status,
+        sortBy,
+        sortOrder,
       });
 
       return res.status(200).json(
