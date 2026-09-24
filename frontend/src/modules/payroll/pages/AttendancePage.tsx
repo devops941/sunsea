@@ -434,7 +434,8 @@ const AttendancePage: React.FC = () => {
       .then(([emps, cfg, allShifts]) => {
         setEmployees(emps);
         setPayrollCfg(cfg);
-        setShifts(allShifts.filter(s => s.isActive));
+        const shiftList: Shift[] = Array.isArray(allShifts) ? allShifts : (allShifts?.data || []);
+        setShifts(shiftList.filter((s: Shift) => s.isActive));
       })
       .catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false));

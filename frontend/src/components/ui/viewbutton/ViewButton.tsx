@@ -5,16 +5,19 @@ interface ViewButtonProps {
   onClick?: () => void;
   disabled?: boolean;
   onMouseEnter?: () => void;
+  title?: string;
+  className?: string;
 }
 
-const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled, onMouseEnter }) => {
+const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled, onMouseEnter, title, className = "" }) => {
   return (
     <button
       type="button"
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       disabled={disabled}
-      className="
+      title={title}
+      className={`
         w-7 h-7
         flex items-center justify-center
         border border-blue-500/20 rounded-sm
@@ -27,7 +30,8 @@ const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled, onMouseEnter
         active:scale-95
         disabled:opacity-50
         disabled:cursor-not-allowed
-      "
+        ${className}
+      `}
     >
       <FiEye className="text-[13px]" />
     </button>
