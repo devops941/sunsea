@@ -504,16 +504,16 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
             </div>
           ) : chartType === "pie" ? (
             /* 3. DONUT SHARE BREAKDOWN */
-            <div className="h-full flex-1 flex flex-col md:flex-row items-center justify-around gap-6 p-4">
-              <div className="relative w-56 h-56 sm:w-72 sm:h-72 shrink-0 flex items-center justify-center">
+            <div className="h-full flex-1 flex flex-col md:flex-row items-center justify-around gap-3 sm:gap-6 p-2 sm:p-4 overflow-y-auto">
+              <div className="relative w-44 h-44 sm:w-72 sm:h-72 shrink-0 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={72}
-                      outerRadius={104}
+                      innerRadius={isMobile ? 54 : 72}
+                      outerRadius={isMobile ? 80 : 104}
                       paddingAngle={4}
                       dataKey="value"
                     >
@@ -525,42 +525,42 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
                 </ResponsiveContainer>
                 {/* Center Badge */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-[10px] uppercase font-bold text-ink-subtle tracking-wider">Net Difference</span>
-                  <span className={`text-base sm:text-lg font-black font-sans ${netMargin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-ink-subtle tracking-wider">Net Difference</span>
+                  <span className={`text-sm sm:text-lg font-black font-sans ${netMargin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {netMargin >= 0 ? "+" : ""}₹{Math.abs(netMargin).toLocaleString("en-IN")}
                   </span>
                 </div>
               </div>
 
               {/* Right Side Metric Cards */}
-              <div className="flex-1 w-full max-w-sm space-y-3">
-                <div className="p-3.5 rounded-xl bg-card-2 border border-sky-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-3.5 h-3.5 rounded-full bg-sky-500 shrink-0 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
+              <div className="flex-1 w-full max-w-sm space-y-2 sm:space-y-3">
+                <div className="p-2.5 sm:p-3.5 rounded-xl bg-card-2 border border-sky-500/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2 sm:gap-2.5">
+                    <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-sky-500 shrink-0 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
                     <div>
-                      <div className="text-[11px] font-bold text-sky-400 uppercase tracking-wider">Total Sales</div>
-                      <div className="text-lg font-black text-white font-sans">₹{totalSales.toLocaleString("en-IN")}</div>
+                      <div className="text-[10px] sm:text-[11px] font-bold text-sky-400 uppercase tracking-wider">Total Sales</div>
+                      <div className="text-sm sm:text-lg font-black text-white font-sans">₹{totalSales.toLocaleString("en-IN")}</div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold px-2 py-1 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                  <span className="text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">
                     {combinedTotal > 0 ? Math.round((totalSales / combinedTotal) * 100) : 0}%
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-card-2 border border-rose-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-3.5 h-3.5 rounded-full bg-rose-500 shrink-0 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                <div className="p-2.5 sm:p-3.5 rounded-xl bg-card-2 border border-rose-500/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2 sm:gap-2.5">
+                    <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-rose-500 shrink-0 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
                     <div>
-                      <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Total Purchase</div>
-                      <div className="text-lg font-black text-ink font-sans">₹{totalPurchase.toLocaleString("en-IN")}</div>
+                      <div className="text-[10px] sm:text-[11px] font-bold text-rose-400 uppercase tracking-wider">Total Purchase</div>
+                      <div className="text-sm sm:text-lg font-black text-ink font-sans">₹{totalPurchase.toLocaleString("en-IN")}</div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold px-2 py-1 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                  <span className="text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
                     {combinedTotal > 0 ? Math.round((totalPurchase / combinedTotal) * 100) : 0}%
                   </span>
                 </div>
 
-                <div className="p-3 rounded-xl bg-card-2 border border-line-soft flex items-center justify-between text-xs">
+                <div className="p-2 sm:p-3 rounded-xl bg-card-2 border border-line-soft flex items-center justify-between text-[10.5px] sm:text-xs">
                   <span className="text-ink-subtle font-semibold">Total Combined Volume</span>
                   <span className="font-mono font-bold text-ink">₹{combinedTotal.toLocaleString("en-IN")}</span>
                 </div>

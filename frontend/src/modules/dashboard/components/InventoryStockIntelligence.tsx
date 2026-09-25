@@ -563,31 +563,31 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
   return (
     <div className="bg-white dark:bg-card border border-slate-200 dark:border-line-soft rounded-2xl shadow-sm hover:shadow-md overflow-hidden flex flex-col mb-4 sm:mb-6 transition-all">
       {/* ── CARD HEADER ── */}
-      <div className="shrink-0 px-4 py-3.5 border-b border-slate-200/80 dark:border-line-soft flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-card-2/40">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0 shadow-2xs">
-            <FaWarehouse className="text-sm" />
+      <div className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-3.5 border-b border-slate-200/80 dark:border-line-soft flex flex-wrap items-center justify-between gap-2.5 bg-slate-50/70 dark:bg-card-2/40">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0 shadow-2xs">
+            <FaWarehouse className="text-xs sm:text-sm" />
           </div>
-          <div>
-            <div className="text-[13px] font-extrabold uppercase tracking-wider text-slate-900 dark:text-ink flex items-center gap-2">
-              <span>Inventory & Stock Intelligence</span>
-              <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-400 border border-teal-500/30 uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+          <div className="min-w-0">
+            <div className="text-[11px] sm:text-[13px] font-extrabold uppercase tracking-wider text-slate-900 dark:text-ink flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="truncate">Inventory & Stock Intelligence</span>
+              <span className="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-400 border border-teal-500/30 uppercase tracking-wider shrink-0">
+                <span className="w-1 sm:w-1.5 h-1 sm:h-1.5 rounded-full bg-teal-500 animate-pulse" />
                 Live Feed
               </span>
-              {isLoading && <FaSync className="animate-spin text-teal-500 text-[10px]" />}
+              {isLoading && <FaSync className="animate-spin text-teal-500 text-[10px] shrink-0" />}
             </div>
           </div>
         </div>
 
         {/* Action Controls: 3 Tabs & Multi-Chart Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Filter Tabs (Persisted to LocalStorage) */}
-          <div className="flex items-center bg-slate-100/90 dark:bg-card p-1 rounded-xl border border-slate-200 dark:border-line-soft text-[11px] font-bold shadow-2xs">
+          <div className="flex items-center bg-slate-100/90 dark:bg-card p-0.5 sm:p-1 rounded-xl border border-slate-200 dark:border-line-soft text-[10px] sm:text-[11px] font-bold shadow-2xs">
             <button
               type="button"
               onClick={() => handleTabChange("raw")}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg transition-all cursor-pointer ${
                 activeTab === "raw" ? "bg-teal-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
@@ -596,7 +596,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             <button
               type="button"
               onClick={() => handleTabChange("finished")}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg transition-all cursor-pointer ${
                 activeTab === "finished" ? "bg-teal-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
@@ -605,7 +605,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
             <button
               type="button"
               onClick={() => handleTabChange("wastage")}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg transition-all cursor-pointer ${
                 activeTab === "wastage" ? "bg-amber-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
@@ -614,74 +614,74 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
           </div>
 
           {/* 4 Graph Type Switch Buttons (Persisted to LocalStorage) */}
-          <div className="flex items-center bg-slate-100/90 dark:bg-card p-1 rounded-xl border border-slate-200 dark:border-line-soft gap-1 shadow-2xs">
+          <div className="flex items-center bg-slate-100/90 dark:bg-card p-0.5 sm:p-1 rounded-xl border border-slate-200 dark:border-line-soft gap-0.5 sm:gap-1 shadow-2xs">
             <button
               type="button"
               onClick={() => handleChartTypeChange("bar")}
               title="Column Chart"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition-all cursor-pointer ${
                 chartType === "bar" ? "bg-teal-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
-              <FaChartBar className="text-xs" />
+              <FaChartBar className="text-[10px] sm:text-xs" />
             </button>
             <button
               type="button"
               onClick={() => handleChartTypeChange("pie")}
               title="Donut Distribution"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition-all cursor-pointer ${
                 chartType === "pie" ? "bg-teal-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
-              <FaChartPie className="text-xs" />
+              <FaChartPie className="text-[10px] sm:text-xs" />
             </button>
             <button
               type="button"
               onClick={() => handleChartTypeChange("area")}
               title="Area Trend"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition-all cursor-pointer ${
                 chartType === "area" ? "bg-teal-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
-              <FaChartLine className="text-xs" />
+              <FaChartLine className="text-[10px] sm:text-xs" />
             </button>
             <button
               type="button"
               onClick={() => handleChartTypeChange("list")}
               title="Matrix Table View"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition-all cursor-pointer ${
                 chartType === "list" ? "bg-teal-600 text-white shadow-xs font-bold" : "text-slate-600 dark:text-ink-muted hover:text-slate-900 dark:hover:text-ink hover:bg-white/70 dark:hover:bg-card-2"
               }`}
             >
-              <FaListUl className="text-xs" />
+              <FaListUl className="text-[10px] sm:text-xs" />
             </button>
           </div>
         </div>
       </div>
 
       {/* ── TOP 4 ACTIONABLE INVENTORY SNAPSHOT METRIC CARDS (CLICKABLE) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 border-b border-slate-200/80 dark:border-line-soft bg-slate-50/50 dark:bg-card-2/20">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 p-2.5 sm:p-3.5 border-b border-slate-200/80 dark:border-line-soft bg-slate-50/50 dark:bg-card-2/20">
         {/* 1. Tracked Inventory SKUs */}
         <div
           onClick={() => navigate("/stock")}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-emerald-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
+          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-emerald-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
           title="Click to view Stock Ledger"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:scale-105 transition-transform">
-            <FaCheckDouble className="text-base" />
+          <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:scale-105 transition-transform">
+            <FaCheckDouble className="text-xs sm:text-base" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
+            <div className="text-[9px] sm:text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors truncate">
               Total SKUs
             </div>
             {isOverallLoading ? (
-              <div className="h-6 w-20 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+              <div className="h-5 sm:h-6 w-16 sm:w-20 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
             ) : (
-              <div className="text-lg font-mono font-black text-slate-900 dark:text-ink mt-0.5">
-                {totalTrackedSKUs} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold uppercase">Items</span>
+              <div className="text-sm sm:text-lg font-mono font-black text-slate-900 dark:text-ink mt-0.5 truncate">
+                {totalTrackedSKUs} <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-ink-muted font-bold uppercase">Items</span>
               </div>
             )}
-            <div className="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+            <div className="text-[8.5px] sm:text-[9.5px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 truncate">
               ● Stock Ledger →
             </div>
           </div>
@@ -690,72 +690,72 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
         {/* 2. Raw Materials Stock (Physical Qty) -> Navigates to /stock */}
         <div
           onClick={() => navigate("/stock")}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-sky-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
+          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-sky-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
           title="Click to open Raw Material Stock Inventory"
         >
-          <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0 group-hover:scale-105 transition-transform">
-            <FaLayerGroup className="text-base" />
+          <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0 group-hover:scale-105 transition-transform">
+            <FaLayerGroup className="text-xs sm:text-base" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
+            <div className="text-[9px] sm:text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors truncate">
               Raw Materials
             </div>
             {isOverallLoading ? (
-              <div className="h-6 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+              <div className="h-5 sm:h-6 w-16 sm:w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
             ) : (
-              <div className="text-lg font-mono font-black text-sky-600 dark:text-sky-400 mt-0.5">
-                {totalRawQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
+              <div className="text-sm sm:text-lg font-mono font-black text-sky-600 dark:text-sky-400 mt-0.5 truncate">
+                {totalRawQty.toLocaleString()} <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
               </div>
             )}
-            <div className="text-[9.5px] text-sky-600 dark:text-sky-400 font-semibold mt-0.5">{isOverallLoading ? "Loading..." : `${rawStockItems.length} materials →`}</div>
+            <div className="text-[8.5px] sm:text-[9.5px] text-sky-600 dark:text-sky-400 font-semibold mt-0.5 truncate">{isOverallLoading ? "Loading..." : `${rawStockItems.length} materials →`}</div>
           </div>
         </div>
 
         {/* 3. Finished Goods Stock (Physical Qty) -> Navigates to /finished-stock */}
         <div
           onClick={() => navigate("/finished-stock")}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-teal-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
+          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-teal-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
           title="Click to open Finished Goods Stock Inventory"
         >
-          <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0 group-hover:scale-105 transition-transform">
-            <FaShoppingBag className="text-base" />
+          <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0 group-hover:scale-105 transition-transform">
+            <FaShoppingBag className="text-xs sm:text-base" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
+            <div className="text-[9px] sm:text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors truncate">
               Finished Goods
             </div>
             {isOverallLoading ? (
-              <div className="h-6 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+              <div className="h-5 sm:h-6 w-16 sm:w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
             ) : (
-              <div className="text-lg font-mono font-black text-teal-600 dark:text-teal-400 mt-0.5">
-                {totalFgQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">PCS</span>
+              <div className="text-sm sm:text-lg font-mono font-black text-teal-600 dark:text-teal-400 mt-0.5 truncate">
+                {totalFgQty.toLocaleString()} <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-ink-muted font-bold">PCS</span>
               </div>
             )}
-            <div className="text-[9.5px] text-teal-600 dark:text-teal-400 font-semibold mt-0.5">{isOverallLoading ? "Loading..." : `${finishedStockItems.length} products →`}</div>
+            <div className="text-[8.5px] sm:text-[9.5px] text-teal-600 dark:text-teal-400 font-semibold mt-0.5 truncate">{isOverallLoading ? "Loading..." : `${finishedStockItems.length} products →`}</div>
           </div>
         </div>
 
         {/* 4. Wastage Scrap Store -> Navigates to /wastage-stock */}
         <div
           onClick={() => navigate("/wastage-stock")}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-amber-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
+          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-white dark:bg-card border border-slate-200/90 dark:border-line-soft shadow-2xs hover:border-amber-500 hover:shadow-md hover:bg-slate-50 dark:hover:bg-card-2/50 transition-all cursor-pointer group"
           title="Click to open Wastage & Scrap Stock Inventory"
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
-            <FaRecycle className="text-base" />
+          <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
+            <FaRecycle className="text-xs sm:text-base" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors">
+            <div className="text-[9px] sm:text-[10.5px] uppercase font-extrabold text-slate-500 dark:text-ink-muted group-hover:text-slate-900 dark:group-hover:text-ink tracking-wider transition-colors truncate">
               Wastage Store
             </div>
             {isOverallLoading ? (
-              <div className="h-6 w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
+              <div className="h-5 sm:h-6 w-16 sm:w-24 bg-slate-200 dark:bg-card-2 rounded animate-pulse my-1" />
             ) : (
-              <div className="text-lg font-mono font-black text-amber-600 dark:text-amber-400 mt-0.5">
-                {totalWastageQty.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
+              <div className="text-sm sm:text-lg font-mono font-black text-amber-600 dark:text-amber-400 mt-0.5 truncate">
+                {totalWastageQty.toLocaleString()} <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-ink-muted font-bold">KG</span>
               </div>
             )}
-            <div className="text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">{isOverallLoading ? "Loading..." : `${wastageStockItems.length} scrap items →`}</div>
+            <div className="text-[8.5px] sm:text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5 truncate">{isOverallLoading ? "Loading..." : `${wastageStockItems.length} scrap items →`}</div>
           </div>
         </div>
       </div>
@@ -764,25 +764,24 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
       <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80 dark:divide-line-soft">
         {/* LEFT 2/3: Dynamic Visual Charts with Auto-Batching Pagination */}
         <div
-          className="lg:col-span-2 p-4 flex flex-col justify-between"
-          style={{ minHeight: "440px" }}
+          className="lg:col-span-2 p-2.5 sm:p-4 flex flex-col justify-between min-h-[320px] sm:min-h-[440px]"
           onMouseEnter={() => setIsAutoRotating(false)}
           onMouseLeave={() => setIsAutoRotating(true)}
         >
           {/* Batch Carousel Navigation Sub-header (when items > 7) */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mb-2 px-1 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-800 dark:text-ink">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2 px-1 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-800 dark:text-ink truncate">
                   Batch {currentPage + 1} of {totalPages}
                 </span>
-                <span className="text-[10px] text-slate-500 dark:text-ink-muted font-mono">
-                  ({currentPage * ITEMS_PER_PAGE + 1}–{Math.min((currentPage + 1) * ITEMS_PER_PAGE, currentTabItems.length)} of {currentTabItems.length} items)
+                <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-ink-muted font-mono truncate">
+                  ({currentPage * ITEMS_PER_PAGE + 1}–{Math.min((currentPage + 1) * ITEMS_PER_PAGE, currentTabItems.length)} of {currentTabItems.length})
                 </span>
               </div>
 
               {/* Controls: Prev, Next, Play/Pause */}
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-card-2/60 border border-slate-200 dark:border-line-soft px-1.5 py-0.5 rounded-lg shadow-2xs">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-card-2/60 border border-slate-200 dark:border-line-soft px-1.5 py-0.5 rounded-lg shadow-2xs shrink-0">
                 <button
                   type="button"
                   onClick={handlePrevPage}
@@ -835,8 +834,8 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
           )}
 
           {isOverallLoading ? (
-            <div className="w-full h-[380px] flex flex-col justify-between p-3 animate-pulse">
-              <div className="flex items-end justify-between gap-3 h-[300px] px-3 pt-4 border-b border-line-soft/40">
+            <div className="w-full h-[280px] sm:h-[380px] flex flex-col justify-between p-3 animate-pulse">
+              <div className="flex items-end justify-between gap-3 h-[220px] sm:h-[300px] px-3 pt-4 border-b border-line-soft/40">
                 {[60, 85, 45, 75, 90, 50, 70].map((h, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
                     <div className="w-full max-w-[28px] bg-teal-500/20 rounded-t" style={{ height: `${h}%` }} />
@@ -845,19 +844,19 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
               </div>
               <div className="flex justify-between px-3 pt-2">
                 {[1, 2, 3, 4, 5, 6, 7].map((_, i) => (
-                  <div key={i} className="h-2.5 w-10 bg-slate-200 dark:bg-card-2 rounded" />
+                  <div key={i} className="h-2.5 w-8 sm:w-10 bg-slate-200 dark:bg-card-2 rounded" />
                 ))}
               </div>
             </div>
           ) : (
             <>
               {chartType === "bar" && (
-                <div className="w-full h-[380px]">
+                <div className="w-full h-[280px] sm:h-[380px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 20, right: 20, left: -10, bottom: 35 }}>
+                    <BarChart data={chartData} margin={{ top: 15, right: 15, left: -15, bottom: 35 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150,150,150,0.18)" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "currentColor" }} angle={-25} textAnchor="end" height={40} interval={0} />
-                      <YAxis tick={{ fontSize: 11, fill: "currentColor" }} />
+                      <XAxis dataKey="name" tick={{ fontSize: 9.5, fill: "currentColor" }} angle={-25} textAnchor="end" height={40} interval={0} />
+                      <YAxis tick={{ fontSize: 9.5, fill: "currentColor" }} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "var(--color-card, #ffffff)",
@@ -884,9 +883,9 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
               )}
 
               {chartType === "pie" && (
-                <div className="w-full h-[380px] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div className="w-full min-h-[280px] sm:min-h-[380px] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
                   {/* Left Donut Wheel */}
-                  <div className="sm:col-span-6 h-[350px] relative flex items-center justify-center">
+                  <div className="sm:col-span-6 h-[220px] sm:h-[350px] relative flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Tooltip
@@ -894,7 +893,7 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                             backgroundColor: "var(--color-card, #ffffff)",
                             borderColor: "var(--color-line-soft, #cbd5e1)",
                             borderRadius: "0.75rem",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             color: "var(--color-ink, #0f172a)",
                             boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
                           }}
@@ -911,8 +910,8 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                           data={chartData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={78}
-                          outerRadius={118}
+                          innerRadius={60}
+                          outerRadius={95}
                           paddingAngle={4}
                           dataKey="quantity"
                         >
@@ -924,41 +923,41 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
                     </ResponsiveContainer>
                     {/* Central Donut Hub with Real Live Batch Total */}
                     <div className="absolute text-center pointer-events-none px-2">
-                      <div className="text-[10px] font-extrabold text-slate-500 dark:text-ink-muted uppercase tracking-wider">
+                      <div className="text-[9px] sm:text-[10px] font-extrabold text-slate-500 dark:text-ink-muted uppercase tracking-wider">
                         {currentTabTitle}
                       </div>
-                      <div className="text-base font-mono font-black text-slate-900 dark:text-ink">
-                        {currentBatchTotal.toLocaleString()} <span className="text-[10px] text-slate-500 dark:text-ink-muted">{currentTabUom}</span>
+                      <div className="text-sm sm:text-base font-mono font-black text-slate-900 dark:text-ink">
+                        {currentBatchTotal.toLocaleString()} <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-ink-muted">{currentTabUom}</span>
                       </div>
-                      <div className="text-[9.5px] text-teal-600 dark:text-teal-400 font-bold">
+                      <div className="text-[8.5px] sm:text-[9.5px] text-teal-600 dark:text-teal-400 font-bold">
                         Batch {currentPage + 1}/{totalPages}
                       </div>
                     </div>
                   </div>
 
                   {/* Right Side Item Legend List with Badges */}
-                  <div className="sm:col-span-6 max-h-[350px] overflow-y-auto pr-1 space-y-1.5">
+                  <div className="sm:col-span-6 max-h-[220px] sm:max-h-[350px] overflow-y-auto pr-1 space-y-1.5">
                     {chartData.map((item, idx) => {
                       const pct = currentBatchTotal > 0 ? ((item.quantity / currentBatchTotal) * 100).toFixed(1) : "0";
                       return (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-2 rounded-lg bg-slate-50/80 dark:bg-card-2/50 border border-slate-200/80 dark:border-line-soft hover:bg-slate-100 dark:hover:bg-card-2 transition-colors text-xs"
+                          className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50/80 dark:bg-card-2/50 border border-slate-200/80 dark:border-line-soft hover:bg-slate-100 dark:hover:bg-card-2 transition-colors text-xs"
                         >
-                          <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-2">
                             <span
-                              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                              className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 shadow-2xs"
                               style={{ backgroundColor: item.color }}
                             />
-                            <span className="font-bold text-slate-800 dark:text-ink truncate text-[11px]" title={item.fullName}>
+                            <span className="font-bold text-slate-800 dark:text-ink truncate text-[10px] sm:text-[11px]" title={item.fullName}>
                               {item.fullName}
                             </span>
                           </div>
                           <div className="text-right shrink-0 font-mono">
-                            <span className="text-[11px] font-bold text-slate-900 dark:text-ink">
+                            <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-ink">
                               {item.quantity.toLocaleString()} {item.uom}
                             </span>
-                            <span className="text-[9.5px] text-slate-500 dark:text-ink-muted ml-1.5 font-bold">({pct}%)</span>
+                            <span className="text-[8.5px] sm:text-[9.5px] text-slate-500 dark:text-ink-muted ml-1 sm:ml-1.5 font-bold">({pct}%)</span>
                           </div>
                         </div>
                       );
@@ -968,9 +967,9 @@ export const InventoryStockIntelligence: React.FC<InventoryStockIntelligenceProp
               )}
 
               {chartType === "area" && (
-                <div className="w-full h-[380px]">
+                <div className="w-full h-[280px] sm:h-[380px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 20, right: 20, left: -10, bottom: 35 }}>
+                    <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -15, bottom: 35 }}>
                       <defs>
                         <linearGradient id="colorStockVal" x1="0" y1="0" x2="0" y2="1">
                           <stop

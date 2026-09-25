@@ -126,7 +126,7 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
   return (
     <div
       data-shortcut-panel
-      className={`relative flex flex-row h-full shrink-0 transition-all duration-300 ease-in-out ${
+      className={`relative max-[991px]:!hidden flex flex-row h-full shrink-0 transition-all duration-300 ease-in-out ${
         isOpen ? "w-[275px]" : "w-[28px]"
       }`}
       style={{ zIndex: 30 }}

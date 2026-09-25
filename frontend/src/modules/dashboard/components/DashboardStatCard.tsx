@@ -99,34 +99,34 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
         className="absolute -right-3 -bottom-2 text-white/20 group-hover:text-white/35 transition-all duration-300 group-hover:scale-110 group-hover:-rotate-6 pointer-events-none select-none"
         style={{ fontSize: "5.5rem" }}
       />
-      <div className="relative z-10 p-4">
+      <div className="relative z-10 p-3 sm:p-3.5">
         {/* Header (Title + Trend) */}
-        <div className="flex items-center justify-between mb-3 gap-1 relative z-20">
-          <span className={`text-[11px] uppercase tracking-wider font-extrabold truncate ${titleColorClass}`}>
+        <div className="flex items-center justify-between mb-2 sm:mb-2.5 gap-1 relative z-20">
+          <span className={`text-[10.5px] sm:text-[11px] uppercase tracking-wider font-extrabold truncate ${titleColorClass}`}>
             {title}
           </span>
           {trend !== "neutral" && !loading && (
             <span
-              className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+              className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border ${
                 trend === "up"
                   ? "bg-white/10 border-white/20 text-white"
                   : "bg-rose-400/20 border-rose-400/40 text-rose-300"
               }`}
             >
-              {trend === "up" ? <FaArrowUp size={7} /> : <FaArrowDown size={7} />}
+              {trend === "up" ? <FaArrowUp size={6.5} /> : <FaArrowDown size={6.5} />}
             </span>
           )}
         </div>
 
         {/* Amount */}
-        <div className="text-2xl sm:text-[26px] xl:text-[28px] font-sans font-black text-white tracking-tight leading-none mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] flex items-baseline gap-1 min-h-[32px]">
+        <div className="text-[17px] sm:text-[19px] md:text-[21px] min-[1200px]:text-[18px] min-[1400px]:text-[21px] font-sans font-black text-white tracking-tight leading-none mb-2.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] flex items-baseline gap-1 min-h-[25px]">
           {isAmountLoading ? (
-            <div className="h-7 w-28 bg-white/20 rounded-lg animate-pulse my-auto" />
+            <div className="h-6 w-24 bg-white/20 rounded-lg animate-pulse my-auto" />
           ) : (
             <>
-              <span>{formatAmount(amount)}</span>
+              <span className="truncate">{formatAmount(amount)}</span>
               {suffixBadge && (
-                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded bg-black/40 border ${suffixBadgeColorClass}`}>
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded bg-black/40 border ${suffixBadgeColorClass}`}>
                   {suffixBadge}
                 </span>
               )}
@@ -135,13 +135,13 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
         </div>
 
         {/* Footer info bullet */}
-        <div className="flex items-center gap-1.5 min-h-[16px]">
+        <div className="flex items-center gap-1.5 min-h-[14px]">
           {isAmountLoading ? (
-            <div className="h-3 w-20 bg-white/15 rounded-md animate-pulse" />
+            <div className="h-2.5 w-16 bg-white/15 rounded-md animate-pulse" />
           ) : (
             <>
               <div className={`w-1.5 h-1.5 rounded-full shadow-sm ${bulletColorClass}`} />
-              <span className={`text-[11px] font-bold ${countTextColorClass}`}>
+              <span className={`text-[10.5px] sm:text-[11px] font-bold ${countTextColorClass}`}>
                 {safeCountText}
               </span>
             </>

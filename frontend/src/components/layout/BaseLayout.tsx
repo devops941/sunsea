@@ -42,7 +42,7 @@ const BaseLayout = () => {
 
   // ── Global keyboard shortcuts ───────────────────────────────────
   const handleToggleSidebar = useCallback(() => {
-    if (window.innerWidth < 1024) {
+    if (window.innerWidth < 992) {
       setShowSidebar((prev) => !prev);
     } else {
       handleTogglePanel();
@@ -68,30 +68,35 @@ const BaseLayout = () => {
     }
   }, [company?.faviconUrl]);
 
+  // Auto-close mobile sidebar drawer on page navigation
+  useEffect(() => {
+    setShowSidebar(false);
+  }, [location.pathname]);
+
   return (
     <div className="flex h-screen overflow-hidden">
 
       {/* Mobile Sidebar Overlay */}
       {showSidebar && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 min-[992px]:hidden"
           onClick={() => setShowSidebar(false)}
         />
       )}
 
       {/* Mobile Sidebar Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out min-[992px]:hidden ${
           showSidebar ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <Sidebar />
+        <Sidebar onClose={() => setShowSidebar(false)} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
-        {/* Top Navbar (Mobile only) */}
-        <div className="lg:hidden">
+        {/* Top Navbar (Mobile/Tablet only: <= 991px) */}
+        <div className="min-[992px]:hidden relative z-30">
           <Navbar
             onMenuClick={() => setShowSidebar(true)}
             user={user}
@@ -107,7 +112,7 @@ const BaseLayout = () => {
 
           {/* Main Content */}
           <main className="flex-1 w-full min-w-0 overflow-y-auto bg-page">
-            <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 min-h-full flex flex-col">
+            <div className="layout-content-wrapper w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 min-h-full flex flex-col">
               <Outlet />
             </div>
           </main>

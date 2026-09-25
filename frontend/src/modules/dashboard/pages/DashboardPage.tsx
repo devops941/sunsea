@@ -602,7 +602,7 @@ const DashboardPage: React.FC = () => {
     <div className="bg-page flex flex-col min-h-0" style={{ height: "calc(100vh - 100px)" }}>
 
       {/* ── SCROLLABLE MAIN CONTENT ─────────────────────────── */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-2 py-3 sm:px-6 sm:py-4 lg:px-8">
+      <div className="dashboard-content-scroll flex-1 overflow-y-auto min-h-0 px-1 py-2 sm:px-2 sm:py-3 lg:px-3">
 
         {/* ── NON-STICKY HEADER ───── */}
         <div className="flex items-center justify-between gap-3 mb-3">
@@ -635,7 +635,7 @@ const DashboardPage: React.FC = () => {
            6 stat cards + Quick Actions + Alerts + Recent Txns
            ══════════════════════════════════════════════════════ */}
         {/* 6 Top Stat Cards (Using Reusable DashboardStatCard Component) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
+        <div className="stat-cards-grid mb-3 sm:mb-4">
 
           {/* TOTAL SALES */}
           <DashboardStatCard
@@ -740,51 +740,66 @@ const DashboardPage: React.FC = () => {
         </div>        {/* ══════════════════════════════════════════════════════
            ROW 2  –  Sales/Purchase Trend Chart (Left) + Today's Tasks & Recent Sales (Right)
            ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Left: Sales & Purchase Trend Chart */}
-          {showTrend && (
-            <div className="w-full" style={{ height: "530px", maxHeight: "530px" }}>
-              <SalesPurchaseTrendChart
-                salesOrders={salesOrders}
-                purchaseOrders={purchaseOrders}
-                productionOrders={productionOrders}
-                salesInvoices={salesInvoices}
-                purchaseInvoices={purchaseInvoices}
-                loading={isDashboardLoading}
-              />
-            </div>
-          )}
+          {/* Left: Interactive Sales vs Purchase Multi-Chart */}
+          <div className="lg:col-span-7 flex flex-col min-w-0">
+            {showTrend && (
+              <div className="w-full h-[440px] sm:h-[530px] lg:h-[530px]">
+                <SalesPurchaseTrendChart
+                  salesOrders={salesOrders}
+                  purchaseOrders={purchaseOrders}
+                  productionOrders={productionOrders}
+                  salesInvoices={salesInvoices}
+                  purchaseInvoices={purchaseInvoices}
+                  loading={isDashboardLoading}
+                />
+              </div>
+            )}
+          </div>
 
           {/* Right: Today's Tasks & Production (Top) + Recent Sales Orders (Bottom) */}
-          <div className="flex flex-col gap-3 sm:gap-4 w-full" style={{ height: "530px", maxHeight: "530px" }}>
+          <div className="lg:col-span-5 flex flex-col gap-3 sm:gap-4 w-full h-auto lg:h-[530px] lg:max-h-[530px]">
             {/* 1. Tasks / Daily Production Planning */}
             {showTasks && (
               <div
-                className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden w-full shrink-0"
-                style={{ height: "257px", minHeight: "257px", maxHeight: "257px" }}
+                className={`bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden w-full ${
+                  showRecentSales
+                    ? "h-[340px] sm:h-[360px] lg:h-[257px]"
+                    : "h-[380px] sm:h-[420px] lg:h-[530px]"
+                }`}
               >
                 {/* Card Header */}
-                <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                      <FaCalendarCheck className="text-xs" />
+                <div className="shrink-0 px-3 py-2 sm:px-3.5 sm:py-2.5 border-b border-line-soft flex items-center justify-between gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <FaCalendarCheck className="text-[10px] sm:text-xs" />
                     </div>
-                    <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
-                      {taskPeriod === "day"
-                        ? "Today's Tasks & Production"
-                        : taskPeriod === "week"
-                          ? "This Week's Tasks & Production"
-                          : "This Month's Tasks & Production"}
+                    <div className="text-[11px] sm:text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
+                      <span className="hidden sm:inline">
+                        {taskPeriod === "day"
+                          ? "Today's Tasks & Production"
+                          : taskPeriod === "week"
+                            ? "This Week's Tasks & Production"
+                            : "This Month's Tasks & Production"}
+                      </span>
+                      <span className="sm:hidden">
+                        {taskPeriod === "day"
+                          ? "Today's Tasks"
+                          : taskPeriod === "week"
+                            ? "This Week's Tasks"
+                            : "This Month's Tasks"}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                     {/* Highest Production Records Leaderboard Button */}
                     <button
                       type="button"
                       onClick={() => navigate("/reports/highest-production")}
                       title="Highest Production List (Leaderboard)"
-                      className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold transition-all duration-200 shadow-xs cursor-pointer bg-amber-50 hover:bg-amber-100/90 text-amber-800 border-amber-300/80 hover:border-amber-400 active:scale-95 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 dark:text-amber-300 dark:border-amber-500/30 dark:hover:border-amber-500/50"
+                      className="group flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg border text-[9px] sm:text-[10px] font-bold transition-all duration-200 shadow-xs cursor-pointer bg-amber-50 hover:bg-amber-100/90 text-amber-800 border-amber-300/80 hover:border-amber-400 active:scale-95 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 dark:text-amber-300 dark:border-amber-500/30 dark:hover:border-amber-500/50"
                     >
                       <FaTrophy className="text-[10px] text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
                       <span className="hidden sm:inline">Highest Records</span>
@@ -797,7 +812,7 @@ const DashboardPage: React.FC = () => {
                           key={p}
                           type="button"
                           onClick={() => handleTaskPeriodChange(p)}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold capitalize transition-all duration-200 cursor-pointer ${taskPeriod === p
+                          className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold capitalize transition-all duration-200 cursor-pointer ${taskPeriod === p
                             ? "bg-emerald-500 text-white shadow-xs font-black"
                             : "text-ink-muted hover:text-ink hover:bg-card/50"
                             }`}
@@ -808,11 +823,11 @@ const DashboardPage: React.FC = () => {
                     </div>
 
                     {isDashboardLoading ? (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-ink-muted border border-line-soft uppercase tracking-wider shrink-0">
+                      <span className="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full bg-white/10 text-ink-muted border border-line-soft uppercase tracking-wider shrink-0">
                         <FaSync className="animate-spin text-emerald-600 dark:text-emerald-400 text-[8px]" /> Loading...
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
+                      <span className="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                         {todayStats.tasksList.length} Tasks
                       </span>
@@ -822,7 +837,7 @@ const DashboardPage: React.FC = () => {
 
                 {/* Card Content */}
                 <div
-                  className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 [&::-webkit-scrollbar]:!block [&::-webkit-scrollbar]:!w-1.5 [&::-webkit-scrollbar-track]:!bg-transparent [&::-webkit-scrollbar-thumb]:!bg-slate-700/60 [&::-webkit-scrollbar-thumb]:!rounded-full hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500"
+                  className="flex-1 min-h-0 overflow-y-auto p-3 pb-6 space-y-2 [&::-webkit-scrollbar]:!block [&::-webkit-scrollbar]:!w-1.5 [&::-webkit-scrollbar-track]:!bg-transparent [&::-webkit-scrollbar-thumb]:!bg-slate-700/60 [&::-webkit-scrollbar-thumb]:!rounded-full hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500"
                   style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(100, 116, 139, 0.4) transparent" }}
                 >
                   {isDashboardLoading ? (
@@ -903,8 +918,11 @@ const DashboardPage: React.FC = () => {
             {/* 2. Recent Sales Orders */}
             {showRecentSales && (
               <div
-                className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden w-full shrink-0"
-                style={{ height: "257px", minHeight: "257px", maxHeight: "257px" }}
+                className={`bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden w-full ${
+                  showTasks
+                    ? "h-[340px] sm:h-[360px] lg:h-[257px]"
+                    : "h-[380px] sm:h-[420px] lg:h-[530px]"
+                }`}
               >
                 {/* Header */}
                 <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft bg-card-2/50 flex items-center justify-between gap-2">
@@ -941,7 +959,7 @@ const DashboardPage: React.FC = () => {
 
                 {/* Content */}
                 <div
-                  className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 [&::-webkit-scrollbar]:!block [&::-webkit-scrollbar]:!w-1.5 [&::-webkit-scrollbar-track]:!bg-transparent [&::-webkit-scrollbar-thumb]:!bg-slate-700/60 [&::-webkit-scrollbar-thumb]:!rounded-full hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500"
+                  className="flex-1 min-h-0 overflow-y-auto p-3 pb-6 space-y-2 [&::-webkit-scrollbar]:!block [&::-webkit-scrollbar]:!w-1.5 [&::-webkit-scrollbar-track]:!bg-transparent [&::-webkit-scrollbar-thumb]:!bg-slate-700/60 [&::-webkit-scrollbar-thumb]:!rounded-full hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500"
                   style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(100, 116, 139, 0.4) transparent" }}
                 >
                   {isDashboardLoading ? (
@@ -1019,13 +1037,11 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* ══════════════════════════════════════════════════════
-           ROW 3  –  Alerts & Recent Transactions (3/4 Left) + Top Products (1/4 Right)
+           ROW 3  –  Alerts, Recent Transactions & Top Products (Zero Whitespace)
            ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ minHeight: "360px" }}>
-          {/* Left 3/4: Alerts (1/3) + Recent Transactions (2/3) */}
-          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 h-full">
-            {/* Alerts (1 of 3 inside 3/4) */}
-            <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
+        <div className={`dashboard-widgets-grid ${showTopProducts ? "has-top-products" : "no-top-products"} mb-4 sm:mb-6`} style={{ minHeight: "360px" }}>
+          {/* Alerts */}
+          <div className="widget-alerts bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
               {/* Header */}
               <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
                 <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink flex items-center gap-1.5">
@@ -1149,83 +1165,9 @@ const DashboardPage: React.FC = () => {
             </div>
 
 
-            {/* Recent Transactions (2 of 3 inside 3/4) */}
-            <div className="md:col-span-2 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
-              <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
-                <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink">Recent Transactions</div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/accounts/ledger-statement")}
-                  className="text-[11px] font-semibold text-blue-400 hover:underline cursor-pointer"
-                >
-                  View Ledger Statement →
-                </button>
-              </div>
-              <div className="flex-1 min-h-0 overflow-auto">
-                {isAccountsLoading ? (
-                  <div className="p-4 space-y-3 animate-pulse">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <div key={n} className="flex items-center justify-between py-2 border-b border-line-soft/40">
-                        <div className="h-3 bg-white/15 rounded w-20" />
-                        <div className="h-3 bg-white/10 rounded w-16" />
-                        <div className="h-3 bg-white/15 rounded w-36" />
-                        <div className="h-3 bg-white/10 rounded w-20" />
-                        <div className="h-3 bg-white/15 rounded w-16" />
-                      </div>
-                    ))}
-                  </div>
-                ) : !accountsSummary || accountsSummary.recentTransactions.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
-                ) : (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
-                      <tr>
-                        <th className="px-3 py-2 bg-card-2 border-r border-line-soft">Voucher No</th>
-                        <th className="px-2 py-2 bg-card-2 border-r border-line-soft">Type</th>
-                        <th className="px-3 py-2 bg-card-2 border-r border-line-soft">Party / Account</th>
-                        <th className="px-2 py-2 bg-card-2 border-r border-line-soft">Date</th>
-                        <th className="px-3 py-2 bg-card-2 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line-soft">
-                      {accountsSummary.recentTransactions.map((t) => {
-                        const typeColor: Record<string, string> = {
-                          SALES: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-                          PURCHASE: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                          RECEIPT: "bg-green-500/10 text-green-500 border-green-500/20",
-                          PAYMENT: "bg-rose-500/10 text-rose-500 border-rose-500/20",
-                          JOURNAL: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-                          CONTRA: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-                        };
-                        const party = t.debitLedger || t.creditLedger || t.narration || "-";
-                        return (
-                          <tr key={t.id} className="hover:bg-card-2 transition-colors border-b border-line-soft last:border-0">
-                            <td className="px-3 py-2 font-mono font-semibold text-blue-400 whitespace-nowrap text-[11px] border-r border-line-soft">{t.voucherNo}</td>
-                            <td className="px-2 py-2 border-r border-line-soft">
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
-                                {t.type}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-ink truncate max-w-[160px] text-[11px] font-medium border-r border-line-soft">{party}</td>
-                            <td className="px-2 py-2 font-mono text-[10px] text-ink-muted whitespace-nowrap border-r border-line-soft">
-                              {formatDate(t.date)}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
-                              ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right 1/4: Top Products */}
+          {/* Top Products */}
           {showTopProducts && (
-            <div className="lg:col-span-1 bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
+            <div className="widget-top-products bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
               <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">Top Products</div>
@@ -1469,6 +1411,79 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
           )}
+
+          {/* Recent Transactions */}
+          <div className="widget-transactions bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[440px]">
+            <div className="shrink-0 px-3.5 py-2.5 border-b border-line-soft flex items-center justify-between">
+              <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink">Recent Transactions</div>
+              <button
+                type="button"
+                onClick={() => navigate("/accounts/ledger-statement")}
+                className="text-[11px] font-semibold text-blue-400 hover:underline cursor-pointer"
+              >
+                View Ledger Statement →
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto">
+              {isAccountsLoading ? (
+                <div className="p-4 space-y-3 animate-pulse">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <div key={n} className="flex items-center justify-between py-2 border-b border-line-soft/40">
+                      <div className="h-3 bg-white/15 rounded w-20" />
+                      <div className="h-3 bg-white/10 rounded w-16" />
+                      <div className="h-3 bg-white/15 rounded w-36" />
+                      <div className="h-3 bg-white/10 rounded w-20" />
+                      <div className="h-3 bg-white/15 rounded w-16" />
+                    </div>
+                  ))}
+                </div>
+              ) : !accountsSummary || accountsSummary.recentTransactions.length === 0 ? (
+                <div className="p-6 text-center text-xs text-ink-subtle">No recent transactions</div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-card-2 text-ink-subtle uppercase text-[10px] font-bold tracking-wide border-b border-line-soft sticky top-0 z-10">
+                    <tr>
+                      <th className="px-3 py-2 bg-card-2 border-r border-line-soft">Voucher No</th>
+                      <th className="px-2 py-2 bg-card-2 border-r border-line-soft">Type</th>
+                      <th className="px-3 py-2 bg-card-2 border-r border-line-soft">Party / Account</th>
+                      <th className="px-2 py-2 bg-card-2 border-r border-line-soft">Date</th>
+                      <th className="px-3 py-2 bg-card-2 text-right whitespace-nowrap">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-soft">
+                    {accountsSummary.recentTransactions.map((t) => {
+                      const typeColor: Record<string, string> = {
+                        SALES: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                        PURCHASE: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                        RECEIPT: "bg-green-500/10 text-green-500 border-green-500/20",
+                        PAYMENT: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+                        JOURNAL: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                        CONTRA: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+                      };
+                      const party = t.debitLedger || t.creditLedger || t.narration || "-";
+                      return (
+                        <tr key={t.id} className="hover:bg-card-2 transition-colors border-b border-line-soft last:border-0">
+                          <td className="px-3 py-2 font-mono font-semibold text-blue-400 whitespace-nowrap text-[11px] border-r border-line-soft">{t.voucherNo}</td>
+                          <td className="px-2 py-2 border-r border-line-soft">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${typeColor[t.type] || "bg-card-2 text-ink-subtle border-line"}`}>
+                              {t.type}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-ink truncate max-w-[200px] text-[11px] font-medium border-r border-line-soft">{party}</td>
+                          <td className="px-2 py-2 font-mono text-[10px] text-ink-muted whitespace-nowrap border-r border-line-soft">
+                            {formatDate(t.date)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-bold text-ink whitespace-nowrap text-[11px]">
+                            ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════
@@ -1609,9 +1624,9 @@ const DashboardPage: React.FC = () => {
         {/* ══════════════════════════════════════════════════════
            ROW 4  –  Customer Product Purchase Report (Left) + Sales Person Location (Right)
            ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6" style={{ height: "360px" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Customer Product Purchase Report — in-card drill-down view */}
-          <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-full min-h-0">
+          <div className="bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden h-[460px] min-h-[460px]">
             {/* Header */}
             <div className="shrink-0 px-3 py-2 border-b border-line-soft flex items-center justify-between gap-2">
               {selectedCustomerReport ? (

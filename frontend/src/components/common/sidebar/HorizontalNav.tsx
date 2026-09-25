@@ -728,7 +728,7 @@ const HorizontalNav = () => {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-slate-900/95 backdrop-blur-md text-slate-800 dark:text-white shadow-xs border-b border-slate-200/90 dark:border-slate-800/80 relative z-40 hidden lg:flex items-center justify-between px-3.5 py-1.5 transition-colors duration-200">
+    <div className="w-full bg-white dark:bg-slate-900/95 backdrop-blur-md text-slate-800 dark:text-white shadow-xs border-b border-slate-200/90 dark:border-slate-800/80 relative z-40 hidden min-[992px]:flex items-center justify-between px-3.5 py-1.5 transition-colors duration-200">
       
       {/* ── MIDDLE: Navigation Items ── */}
       <div className="flex-1 overflow-x-auto no-scrollbar" ref={navContainerRef}>
