@@ -2,7 +2,7 @@ import { formatDate } from "../../../utils/dateUtils";
 import { withDecimalFormat } from "../../../utils/pricingUtils";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaArrowLeft, FaPlus, FaCheck } from "react-icons/fa";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
@@ -22,6 +22,7 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import { useFormKeyboardNav } from "../../../hooks/useFormKeyboardNav";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
 import { useDirtyNavGuard } from "../../../hooks/useDirtyNavGuard";
+import { markStaleByPrefix } from "../../../hooks/useListCache";
 import RecordAuditInfo, { type AuditData } from "../../../components/ui/RecordAuditInfo/RecordAuditInfo";
 
 const addressSchema = z.object({
@@ -95,8 +96,8 @@ const mapCustomerToFormData = (customer: any): CustomerFormValues => {
     isActive: customer.status === "Active" ? "true" : "false",
     firmName: customer.firmName || "",
     displayName: customer.displayName || "",
-    customerTypeId: customer.customerTypeId || null,
-    customerGradeId: customer.customerGradeId || null,
+    customerTypeId: customer.customerTypeId ?? customer.customerType?.id ?? null,
+    customerGradeId: customer.customerGradeId ?? customer.customerGrade?.id ?? null,
     phones: initialPhones,
     email: customer.email || "",
     gstin: customer.gstin || "",
@@ -129,7 +130,7 @@ const CtrlText = ({ field, label, placeholder, required, type, disabled, error, 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
+  // const location = useLocation();
   const isEditMode = !!id;
 
   const { addCustomer, editCustomer } = useCustomers();
@@ -232,7 +233,7 @@ const CustomerFormPage: React.FC = () => {
       p();
       return;
     }
-    navigate(-1);
+    navigate("/customers");
   }, [navigate]);
 
   useDirtyNavGuard(isDirty, (proceed, reset) => {
@@ -245,7 +246,7 @@ const CustomerFormPage: React.FC = () => {
     if (isDirty) {
       openDiscardModal();
     } else {
-      navigate(-1);
+      navigate("/customers");
     }
   }, [isDirty, openDiscardModal, navigate]);
 
@@ -274,7 +275,7 @@ const CustomerFormPage: React.FC = () => {
       } else if (isDirtyRef.current) {
         openDiscardModal();
       } else {
-        navigate(-1);
+        navigate("/customers");
       }
     };
     window.addEventListener("keydown", handleEsc, { capture: true });
@@ -333,7 +334,7 @@ const CustomerFormPage: React.FC = () => {
       };
       fetchCode();
     }
-  }, [id, isEditMode, location.state, reset, setValue]);
+  }, [id, isEditMode, reset, setValue]);
 
 
 
@@ -387,11 +388,20 @@ const CustomerFormPage: React.FC = () => {
           // No transactions — include opening balance in update
           await editCustomer(id, payload as any);
         }
+        markStaleByPrefix("customers:");
         toast.success("Customer updated successfully");
         reset(data); // Clear isDirty so the nav guard doesn't trigger
-        navigate(-1);
+        if (proceedRef.current) {
+          const p = proceedRef.current;
+          proceedRef.current = null;
+          resetRef.current = null;
+          p();
+          return;
+        }
+        navigate("/customers");
       } else {
         await addCustomer(payload as any);
+        markStaleByPrefix("customers:");
         toast.success("Customer created successfully");
         reset(initialFormData);
         try {
@@ -417,37 +427,35 @@ const CustomerFormPage: React.FC = () => {
     "openingBalance", "openingBalanceType", "creditLimit", "creditDays",
   ];
 
-  // Save from the discard modal: close modal first, then validate + submit.
-  // If validation fails → errors show on the form, first error field gets focus
-  //   so keyboard navigation works immediately.
+  // Save from the discard modal: validate + submit.
+  // If validation fails → errors show on the form, first error field gets focus.
   // If validation passes → onSubmit saves and navigates away.
   const handleSaveFromModal = useCallback(() => {
-    setSaveConfirmOpen(false);
-    setTimeout(() => {
-      handleSubmit(
-        onSubmit,
-        (fieldErrors) => {
-          toast.error("Please fill all required fields.");
+    handleSubmit(
+      async (data) => {
+        setSaveConfirmOpen(false);
+        await onSubmit(data);
+      },
+      (fieldErrors) => {
+        setSaveConfirmOpen(false);
+        toast.error("Please fill all required fields.");
 
-          // Walk the visual field order and focus the first one that has an error.
-          // focusFieldByName uses a direct DOM query (name attr + data-nav) so it
-          // works even though CtrlText does not forward field.ref to the input.
-          const firstErrorField = FIELD_ORDER.find((f) => fieldErrors[f]);
-          if (firstErrorField && focusFieldByName(firstErrorField)) {
-            formRef.current
-              ?.querySelector<HTMLElement>(`input[name="${firstErrorField}"]`)
-              ?.scrollIntoView({ block: "center", behavior: "smooth" });
-          } else {
-            // Address / transport errors — focus the first visible red-border input
-            const firstRedInput = formRef.current?.querySelector<HTMLElement>(
-              "input.border-red-500[data-nav]"
-            );
-            firstRedInput?.focus();
-            firstRedInput?.scrollIntoView({ block: "center", behavior: "smooth" });
-          }
+        // Walk the visual field order and focus the first one that has an error.
+        const firstErrorField = FIELD_ORDER.find((f) => fieldErrors[f]);
+        if (firstErrorField && focusFieldByName(firstErrorField)) {
+          formRef.current
+            ?.querySelector<HTMLElement>(`input[name="${firstErrorField}"]`)
+            ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        } else {
+          // Address / transport errors — focus the first visible red-border input
+          const firstRedInput = formRef.current?.querySelector<HTMLElement>(
+            "input.border-red-500[data-nav]"
+          );
+          firstRedInput?.focus();
+          firstRedInput?.scrollIntoView({ block: "center", behavior: "smooth" });
         }
-      )();
-    }, 150);
+      }
+    )();
   }, [handleSubmit, onSubmit, focusFieldByName]);
 
   // ── Global F-Keys / Shortcuts Integration (F2 / F9 / F8 / F5) ──

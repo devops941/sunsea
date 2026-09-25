@@ -26,6 +26,7 @@ import { rawMaterialService } from "../../../../services/rawMaterialService";
 import type { RawMaterial } from "../../../../features/raw-materials/types";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
+import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchStores } from "../../../../features/stores/storeSlice";
@@ -201,22 +202,50 @@ const PurchaseOrderForm: React.FC = () => {
     return () => clearTimeout(timer);
   }, [loading, focusFirstField]);
 
+  const handleCreateInvoiceNavigate = useCallback(() => {
+    if (!id) {
+      toast.error("Please save the purchase order first before creating an invoice.");
+      return;
+    }
+    if (formData.hasGrnInvoice || (formData.grnInvoicesCount && formData.grnInvoicesCount > 0)) {
+      grnInvoiceService.fetchAll({ poId: id })
+        .then((res: any) => {
+          const invoices = Array.isArray(res) ? res : (res?.data || res?.invoices || []);
+          if (invoices && invoices.length > 0) {
+            navigate(`/invoice/edit/${invoices[0].id}`);
+          } else {
+            navigate("/invoice/create", { state: { preselectedPoId: String(id) } });
+          }
+        })
+        .catch(() => {
+          navigate("/invoice/create", { state: { preselectedPoId: String(id) } });
+        });
+    } else {
+      navigate("/invoice/create", { state: { preselectedPoId: String(id) } });
+    }
+  }, [id, formData.hasGrnInvoice, formData.grnInvoicesCount, navigate]);
+
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (saveConfirmOpenRef.current) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (isDirtyRef.current) {
-        lastFocusedRef.current = document.activeElement as HTMLElement;
-        setSaveConfirmOpen(true);
-      } else {
-        navigate(-1);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (saveConfirmOpenRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (isDirtyRef.current) {
+          lastFocusedRef.current = document.activeElement as HTMLElement;
+          setSaveConfirmOpen(true);
+        } else {
+          navigate(-1);
+        }
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCreateInvoiceNavigate();
       }
     };
-    document.addEventListener("keydown", handleEscape, true);
-    return () => document.removeEventListener("keydown", handleEscape, true);
-  }, [navigate]);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [navigate, handleCreateInvoiceNavigate]);
 
   const selectedSupplier = useMemo(() => (suppliers || []).find(
     (s) => String(s?.id) === String(formData.supplierId)
@@ -942,23 +971,7 @@ const PurchaseOrderForm: React.FC = () => {
         );
       }
       setIsDirty(false);
-      if (isEdit) {
-        navigate(-1);
-      } else {
-        setFormData({
-          ...initialFormData,
-          createdByOn: formData.createdByOn,
-          billingAddressLine1: company?.addressLine1 || "",
-          billingCity: company?.city || "",
-          billingState: company?.state || "",
-          billingPincode: company?.zipcode || "",
-          billingCountry: company?.country || "India",
-        });
-        setErrors({});
-        setShippingResetKey((k) => k + 1);
-        await fetchNextCode();
-        setTimeout(() => focusFirstField(), 100);
-      }
+      navigate("/purchase-orders");
     } catch (error: any) {
       toast.error(error?.message || `Failed to ${isEdit ? "update" : "create"} purchase order`);
     } finally {
@@ -1240,13 +1253,25 @@ const PurchaseOrderForm: React.FC = () => {
             </div>
 
           {/* Footer Buttons */}
-          {!isLocked && (
-            <div className="flex justify-end gap-3 px-5 py-4 border-t border-line-soft">
-              <CustomButton text="Clear" variant="danger" onClick={handleClear} disabled={isSubmitting || isSubmittingForApproval} />
-              <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
-              <CustomButton text={isSubmittingForApproval ? "Approving..." : "Approved"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "APPROVED")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+          <div className="flex justify-between items-center px-5 py-4 border-t border-line-soft">
+            <div>
+              {id && (
+                <CustomButton
+                  variant="secondary"
+                  text={(formData.hasGrnInvoice || (formData.grnInvoicesCount && formData.grnInvoicesCount > 0)) ? "Edit Invoice (F6)" : "Create Invoice (F6)"}
+                  type="button"
+                  onClick={handleCreateInvoiceNavigate}
+                />
+              )}
             </div>
-          )}
+            {!isLocked && (
+              <div className="flex justify-end gap-3">
+                <CustomButton text="Clear" variant="danger" onClick={handleClear} disabled={isSubmitting || isSubmittingForApproval} />
+                <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+                <CustomButton text={isSubmittingForApproval ? "Approving..." : "Approved"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "APPROVED")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+              </div>
+            )}
+          </div>
         </form>
       </div>
 

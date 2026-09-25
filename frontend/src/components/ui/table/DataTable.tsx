@@ -111,7 +111,7 @@ function DataTable<T>({
   // 1. `max-content` ensures the column is always wide enough for its content without squishing/wrapping text.
   // 2. `1fr` ensures any leftover table space is distributed equally, so the table stretches to fill 100% width.
   // 3. If the total max-content exceeds the screen, it naturally forces the responsive horizontal scrollbar!
-  const gridTemplateColumns = columns.map((col) => col.width ?? "minmax(0, 1fr)").join(" ");
+  const gridTemplateColumns = columns.map((col) => col.width ?? "minmax(max-content, 1fr)").join(" ");
 
   // True while the table is showing the loader or the empty message instead of
   // real rows. In that case the grid holds only the header and the message is

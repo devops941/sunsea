@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Save, Loader2, AlertCircle, RefreshCw,
-  CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays, Lock, Clock,
+  CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays, Lock, Clock, Plus, Trash2,
+  TrendingUp, Coffee, DollarSign, X, Check, ArrowRight, Sparkles, ShieldAlert,
 } from 'lucide-react';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
+import CommonConfirmModal from '../../../components/ui/CommonConfirmModal/CommonConfirmModal';
+import { useDirtyNavGuard } from '../../../hooks/useDirtyNavGuard';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiEmployeePayroll, ApiPayrollConfig } from '../../../services/payrollService';
 import { shiftService } from '../../../services/shiftService';
@@ -30,20 +33,54 @@ const S: Record<string, { abbr: string; label: string; cell: string }> = {
 const CYCLE: (AttStatus | null)[] = [null, 'PRESENT', 'ABSENT', 'HALF_DAY', 'HOLIDAY'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export type PunchSlot = { inTime: string; outTime: string };
+
 type CellData = {
   status: AttStatus | null;
   inTime: string | null;
   outTime: string | null;
+  punches?: PunchSlot[];
   otHours: number;
+  otAmount?: number;
   otDays: number;
+  otDaysAmount?: number;
   teaOtCount: number;
+  teaOtAmount?: number;
   lateMinutes: number;
+  lateDeduction?: number;
   permissionMinutes: number;
+  permissionDeduction?: number;
   shiftId: number | null;
 };
 type GridState = Record<string, CellData>;
 
-const EMPTY_CELL: CellData = { status: null, inTime: null, outTime: null, otHours: 0, otDays: 0, teaOtCount: 0, lateMinutes: 0, permissionMinutes: 0, shiftId: null };
+const EMPTY_CELL: CellData = {
+  status: null,
+  inTime: null,
+  outTime: null,
+  punches: [],
+  otHours: 0,
+  otAmount: 0,
+  otDays: 0,
+  otDaysAmount: 0,
+  teaOtCount: 0,
+  teaOtAmount: 0,
+  lateMinutes: 0,
+  lateDeduction: 0,
+  permissionMinutes: 0,
+  permissionDeduction: 0,
+  shiftId: null,
+};
+
+/** Helper to find default shift for an employee from Employee record */
+const getEmployeeDefaultShift = (emp?: ApiEmployeePayroll, shifts: Shift[] = []): Shift | undefined => {
+  if (!emp) return undefined;
+  return shifts.find(s =>
+    (emp.shift?.id && s.id === emp.shift.id) ||
+    (emp.shiftId && (s.shiftCode === emp.shiftId || String(s.id) === String(emp.shiftId))) ||
+    (emp.shift?.shiftCode && s.shiftCode === emp.shift.shiftCode)
+  );
+};
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -189,159 +226,799 @@ const StatusCell: React.FC<{
 
 // ─── Cell Edit Panel ──────────────────────────────────────────────────────────
 const CellEditPanel: React.FC<{
-  empName: string; date: string; cell: CellData; isLocked?: boolean;
-  shifts: Shift[]; weeklyOffDays: number[];
-  onChange: (c: CellData) => void; onClose: () => void;
-}> = ({ empName, date, cell, isLocked, shifts, weeklyOffDays, onChange, onClose }) => {
-  const showExtras = cell.status !== null;
+  emp?: ApiEmployeePayroll;
+  empName: string;
+  date: string;
+  cell: CellData;
+  isLocked: boolean;
+  shifts: Shift[];
+  weeklyOffDays: number[];
+  payrollCfg: ApiPayrollConfig | null;
+  calendarDays: number;
+  onChange: (c: CellData) => void;
+  onClose: () => void;
+}> = ({ emp, empName, date, cell, isLocked, shifts, weeklyOffDays, payrollCfg, calendarDays, onChange, onClose }) => {
   const isWeeklyOff = weeklyOffDays.includes(dayOfWeek(date));
+
+  // Employee's default shift configured in Employee Master
+  const defaultShift = useMemo(() => getEmployeeDefaultShift(emp, shifts), [emp, shifts]);
+
+  // Local draft state for cell edits
+  const [draftCell, setDraftCell] = useState<CellData>(() => {
+    let initial = { ...cell };
+    if (initial.shiftId == null && defaultShift) {
+      initial.shiftId = defaultShift.id;
+      initial.inTime = initial.inTime || defaultShift.startTime || null;
+      initial.outTime = initial.outTime || defaultShift.endTime || null;
+    }
+    return initial;
+  });
+
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  const showExtras = draftCell.status !== null;
+
+  // Multi-punch sessions state
+  const initialPunches = useMemo<PunchSlot[]>(() => {
+    if (cell.punches && cell.punches.length > 0) {
+      return cell.punches;
+    }
+    if (cell.inTime || cell.outTime) {
+      return [{ inTime: cell.inTime || '', outTime: cell.outTime || '' }];
+    }
+    if (defaultShift?.startTime || defaultShift?.endTime) {
+      return [{ inTime: defaultShift.startTime || '', outTime: defaultShift.endTime || '' }];
+    }
+    return [{ inTime: '', outTime: '' }];
+  }, [cell.punches, cell.inTime, cell.outTime, defaultShift]);
+
+  const [punches, setPunches] = useState<PunchSlot[]>(initialPunches);
+
+  const handlePunchChange = (index: number, field: 'inTime' | 'outTime', value: string) => {
+    const updated = punches.map((p, idx) => (idx === index ? { ...p, [field]: value } : p));
+    setPunches(updated);
+    const firstIn = updated.find(p => p.inTime)?.inTime || null;
+    const lastOut = [...updated].reverse().find(p => p.outTime)?.outTime || null;
+    setDraftCell(prev => ({
+      ...prev,
+      inTime: firstIn,
+      outTime: lastOut,
+      punches: updated,
+    }));
+    setIsDirty(true);
+  };
+
+  const handleAddPunch = () => {
+    const updated = [...punches, { inTime: '', outTime: '' }];
+    setPunches(updated);
+    setDraftCell(prev => ({
+      ...prev,
+      punches: updated,
+    }));
+    setIsDirty(true);
+  };
+
+  const handleRemovePunch = (index: number) => {
+    if (punches.length <= 1) {
+      handlePunchChange(0, 'inTime', '');
+      handlePunchChange(0, 'outTime', '');
+      return;
+    }
+    const updated = punches.filter((_, idx) => idx !== index);
+    setPunches(updated);
+    const firstIn = updated.find(p => p.inTime)?.inTime || null;
+    const lastOut = [...updated].reverse().find(p => p.outTime)?.outTime || null;
+    setDraftCell(prev => ({
+      ...prev,
+      inTime: firstIn,
+      outTime: lastOut,
+      punches: updated,
+    }));
+    setIsDirty(true);
+  };
+
+  // ── Rate Calculations ──
+  const empDailyRate = useMemo(() => {
+    if (!emp) return 0;
+    const pc = emp.payrollConfig;
+    const gross = Number(pc?.monthlySalary || 0);
+    const st = (pc?.salaryType || emp.salaryType || '').toUpperCase();
+    if (st === 'WEEKLY') {
+      return gross / 6;
+    }
+    if (st === 'DAILY' || st === 'DAILY_WEEKLY') {
+      return Number(pc?.dailySalary || gross || 0);
+    }
+    const divisor = calendarDays > 0 ? calendarDays : 30;
+    return gross / divisor;
+  }, [emp, calendarDays]);
+
+  const defaultWorkingHours = Number(payrollCfg?.defaultWorkingHoursPerDay || 8);
+  const otHourlyRate = Number(payrollCfg?.otRatePerHour || 0) > 0
+    ? Number(payrollCfg?.otRatePerHour)
+    : (defaultWorkingHours > 0 ? empDailyRate / defaultWorkingHours : 0);
+  const teaOtRate = Number(payrollCfg?.teaOtRate || 0);
+  const graceMinutes = Number(payrollCfg?.lateEntryGraceMinutes ?? 10);
+  const workingMinutes = defaultWorkingHours * 60;
+  const perMinuteRate = workingMinutes > 0 ? empDailyRate / workingMinutes : 0;
+
+  const isOfficeStaff = (emp?.payrollConfig?.salaryType !== 'DAILY_WEEKLY' && emp?.payrollConfig?.salaryType !== 'WEEKLY') &&
+    (emp?.employeeCategory === 'office_staff' || !emp?.employeeCategory);
+  const staffFreeMinutes = Number(payrollCfg?.staffPermissionFreeMinutes ?? 240);
+  const staffHourlyRate = Number(payrollCfg?.staffExcessHourlyRate ?? 50);
+
+  // Late deduction calculation
+  const computeLateDeduction = useCallback((mins: number): number => {
+    if (mins <= graceMinutes) return 0;
+    const slabs = (payrollCfg?.lateEntrySlabs as any[]) || [];
+    const matched = slabs.find(s => mins >= s.fromMinutes && (s.toMinutes === 0 || mins <= s.toMinutes));
+    if (matched && Number(matched.amount) > 0) {
+      return Number(matched.amount);
+    }
+    return (mins - graceMinutes) * perMinuteRate;
+  }, [graceMinutes, payrollCfg?.lateEntrySlabs, perMinuteRate]);
+
+  // Permission deduction calculation
+  const computePermDeduction = useCallback((mins: number): number => {
+    if (mins <= 0) return 0;
+    if (isOfficeStaff) {
+      const excess = Math.max(0, mins - staffFreeMinutes);
+      const excessHours = Math.ceil(excess / 60);
+      return excessHours * staffHourlyRate;
+    }
+    const slabs = (payrollCfg?.permissionSlabs as any[]) || [];
+    const matched = slabs.find(s => mins >= s.fromMinutes && (s.toMinutes === 0 || mins <= s.toMinutes));
+    return matched ? Number(matched.amount) : 0;
+  }, [isOfficeStaff, staffFreeMinutes, staffHourlyRate, payrollCfg?.permissionSlabs]);
+
+  // Current amounts (purely manual value from draftCell)
+  const otHoursAmt = Number(draftCell.otAmount ?? 0);
+  const otDaysAmt = Number(draftCell.otDaysAmount ?? 0);
+  const teaOtAmt = Number(draftCell.teaOtAmount ?? 0);
+  const lateDedAmt = Number(draftCell.lateDeduction ?? 0);
+  const permDedAmt = Number(draftCell.permissionDeduction ?? 0);
+
+  const totalEarnings = otHoursAmt + otDaysAmt + teaOtAmt;
+  const totalDeductions = lateDedAmt + permDedAmt;
+  const netImpact = totalEarnings - totalDeductions;
+
+  // Calculate session duration helper
+  const getSlotDuration = (inT: string, outT: string): string => {
+    if (!inT || !outT) return '';
+    const [inH, inM] = inT.split(':').map(Number);
+    const [outH, outM] = outT.split(':').map(Number);
+    if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) return '';
+    let diff = (outH * 60 + outM) - (inH * 60 + inM);
+    if (diff < 0) diff += 24 * 60;
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return `${h}h ${m > 0 ? `${m}m` : ''}`;
+  };
+
+  // Discard / Save logic for Cell Modal
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  const saveConfirmOpenRef = useRef(saveConfirmOpen);
+  useEffect(() => { saveConfirmOpenRef.current = saveConfirmOpen; }, [saveConfirmOpen]);
+
+  const handleResume = useCallback(() => {
+    setSaveConfirmOpen(false);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    setSaveConfirmOpen(false);
+    onClose();
+  }, [onClose]);
+
+  const handleSaveFromModal = useCallback(() => {
+    setSaveConfirmOpen(false);
+    onChange(draftCell);
+    onClose();
+  }, [draftCell, onChange, onClose]);
+
+  const handleRequestClose = useCallback(() => {
+    if (isLocked) {
+      onClose();
+      return;
+    }
+    if (saveConfirmOpenRef.current) {
+      handleResume();
+      return;
+    }
+    if (isDirtyRef.current) {
+      setSaveConfirmOpen(true);
+    } else {
+      onClose();
+    }
+  }, [isLocked, handleResume, onClose]);
+
+  const handleDone = () => {
+    if (!isLocked && isDirty) {
+      onChange(draftCell);
+    }
+    onClose();
+  };
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (document.querySelector('[data-select-portal]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      if (saveConfirmOpenRef.current) {
+        handleResume();
+      } else if (isDirtyRef.current && !isLocked) {
+        setTimeout(() => setSaveConfirmOpen(true), 0);
+      } else {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc, { capture: true });
+    return () => window.removeEventListener('keydown', handleEsc, { capture: true });
+  }, [handleResume, onClose, isLocked]);
+
   return (
-  <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-    <div className="bg-card text-ink border border-line-soft rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-bold text-ink text-sm">{empName}</p>
-          <p className="text-xs text-ink-muted">{formatDate(date)} · {DAY_FULL[dayOfWeek(date)]}</p>
-        </div>
-        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-lg text-ink-muted hover:text-ink transition-colors cursor-pointer">×</button>
-      </div>
-
-      {isLocked && (
-        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-xl font-medium">
-          <Lock size={14} className="shrink-0 text-amber-400" />
-          <span>This date is locked because payroll has been approved. Editing is disabled.</span>
-        </div>
-      )}
-
-      {/* Status grid */}
-      <div>
-        <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">Status</p>
-        <div className="grid grid-cols-5 gap-1.5">
-          {STATUSES.map(st => (
-            <button key={st} disabled={isLocked} onClick={() => {
-              const newStatus = cell.status === st ? null : st;
-              const autoOtDay = isWeeklyOff && newStatus === 'PRESENT' ? 1 : (isWeeklyOff && newStatus !== 'PRESENT' ? 0 : cell.otDays);
-              onChange({ ...cell, status: newStatus, otDays: autoOtDay });
-            }}
-              className={`py-2 rounded-lg text-xs font-bold transition-all border-2 cursor-pointer ${
-                cell.status === st ? `${S[st].cell} border-transparent shadow-xs` : 'bg-card-2 text-ink border-line-soft hover:border-primary/40'
-              } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              {S[st].abbr}
-            </button>
-          ))}
-          <button disabled={isLocked} onClick={() => onChange({ ...cell, status: null })}
-            className={`py-2 rounded-lg text-xs font-bold border-2 transition-all cursor-pointer ${
-              cell.status === null ? 'bg-primary text-white border-transparent shadow-xs' : 'bg-card-2 text-ink border-line-soft hover:border-primary/40'
-            } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            —
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm" onClick={handleRequestClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        data-escape-guarded
+        className="bg-card text-ink border border-line-soft rounded-2xl shadow-2xl w-full max-w-5xl xl:max-w-6xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line-soft bg-card-2/70">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-sm shadow-xs">
+              {empName.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-ink text-sm sm:text-base">{empName}</h3>
+                {emp?.empCode && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-card border border-line-soft text-ink-muted">
+                    {emp.empCode}
+                  </span>
+                )}
+                {emp?.department?.name && (
+                  <span className="text-[11px] font-medium text-ink-subtle hidden sm:inline">
+                    · {emp.department.name}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-ink-muted flex items-center gap-1.5 mt-0.5">
+                <Calendar size={12} className="text-primary" />
+                <span className="font-semibold text-ink">{formatDate(date)}</span>
+                <span className="text-ink-subtle">·</span>
+                <span className="font-medium text-ink-subtle">{DAY_FULL[dayOfWeek(date)]}</span>
+                {isWeeklyOff && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    Weekly Off
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleRequestClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-card-2 transition-colors cursor-pointer"
+          >
+            <X size={18} />
           </button>
         </div>
+
+        {/* Modal Body — Non-scrollable Single Page Grid */}
+        <div className="p-4 sm:p-5 space-y-3.5">
+          {isLocked && (
+            <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-xl font-medium">
+              <Lock size={14} className="shrink-0 text-amber-400" />
+              <span>This date is locked because payroll has already been approved or generated. Editing is disabled.</span>
+            </div>
+          )}
+
+          {/* Row 1: Attendance Status Buttons & Shift Selector in One Unified Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-card-2/40 border border-line-soft p-3 rounded-xl">
+            {/* Status Selector (7 cols) */}
+            <div className="md:col-span-7 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider">Attendance Status</label>
+                <span className="text-[10px] text-ink-muted">
+                  Selected: <span className="font-bold text-ink">{draftCell.status ? (S[draftCell.status]?.label || draftCell.status) : 'Not Marked'}</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {STATUSES.map(st => (
+                  <button
+                    key={st}
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => {
+                      const newStatus = draftCell.status === st ? null : st;
+                      const autoOtDay = isWeeklyOff && newStatus === 'PRESENT' ? 1 : (isWeeklyOff && newStatus !== 'PRESENT' ? 0 : draftCell.otDays);
+                      const assignedShiftId = draftCell.shiftId ?? defaultShift?.id ?? null;
+                      const defaultIn = (!draftCell.inTime && defaultShift?.startTime) ? defaultShift.startTime : draftCell.inTime;
+                      const defaultOut = (!draftCell.outTime && defaultShift?.endTime) ? defaultShift.endTime : draftCell.outTime;
+                      setDraftCell(prev => ({
+                        ...prev,
+                        status: newStatus,
+                        otDays: autoOtDay,
+                        shiftId: assignedShiftId,
+                        inTime: defaultIn,
+                        outTime: defaultOut,
+                      }));
+                      setIsDirty(true);
+                    }}
+                    className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                      draftCell.status === st
+                        ? `${S[st].cell} border-transparent shadow-sm ring-2 ring-primary/40 scale-[1.02]`
+                        : 'bg-card text-ink border-line-soft hover:border-primary/40 hover:bg-card-2'
+                    } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="text-xs font-extrabold">{S[st].abbr}</span>
+                    <span className="text-[10px] opacity-85 hidden sm:inline">{S[st].label}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={isLocked}
+                  onClick={() => {
+                    setDraftCell(prev => ({
+                      ...prev,
+                      status: null,
+                      inTime: null,
+                      outTime: null,
+                      punches: [],
+                      otHours: 0,
+                      otAmount: 0,
+                      otDays: 0,
+                      otDaysAmount: 0,
+                      teaOtCount: 0,
+                      teaOtAmount: 0,
+                      lateMinutes: 0,
+                      lateDeduction: 0,
+                      permissionMinutes: 0,
+                      permissionDeduction: 0,
+                      shiftId: null,
+                    }));
+                    setPunches([{ inTime: '', outTime: '' }]);
+                    setIsDirty(true);
+                  }}
+                  className={`py-1.5 px-1 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    draftCell.status === null
+                      ? 'bg-slate-700 text-white border-transparent shadow-sm ring-2 ring-slate-500/40'
+                      : 'bg-card text-ink border-line-soft hover:border-primary/40 hover:bg-card-2'
+                  } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className="text-xs font-extrabold">—</span>
+                  <span className="text-[10px] opacity-85">Clear</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Shift Selector (5 cols) */}
+            <div className="md:col-span-5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider flex items-center gap-1">
+                  <Clock size={11} className="text-primary" /> Shift Configuration
+                </label>
+                {defaultShift && (
+                  <span className="text-[9px] text-primary font-bold px-1.5 py-0.2 rounded bg-primary/10 border border-primary/20">
+                    ★ {defaultShift.shiftName}
+                  </span>
+                )}
+              </div>
+              <SelectInput
+                name="shiftId"
+                value={draftCell.shiftId ?? ''}
+                defaultOptionLabel="— No Shift Assigned —"
+                disabled={isLocked}
+                noMargin
+                searchable={false}
+                options={shifts.map(sh => ({
+                  value: sh.id,
+                  label: `${sh.shiftName} (${sh.startTime} – ${sh.endTime})${defaultShift?.id === sh.id ? ' ★' : ''}`,
+                }))}
+                onChange={e => {
+                  const selectedShiftId = e.target.value ? Number(e.target.value) : null;
+                  const matchedShift = shifts.find(s => s.id === selectedShiftId);
+                  setDraftCell(prev => ({
+                    ...prev,
+                    shiftId: selectedShiftId,
+                    inTime: (!prev.inTime && matchedShift?.startTime) ? matchedShift.startTime : prev.inTime,
+                    outTime: (!prev.outTime && matchedShift?.endTime) ? matchedShift.endTime : prev.outTime,
+                  }));
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Two-Column Side-by-Side Content */}
+          {showExtras && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+              {/* LEFT COLUMN: Overtime & Earnings */}
+              <div className="bg-card-2/40 border border-line-soft rounded-xl p-3.5 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-line-soft/60 pb-2 mb-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp size={14} className="text-emerald-400" />
+                      <span className="text-[11px] font-bold text-ink uppercase tracking-wider">Overtime & Earnings</span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-emerald-400 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                      Total: +₹{totalEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {/* 3 Metric Cards */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* OT Minutes */}
+                    <div className="bg-card p-2.5 rounded-xl border border-line-soft space-y-1.5">
+                      <span className="text-[10px] font-bold text-ink block truncate">OT Duration</span>
+                      <div>
+                        <span className="text-[8px] font-bold text-ink-muted uppercase block">Minutes</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          disabled={isLocked}
+                          value={draftCell.otHours ? Math.round(draftCell.otHours * 60) : ''}
+                          placeholder="0"
+                          onChange={e => {
+                            const mins = Number(e.target.value) || 0;
+                            const hours = Math.max(0, mins / 60);
+                            setDraftCell(prev => ({ ...prev, otHours: hours }));
+                            setIsDirty(true);
+                          }}
+                          className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-bold text-emerald-400 uppercase block">Amount (₹)</span>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-400">₹</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            disabled={isLocked}
+                            value={draftCell.otAmount !== undefined ? draftCell.otAmount : ''}
+                            placeholder="0"
+                            onChange={e => {
+                              const amt = e.target.value === '' ? 0 : Number(e.target.value);
+                              setDraftCell(prev => ({ ...prev, otAmount: Math.max(0, amt) }));
+                              setIsDirty(true);
+                            }}
+                            className="w-full bg-card-2 border border-emerald-500/30 text-emerald-400 font-mono font-bold rounded-lg pl-5 pr-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* OT Days */}
+                    <div className="bg-card p-2.5 rounded-xl border border-line-soft space-y-1.5">
+                      <span className="text-[10px] font-bold text-ink block truncate">OT Days</span>
+                      <div>
+                        <span className="text-[8px] font-bold text-ink-muted uppercase block">Days</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.5}
+                          disabled={isLocked}
+                          value={draftCell.otDays || ''}
+                          placeholder="0"
+                          onChange={e => {
+                            const val = Number(e.target.value) || 0;
+                            setDraftCell(prev => ({ ...prev, otDays: Math.max(0, val) }));
+                            setIsDirty(true);
+                          }}
+                          className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-bold text-emerald-400 uppercase block">Amount (₹)</span>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-400">₹</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            disabled={isLocked}
+                            value={draftCell.otDaysAmount !== undefined ? draftCell.otDaysAmount : ''}
+                            placeholder="0"
+                            onChange={e => {
+                              const amt = e.target.value === '' ? 0 : Number(e.target.value);
+                              setDraftCell(prev => ({ ...prev, otDaysAmount: Math.max(0, amt) }));
+                              setIsDirty(true);
+                            }}
+                            className="w-full bg-card-2 border border-emerald-500/30 text-emerald-400 font-mono font-bold rounded-lg pl-5 pr-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tea OT */}
+                    <div className="bg-card p-2.5 rounded-xl border border-line-soft space-y-1.5">
+                      <span className="text-[10px] font-bold text-ink block truncate">Tea OT</span>
+                      <div>
+                        <span className="text-[8px] font-bold text-ink-muted uppercase block">Count</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          disabled={isLocked}
+                          value={draftCell.teaOtCount || ''}
+                          placeholder="0"
+                          onChange={e => {
+                            const val = Number(e.target.value) || 0;
+                            setDraftCell(prev => ({ ...prev, teaOtCount: Math.max(0, val) }));
+                            setIsDirty(true);
+                          }}
+                          className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-bold text-emerald-400 uppercase block">Amount (₹)</span>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-400">₹</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            disabled={isLocked}
+                            value={draftCell.teaOtAmount !== undefined ? draftCell.teaOtAmount : ''}
+                            placeholder="0"
+                            onChange={e => {
+                              const amt = e.target.value === '' ? 0 : Number(e.target.value);
+                              setDraftCell(prev => ({ ...prev, teaOtAmount: Math.max(0, amt) }));
+                              setIsDirty(true);
+                            }}
+                            className="w-full bg-card-2 border border-emerald-500/30 text-emerald-400 font-mono font-bold rounded-lg pl-5 pr-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Punch Sessions (In / Out) */}
+                <div className="bg-card/70 border border-line-soft rounded-xl p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider flex items-center gap-1">
+                      <Clock size={11} className="text-primary" /> In / Out Punch Sessions ({punches.length})
+                    </span>
+                    {!isLocked && punches.length < 10 && (
+                      <button
+                        type="button"
+                        onClick={handleAddPunch}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 hover:bg-primary/20"
+                      >
+                        <Plus size={11} /> Add Punch Slot ({punches.length}/10)
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
+                    {punches.map((p, idx) => {
+                      const duration = getSlotDuration(p.inTime, p.outTime);
+                      return (
+                        <div key={idx} className="flex items-center gap-2 bg-card-2 p-1.5 rounded-lg border border-line-soft">
+                          <span className="text-[9px] font-bold text-ink-muted w-4 text-center shrink-0">#{idx + 1}</span>
+                          <div className="flex-1">
+                            <input
+                              type="time"
+                              disabled={isLocked}
+                              value={p.inTime || ''}
+                              onChange={e => handlePunchChange(idx, 'inTime', e.target.value)}
+                              className="w-full bg-card border border-line-soft text-ink font-bold rounded-md px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 cursor-pointer"
+                            />
+                          </div>
+                          <span className="text-ink-subtle font-bold text-xs">→</span>
+                          <div className="flex-1">
+                            <input
+                              type="time"
+                              disabled={isLocked}
+                              value={p.outTime || ''}
+                              onChange={e => handlePunchChange(idx, 'outTime', e.target.value)}
+                              className="w-full bg-card border border-line-soft text-ink font-bold rounded-md px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 cursor-pointer"
+                            />
+                          </div>
+                          {duration && (
+                            <div className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400 font-mono shrink-0">
+                              {duration}
+                            </div>
+                          )}
+                          {punches.length > 1 && !isLocked && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePunch(idx)}
+                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors cursor-pointer shrink-0"
+                              title="Remove session"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: Lost Time & Deductions + Net Impact */}
+              <div className="bg-card-2/40 border border-line-soft rounded-xl p-3.5 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-line-soft/60 pb-2 mb-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle size={14} className="text-red-400" />
+                      <span className="text-[11px] font-bold text-ink uppercase tracking-wider">Lost Time & Deductions</span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-red-400 px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded-md">
+                      Total: -₹{totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {/* 2 Deduction Cards */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Late Entry */}
+                    <div className="bg-card p-2.5 rounded-xl border border-line-soft space-y-1.5">
+                      <span className="text-[10px] font-bold text-ink block truncate">Late Entry</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <span className="text-[8px] font-bold text-ink-muted uppercase block">Minutes</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            disabled={isLocked}
+                            value={draftCell.lateMinutes || ''}
+                            placeholder="0"
+                            onChange={e => {
+                              const val = Number(e.target.value) || 0;
+                              setDraftCell(prev => ({ ...prev, lateMinutes: Math.max(0, val) }));
+                              setIsDirty(true);
+                            }}
+                            className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[8px] font-bold text-red-400 uppercase block">Deduction (₹)</span>
+                          <div className="relative">
+                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-red-400">-₹</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              disabled={isLocked}
+                              value={draftCell.lateDeduction !== undefined ? draftCell.lateDeduction : ''}
+                              placeholder="0"
+                              onChange={e => {
+                                const amt = e.target.value === '' ? 0 : Number(e.target.value);
+                                setDraftCell(prev => ({ ...prev, lateDeduction: Math.max(0, amt) }));
+                                setIsDirty(true);
+                              }}
+                              className="w-full bg-card-2 border border-red-500/30 text-red-400 font-mono font-bold rounded-lg pl-6 pr-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-red-400 disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Permission */}
+                    <div className="bg-card p-2.5 rounded-xl border border-line-soft space-y-1.5">
+                      <span className="text-[10px] font-bold text-ink block truncate">Permission</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <span className="text-[8px] font-bold text-ink-muted uppercase block">Minutes</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            disabled={isLocked}
+                            value={draftCell.permissionMinutes || ''}
+                            placeholder="0"
+                            onChange={e => {
+                              const val = Number(e.target.value) || 0;
+                              setDraftCell(prev => ({ ...prev, permissionMinutes: Math.max(0, val) }));
+                              setIsDirty(true);
+                            }}
+                            className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[8px] font-bold text-red-400 uppercase block">Deduction (₹)</span>
+                          <div className="relative">
+                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-red-400">-₹</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              disabled={isLocked}
+                              value={draftCell.permissionDeduction !== undefined ? draftCell.permissionDeduction : ''}
+                              placeholder="0"
+                              onChange={e => {
+                                const amt = e.target.value === '' ? 0 : Number(e.target.value);
+                                setDraftCell(prev => ({ ...prev, permissionDeduction: Math.max(0, amt) }));
+                                setIsDirty(true);
+                              }}
+                              className="w-full bg-card-2 border border-red-500/30 text-red-400 font-mono font-bold rounded-lg pl-6 pr-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-red-400 disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Financial Net Summary Card */}
+                <div className="bg-gradient-to-r from-blue-950/40 via-card to-indigo-950/40 border border-blue-500/25 rounded-xl p-3">
+                  <div className="grid grid-cols-3 gap-2 text-center divide-x divide-line-soft">
+                    <div className="px-1">
+                      <span className="text-[9px] text-ink-subtle uppercase font-bold block">Earnings</span>
+                      <span className="font-mono font-bold text-xs sm:text-sm text-emerald-400">+₹{totalEarnings.toFixed(2)}</span>
+                    </div>
+                    <div className="px-1">
+                      <span className="text-[9px] text-ink-subtle uppercase font-bold block">Deductions</span>
+                      <span className="font-mono font-bold text-xs sm:text-sm text-red-400">-₹{totalDeductions.toFixed(2)}</span>
+                    </div>
+                    <div className="px-1">
+                      <span className="text-[9px] text-ink-subtle uppercase font-bold block">Net Adjustment</span>
+                      <span className={`font-mono font-black text-xs sm:text-sm ${netImpact >= 0 ? 'text-blue-400' : 'text-amber-400'}`}>
+                        {netImpact >= 0 ? '+' : ''}₹{netImpact.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 bg-card-2/70 border-t border-line-soft flex items-center justify-between gap-3">
+          <span className="text-xs text-ink-muted hidden sm:inline">
+            Amounts & punches entered here flow directly into payroll calculations.
+          </span>
+          <div className="flex items-center gap-2.5 ml-auto w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleRequestClose}
+              className="px-4 py-2 bg-card border border-line-soft text-ink hover:bg-card-2 rounded-xl font-semibold text-xs transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDone}
+              className="px-6 py-2 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-sm hover:shadow-primary/20 flex items-center justify-center gap-1.5"
+            >
+              <Check size={14} />
+              <span>{isLocked ? 'Close' : 'Done & Save Changes'}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Shift selector — available whenever a status is marked */}
-      {showExtras && shifts.length > 0 && (
-        <div>
-          <label className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Shift</label>
-          <SelectInput
-            name="shiftId"
-            value={cell.shiftId ?? ''}
-            defaultOptionLabel="— No Shift —"
-            disabled={isLocked}
-            noMargin
-            searchable={false}
-            options={shifts.map(sh => ({
-              value: sh.id,
-              label: `${sh.shiftName} (${sh.startTime} – ${sh.endTime})`,
-            }))}
-            onChange={e => onChange({ ...cell, shiftId: e.target.value ? Number(e.target.value) : null })}
-          />
-        </div>
-      )}
-
-      {/* OT Hours / OT Days / Tea OT — available for all marked statuses */}
-      {showExtras && (
-        <div className="grid grid-cols-3 gap-3">
-          {([
-            { label: 'OT Hours',    field: 'otHours'    as const, step: 0.5 },
-            { label: 'OT Days',     field: 'otDays'     as const, step: 0.5 },
-            { label: 'Tea OT',      field: 'teaOtCount' as const, step: 1   },
-          ]).map(f => (
-            <div key={f.field}>
-              <label className="block text-[11px] font-bold text-ink-muted mb-1">{f.label}</label>
-              <input
-                type="number"
-                min={0}
-                step={f.step}
-                disabled={isLocked}
-                value={cell[f.field]}
-                onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
-                className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Late / Permission — available for all marked statuses */}
-      {showExtras && (
-        <div className="grid grid-cols-2 gap-3">
-          {([
-            { label: 'Late (min)', field: 'lateMinutes'       as const, step: 1 },
-            { label: 'Perm (min)', field: 'permissionMinutes' as const, step: 1 },
-          ]).map(f => (
-            <div key={f.field}>
-              <label className="block text-[11px] font-bold text-ink-muted mb-1">{f.label}</label>
-              <input
-                type="number"
-                min={0}
-                step={f.step}
-                disabled={isLocked}
-                value={cell[f.field]}
-                onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
-                className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* In Time & Out Time — shown when times or late/perm/half-day are present */}
-      {showExtras && (cell.status === 'HALF_DAY' || cell.lateMinutes > 0 || cell.permissionMinutes > 0 || !!cell.inTime || !!cell.outTime || cell.otHours > 0) && (
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[11px] font-bold text-ink-muted mb-1 flex items-center gap-1.5">
-              <Clock size={12} className="text-emerald-500" />
-              <span>In Time</span>
-            </label>
-            <input
-              type="time"
-              disabled={isLocked}
-              value={cell.inTime || ''}
-              onChange={e => onChange({ ...cell, inTime: e.target.value || null })}
-              className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-ink-muted mb-1 flex items-center gap-1.5">
-              <Clock size={12} className="text-red-400" />
-              <span>Out Time</span>
-            </label>
-            <input
-              type="time"
-              disabled={isLocked}
-              value={cell.outTime || ''}
-              onChange={e => onChange({ ...cell, outTime: e.target.value || null })}
-              className="w-full bg-card-2 border border-line-soft text-ink font-bold rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            />
-          </div>
-        </div>
-      )}
-
-      <button onClick={onClose} className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all cursor-pointer shadow-sm">
-        {isLocked ? 'Close' : 'Done'}
-      </button>
+      {/* Discard Changes Confirm Modal for Cell Modal */}
+      <CommonConfirmModal
+        isOpen={saveConfirmOpen}
+        onClose={handleResume}
+        onCancel={handleDiscard}
+        onConfirm={handleSaveFromModal}
+        title="Discard Changes?"
+        message="Are you sure you want to discard your changes for this date?"
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={Check}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
-  </div>
   );
 };
 
@@ -372,8 +1049,52 @@ const AttendancePage: React.FC = () => {
   const [lockedPeriods, setLockedPeriods] = useState<string[]>([]);
   const [shifts,        setShifts]       = useState<Shift[]>([]);
 
+  // ── Unsaved / Discard modal state ─────────────────────────────────────────
+  const [isDirty, setIsDirty] = useState(false);
+  const [pageConfirmOpen, setPageConfirmOpen] = useState(false);
+  const proceedRef = useRef<(() => void) | null>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  const pageConfirmOpenRef = useRef(pageConfirmOpen);
+  useEffect(() => { pageConfirmOpenRef.current = pageConfirmOpen; }, [pageConfirmOpen]);
+
   // ── Cell panel ────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<{ empId: number; empName: string; date: string } | null>(null);
+  const selectedRef = useRef(selected);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  // Block route navigation when grid is dirty and no cell modal is active
+  useDirtyNavGuard(isDirty && !selected, (proceed, reset) => {
+    proceedRef.current = proceed;
+    resetRef.current = reset;
+    setPageConfirmOpen(true);
+  });
+
+  const handleResumePage = useCallback(() => {
+    setPageConfirmOpen(false);
+    if (resetRef.current) {
+      const r = resetRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      r();
+    }
+  }, []);
+
+  const handleDiscardPage = useCallback(() => {
+    setPageConfirmOpen(false);
+    setIsDirty(false);
+    if (proceedRef.current) {
+      const p = proceedRef.current;
+      proceedRef.current = null;
+      resetRef.current = null;
+      p();
+      return;
+    }
+    navigate(-1);
+  }, [navigate]);
 
   // ── Derived: employees filtered by salary type ────────────────────────────
   const isWeeklyEmployee = (e: ApiEmployeePayroll) =>
@@ -481,11 +1202,16 @@ const AttendancePage: React.FC = () => {
                 status:            r.status as AttStatus,
                 inTime:            r.inTime ?? null,
                 outTime:           r.outTime ?? null,
-                otHours:           Number(r.otHours),
-                otDays:            Number(r.otDays ?? 0),
-                teaOtCount:        Number(r.teaOtCount ?? 0),
-                lateMinutes:       Number(r.lateMinutes),
-                permissionMinutes: Number(r.permissionMinutes),
+                otHours:           Number(r.otHours || 0),
+                otAmount:          Number(r.otAmount || 0),
+                otDays:            Number(r.otDays || 0),
+                otDaysAmount:      Number(r.otDaysAmount || 0),
+                teaOtCount:        Number(r.teaOtCount || 0),
+                teaOtAmount:       Number(r.teaOtAmount || 0),
+                lateMinutes:       Number(r.lateMinutes || 0),
+                lateDeduction:     Number(r.lateDeduction || 0),
+                permissionMinutes: Number(r.permissionMinutes || 0),
+                permissionDeduction: Number(r.permissionDeduction || 0),
                 shiftId:           r.shiftId ?? null,
               };
             }
@@ -496,6 +1222,7 @@ const AttendancePage: React.FC = () => {
       } else {
         setHasSavedData(false);
       }
+      setIsDirty(false);
 
       // Check if period or month is locked/approved
       try {
@@ -526,13 +1253,26 @@ const AttendancePage: React.FC = () => {
   const setCell = (empId: number, date: string, data: CellData) => {
     if (isDateLocked(date)) return;
     setGrid(prev => ({ ...prev, [cellKey(empId, date)]: data }));
+    setIsDirty(true);
     setSaveOk(false);
   };
 
   const cycleCell = (empId: number, date: string) => {
     if (isDateLocked(date)) return;
     const cur = getCell(empId, date);
-    setCell(empId, date, { ...cur, status: cycleStatus(cur.status) });
+    const nextStatus = cycleStatus(cur.status);
+    const emp = employees.find(e => Number(e.id) === empId);
+    const defaultShift = getEmployeeDefaultShift(emp, shifts);
+    const assignedShiftId = cur.shiftId ?? (nextStatus ? defaultShift?.id ?? null : null);
+    const defaultIn = (!cur.inTime && nextStatus && defaultShift?.startTime) ? defaultShift.startTime : cur.inTime;
+    const defaultOut = (!cur.outTime && nextStatus && defaultShift?.endTime) ? defaultShift.endTime : cur.outTime;
+    setCell(empId, date, {
+      ...cur,
+      status: nextStatus,
+      shiftId: assignedShiftId,
+      inTime: defaultIn,
+      outTime: defaultOut,
+    });
   };
 
   // ── Bulk actions ──────────────────────────────────────────────────────────
@@ -540,16 +1280,25 @@ const AttendancePage: React.FC = () => {
     setGrid(prev => {
       const next = { ...prev };
       filteredEmployees.forEach(emp => {
+        const defaultShift = getEmployeeDefaultShift(emp, shifts);
         dates.forEach(date => {
           if (!isDateLocked(date)) {
             const k = cellKey(Number(emp.id), date);
             const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
-            next[k] = { ...(next[k] ?? EMPTY_CELL), status: isOff ? 'HOLIDAY' : 'PRESENT' };
+            const existing = next[k] ?? EMPTY_CELL;
+            next[k] = {
+              ...existing,
+              status: isOff ? 'HOLIDAY' : 'PRESENT',
+              shiftId: existing.shiftId ?? (!isOff ? defaultShift?.id ?? null : null),
+              inTime: existing.inTime ?? (!isOff ? defaultShift?.startTime ?? null : null),
+              outTime: existing.outTime ?? (!isOff ? defaultShift?.endTime ?? null : null),
+            };
           }
         });
       });
       return next;
     });
+    setIsDirty(true);
     setSaveOk(false);
   };
 
@@ -567,6 +1316,7 @@ const AttendancePage: React.FC = () => {
       });
       return next;
     });
+    setIsDirty(true);
     setSaveOk(false);
   };
 
@@ -586,6 +1336,7 @@ const AttendancePage: React.FC = () => {
       });
       return next;
     });
+    setIsDirty(true);
     setSaveOk(false);
   };
 
@@ -603,10 +1354,15 @@ const AttendancePage: React.FC = () => {
           inTime:            c.inTime ?? null,
           outTime:           c.outTime ?? null,
           otHours:           c.otHours,
+          otAmount:          c.otAmount ?? 0,
           otDays:            c.otDays,
+          otDaysAmount:      c.otDaysAmount ?? 0,
           teaOtCount:        c.teaOtCount,
+          teaOtAmount:       c.teaOtAmount ?? 0,
           lateMinutes:       c.lateMinutes,
+          lateDeduction:     c.lateDeduction ?? 0,
           permissionMinutes: c.permissionMinutes,
+          permissionDeduction: c.permissionDeduction ?? 0,
           salaryAdvance:     0,
           shiftId:           c.shiftId,
         };
@@ -621,12 +1377,12 @@ const AttendancePage: React.FC = () => {
     );
 
   // ── Save ──────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     setSaving(true); setError(''); setSaveOk(false);
     try {
       if (allDatesLocked) {
         setError('Cannot save attendance. Payroll for this period has already been approved or locked.');
-        return;
+        return false;
       }
 
       // Collect cleared cells to delete from DB
@@ -651,22 +1407,25 @@ const AttendancePage: React.FC = () => {
             totalSaved += records.length;
           }
         }
-        if (totalSaved === 0 && clearedDates.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
+        if (totalSaved === 0 && clearedDates.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return false; }
         if (totalSaved === 0 && clearedDates.length > 0) {
           // Only clearing — still need to send the delete request
           await payrollService.bulkUpsertAttendance(period, [], clearedDates);
         }
-        setSaveOk(true); setHasSavedData(true);
+        setSaveOk(true); setHasSavedData(true); setIsDirty(false);
+        return true;
       } else {
         // ── Normal single-period save ─────────────────────────────────────
         const editableDates = dates.filter(d => !isDateLocked(d));
         const records = buildRecords(filteredEmployees, editableDates, period);
-        if (records.length === 0 && clearedDates.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
+        if (records.length === 0 && clearedDates.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return false; }
         await payrollService.bulkUpsertAttendance(period, records as any, clearedDates);
-        setSaveOk(true); setHasSavedData(true);
+        setSaveOk(true); setHasSavedData(true); setIsDirty(false);
+        return true;
       }
     } catch (e: any) {
       setError(e?.response?.data?.message ?? 'Failed to save attendance');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -697,20 +1456,69 @@ const AttendancePage: React.FC = () => {
     return count;
   }, [grid, filteredEmployees, dates]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const totalMarkedRef = useRef(totalMarked);
+  useEffect(() => { totalMarkedRef.current = totalMarked; }, [totalMarked]);
+
+  const handleSaveFromPageModal = useCallback(async () => {
+    setPageConfirmOpen(false);
+    const success = await handleSave();
+    if (success) {
+      if (proceedRef.current) {
+        const p = proceedRef.current;
+        proceedRef.current = null;
+        resetRef.current = null;
+        p();
+      } else {
+        navigate(-1);
+      }
+    }
+  }, [handleSave, navigate]);
+
+  const handleBack = useCallback(() => {
+    if (isDirty || totalMarked > 0) {
+      setPageConfirmOpen(true);
+    } else {
+      navigate(-1);
+    }
+  }, [isDirty, totalMarked, navigate]);
+
+  // Esc anywhere on the page (when no cell modal is active)
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (selectedRef.current) return;
+      if (document.querySelector('[data-select-portal]')) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      if (pageConfirmOpenRef.current) {
+        handleResumePage();
+      } else if (isDirtyRef.current || totalMarkedRef.current > 0) {
+        setTimeout(() => setPageConfirmOpen(true), 0);
+      } else {
+        navigate(-1);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, { capture: true });
+    return () => window.removeEventListener('keydown', handleEsc, { capture: true });
+  }, [handleResumePage, navigate]);
+
   const totalCells = filteredEmployees.length * dates.length;
 
   // ─────────────────────────────────────────────────────────────────────────
   if (loading) return <CommonLoader text="Loading employees and payroll settings…" />;
 
   return (
-    <div className="min-h-screen bg-page flex flex-col">
+    <div data-escape-guarded className="min-h-screen bg-page flex flex-col">
 
       {/* ── Header ── */}
       <div className="bg-card border-b border-line-soft px-6 py-4 sticky top-0 z-30">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink transition-colors">
+            <button onClick={handleBack}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink transition-colors cursor-pointer">
               <ArrowLeft size={16} /> Back
             </button>
             <div className="w-px h-5 bg-line-soft" />
@@ -962,7 +1770,7 @@ const AttendancePage: React.FC = () => {
                     <th className="px-2 py-2 text-center font-bold text-red-400 bg-red-500/10 border-b border-r border-line-soft">A</th>
                     <th className="px-2 py-2 text-center font-bold text-amber-400 bg-amber-500/10 border-b border-r border-line-soft">HD</th>
                     <th className="px-2 py-2 text-center font-bold text-blue-400 bg-blue-500/10 border-b border-r border-line-soft">H</th>
-                    <th className="px-2 py-2 text-center font-semibold text-ink-subtle bg-card-2 border-b border-r border-line-soft whitespace-nowrap">OT h</th>
+                    <th className="px-2 py-2 text-center font-semibold text-ink-subtle bg-card-2 border-b border-r border-line-soft whitespace-nowrap">OT m</th>
                     <th className="px-2 py-2 text-center font-semibold text-ink-subtle bg-card-2 border-b border-line-soft whitespace-nowrap">Late</th>
                   </tr>
                 </thead>
@@ -1025,7 +1833,7 @@ const AttendancePage: React.FC = () => {
                         <td className="px-2 py-1.5 text-center font-bold text-red-400   border-b border-r border-line-soft">{sum.A  > 0 ? sum.A  : '—'}</td>
                         <td className="px-2 py-1.5 text-center font-bold text-amber-400 border-b border-r border-line-soft">{sum.HD > 0 ? sum.HD : '—'}</td>
                         <td className="px-2 py-1.5 text-center font-bold text-blue-400  border-b border-r border-line-soft">{sum.H  > 0 ? sum.H  : '—'}</td>
-                        <td className="px-2 py-1.5 text-center text-ink-subtle border-b border-r border-line-soft">{sum.OT > 0 ? sum.OT.toFixed(1) : '—'}</td>
+                        <td className="px-2 py-1.5 text-center text-ink-subtle border-b border-r border-line-soft">{sum.OT > 0 ? `${Math.round(sum.OT * 60)}m` : '—'}</td>
                         <td className="px-2 py-1.5 text-center text-text-secondary border-b border-line-soft">{sum.Late > 0 ? `${sum.Late}m` : '—'}</td>
                       </tr>
                     );
@@ -1040,16 +1848,37 @@ const AttendancePage: React.FC = () => {
       {/* ── Cell Edit Panel ── */}
       {selected && (
         <CellEditPanel
+          emp={employees.find(e => Number(e.id) === selected.empId)}
           empName={selected.empName}
           date={selected.date}
           cell={getCell(selected.empId, selected.date)}
           isLocked={isDateLocked(selected.date)}
           shifts={shifts}
           weeklyOffDays={weeklyOffDays}
+          payrollCfg={payrollCfg}
+          calendarDays={dates.length}
           onChange={c => setCell(selected.empId, selected.date, c)}
           onClose={() => setSelected(null)}
         />
       )}
+
+      {/* ── Page-level Discard / Save Changes Modal ── */}
+      <CommonConfirmModal
+        isOpen={pageConfirmOpen}
+        onClose={handleResumePage}
+        onCancel={handleDiscardPage}
+        onConfirm={handleSaveFromPageModal}
+        title="Discard Changes?"
+        message="Are you sure you want to leave? Any unsaved attendance entries will be lost."
+        warningText="Save to keep your changes, or Discard to leave."
+        cancelText="Discard"
+        cancelVariant="danger"
+        confirmText="Save"
+        confirmVariant="primary"
+        confirmIcon={Save}
+        isDangerous={false}
+        defaultFocusCancel={false}
+      />
     </div>
   );
 };

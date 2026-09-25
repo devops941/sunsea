@@ -44,10 +44,30 @@ class AuditController {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
+    const startDate = (req.query.startDate || req.query.fromDate || req.query.date) as string;
+    const endDate = (req.query.endDate || req.query.toDate || req.query.date) as string;
 
     const skip = (page - 1) * limit;
 
     const whereClause: any = {};
+
+    if (startDate || endDate) {
+      whereClause.changedAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) {
+          start.setHours(0, 0, 0, 0);
+          whereClause.changedAt.gte = start;
+        }
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          whereClause.changedAt.lte = end;
+        }
+      }
+    }
 
     if (search) {
       whereClause.OR = [

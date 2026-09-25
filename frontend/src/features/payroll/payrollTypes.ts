@@ -131,6 +131,7 @@ export interface PayrollEmployee {
   bankAccount?: string;
   pfNumber?: string;
   esiNumber?: string;
+  paymentMode?: string;
 }
 
 // ──────────────────────────────────────────────

@@ -3,10 +3,10 @@ import React from 'react';
 import type { ApiPayslipData } from '../../../services/payrollService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const ONES = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
-  'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
-  'Seventeen','Eighteen','Nineteen'];
-const TENS = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+  'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
 function twoDigit(n: number): string {
   if (n < 20) return ONES[n];
@@ -17,24 +17,24 @@ function numberToWords(amount: number): string {
   const n = Math.floor(amount);
   if (n === 0) return 'Zero Rupees Only';
   const crore = Math.floor(n / 10_000_000);
-  const lakh  = Math.floor((n % 10_000_000) / 100_000);
-  const thou  = Math.floor((n % 100_000) / 1_000);
-  const hund  = Math.floor((n % 1_000) / 100);
-  const rem   = n % 100;
+  const lakh = Math.floor((n % 10_000_000) / 100_000);
+  const thou = Math.floor((n % 100_000) / 1_000);
+  const hund = Math.floor((n % 1_000) / 100);
+  const rem = n % 100;
   const parts: string[] = [];
   if (crore) parts.push(twoDigit(crore) + ' Crore');
-  if (lakh)  parts.push(twoDigit(lakh)  + ' Lakh');
-  if (thou)  parts.push(twoDigit(thou)  + ' Thousand');
-  if (hund)  parts.push(ONES[hund]      + ' Hundred');
-  if (rem)   parts.push(twoDigit(rem));
+  if (lakh) parts.push(twoDigit(lakh) + ' Lakh');
+  if (thou) parts.push(twoDigit(thou) + ' Thousand');
+  if (hund) parts.push(ONES[hund] + ' Hundred');
+  if (rem) parts.push(twoDigit(rem));
   return parts.join(' ') + ' Rupees Only';
 }
 
 function periodLabel(period: string, type: 'MONTHLY' | 'WEEKLY'): string {
   if (type === 'MONTHLY' && /^\d{4}-\d{2}$/.test(period)) {
     const [y, m] = period.split('-');
-    const months = ['January','February','March','April','May','June',
-                    'July','August','September','October','November','December'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
     return `${months[parseInt(m, 10) - 1]} ${y}`;
   }
   const wm = period.match(/^(\d{4})-W(\d{2})$/);
@@ -45,13 +45,13 @@ function periodLabel(period: string, type: 'MONTHLY' | 'WEEKLY'): string {
 function periodShort(period: string, type: 'MONTHLY' | 'WEEKLY'): string {
   if (type === 'MONTHLY' && /^\d{4}-\d{2}$/.test(period)) {
     const [y, m] = period.split('-');
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${months[parseInt(m, 10) - 1]}-${y.slice(2)}`;
   }
   return period;
 }
 
-const fmt  = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt0 = (n: number) => n.toLocaleString('en-IN');
 
 // ─── Inline styles (PDF/print safe — no Tailwind) ─────────────────────────────
@@ -84,10 +84,10 @@ const cell = (extra?: React.CSSProperties): React.CSSProperties => ({
 
 // Outer table <td> — section-level dividers (visible but not heavy)
 const sectionTd = (extra?: React.CSSProperties): React.CSSProperties => ({
-  borderTop:    '1px solid #555',
+  borderTop: '1px solid #555',
   borderBottom: '1px solid #555',
-  borderLeft:   'none',
-  borderRight:  'none',
+  borderLeft: 'none',
+  borderRight: 'none',
   padding: '5px 8px',
   verticalAlign: 'top',
   ...extra,
@@ -120,11 +120,11 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
     // Earnings rows
     const earnRows: { label: string; amount: number }[] = [];
     if (isMonthly && pc) {
-      if (pc.basicSalary > 0)    earnRows.push({ label: 'Basic Salary',       amount: Math.round(pc.basicSalary    * proration) });
-      if (pc.hra > 0)            earnRows.push({ label: 'House Rent Allowance (HRA)', amount: Math.round(pc.hra    * proration) });
-      if (pc.da > 0)             earnRows.push({ label: 'Dearness Allowance (DA)',    amount: Math.round(pc.da     * proration) });
-      if (pc.otherAllowance > 0) earnRows.push({ label: 'Other Allowance',    amount: Math.round(pc.otherAllowance * proration) });
-      if (result.otPay > 0)      earnRows.push({ label: 'Overtime Pay',       amount: result.otPay });
+      if (pc.basicSalary > 0) earnRows.push({ label: 'Basic Salary', amount: Math.round(pc.basicSalary * proration) });
+      if (pc.hra > 0) earnRows.push({ label: 'House Rent Allowance (HRA)', amount: Math.round(pc.hra * proration) });
+      if (pc.da > 0) earnRows.push({ label: 'Dearness Allowance (DA)', amount: Math.round(pc.da * proration) });
+      if (pc.otherAllowance > 0) earnRows.push({ label: 'Other Allowance', amount: Math.round(pc.otherAllowance * proration) });
+      if (result.otPay > 0) earnRows.push({ label: 'Overtime Pay', amount: result.otPay });
     } else {
       earnRows.push({ label: 'Daily Wages Earned', amount: result.earnedSalary });
       if (result.otPay > 0) earnRows.push({ label: 'Overtime Pay', amount: result.otPay });
@@ -135,16 +135,16 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
     const dedRows: { label: string; amount: number }[] = [];
     const empPfPct = result.pfWage > 0 ? ((Number(result.employeePf) / Number(result.pfWage)) * 100).toFixed(2).replace(/\.?0+$/, '') : '12';
     const empEsiPct = (Number(result.earnedSalary) + Number(result.otPay)) > 0 ? ((Number(result.employeeEsi) / (Number(result.earnedSalary) + Number(result.otPay))) * 100).toFixed(2).replace(/\.?0+$/, '') : '0.75';
-    if (result.employeePf > 0)        dedRows.push({ label: `Provident Fund (Employee @ ${empPfPct}%)`, amount: result.employeePf });
-    if (result.employeeEsi > 0)       dedRows.push({ label: `ESI (Employee @ ${empEsiPct}%)`,          amount: result.employeeEsi });
-    if (result.professionalTax > 0)   dedRows.push({ label: 'Professional Tax',                amount: result.professionalTax });
-    if (result.lateEntryDeduction > 0)dedRows.push({ label: 'Late Entry Deduction',            amount: result.lateEntryDeduction });
-    if (result.permissionDeduction>0) dedRows.push({ label: 'Permission Deduction',            amount: result.permissionDeduction });
-    if (result.salaryAdvance > 0)     dedRows.push({ label: 'Salary Advance Recovery',         amount: result.salaryAdvance });
-    if (result.loanRecovery > 0)      dedRows.push({ label: 'Loan Recovery',                   amount: result.loanRecovery });
-    if (result.otherDeductions > 0)   dedRows.push({ label: 'Other Deductions',                amount: result.otherDeductions });
+    if (result.employeePf > 0) dedRows.push({ label: `Provident Fund (Employee @ ${empPfPct}%)`, amount: result.employeePf });
+    if (result.employeeEsi > 0) dedRows.push({ label: `ESI (Employee @ ${empEsiPct}%)`, amount: result.employeeEsi });
+    if (result.professionalTax > 0) dedRows.push({ label: 'Professional Tax', amount: result.professionalTax });
+    if (result.lateEntryDeduction > 0) dedRows.push({ label: 'Late Entry Deduction', amount: result.lateEntryDeduction });
+    if (result.permissionDeduction > 0) dedRows.push({ label: 'Permission Deduction', amount: result.permissionDeduction });
+    if (result.salaryAdvance > 0) dedRows.push({ label: 'Salary Advance Recovery', amount: result.salaryAdvance });
+    if (result.loanRecovery > 0) dedRows.push({ label: 'Loan Recovery', amount: result.loanRecovery });
+    if (result.otherDeductions > 0) dedRows.push({ label: 'Other Deductions', amount: result.otherDeductions });
 
-    const grossEarnings   = earnRows.reduce((s, r) => s + r.amount, 0);
+    const grossEarnings = earnRows.reduce((s, r) => s + r.amount, 0);
     const totalDeductions = dedRows.reduce((s, r) => s + r.amount, 0);
     // PF employees: net salary excludes cash in hand (paid separately off payslip)
     const isPfWithCash = result.pfApplicable && Number(result.cashInHand || 0) > 0;
@@ -160,14 +160,14 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
 
     // Right-side info grid rows
     const infoRows: [string, string][] = [
-      ['Pay Period',    periodLabel(run.period, run.type)],
-      ['Slip No.',      run.runCode],
-      ['Dated',        periodShort(run.period, run.type)],
+      ['Pay Period', periodLabel(run.period, run.type)],
+      ['Slip No.', run.runCode],
+      ['Dated', periodShort(run.period, run.type)],
       ['Payment Mode', result.paymentMode],
-      ['PF Number',    (employee.pfNumber && employee.pfNumber.trim()) ? employee.pfNumber.trim() : '—'],
-      ['ESIC Number',  (employee.esiNumber && employee.esiNumber.trim()) ? employee.esiNumber.trim() : '—'],
-      ['UAN Number',   (employee.uanNumber && employee.uanNumber.trim()) ? employee.uanNumber.trim() : '—'],
-      ['PAN Number',   (employee.panNumber && employee.panNumber.trim()) ? employee.panNumber.trim() : '—'],
+      ['PF Number', (employee.pfNumber && employee.pfNumber.trim()) ? employee.pfNumber.trim() : '—'],
+      ['ESIC Number', (employee.esiNumber && employee.esiNumber.trim()) ? employee.esiNumber.trim() : '—'],
+      ['UAN Number', (employee.uanNumber && employee.uanNumber.trim()) ? employee.uanNumber.trim() : '—'],
+      ['PAN Number', (employee.panNumber && employee.panNumber.trim()) ? employee.panNumber.trim() : '—'],
     ];
 
     // Employer contributions note
@@ -252,7 +252,7 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f0f0f0' }}>
-                      {['Total Days', 'Present Days', 'Absent Days', 'Half Days', 'LOP Days', 'OT Hours', 'Late (min)', 'Permission (min)'].map(h => (
+                      {['Total Days', 'Present Days', 'Absent Days', 'Half Days', 'LOP Days'].map(h => (
                         <th key={h} style={{ ...cell(), fontWeight: 700, textAlign: 'center', padding: '3px 4px', fontSize: '8.5px' }}>{h}</th>
                       ))}
                     </tr>
@@ -265,9 +265,6 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
                         result.absentDays,
                         result.halfDays,
                         result.lopDays,
-                        result.otHours > 0 ? Number(result.otHours).toFixed(1) : '—',
-                        result.lateMinutes > 0 ? result.lateMinutes : '—',
-                        result.permissionMinutes > 0 ? result.permissionMinutes : '—',
                       ].map((v, i) => (
                         <td key={i} style={{ ...cell(), textAlign: 'center', padding: '3px 4px', fontWeight: 600 }}>{v}</td>
                       ))}
@@ -283,7 +280,7 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9.5px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f0f0f0' }}>
-                      <th style={th({ width: '5%'  })}>Sl.</th>
+                      <th style={th({ width: '5%' })}>Sl.</th>
                       <th style={th({ textAlign: 'left', width: '55%' })}>Particulars</th>
                       <th style={th({ width: '12%' })}>Days / Hrs</th>
                       <th style={th({ width: '12%' })}>Rate (₹)</th>
@@ -352,29 +349,29 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
                         {result.pfApplicable && (() => {
                           const emrPfPct = result.pfWage > 0 ? ((Number(result.employerPf) / Number(result.pfWage)) * 100).toFixed(2).replace(/\.?0+$/, '') : '12';
                           return (
-                          <tr>
-                            <td style={{ ...cell() }} />
-                            <td style={{ ...cell({ fontStyle: 'italic', color: '#444' }) }}>
-                              Employer PF Contribution @ {emrPfPct}% (Not deducted from salary)
-                            </td>
-                            <td style={{ ...cell({ textAlign: 'center' }) }}>{emrPfPct}%</td>
-                            <td style={{ ...cell() }} />
-                            <td style={{ ...cell({ textAlign: 'right', color: '#444' }) }}>{fmt(result.employerPf)}</td>
-                          </tr>
+                            <tr>
+                              <td style={{ ...cell() }} />
+                              <td style={{ ...cell({ fontStyle: 'italic', color: '#444' }) }}>
+                                Employer PF Contribution @ {emrPfPct}% (Not deducted from salary)
+                              </td>
+                              <td style={{ ...cell({ textAlign: 'center' }) }}>{emrPfPct}%</td>
+                              <td style={{ ...cell() }} />
+                              <td style={{ ...cell({ textAlign: 'right', color: '#444' }) }}>{fmt(result.employerPf)}</td>
+                            </tr>
                           );
                         })()}
                         {result.esiApplicable && (() => {
                           const emrEsiPct = result.earnedSalary > 0 ? ((Number(result.employerEsi) / (Number(result.earnedSalary) + Number(result.otPay))) * 100).toFixed(2).replace(/\.?0+$/, '') : '3.25';
                           return (
-                          <tr>
-                            <td style={{ ...cell() }} />
-                            <td style={{ ...cell({ fontStyle: 'italic', color: '#444' }) }}>
-                              Employer ESI Contribution @ {emrEsiPct}% (Not deducted from salary)
-                            </td>
-                            <td style={{ ...cell({ textAlign: 'center' }) }}>{emrEsiPct}%</td>
-                            <td style={{ ...cell() }} />
-                            <td style={{ ...cell({ textAlign: 'right', color: '#444' }) }}>{fmt(result.employerEsi)}</td>
-                          </tr>
+                            <tr>
+                              <td style={{ ...cell() }} />
+                              <td style={{ ...cell({ fontStyle: 'italic', color: '#444' }) }}>
+                                Employer ESI Contribution @ {emrEsiPct}% (Not deducted from salary)
+                              </td>
+                              <td style={{ ...cell({ textAlign: 'center' }) }}>{emrEsiPct}%</td>
+                              <td style={{ ...cell() }} />
+                              <td style={{ ...cell({ textAlign: 'right', color: '#444' }) }}>{fmt(result.employerEsi)}</td>
+                            </tr>
                           );
                         })()}
                       </>

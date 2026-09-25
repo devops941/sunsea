@@ -59,11 +59,16 @@ interface AttendanceInput {
   absentDays: number;
   halfDays: number;
   otHours: number;
+  otAmount?: number;
   otDays: number;
+  otDaysAmount?: number;
   teaOtCount: number;
+  teaOtAmount?: number;
   lateMinutes: number;
+  lateDeduction?: number;
   dailyLateMinutes?: number[];  // per-day late minutes for per-day slab deduction
   permissionMinutes: number;
+  permissionDeduction?: number;
   advance: number;
 }
 
@@ -319,24 +324,14 @@ function computeResult(
   earnedCashInHand = Math.max(0, earnedCashInHand);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 4 — OT Pay  (combined: OT Hours + OT Days + Tea OT)
-  //   OT is a CASH BONUS — it does NOT inflate grossSalary for PF/ESI.
-  //   OT Hours pay  = otHours × otRatePerHour
-  //   OT Days pay   = otDays × employee's dailyRate (one full day salary)
-  //   Tea OT pay    = teaOtCount × teaOtRate
   // ─────────────────────────────────────────────────────────────────────────────
-  const otEnabled = settings.otEnabled !== false;
-  let otPay = 0;
-  let otH = att.otHours || 0;
+  // STEP 4 — OT Pay (combined: OT Hours/Minutes + OT Days + Tea OT)
+  //   Direct manual amounts entered in Attendance: otAmount + otDaysAmount + teaOtAmount.
+  // ─────────────────────────────────────────────────────────────────────────────
+  const otH = att.otHours || 0;
   const otD = att.otDays || 0;
   const teaOt = att.teaOtCount || 0;
-
-  if (otEnabled) {
-    const otHoursPay = otH > 0 && settings.otRatePerHour > 0 ? otH * settings.otRatePerHour : 0;
-    const otDaysPay = otD > 0 ? otD * dailyRate : 0;
-    const teaOtPay = teaOt > 0 && settings.teaOtRate > 0 ? teaOt * settings.teaOtRate : 0;
-    otPay = otHoursPay + otDaysPay + teaOtPay;
-  }
+  const otPay = Number(att.otAmount || 0) + Number(att.otDaysAmount || 0) + Number(att.teaOtAmount || 0);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 5 — Gross Pay = Earned (OT excluded — OT goes to cash, not bank)
@@ -406,78 +401,20 @@ function computeResult(
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 9 — Role-based Late Entry & Permission deductions
+  // STEP 9 — Late Entry & Permission deductions (Direct Manual Entry from Attendance)
   // ─────────────────────────────────────────────────────────────────────────────
-  const workingMins = (settings.defaultWorkingHoursPerDay > 0 ? settings.defaultWorkingHoursPerDay : 8) * 60;
-  const perMinuteRate = dailyRate / workingMins;
-
-  let lateEntryDeduction = 0;
-  let permissionDeduction = 0;
-
-  const empCat = String(emp.employeeCategory || (emp as any).category || '').toLowerCase();
-  const isDailyWeeklyType = ['DAILY_WEEKLY', 'WEEKLY'].includes(salaryType);
-  const isOfficeStaff = !isDailyWeeklyType && (empCat === 'office_staff' || !empCat);
-
-  if (isOfficeStaff) {
-    // ── OFFICE STAFF RULE ──
-    // 1. Late minutes pool with permission minutes.
-    // 2. Free permission pool per period (configurable, default 240 minutes = 4 hrs).
-    // 3. Excess time beyond free pool deducted in 1-hour chunks at configurable rate (default ₹50/hr).
-    // 4. Late entry slab deduction is bypassed (₹0).
-    const freeMins = Number(settings.staffPermissionFreeMinutes ?? 240);
-    const hourlyRate = Number(settings.staffExcessHourlyRate ?? 50);
-    const totalPooledMinutes = (att.permissionMinutes || 0) + (att.lateMinutes || 0);
-    const excessMinutes = Math.max(0, totalPooledMinutes - freeMins);
-    const excessHours = Math.ceil(excessMinutes / 60);
-    permissionDeduction = excessHours * hourlyRate;
-    lateEntryDeduction = 0;
-  } else {
-    // ── LABOUR RULE ──
-    // 1. Daily grace time (configurable, default 10 min).
-    // 2. Late arrivals > grace time deducted via slabs (or fallback per-minute rate).
-    // 3. Permission deduction follows standard permission slabs.
-    const graceMins = Number(settings.lateEntryGraceMinutes ?? 10);
-    const hasSlabs = settings.lateEntrySlabs?.length > 0;
-    if (att.dailyLateMinutes && att.dailyLateMinutes.length > 0) {
-      for (const dayLate of att.dailyLateMinutes) {
-        if (dayLate > graceMins) {
-          const slabAmount = hasSlabs ? lookupSlab(dayLate, settings.lateEntrySlabs) : 0;
-          if (slabAmount > 0) {
-            lateEntryDeduction += slabAmount;
-          } else {
-            // No matching slab or no slabs configured — use per-minute rate
-            lateEntryDeduction += (dayLate - graceMins) * perMinuteRate;
-          }
-        }
-      }
-    } else if (att.lateMinutes > graceMins) {
-      const slabAmount = hasSlabs ? lookupSlab(att.lateMinutes, settings.lateEntrySlabs) : 0;
-      if (slabAmount > 0) {
-        lateEntryDeduction = slabAmount;
-      } else {
-        lateEntryDeduction = (att.lateMinutes - graceMins) * perMinuteRate;
-      }
-    }
-    lateEntryDeduction = Math.round(lateEntryDeduction);
-
-    if (att.permissionMinutes > 0 && settings.permissionSlabs?.length > 0) {
-      permissionDeduction = applyPermissionSlab(att.permissionMinutes, settings.permissionSlabs);
-    } else {
-      permissionDeduction = 0;
-    }
-  }
+  const lateEntryDeduction = Number(att.lateDeduction || 0);
+  const permissionDeduction = Number(att.permissionDeduction || 0);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 10 — Deduction Separation & Final Pay (Excel-matching logic)
-  // PF employees with Cash in Hand:
-  //   Bank Deductions = PF + ESI + PT + Loan + Other (from Bank Gross)
-  //   Cash Deductions = Advance + Late + Permission (from Earned Cash in Hand)
-  //   Bank Transfer  = round(earnedBank - bankDeductions)   ← to nearest ₹1
-  //   Cash Payment   = round(earnedCash - cashDeductions)   ← to nearest ₹1
-  //   Cash Paid      = ceil(cashPayment / 10) × 10          ← UP to nearest ₹10
-  // Non-PF / no cash-in-hand:
-  //   Cash Payment   = round(earned - allDeductions)
-  //   Cash Paid      = ceil(cashPayment / 10) × 10
+  // Round off rules:
+  //   1. Round off (ceil to nearest ₹10) is ONLY applicable for monthly salary employees
+  //      (runType === 'MONTHLY' & not a weekly wage worker).
+  //   2. PF Bank Transfer is NEVER affected by round off (transferred as exact computed amount).
+  //   3. For PF employees: ONLY the cash component (cash in hand / cash payment) is rounded off.
+  //   4. For Monthly Cash employees (non-PF & cash): The cash salary is rounded off.
+  //   5. For Weekly / Daily employees: Round off is NOT applicable (exact amounts).
   // ─────────────────────────────────────────────────────────────────────────────
   let totalDeductions = 0;
   let bankTransfer = 0;
@@ -485,15 +422,22 @@ function computeResult(
   let cashPaid = 0;
   let finalCashInHand = 0;
 
+  const isMonthlyRun = runType === 'MONTHLY';
+  const isWeeklySalary = ['DAILY_WEEKLY', 'DAILY', 'WEEKLY'].includes(st);
+  const isRoundOffApplicable = isMonthlyRun && !isWeeklySalary;
+
   if (initialCashInHand > 0 && hasPf) {
     const bankDeductions = employeePf + employeeEsi + professionalTax + loanRecoveryAmount + otherDeductionAmount;
     const cashDeductions = salaryAdvanceOverride + lateEntryDeduction + permissionDeduction;
     totalDeductions = bankDeductions + cashDeductions;
 
+    // Bank transfer is NEVER affected by round off (exact rupees)
     bankTransfer = Math.round(Math.max(0, grossSalary - bankDeductions));
     cashPayment = Math.round(Math.max(0, earnedCashInHand + otPay - cashDeductions));
-    cashPaid = Math.ceil(cashPayment / 10) * 10;
-    finalCashInHand = cashPayment;
+    
+    // Round off is ONLY applied to the cash portion for monthly salary
+    cashPaid = isRoundOffApplicable ? (Math.ceil(cashPayment / 10) * 10) : cashPayment;
+    finalCashInHand = isRoundOffApplicable ? cashPaid : cashPayment;
   } else {
     const allDeductions = employeePf + employeeEsi + professionalTax +
       lateEntryDeduction + permissionDeduction +
@@ -502,9 +446,21 @@ function computeResult(
 
     const rawNet = grossSalary + earnedCashInHand + otPay - allDeductions;
     const clampedNet = runType === 'WEEKLY' ? rawNet : Math.max(0, rawNet);
-    cashPayment = Math.round(clampedNet);
-    cashPaid = Math.ceil(cashPayment / 10) * 10;
-    finalCashInHand = Math.round(earnedCashInHand);
+
+    const isBankMode = pc.paymentMode === 'BANK' && !hasPf && initialCashInHand === 0;
+    if (isBankMode) {
+      // Direct bank transfer for fixed monthly with bank mode — NOT rounded off by cash round-off
+      bankTransfer = Math.round(clampedNet);
+      cashPayment = 0;
+      cashPaid = 0;
+      finalCashInHand = 0;
+    } else {
+      bankTransfer = 0;
+      cashPayment = Math.round(clampedNet);
+      // Round off ONLY for monthly salary cash
+      cashPaid = isRoundOffApplicable ? (Math.ceil(cashPayment / 10) * 10) : cashPayment;
+      finalCashInHand = Math.round(earnedCashInHand);
+    }
   }
 
   const actualSalary = bankTransfer + cashPayment;
@@ -663,11 +619,11 @@ class PayrollService {
           where: isMonthPeriod
             ? { date: { startsWith: period } }
             : {
-                OR: [
-                  { period },
-                  { date: { gte: start, lte: end } },
-                ],
-              },
+              OR: [
+                { period },
+                { date: { gte: start, lte: end } },
+              ],
+            },
           select: { employeeId: true },
           distinct: ['employeeId'],
         });
@@ -690,6 +646,7 @@ class PayrollService {
       include: {
         payrollConfig: true,
         department: { select: { name: true } },
+        shift: true,
       },
       orderBy: { empCode: 'asc' },
     });
@@ -736,9 +693,12 @@ class PayrollService {
   async bulkUpsertAttendance(records: Array<{
     employeeId: bigint; date: string; period: string;
     status: string; inTime?: string | null; outTime?: string | null;
-    otHours: number; otDays: number; teaOtCount: number;
-    lateMinutes: number;
-    permissionMinutes: number; salaryAdvance: number;
+    otHours: number; otAmount?: number;
+    otDays: number; otDaysAmount?: number;
+    teaOtCount: number; teaOtAmount?: number;
+    lateMinutes: number; lateDeduction?: number;
+    permissionMinutes: number; permissionDeduction?: number;
+    salaryAdvance: number;
     shiftId?: number | null;
   }>) {
     // Determine if this is a monthly or weekly save based on the period format
@@ -786,8 +746,35 @@ class PayrollService {
       const { shiftId, inTime, outTime, ...rest } = r;
       return (prisma.attendanceRecord as any).upsert({
         where: { employeeId_date: { employeeId: r.employeeId, date: r.date } },
-        update: { status: r.status, inTime: inTime ?? null, outTime: outTime ?? null, otHours: r.otHours, otDays: r.otDays, teaOtCount: r.teaOtCount, lateMinutes: r.lateMinutes, permissionMinutes: r.permissionMinutes, salaryAdvance: r.salaryAdvance, period: r.period, shiftId: shiftId ?? null },
-        create: { ...rest, inTime: inTime ?? null, outTime: outTime ?? null, shiftId: shiftId ?? null },
+        update: {
+          status: r.status,
+          inTime: inTime ?? null,
+          outTime: outTime ?? null,
+          otHours: r.otHours,
+          otAmount: r.otAmount ?? 0,
+          otDays: r.otDays,
+          otDaysAmount: r.otDaysAmount ?? 0,
+          teaOtCount: r.teaOtCount,
+          teaOtAmount: r.teaOtAmount ?? 0,
+          lateMinutes: r.lateMinutes,
+          lateDeduction: r.lateDeduction ?? 0,
+          permissionMinutes: r.permissionMinutes,
+          permissionDeduction: r.permissionDeduction ?? 0,
+          salaryAdvance: r.salaryAdvance,
+          period: r.period,
+          shiftId: shiftId ?? null,
+        },
+        create: {
+          ...rest,
+          inTime: inTime ?? null,
+          outTime: outTime ?? null,
+          otAmount: r.otAmount ?? 0,
+          otDaysAmount: r.otDaysAmount ?? 0,
+          teaOtAmount: r.teaOtAmount ?? 0,
+          lateDeduction: r.lateDeduction ?? 0,
+          permissionDeduction: r.permissionDeduction ?? 0,
+          shiftId: shiftId ?? null,
+        },
       });
     });
     return prisma.$transaction(ops);
@@ -1523,15 +1510,15 @@ class PayrollService {
 
     const filteredEmployees = (category && category !== 'ALL')
       ? enrichedEmployees.filter(e => {
-          const st = String(e.payrollConfig?.salaryType || e.salaryType || '').toUpperCase();
-          if (category === 'MONTHLY') {
-            return st.includes('MONTHLY');
-          }
-          if (category === 'WEEKLY') {
-            return st.includes('WEEKLY') || st.includes('DAILY');
-          }
-          return st === category;
-        })
+        const st = String(e.payrollConfig?.salaryType || e.salaryType || '').toUpperCase();
+        if (category === 'MONTHLY') {
+          return st.includes('MONTHLY');
+        }
+        if (category === 'WEEKLY') {
+          return st.includes('WEEKLY') || st.includes('DAILY');
+        }
+        return st === category;
+      })
       : enrichedEmployees;
 
     // 3. Fetch all attendance records in the entire date range

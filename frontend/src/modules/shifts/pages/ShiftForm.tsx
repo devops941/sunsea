@@ -325,22 +325,23 @@ const ShiftForm: React.FC = () => {
             </form>
 
             <CommonConfirmModal
-                show={saveConfirmOpen}
-                onHide={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
+                isOpen={saveConfirmOpen}
+                onClose={() => { setSaveConfirmOpen(false); if (resetRef.current) { const r = resetRef.current; proceedRef.current = null; resetRef.current = null; r(); } setTimeout(() => { lastFocusedRef.current?.focus() ?? formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(); }, 50); }}
                 onConfirm={() => {
                     setSaveConfirmOpen(false);
-                    setTimeout(() => {
-                        handleSubmitRef.current();
-                        setTimeout(() => formRef.current?.querySelector<HTMLElement>("[data-nav]:not([disabled])")?.focus(), 100);
-                    }, 150);
+                    handleSubmitRef.current();
                 }}
-                title="Unsaved Changes"
-                message="You have unsaved changes. Do you want to save before leaving?"
-                confirmText="Save"
+                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } navigate(-1); }}
+                title="Discard Changes?"
+                message="Are you sure you want to leave? Any unsaved shift details will be lost."
+                warningText="Save to keep your changes, or Discard to leave."
                 cancelText="Discard"
+                cancelVariant="danger"
+                confirmText="Save"
                 confirmVariant="primary"
                 confirmIcon={FaCheck}
-                onCancel={() => { setSaveConfirmOpen(false); setIsDirty(false); if (proceedRef.current) { const p = proceedRef.current; proceedRef.current = null; resetRef.current = null; p(); return; } navigate(-1); }}
+                isDangerous={false}
+                defaultFocusCancel={false}
             />
         </div>
     );
