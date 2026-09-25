@@ -41,6 +41,9 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         handleClose();
         return;
       }
@@ -63,8 +66,15 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Use a small delay so an in-flight keydown event that opened the modal does not immediately trigger handleClose
+    const timer = setTimeout(() => {
+      window.addEventListener("keydown", handleKeyDown);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isVisible, handleClose]);
 
   if (!isVisible || typeof document === "undefined") return null;
@@ -72,7 +82,10 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   return createPortal(
     <div
       className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={handleClose}
+      onClick={(e) => {
+        e.stopPropagation();
+        handleClose();
+      }}
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
     >
       <div

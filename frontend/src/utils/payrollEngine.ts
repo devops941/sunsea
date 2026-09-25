@@ -401,29 +401,38 @@ export function computeEmployeePayroll(
   let finalCashInHand = 0;
   let totalDeductions = 0;
 
+  const isWeeklySalary = ['DAILY_WEEKLY', 'DAILY', 'WEEKLY'].includes(st);
+  const isRoundOffApplicable = !isWeekly && !isWeeklySalary;
+
   if (initialCashInHand > 0 && pfApplicable) {
     // PF Applicable employee with Cash in Hand:
     const bankDeductions = employeePf + employeeEsi + professionalTax;
     const cashDeductions = salaryAdvanceAmount + lateEntryDeduction + permissionDeduction;
 
-    bankNet = Math.max(0, earnedSalary + totalOtPay - bankDeductions);
-    finalCashInHand = Math.max(0, earnedCashInHand - cashDeductions);
+    // Bank salary transfer is NEVER affected by cash round off (exact rupees)
+    bankNet = Math.round(Math.max(0, earnedSalary + totalOtPay - bankDeductions));
+    const rawCash = Math.round(Math.max(0, earnedCashInHand - cashDeductions));
+    finalCashInHand = isRoundOffApplicable ? (Math.ceil(rawCash / 10) * 10) : rawCash;
     totalDeductions = bankDeductions + cashDeductions;
   } else {
     // Standard employee: all deductions apply against gross
     const standardDeductions = employeePf + employeeEsi + professionalTax + lateEntryDeduction + permissionDeduction + salaryAdvanceAmount;
     totalDeductions = standardDeductions;
-    const rawBankNet = earnedSalary + totalOtPay - standardDeductions;
-    bankNet = isWeekly ? rawBankNet : Math.max(0, rawBankNet);
-    finalCashInHand = earnedCashInHand;
+    const rawNet = earnedSalary + totalOtPay - standardDeductions;
+    const clampedNet = isWeekly ? rawNet : Math.max(0, rawNet);
+
+    const isBankMode = employee.paymentMode === 'BANK' && !pfApplicable && initialCashInHand === 0;
+    if (isBankMode) {
+      bankNet = Math.round(clampedNet);
+      finalCashInHand = 0;
+    } else {
+      bankNet = 0;
+      const rawCash = Math.round(clampedNet);
+      finalCashInHand = isRoundOffApplicable ? (Math.ceil(rawCash / 10) * 10) : rawCash;
+    }
   }
 
-  const rawNet = bankNet + finalCashInHand;
-  const netSalary = applyRounding(
-    isWeekly ? rawNet : Math.max(0, rawNet),
-    settings.roundingRule,
-    settings.decimalPrecision
-  );
+  const netSalary = bankNet + finalCashInHand;
 
   // 10. Variance: only meaningful for monthly salary types
   const hasVariance = !isWeekly && employee.monthlySalary > 0

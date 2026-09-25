@@ -2242,14 +2242,19 @@ model AttendanceRecord {
   shiftId           Int?
   inTime            String?
   outTime           String?
-  otHours           Decimal  @default(0) @db.Decimal(10, 2)
-  otDays            Decimal  @default(0) @db.Decimal(10, 2)
-  teaOtCount        Int      @default(0)
-  lateMinutes       Int      @default(0)
-  permissionMinutes Int      @default(0)
-  salaryAdvance     Decimal  @default(0) @db.Decimal(14, 2)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  otHours             Decimal  @default(0) @db.Decimal(10, 2)
+  otAmount            Decimal  @default(0) @db.Decimal(14, 2)
+  otDays              Decimal  @default(0) @db.Decimal(10, 2)
+  otDaysAmount        Decimal  @default(0) @db.Decimal(14, 2)
+  teaOtCount          Int      @default(0)
+  teaOtAmount         Decimal  @default(0) @db.Decimal(14, 2)
+  lateMinutes         Int      @default(0)
+  lateDeduction       Decimal  @default(0) @db.Decimal(14, 2)
+  permissionMinutes   Int      @default(0)
+  permissionDeduction Decimal  @default(0) @db.Decimal(14, 2)
+  salaryAdvance       Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   shift Shift? @relation(fields: [shiftId], references: [id])
 

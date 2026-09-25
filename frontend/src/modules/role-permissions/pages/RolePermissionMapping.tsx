@@ -136,6 +136,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
       { key: "whatsapp", label: "WhatsApp Settings", subGroup: "Configuration" },
       { key: "email-config", label: "Email Config", subGroup: "Configuration" },
       { key: "invoice-settings", label: "Invoice Settings", subGroup: "Configuration" },
+      { key: "audit-reports", label: "Audit Logs", subGroup: "Configuration" },
       { key: "users", label: "System Users", subGroup: "Other" },
       { key: "permissions", label: "Permissions", subGroup: "Other" },
       { key: "gst_tax", label: "GST Tax Rates", subGroup: "Other" },

@@ -62,19 +62,24 @@ class PayrollController {
   bulkUpsertAttendance = asyncHandler(async (req: Request, res: Response) => {
     const { period, records, clearedDates } = req.body;
     const mapped = (records || []).map((r: any) => ({
-      employeeId:        BigInt(r.employeeId),
-      date:              r.date,
+      employeeId:          BigInt(r.employeeId),
+      date:                r.date,
       period,
-      status:            r.status,
-      inTime:            r.inTime ?? null,
-      outTime:           r.outTime ?? null,
-      otHours:           r.otHours ?? 0,
-      otDays:            r.otDays ?? 0,
-      teaOtCount:        r.teaOtCount ?? 0,
-      lateMinutes:       r.lateMinutes ?? 0,
-      permissionMinutes: r.permissionMinutes ?? 0,
-      salaryAdvance:     r.salaryAdvance ?? 0,
-      shiftId:           r.shiftId ?? null,
+      status:              r.status,
+      inTime:              r.inTime ?? null,
+      outTime:             r.outTime ?? null,
+      otHours:             r.otHours ?? 0,
+      otAmount:            r.otAmount ?? 0,
+      otDays:              r.otDays ?? 0,
+      otDaysAmount:        r.otDaysAmount ?? 0,
+      teaOtCount:          r.teaOtCount ?? 0,
+      teaOtAmount:         r.teaOtAmount ?? 0,
+      lateMinutes:         r.lateMinutes ?? 0,
+      lateDeduction:       r.lateDeduction ?? 0,
+      permissionMinutes:   r.permissionMinutes ?? 0,
+      permissionDeduction: r.permissionDeduction ?? 0,
+      salaryAdvance:       r.salaryAdvance ?? 0,
+      shiftId:             r.shiftId ?? null,
     }));
     const result = await payrollService.bulkUpsertAttendance(mapped);
 

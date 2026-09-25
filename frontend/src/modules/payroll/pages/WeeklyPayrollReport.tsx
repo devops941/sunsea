@@ -53,9 +53,9 @@ const WEEK_OPTIONS = [
 const fmt = (n: number) => n.toLocaleString('en-IN');
 
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT:    'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-blue-100 text-blue-700',
-  LOCKED:   'bg-card-2 text-ink-muted',
+  DRAFT:    'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+  APPROVED: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  LOCKED:   'bg-slate-500/15 text-slate-300 border border-slate-500/30',
 };
 
 
@@ -389,20 +389,20 @@ const WeeklyPayrollReport: React.FC = () => {
       header: 'SALARY/DAY (₹)',
       width: '135px',
       align: 'right',
-      render: (r) => <span className="font-mono">₹{fmt(Number(r.dailyRate))}</span>,
+      render: (r) => <span className="font-mono text-text-primary">₹{fmt(Number(r.dailyRate))}</span>,
     },
     {
       header: 'PRESENT',
       width: '85px',
       align: 'right',
-      render: (r) => <span className="font-mono text-emerald-700 font-semibold">{r.presentDays}</span>,
+      render: (r) => <span className="font-mono text-emerald-400 font-semibold">{r.presentDays}</span>,
     },
     {
       header: 'ABSENT',
       width: '80px',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.absentDays) > 0 ? 'text-red-600 font-semibold' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.absentDays) > 0 ? 'text-red-400 font-semibold' : 'text-text-muted'}`}>
           {Number(r.absentDays) > 0 ? r.absentDays : '—'}
         </span>
       ),
@@ -412,7 +412,7 @@ const WeeklyPayrollReport: React.FC = () => {
       width: '75px',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.halfDays) > 0 ? 'text-amber-600 font-semibold' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.halfDays) > 0 ? 'text-amber-400 font-semibold' : 'text-text-muted'}`}>
           {Number(r.halfDays) > 0 ? r.halfDays : '—'}
         </span>
       ),
@@ -421,14 +421,14 @@ const WeeklyPayrollReport: React.FC = () => {
       header: 'EARNED (₹)',
       width: '115px',
       align: 'right',
-      render: (r) => <span className="font-mono">₹{fmt(Number(r.earnedSalary))}</span>,
+      render: (r) => <span className="font-mono text-text-primary font-medium">₹{fmt(Number(r.earnedSalary))}</span>,
     },
     {
       header: 'OT PAY (₹)',
       width: '105px',
       align: 'right',
       render: (r) => (
-        <span className="font-mono text-emerald-700">
+        <span className="font-mono text-emerald-400 font-semibold">
           {Number(r.otPay) > 0 ? `₹${fmt(Number(r.otPay))}` : '—'}
         </span>
       ),
@@ -438,7 +438,7 @@ const WeeklyPayrollReport: React.FC = () => {
       width: '115px',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.lateEntryDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.lateEntryDeduction) > 0 ? 'text-red-400' : 'text-text-muted'}`}>
           {Number(r.lateEntryDeduction) > 0 ? `₹${fmt(Number(r.lateEntryDeduction))}` : '—'}
         </span>
       ),
@@ -448,7 +448,7 @@ const WeeklyPayrollReport: React.FC = () => {
       width: '120px',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.permissionDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.permissionDeduction) > 0 ? 'text-red-400' : 'text-text-muted'}`}>
           {Number(r.permissionDeduction) > 0 ? `₹${fmt(Number(r.permissionDeduction))}` : '—'}
         </span>
       ),
@@ -458,7 +458,7 @@ const WeeklyPayrollReport: React.FC = () => {
       width: '115px',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-700' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-400' : 'text-text-muted'}`}>
           {Number(r.salaryAdvance) > 0 ? `₹${fmt(Number(r.salaryAdvance))}` : '—'}
         </span>
       ),
@@ -470,7 +470,7 @@ const WeeklyPayrollReport: React.FC = () => {
       render: (r) => {
         const tot = Number(r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)));
         return (
-          <span className={`font-mono font-semibold ${tot > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+          <span className={`font-mono font-semibold ${tot > 0 ? 'text-red-400' : 'text-text-muted'}`}>
             {tot > 0 ? `₹${fmt(tot)}` : '—'}
           </span>
         );
@@ -486,7 +486,7 @@ const WeeklyPayrollReport: React.FC = () => {
           <div className="flex flex-col items-end">
             <span className="font-mono font-bold text-text-primary">₹{fmt(Number(r.netSalary))}</span>
             {cashAmt > 0 && (
-              <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
+              <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-950/70 border border-indigo-700/50 px-1.5 py-0.5 rounded mt-0.5">
                 Cash in Hand ₹{fmt(cashAmt)}
               </span>
             )}
@@ -499,8 +499,8 @@ const WeeklyPayrollReport: React.FC = () => {
       width: '90px',
       align: 'center',
       render: (r) => (
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-          r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+          r.paymentMode === 'BANK' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
         }`}>
           {r.paymentMode}
         </span>
@@ -658,68 +658,68 @@ const WeeklyPayrollReport: React.FC = () => {
 
         {/* Footer Summary Bar matching PayrollRun design */}
         {filtered.length > 0 && (
-          <div className="bg-card border-t border-line-soft overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
+          <div className="bg-surface border-t border-border overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
 
             {/* Left side: TOTAL EMPLOYEES */}
-            <div className="px-6 py-4 flex items-center xl:border-r border-line-soft xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
+            <div className="px-6 py-4 flex items-center xl:border-r border-border xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-card-2 text-ink-muted font-bold">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-card-2 text-text-secondary font-bold">
                   <Users size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest">TOTAL EMPLOYEES</p>
-                  <p className="text-sm font-bold text-ink">{filtered.length}</p>
+                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">TOTAL EMPLOYEES</p>
+                  <p className="text-sm font-bold text-text-primary">{filtered.length}</p>
                 </div>
               </div>
             </div>
 
             {/* Middle: EARNED | OT | GROSS | DEDUCTIONS */}
-            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-line-soft">
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-border">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">EARNED</span>
-                <span className="font-mono font-semibold text-ink">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-0.5">EARNED</span>
+                <span className="font-mono font-semibold text-text-primary">
                   ₹{fmt(totals.earnedSalary)}
                 </span>
               </div>
-              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
+              <div className="h-7 w-px bg-border hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">OT</span>
-                <span className="font-mono font-semibold text-emerald-600">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-0.5">OT</span>
+                <span className="font-mono font-semibold text-emerald-400">
                   ₹{fmt(totals.otPay)}
                 </span>
               </div>
-              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
+              <div className="h-7 w-px bg-border hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">GROSS</span>
-                <span className="font-mono font-bold text-ink">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-0.5">GROSS</span>
+                <span className="font-mono font-bold text-text-primary">
                   ₹{fmt(totals.earnedSalary + totals.otPay)}
                 </span>
               </div>
-              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
+              <div className="h-7 w-px bg-border hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5">DEDUCTIONS</span>
-                <span className="font-mono font-semibold text-rose-600">
+                <span className="font-mono font-semibold text-rose-400">
                   ₹{fmt(totals.totalDeductions)}
                 </span>
               </div>
             </div>
 
             {/* Right side: NET PAY & CASH IN HAND */}
-            <div className="flex items-stretch xl:border-l border-line-soft bg-card-2 w-full xl:w-auto">
-              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-line-soft flex-1 xl:flex-none">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">NET PAY</span>
-                <span className="font-mono text-lg font-black text-emerald-700">
+            <div className="flex items-stretch xl:border-l border-border bg-surface w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-border flex-1 xl:flex-none">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-0.5">NET PAY</span>
+                <span className="font-mono text-lg font-black text-emerald-400">
                   ₹{fmt(totals.netSalary)}
                 </span>
               </div>
 
               {totalCashInHand > 0 && (
-                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50/70 flex-1 xl:flex-none">
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
-                  <span className="font-mono text-lg font-black text-indigo-700">
+                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-950/40 border-l border-border flex-1 xl:flex-none">
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
+                  <span className="font-mono text-lg font-black text-indigo-400">
                     ₹{fmt(totalCashInHand)}
                   </span>
                 </div>
@@ -731,7 +731,7 @@ const WeeklyPayrollReport: React.FC = () => {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 print:hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 print:hidden pb-12">
         {[
           {
             label: 'Total Gross',
@@ -741,18 +741,18 @@ const WeeklyPayrollReport: React.FC = () => {
           {
             label: 'Total Deductions',
             value: `₹${fmt(totals.totalDeductions)}`,
-            color: 'text-red-600',
+            color: 'text-rose-400',
           },
           {
             label: 'Total Net Payable',
             value: `₹${fmt(totals.netSalary)}`,
-            color: 'text-primary font-bold',
+            color: 'text-emerald-400 font-bold',
           },
           ...(totalCashInHand > 0 ? [
             {
               label: 'Cash in Hand',
               value: `₹${fmt(totalCashInHand)}`,
-              color: 'text-indigo-700 font-bold',
+              color: 'text-indigo-400 font-bold',
             }
           ] : []),
           {

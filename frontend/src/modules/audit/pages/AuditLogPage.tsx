@@ -3,6 +3,8 @@ import { getAllAuditLogs } from '../../../services/auditService';
 import type { DataTableColumn } from '../../../components/ui/table/DataTable';
 import DataTable from '../../../components/ui/table/DataTable';
 import SearchInput from '../../../components/ui/SearchInput/SearchInput';
+import DatePickerCalendar from '../../../components/ui/DatePickerCalendar/DatePickerCalendar';
+import { X } from 'lucide-react';
 interface AuditLog {
   id: string;
   entityName: string;
@@ -16,7 +18,8 @@ const AuditLogPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filterEntity, setFilterEntity] = useState<string>('All');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
   const ITEMS_PER_PAGE = 15;
@@ -31,7 +34,7 @@ const AuditLogPage: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [currentPage, debouncedSearch]);
+  }, [currentPage, debouncedSearch, fromDate, toDate]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -40,7 +43,9 @@ const AuditLogPage: React.FC = () => {
       const response = await getAllAuditLogs({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
-        search: debouncedSearch || undefined
+        search: debouncedSearch || undefined,
+        startDate: fromDate || undefined,
+        endDate: toDate || undefined,
       });
       setLogs(response.data?.data || []);
       setTotalLogs(response.data?.total || 0);
@@ -173,6 +178,48 @@ const AuditLogPage: React.FC = () => {
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 relative w-full md:w-auto">
+            <div className="w-36 sm:w-40">
+              <DatePickerCalendar
+                name="auditFromDate"
+                value={fromDate}
+                maxDate={toDate || undefined}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="From Date"
+              />
+            </div>
+
+            <div className="w-36 sm:w-40">
+              <DatePickerCalendar
+                name="auditToDate"
+                value={toDate}
+                minDate={fromDate || undefined}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="To Date"
+              />
+            </div>
+
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFromDate('');
+                  setToDate('');
+                  setCurrentPage(1);
+                }}
+                className="h-10 px-3 rounded-md text-xs font-semibold bg-card-2 hover:bg-line border border-line-soft text-ink-subtle hover:text-ink transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Clear date filter"
+              >
+                <X size={14} />
+                <span>Clear</span>
+              </button>
+            )}
+
             <SearchInput
               value={searchTerm}
               onChange={handleSearch}

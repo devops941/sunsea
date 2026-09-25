@@ -49,9 +49,20 @@ export interface ApiEmployeePayroll {
   id: string;
   empCode: string;
   fullName: string;
+  employeeCategory?: string | null;
   salaryType?: string;   // raw Employee.salaryType from the DB (monthly|weekly|daily|hourly)
   designation: string | null;
   department: { name: string } | null;
+  shiftId?: string | null;
+  shift?: {
+    id: number;
+    shiftCode: string;
+    shiftName: string;
+    startTime: string;
+    endTime: string;
+    breakDuration?: number | null;
+    gracePeriod?: number | null;
+  } | null;
   payrollConfig: {
     salaryType: string;
     monthlySalary: number;
@@ -75,11 +86,16 @@ export interface AttendanceInput {
   absentDays: number;
   halfDays: number;
   otHours: number;
+  otAmount?: number;
   otDays: number;
+  otDaysAmount?: number;
   teaOtCount: number;
+  teaOtAmount?: number;
   lateMinutes: number;
+  lateDeduction?: number;
   dailyLateMinutes: number[];  // per-day late minutes for per-day slab deduction
   permissionMinutes: number;
+  permissionDeduction?: number;
   advance: number;
 }
 

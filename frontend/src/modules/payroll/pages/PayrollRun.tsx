@@ -457,18 +457,14 @@ const OtTooltip: React.FC<{
   otHours: number;
   otPay: number;
   dailyRate: number;
-}> = ({ otHours, otPay, dailyRate }) => {
+}> = ({ otHours, otPay }) => {
   const [show, setShow] = React.useState(false);
 
   if (otHours <= 0 && otPay <= 0) {
     return <span className="font-mono text-xs text-text-muted">—</span>;
   }
 
-  const effectiveHourlyRate = otHours > 0 ? otPay / otHours : 0;
-  const estimatedBaseHourly = dailyRate > 0 ? dailyRate / 8 : 0;
-  const estimatedMultiplier = estimatedBaseHourly > 0 && effectiveHourlyRate > 0
-    ? (effectiveHourlyRate / estimatedBaseHourly).toFixed(2)
-    : '—';
+  const otMins = Math.round(otHours * 60);
 
   return (
     <div
@@ -476,33 +472,17 @@ const OtTooltip: React.FC<{
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
-      <span className="font-mono text-xs text-emerald-600 font-semibold underline decoration-dotted underline-offset-2">
+      <span className="font-mono text-xs text-emerald-400 font-semibold underline decoration-dotted underline-offset-2">
         {`₹${Math.round(otPay).toLocaleString('en-IN')}`}
       </span>
       {show && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 pointer-events-none">
-          <div className="bg-slate-900 text-white rounded-xl shadow-2xl p-3 text-xs space-y-1.5">
-            <p className="font-bold text-emerald-400 text-[11px] uppercase tracking-wider mb-2">OT Calculation</p>
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 pointer-events-none">
+          <div className="bg-slate-900 text-white rounded-xl shadow-2xl p-3 text-xs space-y-1.5 border border-slate-700">
+            <p className="font-bold text-emerald-400 text-[11px] uppercase tracking-wider mb-2">Overtime</p>
             {otHours > 0 && (
               <div className="flex justify-between">
-                <span className="text-slate-400">OT Hours</span>
-                <span className="font-semibold">{otHours} hrs</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-slate-400">Daily Rate</span>
-              <span className="font-semibold">₹{dailyRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-            </div>
-            {effectiveHourlyRate > 0 && (
-              <div className="flex justify-between">
-                <span className="text-slate-400">Effective Rate</span>
-                <span className="font-semibold text-yellow-300">₹{effectiveHourlyRate.toFixed(2)}/hr</span>
-              </div>
-            )}
-            {estimatedMultiplier !== '—' && (
-              <div className="flex justify-between">
-                <span className="text-slate-400">Multiplier (est.)</span>
-                <span className="font-semibold">{estimatedMultiplier}×</span>
+                <span className="text-slate-400">Duration</span>
+                <span className="font-semibold">{otMins}m ({otHours.toFixed(1)}h)</span>
               </div>
             )}
             <div className="border-t border-slate-700 pt-1.5 flex justify-between">
@@ -512,7 +492,7 @@ const OtTooltip: React.FC<{
           </div>
           {/* Arrow */}
           <div className="flex justify-center">
-            <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1.5" />
+            <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1.5 border-r border-b border-slate-700" />
           </div>
         </div>
       )}
@@ -687,18 +667,25 @@ const Step2: React.FC<{
       ),
     },
     {
-      header: "OT HRS",
+      header: "OT DURATION",
       headerNode: (
         <span>
           OT <br />
-          <span className="font-normal normal-case text-ink-subtle">Hrs</span>
+          <span className="font-normal normal-case text-ink-subtle">Duration</span>
         </span>
       ),
       align: "center",
       render: (row) => (
-        <span className={`font-mono text-sm ${row.otHours > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
-          {row.otHours > 0 ? row.otHours.toFixed(1) : '—'}
-        </span>
+        <div>
+          <span className={`font-mono text-xs ${row.otHours > 0 ? 'text-blue-400 font-bold' : 'text-text-muted'}`}>
+            {row.otHours > 0 ? `${Math.round(row.otHours * 60)}m (${Number(row.otHours).toFixed(1)}h)` : '—'}
+          </span>
+          {Number((row as any).otAmount) > 0 && (
+            <div className="text-[10px] font-mono font-bold text-emerald-400">
+              ₹{Number((row as any).otAmount)}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -711,9 +698,16 @@ const Step2: React.FC<{
       ),
       align: "center",
       render: (row) => (
-        <span className={`font-mono text-sm ${row.otDays > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
-          {row.otDays > 0 ? row.otDays.toFixed(1) : '—'}
-        </span>
+        <div>
+          <span className={`font-mono text-xs ${row.otDays > 0 ? 'text-blue-600 font-bold' : 'text-text-muted'}`}>
+            {row.otDays > 0 ? `${row.otDays.toFixed(1)}d` : '—'}
+          </span>
+          {Number((row as any).otDaysAmount) > 0 && (
+            <div className="text-[10px] font-mono font-bold text-emerald-500">
+              ₹{Number((row as any).otDaysAmount)}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -726,9 +720,16 @@ const Step2: React.FC<{
       ),
       align: "center",
       render: (row) => (
-        <span className={`font-mono text-sm ${row.teaOtCount > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
-          {row.teaOtCount > 0 ? row.teaOtCount : '—'}
-        </span>
+        <div>
+          <span className={`font-mono text-xs ${row.teaOtCount > 0 ? 'text-blue-600 font-bold' : 'text-text-muted'}`}>
+            {row.teaOtCount > 0 ? row.teaOtCount : '—'}
+          </span>
+          {Number((row as any).teaOtAmount) > 0 && (
+            <div className="text-[10px] font-mono font-bold text-emerald-500">
+              ₹{Number((row as any).teaOtAmount)}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -741,9 +742,16 @@ const Step2: React.FC<{
       ),
       align: "center",
       render: (row) => (
-        <span className={`font-mono text-sm ${row.lateMinutes > 0 ? 'text-orange-600' : 'text-text-muted'}`}>
-          {row.lateMinutes > 0 ? row.lateMinutes : '—'}
-        </span>
+        <div>
+          <span className={`font-mono text-xs ${row.lateMinutes > 0 ? 'text-orange-600 font-bold' : 'text-text-muted'}`}>
+            {row.lateMinutes > 0 ? `${row.lateMinutes}m` : '—'}
+          </span>
+          {Number((row as any).lateDeduction) > 0 && (
+            <div className="text-[10px] font-mono font-bold text-red-500">
+              ₹{Number((row as any).lateDeduction)}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -756,9 +764,16 @@ const Step2: React.FC<{
       ),
       align: "center",
       render: (row) => (
-        <span className={`font-mono text-sm ${row.permissionMinutes > 0 ? 'text-orange-600' : 'text-text-muted'}`}>
-          {row.permissionMinutes > 0 ? row.permissionMinutes : '—'}
-        </span>
+        <div>
+          <span className={`font-mono text-xs ${row.permissionMinutes > 0 ? 'text-orange-600 font-bold' : 'text-text-muted'}`}>
+            {row.permissionMinutes > 0 ? `${row.permissionMinutes}m` : '—'}
+          </span>
+          {Number((row as any).permissionDeduction) > 0 && (
+            <div className="text-[10px] font-mono font-bold text-red-500">
+              ₹{Number((row as any).permissionDeduction)}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -1824,11 +1839,16 @@ const PayrollRun: React.FC = () => {
           absentDays: 0,
           halfDays: 0,
           otHours: 0,
+          otAmount: 0,
           otDays: 0,
+          otDaysAmount: 0,
           teaOtCount: 0,
+          teaOtAmount: 0,
           lateMinutes: 0,
+          lateDeduction: 0,
           dailyLateMinutes: [],
           permissionMinutes: 0,
+          permissionDeduction: 0,
           advance: 0,
         }));
 
@@ -1840,22 +1860,52 @@ const PayrollRun: React.FC = () => {
           });
           const uniqueRecs = Array.from(uniqueMap.values());
 
-          type Agg = { present: number; absent: number; half: number; ot: number; otDays: number; teaOt: number; late: number; dailyLate: number[]; perm: number; adv: number };
+          type Agg = {
+            present: number;
+            absent: number;
+            half: number;
+            ot: number;
+            otAmount: number;
+            otDays: number;
+            otDaysAmount: number;
+            teaOt: number;
+            teaOtAmount: number;
+            late: number;
+            lateDeduction: number;
+            dailyLate: number[];
+            perm: number;
+            permissionDeduction: number;
+            adv: number;
+          };
           const agg: Record<number, Agg> = {};
           uniqueRecs.forEach((r: any) => {
             const empId = Number(r.employeeId);
-            if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, otDays: 0, teaOt: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
+            if (!agg[empId]) agg[empId] = {
+              present: 0, absent: 0, half: 0,
+              ot: 0, otAmount: 0,
+              otDays: 0, otDaysAmount: 0,
+              teaOt: 0, teaOtAmount: 0,
+              late: 0, lateDeduction: 0,
+              dailyLate: [],
+              perm: 0, permissionDeduction: 0,
+              adv: 0,
+            };
             if (r.status === 'PRESENT') agg[empId].present++;
             if (runType === 'MONTHLY' && (r.status === 'WEEKLY_OFF' || r.status === 'HOLIDAY' || r.status === 'LEAVE_PAID')) agg[empId].present++;
             if (r.status === 'ABSENT' || r.status === 'LEAVE_UNPAID') agg[empId].absent++;
             if (r.status === 'HALF_DAY') agg[empId].half++;
-            agg[empId].ot += Number(r.otHours);
-            agg[empId].otDays += Number(r.otDays ?? 0);
-            agg[empId].teaOt += Number(r.teaOtCount ?? 0);
-            agg[empId].late += Number(r.lateMinutes);
-            agg[empId].dailyLate.push(Number(r.lateMinutes));
-            agg[empId].perm += Number(r.permissionMinutes);
-            agg[empId].adv += Number(r.salaryAdvance);
+            agg[empId].ot += Number(r.otHours || 0);
+            agg[empId].otAmount += Number(r.otAmount || 0);
+            agg[empId].otDays += Number(r.otDays || 0);
+            agg[empId].otDaysAmount += Number(r.otDaysAmount || 0);
+            agg[empId].teaOt += Number(r.teaOtCount || 0);
+            agg[empId].teaOtAmount += Number(r.teaOtAmount || 0);
+            agg[empId].late += Number(r.lateMinutes || 0);
+            agg[empId].lateDeduction += Number(r.lateDeduction || 0);
+            agg[empId].dailyLate.push(Number(r.lateMinutes || 0));
+            agg[empId].perm += Number(r.permissionMinutes || 0);
+            agg[empId].permissionDeduction += Number(r.permissionDeduction || 0);
+            agg[empId].adv += Number(r.salaryAdvance || 0);
           });
           rows = defaultRows.map(row => {
             const a = agg[row.employeeId];
@@ -1866,11 +1916,16 @@ const PayrollRun: React.FC = () => {
               absentDays: a.absent,
               halfDays: a.half,
               otHours: a.ot,
+              otAmount: a.otAmount,
               otDays: a.otDays,
+              otDaysAmount: a.otDaysAmount,
               teaOtCount: a.teaOt,
+              teaOtAmount: a.teaOtAmount,
               lateMinutes: a.late,
+              lateDeduction: a.lateDeduction,
               dailyLateMinutes: a.dailyLate,
               permissionMinutes: a.perm,
+              permissionDeduction: a.permissionDeduction,
               advance: a.adv,
             };
           });
@@ -1962,11 +2017,16 @@ const PayrollRun: React.FC = () => {
       absentDays: 0,
       halfDays: 0,
       otHours: 0,
+      otAmount: 0,
       otDays: 0,
+      otDaysAmount: 0,
       teaOtCount: 0,
+      teaOtAmount: 0,
       lateMinutes: 0,
+      lateDeduction: 0,
       dailyLateMinutes: [],
       permissionMinutes: 0,
+      permissionDeduction: 0,
       advance: 0,
     })));
   };
@@ -1992,11 +2052,16 @@ const PayrollRun: React.FC = () => {
       absentDays: 0,
       halfDays: 0,
       otHours: 0,
+      otAmount: 0,
       otDays: 0,
+      otDaysAmount: 0,
       teaOtCount: 0,
+      teaOtAmount: 0,
       lateMinutes: 0,
+      lateDeduction: 0,
       dailyLateMinutes: [],
       permissionMinutes: 0,
+      permissionDeduction: 0,
       advance: 0,
     }));
 
@@ -2042,21 +2107,51 @@ const PayrollRun: React.FC = () => {
     }
 
     // ── All employees complete — aggregate attendance ──────────────────────────
-    type Agg = { present: number; absent: number; half: number; ot: number; otDays: number; teaOt: number; late: number; dailyLate: number[]; perm: number; adv: number };
+    type Agg = {
+      present: number;
+      absent: number;
+      half: number;
+      ot: number;
+      otAmount: number;
+      otDays: number;
+      otDaysAmount: number;
+      teaOt: number;
+      teaOtAmount: number;
+      late: number;
+      lateDeduction: number;
+      dailyLate: number[];
+      perm: number;
+      permissionDeduction: number;
+      adv: number;
+    };
     const agg: Record<number, Agg> = {};
     uniqueRecords.forEach((r: any) => {
       const empId = Number(r.employeeId);
-      if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, otDays: 0, teaOt: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
+      if (!agg[empId]) agg[empId] = {
+        present: 0, absent: 0, half: 0,
+        ot: 0, otAmount: 0,
+        otDays: 0, otDaysAmount: 0,
+        teaOt: 0, teaOtAmount: 0,
+        late: 0, lateDeduction: 0,
+        dailyLate: [],
+        perm: 0, permissionDeduction: 0,
+        adv: 0,
+      };
       if (r.status === 'PRESENT') agg[empId].present++;
       if (runType === 'MONTHLY' && (r.status === 'WEEKLY_OFF' || r.status === 'HOLIDAY' || r.status === 'LEAVE_PAID')) agg[empId].present++;
       if (r.status === 'ABSENT' || r.status === 'LEAVE_UNPAID') agg[empId].absent++;
       if (r.status === 'HALF_DAY') agg[empId].half++;
-      agg[empId].ot += Number(r.otHours);
-      agg[empId].otDays += Number(r.otDays ?? 0);
-      agg[empId].teaOt += Number(r.teaOtCount ?? 0);
-      agg[empId].late += Number(r.lateMinutes);
-      agg[empId].dailyLate.push(Number(r.lateMinutes));
-      agg[empId].perm += Number(r.permissionMinutes);
+      agg[empId].ot += Number(r.otHours || 0);
+      agg[empId].otAmount += Number(r.otAmount || 0);
+      agg[empId].otDays += Number(r.otDays || 0);
+      agg[empId].otDaysAmount += Number(r.otDaysAmount || 0);
+      agg[empId].teaOt += Number(r.teaOtCount || 0);
+      agg[empId].teaOtAmount += Number(r.teaOtAmount || 0);
+      agg[empId].late += Number(r.lateMinutes || 0);
+      agg[empId].lateDeduction += Number(r.lateDeduction || 0);
+      agg[empId].dailyLate.push(Number(r.lateMinutes || 0));
+      agg[empId].perm += Number(r.permissionMinutes || 0);
+      agg[empId].permissionDeduction += Number(r.permissionDeduction || 0);
     });
 
     // ── Load salary advances disbursed within this period ─────────────────────
@@ -2101,11 +2196,16 @@ const PayrollRun: React.FC = () => {
           absentDays: a?.absent ?? 0,
           halfDays: a?.half ?? 0,
           otHours: a?.ot ?? 0,
+          otAmount: a?.otAmount ?? 0,
           otDays: a?.otDays ?? 0,
+          otDaysAmount: a?.otDaysAmount ?? 0,
           teaOtCount: a?.teaOt ?? 0,
+          teaOtAmount: a?.teaOtAmount ?? 0,
           lateMinutes: a?.late ?? 0,
+          lateDeduction: a?.lateDeduction ?? 0,
           dailyLateMinutes: a?.dailyLate ?? [],
           permissionMinutes: a?.perm ?? 0,
+          permissionDeduction: a?.permissionDeduction ?? 0,
           advance: advanceMap[row.employeeId] ?? 0,
         };
       });
@@ -2129,11 +2229,16 @@ const PayrollRun: React.FC = () => {
         absentDays: r.absentDays,
         halfDays: r.halfDays,
         otHours: r.otHours,
+        otAmount: (r as any).otAmount ?? 0,
         otDays: r.otDays,
+        otDaysAmount: (r as any).otDaysAmount ?? 0,
         teaOtCount: r.teaOtCount,
+        teaOtAmount: (r as any).teaOtAmount ?? 0,
         lateMinutes: r.lateMinutes,
+        lateDeduction: (r as any).lateDeduction ?? 0,
         dailyLateMinutes: r.dailyLateMinutes ?? [],
         permissionMinutes: r.permissionMinutes,
+        permissionDeduction: (r as any).permissionDeduction ?? 0,
         advance: Number(r.employeeId) === Number(empId) ? amount : r.advance,
       }));
       try {
@@ -2153,11 +2258,16 @@ const PayrollRun: React.FC = () => {
       absentDays: r.absentDays,
       halfDays: r.halfDays,
       otHours: r.otHours,
+      otAmount: (r as any).otAmount ?? 0,
       otDays: r.otDays,
+      otDaysAmount: (r as any).otDaysAmount ?? 0,
       teaOtCount: r.teaOtCount,
+      teaOtAmount: (r as any).teaOtAmount ?? 0,
       lateMinutes: r.lateMinutes,
+      lateDeduction: (r as any).lateDeduction ?? 0,
       dailyLateMinutes: r.dailyLateMinutes ?? [],
       permissionMinutes: r.permissionMinutes,
+      permissionDeduction: (r as any).permissionDeduction ?? 0,
       advance: r.advance,
     }));
     try {

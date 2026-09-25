@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Calendar, AlertTriangle, ChevronLeft, ChevronRight, Printer, FileDown, Users, TrendingUp, TrendingDown, Wallet, Shield, Clock } from 'lucide-react';
+import { Calendar, AlertTriangle, ChevronLeft, ChevronRight, Printer, FileDown, Users, TrendingUp, TrendingDown, Wallet, Shield } from 'lucide-react';
 import ViewButton from '../../../components/ui/viewbutton/ViewButton';
 import { usePermission } from '../../../hooks/usePermission';
 import IconButton from '../../../components/ui/IconButton/IconButton';
@@ -45,16 +45,16 @@ const YEAR_OPTIONS = [
 ];
 
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT:    'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-blue-100 text-blue-700',
-  LOCKED:   'bg-card-2 text-ink-muted',
+  DRAFT: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+  APPROVED: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  LOCKED: 'bg-slate-500/15 text-slate-300 border border-slate-500/30',
 };
 
 const SALARY_TYPE_LABEL: Record<string, string> = {
-  FIXED_MONTHLY:  'Fixed',
-  PF_MONTHLY:     'PF',
-  CASH_MONTHLY:   'Cash',
-  DAILY_WEEKLY:   'Daily',
+  FIXED_MONTHLY: 'Fixed',
+  PF_MONTHLY: 'PF',
+  CASH_MONTHLY: 'Cash',
+  DAILY_WEEKLY: 'Daily',
 };
 
 type ViewMode = 'ALL' | 'PF' | 'CASH';
@@ -62,12 +62,12 @@ type ViewMode = 'ALL' | 'PF' | 'CASH';
 // ─── Component ────────────────────────────────────────────────────────────────
 const MonthlyPayrollReport: React.FC = () => {
   const { can } = usePermission();
-  const canViewRun        = can("payroll-run.view");
-  const { socket }    = useSocket();
-  const [selectedYear, setSelectedYear]   = useState<string>('ALL');
+  const canViewRun = can("payroll-run.view");
+  const { socket } = useSocket();
+  const [selectedYear, setSelectedYear] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
-  const [draftYear, setDraftYear]         = useState<string>('ALL');
-  const [draftMonth, setDraftMonth]       = useState<string>('ALL');
+  const [draftYear, setDraftYear] = useState<string>('ALL');
+  const [draftMonth, setDraftMonth] = useState<string>('ALL');
 
   const hasActiveFilters = selectedMonth !== 'ALL' || selectedYear !== 'ALL';
   const activeFilterCount = (selectedMonth !== 'ALL' ? 1 : 0) + (selectedYear !== 'ALL' ? 1 : 0);
@@ -89,12 +89,12 @@ const MonthlyPayrollReport: React.FC = () => {
     setSelectedYear('ALL');
   };
 
-  const [runs, setRuns]       = useState<ApiPayrollRun[]>([]);
-  const [runIdx, setRunIdx]   = useState(0);
+  const [runs, setRuns] = useState<ApiPayrollRun[]>([]);
+  const [runIdx, setRunIdx] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
-  const [view, setView]       = useState<ViewMode>('ALL');
-  const [page, setPage]       = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>('ALL');
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   // Track which result ids have PDF generation in progress (prevents double-click)
   const [pdfLoadingIds, setPdfLoadingIds] = useState<Set<number>>(new Set());
@@ -129,14 +129,14 @@ const MonthlyPayrollReport: React.FC = () => {
     if (!socket) return;
     const onRefresh = () => fetchRuns();
     socket.on('payroll:completed', onRefresh);
-    socket.on('payroll:approved',  onRefresh);
-    socket.on('payroll:locked',    onRefresh);
-    socket.on('payroll:deleted',   onRefresh);
+    socket.on('payroll:approved', onRefresh);
+    socket.on('payroll:locked', onRefresh);
+    socket.on('payroll:deleted', onRefresh);
     return () => {
       socket.off('payroll:completed', onRefresh);
-      socket.off('payroll:approved',  onRefresh);
-      socket.off('payroll:locked',    onRefresh);
-      socket.off('payroll:deleted',   onRefresh);
+      socket.off('payroll:approved', onRefresh);
+      socket.off('payroll:locked', onRefresh);
+      socket.off('payroll:deleted', onRefresh);
     };
   }, [socket, fetchRuns]);
 
@@ -152,7 +152,7 @@ const MonthlyPayrollReport: React.FC = () => {
         if (fullRun && fullRun.results) {
           setRuns((prev) => prev.map((r) => (r.id === fullRun.id ? fullRun : r)));
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [run?.id]);
 
@@ -163,7 +163,7 @@ const MonthlyPayrollReport: React.FC = () => {
     try {
       const data = await payrollService.getPayslip(run.id, r.id);
       const { default: PayslipDocument } = await import('../components/PayslipDocument');
-      const { default: ReactDOMServer }  = await import('react-dom/server');
+      const { default: ReactDOMServer } = await import('react-dom/server');
       const React2 = await import('react');
       const html = ReactDOMServer.renderToStaticMarkup(
         React2.createElement(PayslipDocument, { data })
@@ -182,7 +182,7 @@ const MonthlyPayrollReport: React.FC = () => {
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const ratio = pageW / canvas.width;
-      const imgH  = canvas.height * ratio;
+      const imgH = canvas.height * ratio;
       let yPos = 0; let remaining = imgH;
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       while (remaining > 0) {
@@ -196,7 +196,7 @@ const MonthlyPayrollReport: React.FC = () => {
       let filename = `PAYSLIP_${code}_${period}.pdf`;
       if (/^\d{4}-\d{2}$/.test(period)) {
         const [y, m] = period.split('-');
-        const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
         filename = `PAYSLIP_${code}_${months[parseInt(m, 10) - 1]}_${y}.pdf`;
       }
       pdf.save(filename);
@@ -208,7 +208,7 @@ const MonthlyPayrollReport: React.FC = () => {
   };
 
   const allResults: ApiPayrollResult[] = run?.results ?? [];
-  const pfEmployees   = allResults.filter((r) => r.pfApplicable);
+  const pfEmployees = allResults.filter((r) => r.pfApplicable);
   const cashEmployees = allResults.filter((r) => !r.pfApplicable);
 
   const varianceCount = allResults.filter((r) => r.hasVariance).length;
@@ -216,30 +216,30 @@ const MonthlyPayrollReport: React.FC = () => {
   // ── Totals ──
   const allTotals = allResults.reduce(
     (a, e) => ({
-      grossSalary:     a.grossSalary     + Number(e.grossSalary    || 0),
-      presentDays:     a.presentDays     + Number(e.presentDays    || 0),
-      absentDays:      a.absentDays      + Number(e.absentDays     || 0),
-      halfDays:        a.halfDays        + Number(e.halfDays        || 0),
-      lopDays:         a.lopDays         + Number(e.lopDays         || 0),
-      otHours:         a.otHours         + Number(e.otHours         || 0),
-      otPay:           a.otPay           + Number(e.otPay           || 0),
+      grossSalary: a.grossSalary + Number(e.grossSalary || 0),
+      presentDays: a.presentDays + Number(e.presentDays || 0),
+      absentDays: a.absentDays + Number(e.absentDays || 0),
+      halfDays: a.halfDays + Number(e.halfDays || 0),
+      lopDays: a.lopDays + Number(e.lopDays || 0),
+      otHours: a.otHours + Number(e.otHours || 0),
+      otPay: a.otPay + Number(e.otPay || 0),
       totalDeductions: a.totalDeductions + Number(e.totalDeductions || 0),
-      netSalary:       a.netSalary       + Number(e.netSalary       || 0),
+      netSalary: a.netSalary + Number(e.netSalary || 0),
     }),
     { grossSalary: 0, presentDays: 0, absentDays: 0, halfDays: 0, lopDays: 0, otHours: 0, otPay: 0, totalDeductions: 0, netSalary: 0 }
   );
 
   const pfTotals = pfEmployees.reduce(
     (a, e) => ({
-      grossSalary:     a.grossSalary     + Number(e.grossSalary     || 0),
-      earnedSalary:    a.earnedSalary    + Number(e.earnedSalary    || 0),
-      lopDays:         a.lopDays         + Number(e.lopDays         || 0),
+      grossSalary: a.grossSalary + Number(e.grossSalary || 0),
+      earnedSalary: a.earnedSalary + Number(e.earnedSalary || 0),
+      lopDays: a.lopDays + Number(e.lopDays || 0),
       otherDeductions: a.otherDeductions + Number(e.otherDeductions || 0),
-      employeePf:      a.employeePf      + Number(e.employeePf      || 0),
-      employerPf:      a.employerPf      + Number(e.employerPf      || 0),
-      employeeEsi:     a.employeeEsi     + Number(e.employeeEsi     || 0),
-      employerEsi:     a.employerEsi     + Number(e.employerEsi     || 0),
-      netSalary:       a.netSalary       + Number(e.netSalary       || 0),
+      employeePf: a.employeePf + Number(e.employeePf || 0),
+      employerPf: a.employerPf + Number(e.employerPf || 0),
+      employeeEsi: a.employeeEsi + Number(e.employeeEsi || 0),
+      employerEsi: a.employerEsi + Number(e.employerEsi || 0),
+      netSalary: a.netSalary + Number(e.netSalary || 0),
     }),
     { grossSalary: 0, earnedSalary: 0, lopDays: 0, otherDeductions: 0, employeePf: 0, employerPf: 0, employeeEsi: 0, employerEsi: 0, netSalary: 0 }
   );
@@ -251,82 +251,82 @@ const MonthlyPayrollReport: React.FC = () => {
       const advDed = Number(e.salaryAdvance || 0);
       const totDed = Number(e.totalDeductions ?? (lateDed + permDed + advDed + Number(e.loanRecovery || 0) + Number(e.otherDeductions || 0)));
       return {
-        grossSalary:         a.grossSalary         + Number(e.grossSalary         || 0),
-        presentDays:         a.presentDays         + Number(e.presentDays         || 0),
-        otPay:               a.otPay               + Number(e.otPay               || 0),
-        lateEntryDeduction:  a.lateEntryDeduction  + lateDed,
-        salaryAdvance:       a.salaryAdvance       + advDed,
+        grossSalary: a.grossSalary + Number(e.grossSalary || 0),
+        presentDays: a.presentDays + Number(e.presentDays || 0),
+        otPay: a.otPay + Number(e.otPay || 0),
+        lateEntryDeduction: a.lateEntryDeduction + lateDed,
+        salaryAdvance: a.salaryAdvance + advDed,
         permissionDeduction: a.permissionDeduction + permDed,
-        totalDeductions:     a.totalDeductions     + totDed,
-        netSalary:           a.netSalary           + Number(e.netSalary           || 0),
+        totalDeductions: a.totalDeductions + totDed,
+        netSalary: a.netSalary + Number(e.netSalary || 0),
       };
     },
     { grossSalary: 0, presentDays: 0, otPay: 0, lateEntryDeduction: 0, salaryAdvance: 0, permissionDeduction: 0, totalDeductions: 0, netSalary: 0 }
   );
 
-  const totalNet          = pfTotals.netSalary + cashTotals.netSalary;
-  const totalPfLiability  = pfTotals.employeePf + pfTotals.employerPf;
+  const totalNet = pfTotals.netSalary + cashTotals.netSalary;
+  const totalPfLiability = pfTotals.employeePf + pfTotals.employerPf;
   const totalEsiLiability = pfTotals.employeeEsi + pfTotals.employerEsi;
   const totalCashInHand = allResults.reduce((s, r) => s + Number(r.cashInHand || 0), 0);
 
   // ── CSV columns ──
   const allCsvCols = [
-    { header: 'Emp Code',              accessor: (r: ApiPayrollResult) => r.employeeCode },
-    { header: 'Name',                  accessor: (r: ApiPayrollResult) => r.employeeName },
-    { header: 'Department',            accessor: (r: ApiPayrollResult) => r.department },
-    { header: 'Salary Type',           accessor: (r: ApiPayrollResult) => SALARY_TYPE_LABEL[r.salaryType] ?? r.salaryType },
-    { header: 'Present Days',          accessor: (r: ApiPayrollResult) => r.presentDays },
-    { header: 'Absent Days',           accessor: (r: ApiPayrollResult) => r.absentDays },
-    { header: 'Half Days',             accessor: (r: ApiPayrollResult) => r.halfDays },
-    { header: 'LOP Days',              accessor: (r: ApiPayrollResult) => r.lopDays },
-    { header: 'OT Hours',              accessor: (r: ApiPayrollResult) => r.otHours },
-    { header: 'OT Pay (₹)',            accessor: (r: ApiPayrollResult) => r.otPay },
-    { header: 'Gross (₹)',             accessor: (r: ApiPayrollResult) => r.grossSalary },
-    { header: 'Total Deductions (₹)',  accessor: (r: ApiPayrollResult) => r.totalDeductions },
-    { header: 'Net Salary (₹)',        accessor: (r: ApiPayrollResult) => r.netSalary },
-    { header: 'Cash in Hand (₹)',     accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
-    { header: 'Payment Mode',          accessor: (r: ApiPayrollResult) => r.paymentMode },
+    { header: 'Emp Code', accessor: (r: ApiPayrollResult) => r.employeeCode },
+    { header: 'Name', accessor: (r: ApiPayrollResult) => r.employeeName },
+    { header: 'Department', accessor: (r: ApiPayrollResult) => r.department },
+    { header: 'Salary Type', accessor: (r: ApiPayrollResult) => SALARY_TYPE_LABEL[r.salaryType] ?? r.salaryType },
+    { header: 'Present Days', accessor: (r: ApiPayrollResult) => r.presentDays },
+    { header: 'Absent Days', accessor: (r: ApiPayrollResult) => r.absentDays },
+    { header: 'Half Days', accessor: (r: ApiPayrollResult) => r.halfDays },
+    { header: 'LOP Days', accessor: (r: ApiPayrollResult) => r.lopDays },
+    { header: 'OT Hours', accessor: (r: ApiPayrollResult) => r.otHours },
+    { header: 'OT Pay (₹)', accessor: (r: ApiPayrollResult) => r.otPay },
+    { header: 'Gross (₹)', accessor: (r: ApiPayrollResult) => r.grossSalary },
+    { header: 'Total Deductions (₹)', accessor: (r: ApiPayrollResult) => r.totalDeductions },
+    { header: 'Net Salary (₹)', accessor: (r: ApiPayrollResult) => r.netSalary },
+    { header: 'Cash in Hand (₹)', accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
+    { header: 'Payment Mode', accessor: (r: ApiPayrollResult) => r.paymentMode },
   ];
 
   const pfCsvCols = [
-    { header: 'Emp Code',       accessor: (r: ApiPayrollResult) => r.employeeCode },
-    { header: 'Name',           accessor: (r: ApiPayrollResult) => r.employeeName },
-    { header: 'Department',     accessor: (r: ApiPayrollResult) => r.department },
-    { header: 'Gross (₹)',      accessor: (r: ApiPayrollResult) => r.grossSalary },
-    { header: 'Earned (₹)',     accessor: (r: ApiPayrollResult) => r.earnedSalary },
-    { header: 'LOP Days',       accessor: (r: ApiPayrollResult) => r.lopDays },
-    { header: 'PF Wage (₹)',    accessor: (r: ApiPayrollResult) => r.pfWage },
-    { header: 'PF Emp (₹)',     accessor: (r: ApiPayrollResult) => r.employeePf },
-    { header: 'PF Er (₹)',      accessor: (r: ApiPayrollResult) => r.employerPf },
-    { header: 'ESI Emp (₹)',    accessor: (r: ApiPayrollResult) => r.employeeEsi },
-    { header: 'ESI Er (₹)',     accessor: (r: ApiPayrollResult) => r.employerEsi },
+    { header: 'Emp Code', accessor: (r: ApiPayrollResult) => r.employeeCode },
+    { header: 'Name', accessor: (r: ApiPayrollResult) => r.employeeName },
+    { header: 'Department', accessor: (r: ApiPayrollResult) => r.department },
+    { header: 'Gross (₹)', accessor: (r: ApiPayrollResult) => r.grossSalary },
+    { header: 'Earned (₹)', accessor: (r: ApiPayrollResult) => r.earnedSalary },
+    { header: 'LOP Days', accessor: (r: ApiPayrollResult) => r.lopDays },
+    { header: 'PF Wage (₹)', accessor: (r: ApiPayrollResult) => r.pfWage },
+    { header: 'PF Emp (₹)', accessor: (r: ApiPayrollResult) => r.employeePf },
+    { header: 'PF Er (₹)', accessor: (r: ApiPayrollResult) => r.employerPf },
+    { header: 'ESI Emp (₹)', accessor: (r: ApiPayrollResult) => r.employeeEsi },
+    { header: 'ESI Er (₹)', accessor: (r: ApiPayrollResult) => r.employerEsi },
     { header: 'Net Salary (₹)', accessor: (r: ApiPayrollResult) => r.netSalary },
     { header: 'Cash in Hand (₹)', accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
   ];
 
   const cashCsvCols = [
-    { header: 'Emp Code',             accessor: (r: ApiPayrollResult) => r.employeeCode },
-    { header: 'Name',                 accessor: (r: ApiPayrollResult) => r.employeeName },
-    { header: 'Department',           accessor: (r: ApiPayrollResult) => r.department },
-    { header: 'Gross (₹)',            accessor: (r: ApiPayrollResult) => r.grossSalary },
-    { header: 'Present Days',         accessor: (r: ApiPayrollResult) => r.presentDays },
-    { header: 'OT Pay (₹)',           accessor: (r: ApiPayrollResult) => r.otPay },
-    { header: 'Late Ded. (₹)',        accessor: (r: ApiPayrollResult) => r.lateEntryDeduction || 0 },
-    { header: 'Perm. Ded. (₹)',       accessor: (r: ApiPayrollResult) => r.permissionDeduction || 0 },
-    { header: 'Advance (₹)',          accessor: (r: ApiPayrollResult) => r.salaryAdvance || 0 },
-    { header: 'Total Ded. (₹)',       accessor: (r: ApiPayrollResult) => r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)) },
-    { header: 'Net Salary (₹)',       accessor: (r: ApiPayrollResult) => r.netSalary },
-    { header: 'Cash in Hand (₹)',    accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
-    { header: 'Payment Mode',         accessor: (r: ApiPayrollResult) => r.paymentMode },
+    { header: 'Emp Code', accessor: (r: ApiPayrollResult) => r.employeeCode },
+    { header: 'Name', accessor: (r: ApiPayrollResult) => r.employeeName },
+    { header: 'Department', accessor: (r: ApiPayrollResult) => r.department },
+    { header: 'Gross (₹)', accessor: (r: ApiPayrollResult) => r.grossSalary },
+    { header: 'Present Days', accessor: (r: ApiPayrollResult) => r.presentDays },
+    { header: 'OT Pay (₹)', accessor: (r: ApiPayrollResult) => r.otPay },
+    { header: 'Late Ded. (₹)', accessor: (r: ApiPayrollResult) => r.lateEntryDeduction || 0 },
+    { header: 'Perm. Ded. (₹)', accessor: (r: ApiPayrollResult) => r.permissionDeduction || 0 },
+    { header: 'Advance (₹)', accessor: (r: ApiPayrollResult) => r.salaryAdvance || 0 },
+    { header: 'Total Ded. (₹)', accessor: (r: ApiPayrollResult) => r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)) },
+    { header: 'Net Salary (₹)', accessor: (r: ApiPayrollResult) => r.netSalary },
+    { header: 'Cash in Hand (₹)', accessor: (r: ApiPayrollResult) => r.cashInHand || 0 },
+    { header: 'Payment Mode', accessor: (r: ApiPayrollResult) => r.paymentMode },
   ];
 
   const getCsvData = () => {
-    if (view === 'PF')   return pfEmployees;
+    if (view === 'PF') return pfEmployees;
     if (view === 'CASH') return cashEmployees;
     return allResults;
   };
   const getCsvCols = () => {
-    if (view === 'PF')   return pfCsvCols;
+    if (view === 'PF') return pfCsvCols;
     if (view === 'CASH') return cashCsvCols;
     return allCsvCols;
   };
@@ -385,9 +385,8 @@ const MonthlyPayrollReport: React.FC = () => {
       header: 'TYPE',
       align: 'left',
       render: (r) => (
-        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-          r.pfApplicable ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'
-        }`}>
+        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${r.pfApplicable ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'
+          }`}>
           {SALARY_TYPE_LABEL[r.salaryType] ?? r.salaryType}
         </span>
       ),
@@ -474,9 +473,8 @@ const MonthlyPayrollReport: React.FC = () => {
       header: 'MODE',
       align: 'center',
       render: (r) => (
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-          r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-        }`}>
+        <span className={`px-2 py-0.5 rounded text-xs font-medium ${r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+          }`}>
           {r.paymentMode}
         </span>
       ),
@@ -598,18 +596,18 @@ const MonthlyPayrollReport: React.FC = () => {
     {
       header: 'GROSS (₹)',
       align: 'right',
-      render: (r) => <span className="font-mono font-semibold">₹{fmt(r.grossSalary)}</span>,
+      render: (r) => <span className="font-mono font-semibold text-text-primary">₹{fmt(r.grossSalary)}</span>,
     },
     {
       header: 'PRESENT DAYS',
       align: 'right',
-      render: (r) => <span className="font-mono text-emerald-700 font-semibold">{r.presentDays}</span>,
+      render: (r) => <span className="font-mono text-emerald-400 font-semibold">{r.presentDays}</span>,
     },
     {
       header: 'OT PAY (₹)',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.otPay) > 0 ? 'text-emerald-700' : 'text-text-muted'}`}>
+        <span className={`font-mono font-semibold ${Number(r.otPay) > 0 ? 'text-emerald-400' : 'text-text-muted'}`}>
           {Number(r.otPay) > 0 ? `₹${fmt(r.otPay)}` : '—'}
         </span>
       ),
@@ -618,7 +616,7 @@ const MonthlyPayrollReport: React.FC = () => {
       header: 'LATE DED. (₹)',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.lateEntryDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.lateEntryDeduction) > 0 ? 'text-red-400' : 'text-text-muted'}`}>
           {Number(r.lateEntryDeduction) > 0 ? `₹${fmt(r.lateEntryDeduction)}` : '—'}
         </span>
       ),
@@ -627,7 +625,7 @@ const MonthlyPayrollReport: React.FC = () => {
       header: 'PERM. DED. (₹)',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.permissionDeduction) > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.permissionDeduction) > 0 ? 'text-red-400' : 'text-text-muted'}`}>
           {Number(r.permissionDeduction) > 0 ? `₹${fmt(r.permissionDeduction)}` : '—'}
         </span>
       ),
@@ -636,7 +634,7 @@ const MonthlyPayrollReport: React.FC = () => {
       header: 'ADVANCE (₹)',
       align: 'right',
       render: (r) => (
-        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-700' : 'text-text-muted'}`}>
+        <span className={`font-mono ${Number(r.salaryAdvance) > 0 ? 'text-amber-400' : 'text-text-muted'}`}>
           {Number(r.salaryAdvance) > 0 ? `₹${fmt(r.salaryAdvance)}` : '—'}
         </span>
       ),
@@ -647,7 +645,7 @@ const MonthlyPayrollReport: React.FC = () => {
       render: (r) => {
         const tot = Number(r.totalDeductions || (Number(r.lateEntryDeduction || 0) + Number(r.permissionDeduction || 0) + Number(r.salaryAdvance || 0) + Number(r.loanRecovery || 0) + Number(r.otherDeductions || 0)));
         return (
-          <span className={`font-mono font-semibold ${tot > 0 ? 'text-red-600' : 'text-text-muted'}`}>
+          <span className={`font-mono font-semibold ${tot > 0 ? 'text-red-400' : 'text-text-muted'}`}>
             {tot > 0 ? `₹${fmt(tot)}` : '—'}
           </span>
         );
@@ -671,9 +669,8 @@ const MonthlyPayrollReport: React.FC = () => {
       header: 'MODE',
       align: 'center',
       render: (r) => (
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-          r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-        }`}>
+        <span className={`px-2 py-0.5 rounded text-xs font-medium ${r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+          }`}>
           {r.paymentMode}
         </span>
       ),
@@ -757,12 +754,12 @@ const MonthlyPayrollReport: React.FC = () => {
   }
 
   // ── Active data for the selected view ──
-  const activeData    = view === 'PF' ? pfEmployees : view === 'CASH' ? cashEmployees : allResults;
-  const activeColumns = view === 'PF' ? pfColumns   : view === 'CASH' ? cashColumns   : allColumns;
+  const activeData = view === 'PF' ? pfEmployees : view === 'CASH' ? cashEmployees : allResults;
+  const activeColumns = view === 'PF' ? pfColumns : view === 'CASH' ? cashColumns : allColumns;
 
   // ── Pagination ──
   const totalPages = Math.max(1, Math.ceil(activeData.length / pageSize));
-  const pagedData  = activeData.slice((page - 1) * pageSize, page * pageSize);
+  const pagedData = activeData.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="min-h-screen p-6 space-y-5">
@@ -871,16 +868,15 @@ const MonthlyPayrollReport: React.FC = () => {
       <div className="flex justify-center">
         <div className="inline-flex rounded-xl border-2 border-border overflow-hidden shadow-sm">
           {([
-            ['ALL',  `All Employees (${allResults.length})`],
-            ['PF',   `PF / Fixed (${pfEmployees.length})`],
+            ['ALL', `All Employees (${allResults.length})`],
+            ['PF', `PF / Fixed (${pfEmployees.length})`],
             ['CASH', `Cash / Non-PF (${cashEmployees.length})`],
           ] as const).map(([v, label]) => (
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`px-5 py-2.5 text-sm font-semibold transition-colors ${
-                view === v ? 'bg-primary text-white' : 'bg-card text-text-secondary hover:bg-card-2'
-              }`}
+              className={`px-5 py-2.5 text-sm font-semibold transition-colors ${view === v ? 'bg-primary text-white' : 'bg-card text-text-secondary hover:bg-card-2'
+                }`}
             >
               {label}
             </button>
@@ -902,68 +898,68 @@ const MonthlyPayrollReport: React.FC = () => {
 
         {/* Footer Summary Bar matching PayrollRun design */}
         {activeData.length > 0 && (
-          <div className="bg-card border-t border-line-soft overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
+          <div className="bg-surface border-t border-border overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
 
             {/* Left side: TOTAL EMPLOYEES */}
-            <div className="px-6 py-4 flex items-center xl:border-r border-line-soft xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
+            <div className="px-6 py-4 flex items-center xl:border-r border-border xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-card-2 text-ink-muted font-bold">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-card-2 text-text-secondary font-bold">
                   <Users size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest">TOTAL EMPLOYEES</p>
-                  <p className="text-sm font-bold text-ink">{activeData.length}</p>
+                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">TOTAL EMPLOYEES</p>
+                  <p className="text-sm font-bold text-text-primary">{activeData.length}</p>
                 </div>
               </div>
             </div>
 
             {/* Middle: EARNED | OT | GROSS | DEDUCTIONS */}
-            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-line-soft">
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-border">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">EARNED</span>
-                <span className="font-mono font-semibold text-ink">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-0.5">EARNED</span>
+                <span className="font-mono font-semibold text-text-primary">
                   ₹{fmt(activeData.reduce((s, r) => s + Number(r.earnedSalary || 0), 0))}
                 </span>
               </div>
-              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
+              <div className="h-7 w-px bg-border hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">OT</span>
-                <span className="font-mono font-semibold text-emerald-600">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-0.5">OT</span>
+                <span className="font-mono font-semibold text-emerald-400">
                   ₹{fmt(activeData.reduce((s, r) => s + Number(r.otPay || 0), 0))}
                 </span>
               </div>
-              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
+              <div className="h-7 w-px bg-border hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-ink-subtle uppercase tracking-widest mb-0.5">GROSS</span>
-                <span className="font-mono font-bold text-ink">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-0.5">GROSS</span>
+                <span className="font-mono font-bold text-text-primary">
                   ₹{fmt(activeData.reduce((s, r) => s + Number(r.grossSalary || 0), 0))}
                 </span>
               </div>
-              <div className="h-7 w-px bg-line-soft hidden sm:block"></div>
+              <div className="h-7 w-px bg-border hidden sm:block"></div>
 
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5">DEDUCTIONS</span>
-                <span className="font-mono font-semibold text-rose-600">
+                <span className="font-mono font-semibold text-rose-400">
                   PF ₹{fmt(activeData.reduce((s, r) => s + Number((r as any).employeePf || 0), 0))} · ESI ₹{fmt(activeData.reduce((s, r) => s + Number((r as any).employeeEsi || 0), 0))}
                 </span>
               </div>
             </div>
 
             {/* Right side: NET PAY & CASH IN HAND */}
-            <div className="flex items-stretch xl:border-l border-line-soft bg-card-2 w-full xl:w-auto">
-              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-line-soft flex-1 xl:flex-none">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">NET PAY</span>
-                <span className="font-mono text-lg font-black text-emerald-700">
+            <div className="flex items-stretch xl:border-l border-border bg-surface w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-border flex-1 xl:flex-none">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-0.5">NET PAY</span>
+                <span className="font-mono text-lg font-black text-emerald-400">
                   ₹{fmt(activeData.reduce((s, r) => s + Number(r.netSalary || 0), 0))}
                 </span>
               </div>
 
               {activeData.reduce((s, r) => s + Number(r.cashInHand || 0), 0) > 0 && (
-                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50/70 flex-1 xl:flex-none">
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
-                  <span className="font-mono text-lg font-black text-indigo-700">
+                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-950/40 border-l border-border flex-1 xl:flex-none">
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
+                  <span className="font-mono text-lg font-black text-indigo-400">
                     ₹{fmt(activeData.reduce((s, r) => s + Number(r.cashInHand || 0), 0))}
                   </span>
                 </div>
@@ -977,7 +973,7 @@ const MonthlyPayrollReport: React.FC = () => {
       {/* Summary Panel — below table as stat cards */}
       <div className="space-y-4">
         {/* Row 1: Headcount + Financials */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-text-muted">
               <Users size={15} />
@@ -1033,41 +1029,6 @@ const MonthlyPayrollReport: React.FC = () => {
                 label="Total Cash in Hand"
                 value={<span className="text-base font-bold text-indigo-700 font-mono">₹{fmt(totalCashInHand)}</span>}
               />
-            </div>
-          )}
-
-          <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-text-muted">
-              <Clock size={15} />
-              <span className="text-[11px] font-bold uppercase tracking-wide">Attendance</span>
-            </div>
-            <div className="flex gap-3 flex-wrap">
-              <DetailBox label="Present" value={<span className="text-sm font-semibold text-emerald-700">{allTotals.presentDays}</span>} />
-              <DetailBox label="Absent" value={<span className="text-sm font-semibold text-red-600">{allTotals.absentDays}</span>} />
-              {allTotals.lopDays > 0 && (
-                <DetailBox label="LOP" value={<span className="text-sm font-semibold text-red-600">{allTotals.lopDays}</span>} />
-              )}
-            </div>
-          </div>
-
-          {(totalPfLiability > 0 || totalEsiLiability > 0) && (
-            <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex flex-col gap-2">
-              <div className="flex items-center gap-2 text-text-muted">
-                <Shield size={15} />
-                <span className="text-[11px] font-bold uppercase tracking-wide">Statutory</span>
-              </div>
-              {totalPfLiability > 0 && (
-                <DetailBox
-                  label="PF (Emp + Er)"
-                  value={<span className="text-sm font-semibold text-violet-700 font-mono">₹{fmt(totalPfLiability)}</span>}
-                />
-              )}
-              {totalEsiLiability > 0 && (
-                <DetailBox
-                  label="ESI (Emp + Er)"
-                  value={<span className="text-sm font-semibold text-blue-700 font-mono">₹{fmt(totalEsiLiability)}</span>}
-                />
-              )}
             </div>
           )}
         </div>
