@@ -117,7 +117,11 @@ const SALES_PERSONS_INITIAL: SalesPerson[] = [
 
 type TileLayerType = "theme_default" | "satellite" | "streets";
 
-export const SalesPersonLiveMap: React.FC = () => {
+export interface SalesPersonLiveMapProps {
+  className?: string;
+}
+
+export const SalesPersonLiveMap: React.FC<SalesPersonLiveMapProps> = ({ className = "" }) => {
   const { mode } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -142,6 +146,8 @@ export const SalesPersonLiveMap: React.FC = () => {
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
+    let resizeObserver: ResizeObserver | null = null;
+
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current, {
         center: [11.0168, 77.15],
@@ -158,9 +164,25 @@ export const SalesPersonLiveMap: React.FC = () => {
 
       tileLayerRef.current = tileLayer;
       mapInstanceRef.current = map;
+
+      // Force recalculation after initial layout settles
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 150);
+
+      // Invalidate size on any responsive or layout resize
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => {
+          map.invalidateSize();
+        });
+        resizeObserver.observe(mapContainerRef.current);
+      }
     }
 
     return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -297,7 +319,7 @@ export const SalesPersonLiveMap: React.FC = () => {
   return (
     <div
       className={`bg-card border border-line-soft rounded-xl shadow-md flex flex-col overflow-hidden relative transition-all duration-300 ${
-        isFullscreen ? "fixed inset-3 z-50 rounded-2xl shadow-2xl" : "h-full min-h-0"
+        isFullscreen ? "fixed inset-3 z-50 rounded-2xl shadow-2xl" : `h-[460px] min-h-[460px] w-full ${className}`
       }`}
     >
       {/* ── CARD HEADER ────────────────────────────────────── */}
@@ -307,7 +329,7 @@ export const SalesPersonLiveMap: React.FC = () => {
             <FaMapMarkerAlt className="text-xs" />
           </div>
           <div className="text-[12px] uppercase tracking-wider font-extrabold text-ink truncate">
-            Sales Force Live GPS Map
+            Sales Force Live GPS
           </div>
           <span className="inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -329,14 +351,14 @@ export const SalesPersonLiveMap: React.FC = () => {
             }`}
           >
             {isSimulating ? <FaPause className="text-[8px]" /> : <FaPlay className="text-[8px]" />}
-            <span className="hidden sm:inline">{isSimulating ? "Live Feed" : "Paused"}</span>
+            <span className="hidden sm:inline">{isSimulating ? "Live" : "Paused"}</span>
           </button>
 
           {/* Map Layer Switcher */}
           <div className="flex items-center bg-card-2 p-0.5 rounded-lg border border-line-soft gap-0.5 shadow-inner">
             {(
               [
-                { key: "theme_default", label: "Street Map" },
+                { key: "theme_default", label: "Street" },
                 { key: "satellite", label: "Satellite" },
               ] as { key: TileLayerType; label: string }[]
             ).map(({ key, label }) => (

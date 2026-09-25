@@ -1,3 +1,149 @@
+/* Reduce horizontal padding on both sides below 1440px down to 600px */
+@media screen and (max-width: 1440px) and (min-width: 600px) {
+    .layout-content-wrapper {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .dashboard-content-scroll {
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+
+    .top-navbar,
+    .main-header {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+
+/* Below 600px mobile compact padding */
+@media screen and (max-width: 599px) {
+    .layout-content-wrapper {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .dashboard-content-scroll {
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+}
+
+/* Stat Cards Grid: 6 per row above 1200px, 3 per row (3 and 3) below 1200px */
+.stat-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 12px;
+}
+
+@media screen and (max-width: 1200px) {
+    .stat-cards-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 10px;
+    }
+}
+
+@media screen and (max-width: 640px) {
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px;
+    }
+}
+
+/* Dashboard Widgets Grid: Alerts, Recent Transactions, Top Products */
+.dashboard-widgets-grid {
+    display: grid !important;
+    gap: 14px;
+    width: 100%;
+}
+
+/* ══════════════════════════════════════════════════
+   CASE A: WITH Top Products (3 cards)
+   ══════════════════════════════════════════════════ */
+
+/* Above 1400px: Exactly 3 cards in 1 row (Alerts 25% | Transactions 50% | Top Products 25%) */
+@media screen and (min-width: 1400px) {
+    .dashboard-widgets-grid.has-top-products {
+        grid-template-columns: 1fr 2fr 1fr !important;
+        grid-template-areas: "alerts txns products" !important;
+    }
+    .dashboard-widgets-grid.has-top-products .widget-alerts {
+        grid-area: alerts !important;
+    }
+    .dashboard-widgets-grid.has-top-products .widget-transactions {
+        grid-area: txns !important;
+    }
+    .dashboard-widgets-grid.has-top-products .widget-top-products {
+        grid-area: products !important;
+    }
+}
+
+/* Below 1400px down to 768px with Top Products:
+   Row 1: Alerts (50%) + Top Products (50%)
+   Row 2: Recent Transactions (100% full width) -> ZERO WHITE SPACE! */
+@media screen and (max-width: 1399px) and (min-width: 768px) {
+    .dashboard-widgets-grid.has-top-products {
+        grid-template-columns: 1fr 1fr !important;
+        grid-template-areas: 
+            "alerts products"
+            "txns txns" !important;
+    }
+    .dashboard-widgets-grid.has-top-products .widget-alerts {
+        grid-area: alerts !important;
+    }
+    .dashboard-widgets-grid.has-top-products .widget-top-products {
+        grid-area: products !important;
+    }
+    .dashboard-widgets-grid.has-top-products .widget-transactions {
+        grid-area: txns !important;
+    }
+}
+
+/* ══════════════════════════════════════════════════
+   CASE B: WITHOUT Top Products (2 cards: Alerts & Transactions)
+   ══════════════════════════════════════════════════ */
+@media screen and (min-width: 768px) {
+    .dashboard-widgets-grid.no-top-products {
+        grid-template-columns: 1fr 2fr !important;
+        grid-template-areas: "alerts txns" !important;
+    }
+    .dashboard-widgets-grid.no-top-products .widget-alerts {
+        grid-area: alerts !important;
+    }
+    .dashboard-widgets-grid.no-top-products .widget-transactions {
+        grid-area: txns !important;
+    }
+}
+
+/* ══════════════════════════════════════════════════
+   MOBILE (< 768px): 1 column stacked cleanly
+   ══════════════════════════════════════════════════ */
+@media screen and (max-width: 767px) {
+    .dashboard-widgets-grid.has-top-products {
+        grid-template-columns: 1fr !important;
+        grid-template-areas: 
+            "alerts"
+            "products"
+            "txns" !important;
+    }
+    .dashboard-widgets-grid.no-top-products {
+        grid-template-columns: 1fr !important;
+        grid-template-areas: 
+            "alerts"
+            "txns" !important;
+    }
+    .dashboard-widgets-grid .widget-alerts {
+        grid-area: alerts !important;
+    }
+    .dashboard-widgets-grid .widget-top-products {
+        grid-area: products !important;
+    }
+    .dashboard-widgets-grid .widget-transactions {
+        grid-area: txns !important;
+    }
+}
+
 /* Large Desktop */
 @media screen and (max-width: 1440px) {
     .sidebar {
@@ -71,6 +217,13 @@
 @media screen and (max-width: 1100px) {
     .sidebar {
         width: 200px !important;
+    }
+}
+
+/* Tablet Landscape / Below 991px */
+@media screen and (max-width: 991px) {
+    [data-shortcut-panel] {
+        display: none !important;
     }
 }
 
