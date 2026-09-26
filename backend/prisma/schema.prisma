@@ -109,6 +109,7 @@ model Employee {
   salesOrdersAsSource        SalesOrder[]                 @relation("SalesOrderSourceEmployee")
   dailyPlanOperators         DailyPlanOperator[]
   shiftRecordOperators       ProductShiftRecordOperator[]
+  routeAssignments           RouteAssignment[]
 
   @@index([departmentId])
   @@index([roleId])
@@ -372,6 +373,7 @@ model Customer {
   salesOrdersAsReferral SalesOrder[]             @relation("SalesOrderReferredBy")
   accountLedger         AccountLedger?
   salesReturns          SalesReturn[]
+  deliveryRouteStops    DeliveryRouteStop[]
 
   @@unique([companyId, customerCode])
   @@index([companyId, status], map: "idx_cust_company_status")
@@ -2435,4 +2437,59 @@ model EmployeePermanentDeduction {
   employee   Employee @relation(fields: [employeeId], references: [id])
 
   @@map("employee_permanent_deductions")
+}
+
+model DeliveryRoute {
+  id              String              @id @default(uuid()) @db.Uuid
+  code            String              @unique @db.VarChar(30)
+  name            String              @db.VarChar(160)
+  originCity      String              @default("MADURAI") @db.VarChar(80)
+  destinationCity String?             @db.VarChar(80)
+  description     String?             @db.VarChar(500)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(6)
+  
+  stops           DeliveryRouteStop[]
+  assignments     RouteAssignment[]
+
+  @@map("delivery_routes")
+}
+
+model DeliveryRouteStop {
+  id           String        @id @default(uuid()) @db.Uuid
+  routeId      String        @db.Uuid
+  route        DeliveryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  customerId   String?       @db.Uuid
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName String        @db.VarChar(160)
+  city         String        @db.VarChar(80)
+  sequence     Int           @default(1)
+  week         String        @db.VarChar(20)
+  day          String        @db.VarChar(20)
+  plannedTime  String?       @db.VarChar(30)
+  remarks      String?       @db.VarChar(100)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+
+  @@index([routeId])
+  @@index([customerId])
+  @@map("delivery_route_stops")
+}
+
+model RouteAssignment {
+  id         String        @id @default(uuid()) @db.Uuid
+  routeId    String        @db.Uuid
+  route      DeliveryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  employeeId BigInt
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  status     String        @default("ACTIVE") @db.VarChar(30)
+  notes      String?       @db.VarChar(500)
+  createdAt  DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime      @updatedAt @db.Timestamptz(6)
+
+  @@unique([routeId, employeeId])
+  @@index([employeeId])
+  @@index([routeId])
+  @@map("route_assignments")
 }

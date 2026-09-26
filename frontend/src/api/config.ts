@@ -144,5 +144,8 @@ const config = {
     inventory: {
         eodStock: "/inventory/eod-stock",
     },
+    routes: {
+        base: "/routes",
+    },
 }
 export default config;
