@@ -54,6 +54,12 @@ export const sidebarItems: SidebarItem[] = [
             ],
           },
           {
+            title: "Sales Routes",
+            children: [
+              { title: "Route Assignment", path: "/routes" },
+            ],
+          },
+          {
             title: "Suppliers",
             permission: "suppliers.view",
             children: [

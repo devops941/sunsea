@@ -34,6 +34,8 @@ const UserList = lazy(() => import("../modules/users/pages/UserList"));
 const PermissionList = lazy(() => import("../modules/permissions/pages/PermissionList"));
 const Settings = lazy(() => import("../modules/settings/Setting"));
 const AuditLogPage = lazy(() => import("../modules/audit/pages/AuditLogPage"));
+const RouteManagementPage = lazy(() => import("../modules/routes/pages/RouteManagementPage"));
+const RouteAssignFormPage = lazy(() => import("../modules/routes/pages/RouteAssignFormPage"));
 
 // ===========================================================================
 // CATEGORY MASTER
@@ -311,6 +313,10 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permission="departments.view" />}>
                 <Route path="/departments" element={<DepartmentList />} />
               </Route>
+              <Route path="/routes" element={<RouteManagementPage />} />
+              <Route path="/routes/management" element={<RouteManagementPage />} />
+              <Route path="/routes/create" element={<RouteAssignFormPage />} />
+              <Route path="/routes/edit/:id" element={<RouteAssignFormPage />} />
 
               {/* ---------- Category Master ---------- */}
               <Route element={<ProtectedRoute permission="categories.view" />}>

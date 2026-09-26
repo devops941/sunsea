@@ -11,6 +11,9 @@ export const roleService = {
     sortOrder?: "asc" | "desc";
   }): Promise<{ data: Role[]; total: number }> => {
     const response = await apiClient.get(config.role.base, { params: options });
+    const rawData = response.data?.data?.roles || response.data?.roles || response.data?.data || response.data;
+    const list: Role[] = Array.isArray(rawData) ? rawData : [];
+    const total = response.data?.data?.total || response.data?.meta?.total || response.data?.total || list.length;
     return {
       data: response.data?.data || response.data,
       total: response.data?.meta?.total ?? (response.data?.data || response.data).length,

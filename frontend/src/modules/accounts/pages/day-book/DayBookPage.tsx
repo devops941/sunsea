@@ -125,7 +125,23 @@ const DayBookPage: React.FC = () => {
   });
 // F5 = refresh (centralised via usePageShortcuts).  usePageShortcuts({ onRefresh: refresh });
 
-  const dayBook: DayBookResult | null = results[0] || null;
+  const rawDayBook = results[0] || null;
+  // Defensive normalization — API may return a partial shape when there are
+  // no transactions for the selected period (debitRows / creditRows undefined).
+  // Normalise here so every downstream useMemo / component receives safe arrays.
+  const dayBook: DayBookResult | null = rawDayBook
+    ? {
+        ...rawDayBook,
+        debitRows: Array.isArray(rawDayBook.debitRows) ? rawDayBook.debitRows : [],
+        creditRows: Array.isArray(rawDayBook.creditRows) ? rawDayBook.creditRows : [],
+        totals: rawDayBook.totals ?? {
+          cashDrTotal: 0, cashCrTotal: 0,
+          amountDrTotal: 0, amountCrTotal: 0,
+          grandCashDr: 0, grandCashCr: 0,
+          grandAmountDr: 0, grandAmountCr: 0,
+        },
+      }
+    : null;
 
   // Shared row-count target for BOTH Dr and Cr sides so TOTAL / Closing
   // Balance / GRAND TOTAL rows line up horizontally like Busy. We pick the

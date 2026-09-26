@@ -54,6 +54,7 @@ import payrollRoutes from "../modules/payroll/payroll.routes";
 import dashboardRoutes from "../modules/dashboard/dashboard.routes";
 import categoryRoutes from "../modules/category/category.routes";
 import auditRoutes from "../modules/audit/audit.routes";
+import deliveryRoutes from "../modules/routes/routes.routes";
 
 const router = Router();
 
@@ -118,6 +119,7 @@ router.use("/payroll", payrollRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/audit-logs", auditRoutes);
+router.use("/routes", deliveryRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({
