@@ -17,6 +17,7 @@ import { productionOrderService } from "../../../services/productionOrderService
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -518,7 +519,7 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Load machines on mount ──────────────────────────────────────────────
   useEffect(() => {
-    dispatch(fetchMachines());
+    dispatch(fetchMachines({}));
   }, [dispatch]);
 
   // ── Load production orders + existing daily plans for selected week ──────

@@ -17,6 +17,7 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { formatDate } from "../../../utils/dateUtils";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -196,19 +197,19 @@ const GoodsDispatchList: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Status</label>
-                <select
-                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card-2 text-ink font-semibold"
+                <SelectInput
+                  label="Status"
                   value={draftFilterStatus}
                   onChange={(e) => setDraftFilterStatus(e.target.value)}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="PENDING_GATE_APPROVAL">Pending Gate Approval</option>
-                  <option value="PENDING_STORE_RECEIPT">Pending Store Receipt</option>
-                  <option value="WAREHOUSE_RECEIVED">Warehouse Received</option>
-                  <option value="GATE_REJECTED">Gate Rejected</option>
-                  <option value="STORE_REJECTED">Store Rejected</option>
-                </select>
+                  defaultOptionLabel="All Statuses"
+                  options={[
+                    { label: "Pending Gate Approval", value: "PENDING_GATE_APPROVAL" },
+                    { label: "Pending Store Receipt", value: "PENDING_STORE_RECEIPT" },
+                    { label: "Warehouse Received", value: "WAREHOUSE_RECEIVED" },
+                    { label: "Gate Rejected", value: "GATE_REJECTED" },
+                    { label: "Store Rejected", value: "STORE_REJECTED" },
+                  ]}
+                />
               </div>
               <div className="mb-3">
                 <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date From</label>

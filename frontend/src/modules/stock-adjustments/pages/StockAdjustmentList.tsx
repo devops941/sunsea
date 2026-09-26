@@ -168,7 +168,7 @@ const getPrimaryUom = (uomStr?: string) => {
   if (!uomStr) return "";
   const first = uomStr.split(",")[0].trim();
   const l = first.toLowerCase();
-  if (l === "ea" || l === "each" || l === "piece" || l === "pcs") return "pcs";
+  if (l === "ea" || l === "each" || l === "piece" || l === "pcs" || l === "nos" || l === "no") return "pcs";
   return first;
 };
 

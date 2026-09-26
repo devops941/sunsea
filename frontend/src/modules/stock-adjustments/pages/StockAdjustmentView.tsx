@@ -22,6 +22,7 @@ import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { formatDate } from "../../../utils/dateUtils";
+import { formatQtyValue } from "../../../utils/uomConversion";
 
 const ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
   PRODUCTION_MATERIAL_ISSUE: "Production Material Issue",
@@ -38,7 +39,7 @@ const ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
 const formatUomStr = (raw: string): string => {
   if (!raw) return "";
   const first = String(raw).split(",")[0].trim().toLowerCase();
-  if (first === "ea" || first === "each") return "pcs";
+  if (first === "ea" || first === "each" || first === "piece" || first === "pcs" || first === "nos" || first === "no") return "pcs";
   return first;
 };
 
@@ -133,7 +134,7 @@ const StockAdjustmentView: React.FC = () => {
           const uom = getItemUom(item);
           return (
             <span className="font-mono text-xs text-ink font-semibold">
-              {Number(item.currentQty).toFixed(3)} {uom}
+              {formatQtyValue(item.currentQty, uom)} {uom}
             </span>
           );
         },
@@ -145,7 +146,7 @@ const StockAdjustmentView: React.FC = () => {
           const uom = getItemUom(item);
           return (
             <span className="font-mono text-xs text-ink font-semibold">
-              {Number(item.adjustedQty).toFixed(3)} {uom}
+              {formatQtyValue(item.adjustedQty, uom)} {uom}
             </span>
           );
         },
@@ -157,7 +158,7 @@ const StockAdjustmentView: React.FC = () => {
           const uom = getItemUom(item);
           return (
             <span className="font-extrabold text-red-400 font-mono text-xs">
-              {Math.abs(Number(item.difference)).toFixed(3)} {uom}
+              {formatQtyValue(Math.abs(Number(item.difference)), uom)} {uom}
             </span>
           );
         },
@@ -224,7 +225,7 @@ const StockAdjustmentView: React.FC = () => {
           const uom = getItemUom(item);
           return (
             <span className="font-mono text-xs text-ink font-semibold">
-              {Number(item.currentQty).toFixed(3)} {uom}
+              {formatQtyValue(item.currentQty, uom)} {uom}
             </span>
           );
         },
@@ -237,7 +238,7 @@ const StockAdjustmentView: React.FC = () => {
           const uom = getItemUom(item);
           return (
             <span className="font-mono text-xs text-ink font-semibold">
-              {Number(item.adjustedQty).toFixed(3)} {uom}
+              {formatQtyValue(item.adjustedQty, uom)} {uom}
             </span>
           );
         },
@@ -247,15 +248,17 @@ const StockAdjustmentView: React.FC = () => {
         width: "130px",
         align: "right",
         render: (item) => {
-          const diff = Number(item.difference);
+          const diff = Number(item.difference || 0);
           const uom = getItemUom(item);
+          const formatted = formatQtyValue(Math.abs(diff), uom);
+          const sign = diff > 0 ? "+" : diff < 0 ? "-" : "";
           return (
             <span
               className={`font-extrabold font-mono text-xs ${
                 diff > 0 ? "text-emerald-400" : diff < 0 ? "text-red-400" : "text-ink-subtle"
               }`}
             >
-              {diff > 0 ? `+${diff.toFixed(3)}` : diff.toFixed(3)} {uom}
+              {sign}{formatted} {uom}
             </span>
           );
         },
@@ -445,6 +448,7 @@ const StockAdjustmentView: React.FC = () => {
               rowKey={(row) => row.id || `${row.rawMaterialId || row.productItemId}-${Math.random()}`}
               density="compact"
               emptyMessage="No items found"
+              minHeightClassName="min-h-0"
             />
           </div>
         </div>

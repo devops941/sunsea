@@ -21,7 +21,7 @@ import { fetchRawMaterialStocks } from "../../../features/raw-materials/rawMater
 import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
-import { convertUomQty, getUomOptions } from "../../../utils/uomConversion";
+import { convertUomQty, getUomOptions, formatQtyValue } from "../../../utils/uomConversion";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
@@ -203,7 +203,7 @@ const StockAdjustmentForm: React.FC = () => {
     if (!uomStr) return "pcs";
     const first = uomStr.split(",")[0].trim();
     const l = first.toLowerCase();
-    if (l === "ea" || l === "each" || l === "piece" || l === "pcs") return "pcs";
+    if (l === "ea" || l === "each" || l === "piece" || l === "pcs" || l === "nos" || l === "no") return "pcs";
     return first;
   };
 
@@ -780,35 +780,35 @@ const StockAdjustmentForm: React.FC = () => {
       header: "Req Qty",
       width: "80px",
       align: "center" as const,
-      render: (item: any) => <span className="text-ink-muted text-xs">{Number(item.requiredQty).toFixed(2)}</span>,
+      render: (item: any) => <span className="text-ink-muted text-xs">{formatQtyValue(item.requiredQty, item.uom, 2)}</span>,
     },
     {
       key: "reservedQty",
       header: "Reserved",
       width: "80px",
       align: "center" as const,
-      render: (item: any) => <span className="text-ink-muted text-xs">{Number(item.reservedQty).toFixed(2)}</span>,
+      render: (item: any) => <span className="text-ink-muted text-xs">{formatQtyValue(item.reservedQty, item.uom, 2)}</span>,
     },
     {
       key: "alreadyIssuedQty",
       header: "Issued",
       width: "80px",
       align: "center" as const,
-      render: (item: any) => <span className="text-ink-muted text-xs">{Number(item.alreadyIssuedQty).toFixed(2)}</span>,
+      render: (item: any) => <span className="text-ink-muted text-xs">{formatQtyValue(item.alreadyIssuedQty, item.uom, 2)}</span>,
     },
     {
       key: "remainingQty",
       header: "Remaining",
       width: "90px",
       align: "center" as const,
-      render: (item: any) => <span className="text-amber-400 font-semibold text-xs">{Number(item.remainingQty).toFixed(2)}</span>,
+      render: (item: any) => <span className="text-amber-400 font-semibold text-xs">{formatQtyValue(item.remainingQty, item.uom, 2)}</span>,
     },
     {
       key: "availableStock",
       header: "Avail Stock",
       width: "90px",
       align: "center" as const,
-      render: (item: any) => <span className="text-emerald-400 font-semibold text-xs">{Number(item.availableStock).toFixed(2)}</span>,
+      render: (item: any) => <span className="text-emerald-400 font-semibold text-xs">{formatQtyValue(item.availableStock, item.uom, 2)}</span>,
     },
     {
       key: "uom",

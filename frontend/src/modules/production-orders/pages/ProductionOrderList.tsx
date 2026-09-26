@@ -11,8 +11,6 @@ import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
-import IconButton from "../../../components/ui/IconButton/IconButton";
-import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
@@ -21,8 +19,6 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { machineService } from "../../../services/machineService";
 import { productionOrderService } from "../../../services/productionOrderService";
-import type { ProductionOrder } from "../../../services/productionOrderService";
-import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -33,7 +29,6 @@ type SortOrder = "default" | "asc" | "desc";
 
 interface FilterState {
     status: string;
-    orderType: string;
     machineId: string;
     fromDate: string;
     toDate: string;
@@ -41,7 +36,6 @@ interface FilterState {
 
 const DEFAULT_FILTERS: FilterState = {
     status: "",
-    orderType: "",
     machineId: "",
     fromDate: "",
     toDate: "",
@@ -52,11 +46,6 @@ const statusOptions = [
     { label: "Weekly Scheduled", value: "WEEKLY_SCHEDULED" },
     { label: "In Progress", value: "IN_PROGRESS" },
     { label: "Completed", value: "COMPLETED" },
-];
-
-const orderTypeOptions = [
-    { label: "Weekly Plan", value: "weekly-group" },
-    { label: "Direct Order", value: "standalone" },
 ];
 
 const ProductionOrderList: React.FC = () => {
@@ -94,50 +83,9 @@ const ProductionOrderList: React.FC = () => {
 
     const [machines, setMachines] = useState<any[]>([]);
 
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
-    const [fullOrder, setFullOrder] = useState<any>(null);
-    const [loadingDetails, setLoadingDetails] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
-
-    const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
-
-
-
-    // Fetch raw materials map
-    const fetchRawMaterials = useCallback(async () => {
-        try {
-            const data = await rawMaterialService.fetchAll();
-            const arr = Array.isArray(data) ? data : ((data as any)?.rawMaterials ?? []);
-            const map = new Map<string, any>();
-            arr.forEach((rm: any) => map.set(rm.rawMaterialId?.toString(), rm));
-            setRawMaterialsMap(map);
-        } catch {
-            // silently ignore
-        }
-    }, []);
-
-    const fetchOrderDetails = useCallback(async (id: string) => {
-        setLoadingDetails(true);
-        try {
-            const data = (await productionOrderService.getById(id)) as any;
-            if (data && data.products) {
-                data.products = data.products.map((p: any) => ({
-                    ...p,
-                    productionOrderId: data.productionOrderId,
-                    status: data.status
-                }));
-            }
-            setFullOrder(data);
-        } catch {
-            toast.error("Failed to load production order details");
-        } finally {
-            setLoadingDetails(false);
-        }
-    }, []);
-
 
     const fetchMachines = useCallback(async () => {
         try {
@@ -150,9 +98,8 @@ const ProductionOrderList: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        fetchRawMaterials();
         fetchMachines();
-    }, [fetchRawMaterials, fetchMachines]);
+    }, [fetchMachines]);
 
     const machineOptions = useMemo(() => {
         return machines.map((m: any) => {
@@ -191,11 +138,10 @@ const ProductionOrderList: React.FC = () => {
         return match ? match[1] : null;
     };
 
-    // Fetch and combine Sales Orders and Production Orders
+    // Fetch and combine Production Orders
     const fetchCombinedData = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch Production Orders
             let poList: any[] = [];
             try {
                 const poRes = await productionOrderService.fetchAll({
@@ -209,13 +155,10 @@ const ProductionOrderList: React.FC = () => {
             }
 
             // Group all POs — weekly plan POs by base ID, standalone as-is
-            const directPOs = poList;
-
-            // Group direct POs — weekly plan POs by base ID, standalone as-is
             const weeklyGroupMap = new Map<string, any[]>();
             const standalonePOs: any[] = [];
 
-            directPOs.forEach((po: any) => {
+            poList.forEach((po: any) => {
                 const baseId = getBaseId(po.productionOrderId);
                 if (baseId) {
                     if (!weeklyGroupMap.has(baseId)) weeklyGroupMap.set(baseId, []);
@@ -258,7 +201,6 @@ const ProductionOrderList: React.FC = () => {
                     weekEnd: firstPO.weekEndDate,
                     status: overallStatus,
                     children: pos,
-                    isDirect: true,
                     primaryPO: firstPO,
                 };
             });
@@ -274,12 +216,9 @@ const ProductionOrderList: React.FC = () => {
                     orderNo: po.productionOrderId,
                     orderDate: po.orderDate,
                     expectedCompletionDate: po.dueDate,
-                    customer: { firmName: 'Direct Production Order' },
                     status: effectiveStatus,
                     productionOrders: [po],
                     primaryPO: po,
-                    isDirect: true,
-                    items: [{ product: po.productItem, quantity: po.targetQty }]
                 };
             });
 
@@ -289,11 +228,6 @@ const ProductionOrderList: React.FC = () => {
             // Apply status filter
             if (appliedFilters.status) {
                 combinedList = combinedList.filter(item => item.status?.toUpperCase() === appliedFilters.status.toUpperCase());
-            }
-
-            // Apply order type filter
-            if (appliedFilters.orderType) {
-                combinedList = combinedList.filter(item => item.type === appliedFilters.orderType);
             }
 
             // Apply machine filter
@@ -328,7 +262,7 @@ const ProductionOrderList: React.FC = () => {
                 const q = searchTerm.trim().toLowerCase();
                 combinedList = combinedList.filter((item: any) => {
                     const poNo = (item.primaryPO?.productionOrderId || item.orderNo || item.baseId || "").toLowerCase();
-                    const products = (item.productionOrders || item.items || item.children || [])
+                    const products = (item.productionOrders || item.children || [])
                         .map((p: any) => (p.productItem?.productName || p.product?.productName || "").toLowerCase())
                         .join(" ");
                     return poNo.includes(q) || products.includes(q);
@@ -365,6 +299,7 @@ const ProductionOrderList: React.FC = () => {
     const tableRef = useRef<HTMLDivElement>(null);
 
     const handleOpenWeeklyPlan = useCallback((item: any) => {
+        if (!can("production_orders.view")) return;
         navigate(
             `/production-orders/weekly-plan/${item.baseId}`,
             {
@@ -376,9 +311,10 @@ const ProductionOrderList: React.FC = () => {
                 }
             }
         );
-    }, [navigate]);
+    }, [can, navigate]);
 
     const handleEditWeeklyPlan = useCallback((item: any) => {
+        if (!can("production_orders.edit")) return;
         navigate(
             '/production-orders/create',
             {
@@ -391,23 +327,23 @@ const ProductionOrderList: React.FC = () => {
                 }
             }
         );
-    }, [navigate]);
+    }, [can, navigate]);
 
     const handleOpenEdit = useCallback((po: any) => {
+        if (!can("production_orders.edit")) return;
         navigate(`/production-orders/edit/${po.productionOrderId}`);
-    }, [navigate]);
+    }, [can, navigate]);
 
     const handleOpenViewItem = useCallback((item: any) => {
+        if (!can("production_orders.view")) return;
         if (item.type === 'weekly-group') {
             handleOpenWeeklyPlan(item);
             return;
         }
         if (!item.primaryPO) return;
-        setSelectedItem(item.primaryPO);
-        setFullOrder(null);
-        setShowViewModal(true);
-        fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
-    }, [fetchOrderDetails, handleOpenWeeklyPlan]);
+        const poId = item.primaryPO.productionOrderId || item.primaryPO.id;
+        navigate(`/production-orders/history/view/${poId}`, { state: { order: item.primaryPO } });
+    }, [can, navigate, handleOpenWeeklyPlan]);
 
     const { focusedIndex, setFocusedIndex } = useTableKeyboardNav({
         count: combinedData.length,
@@ -436,6 +372,7 @@ const ProductionOrderList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (!itemToDelete || itemToDelete.length === 0 || isDeleting) return;
+        if (!can("production_orders.delete")) return;
         setIsDeleting(true);
         try {
             for (const id of itemToDelete) {
@@ -443,8 +380,12 @@ const ProductionOrderList: React.FC = () => {
             }
             toast.success("Production order(s) deleted successfully!");
             setShowDeleteModal(false);
+            if (combinedData.length <= itemToDelete.length && currentPage > 1) {
+                setCurrentPage(prev => Math.max(1, prev - 1));
+            }
             setItemToDelete([]);
             fetchCombinedData();
+            setTimeout(() => tableRef.current?.focus({ preventScroll: true }), 100);
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to delete order(s)");
         } finally {
@@ -561,7 +502,7 @@ const ProductionOrderList: React.FC = () => {
                 }
                 const productsList = item.productionOrders && item.productionOrders.length > 0
                     ? item.productionOrders.map((po: any) => po.productItem?.productName || "Unknown").join(", ")
-                    : item.items?.map((it: any) => it.product?.productName || "Unknown").join(", ") || "—";
+                    : "—";
                 return <span className="text-ink-muted text-xs">{productsList}</span>;
             },
         },
@@ -601,12 +542,7 @@ const ProductionOrderList: React.FC = () => {
                     <div className="flex items-center gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
                         {item.primaryPO && can("production_orders.view") && (
                             <ViewButton
-                                onClick={() => {
-                                    setSelectedItem(item.primaryPO);
-                                    setFullOrder(null);
-                                    setShowViewModal(true);
-                                    fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
-                                }}
+                                onClick={() => handleOpenViewItem(item)}
                             />
                         )}
                         {isStandaloneEditable && (
@@ -632,7 +568,7 @@ const ProductionOrderList: React.FC = () => {
         handleEditWeeklyPlan,
         triggerDelete,
         handleOpenEdit,
-        fetchOrderDetails,
+        handleOpenViewItem,
     ]);
 
     const handleDeleteCurrentRow = useCallback(() => {
@@ -662,132 +598,6 @@ const ProductionOrderList: React.FC = () => {
         onDelete: handleDeleteCurrentRow,
         onNew: () => can("production_orders.create") && navigate("/production-orders/create"),
     });
-
-    const hasInsufficientStock = fullOrder?.products?.some((p: any) =>
-        p.rawMaterials?.some((rm: any) => {
-            const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-            const required = Number(rm.requiredQty || 0);
-            let available = stockRm 
-                ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
-                : Number(rm.availableStock || 0);
-            const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
-            if (isReservedStatus && stockRm) {
-                available += required;
-            }
-            return rm.status ? rm.status === "INSUFFICIENT" : available < required;
-        })
-    );
-
-    const modalSections = selectedItem
-        ? [
-            {
-                title: "Order Information",
-                fields: [
-                    { label: "Order No", value: fullOrder?.productionOrderId || selectedItem.productionOrderId },
-                ],
-            },
-            {
-                title: "Schedule & Additional Details",
-                fields: [
-                    { label: "Order Date", value: formatDate(fullOrder?.orderDate || selectedItem.orderDate) },
-                    { label: "Due Date", value: formatDate(fullOrder?.dueDate || selectedItem.dueDate) },
-                    { label: "Remarks", value: fullOrder?.remarks || selectedItem.remarks || "N/A" },
-                ],
-            },
-        ]
-        : [];
-
-    const modalCustomContent = (
-        <div>
-            {hasInsufficientStock && (
-                <div className="alert alert-danger d-flex align-items-center gap-2 mb-4 fw-medium" role="alert" style={{ borderRadius: '8px', fontSize: '14px' }}>
-                    <span>One or more required raw materials have insufficient stock. Please create a Raw Material Order before proceeding to Weekly Machine Assignment.</span>
-                </div>
-            )}
-
-            {loadingDetails ? (
-                <div className="text-center p-4">
-                    <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-6 w-6 inline-block mr-2"></div> Loading details...
-                </div>
-            ) : (
-                fullOrder?.products?.map((prod: any, idx: number) => (
-                    <div key={idx} className="mt-4 border-t border-line pt-4">
-                        <h6 className="text-base font-bold text-ink mb-3">Product {idx + 1}: {prod.productName} ({prod.productCode})</h6>
-                        
-                        <div className="grid grid-cols-3 gap-4 mb-4 bg-card-2 p-4 rounded-xl border border-line-soft">
-                            <div>
-                                <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Production Qty</div>
-                                <div className="text-sm font-bold text-ink mt-1">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Weight Used</div>
-                                <div className="text-sm font-bold text-ink mt-1">{Number(prod.weightPerPieceUsed || 0).toFixed(3)} KG</div>
-                            </div>
-                            <div>
-                                <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Unit (UOM)</div>
-                                <div className="text-sm font-bold text-ink mt-1">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
-                            </div>
-                        </div>
-
-                        <div className="text-sm font-semibold text-ink-muted mb-2 mt-4">Required Raw Materials</div>
-                        <div className="w-full border border-line rounded-lg overflow-hidden mb-3">
-                            <table className="w-full text-left border-collapse text-sm">
-                                <thead className="bg-card-2 border-b border-line text-ink-muted">
-                                    <tr>
-                                        <th className="p-2 font-semibold">RAW MATERIAL CODE</th>
-                                        <th className="p-2 font-semibold">RAW MATERIAL NAME</th>
-                                        <th className="p-2 font-semibold text-right">REQUIRED QTY</th>
-                                        <th className="p-2 font-semibold text-right">AVAILABLE STOCK</th>
-                                        <th className="p-2 font-semibold text-center">STOCK STATUS</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-line bg-card">
-                                    {prod.rawMaterials?.map((rm: any) => {
-                                        const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-                                        const required = Number(rm.requiredQty || 0);
-                                        let available = stockRm 
-                                            ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
-                                            : Number(rm.availableStock || 0);
-                                        const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
-                                        if (isReservedStatus && stockRm) {
-                                            available += required;
-                                        }
-                                        const materialName = rm.materialName || stockRm?.materialName || rm.rawMaterialId;
-                                        const isAvailable = rm.status ? rm.status === "AVAILABLE" : available >= required;
-                                        
-                                        // Get correct UOM
-                                        let displayUom = stockRm?.baseUom?.split(',')[0] || rm.uom || stockRm?.uom || "KG";
-                                        if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
-                                            displayUom = 'pcs';
-                                        }
-
-                                        return (
-                                            <tr key={rm.rawMaterialId} className="hover:bg-card-2 transition-colors">
-                                                <td className="p-2 font-semibold text-ink-muted">{rm.rawMaterialId}</td>
-                                                <td className="p-2 text-ink-muted">{materialName}</td>
-                                                <td className="p-2 text-right text-ink-muted">{required.toFixed(2)} {displayUom}</td>
-                                                <td className="p-2 text-right text-ink-muted">{available.toFixed(2)} {displayUom}</td>
-                                                <td className="p-2 text-center">
-                                                    <StatusBadge status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"} />
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {(!prod.rawMaterials || prod.rawMaterials.length === 0) && (
-                                        <tr>
-                                            <td colSpan={5} className="text-center text-ink-subtle p-4">
-                                                No raw materials defined for this product.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                ))
-            )}
-        </div>
-    );
 
     return (
         <div className="w-full flex-1 flex flex-col min-h-0">
@@ -825,24 +635,6 @@ const ProductionOrderList: React.FC = () => {
                                         noMargin
                                         onChange={(e) =>
                                             setDraftFilters((p) => ({ ...p, status: e.target.value }))
-                                        }
-                                    />
-                                </div>
-
-                                {/* Order Type */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
-                                        Order Type
-                                    </label>
-                                    <SelectInput
-                                        name="filterOrderType"
-                                        value={draftFilters.orderType}
-                                        options={orderTypeOptions}
-                                        defaultOptionLabel="All Types"
-                                        searchable={false}
-                                        noMargin
-                                        onChange={(e) =>
-                                            setDraftFilters((p) => ({ ...p, orderType: e.target.value }))
                                         }
                                     />
                                 </div>
@@ -928,16 +720,6 @@ const ProductionOrderList: React.FC = () => {
                             </span>
                         )}
 
-                        {appliedFilters.orderType && (
-                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
-                                Type: {orderTypeOptions.find(t => t.value === appliedFilters.orderType)?.label || appliedFilters.orderType}
-                                <FaTimes
-                                    className="cursor-pointer hover:opacity-75 ml-0.5"
-                                    onClick={() => { setAppliedFilters((p) => ({ ...p, orderType: "" })); setCurrentPage(1); }}
-                                />
-                            </span>
-                        )}
-
                         {appliedFilters.machineId && (
                             <span className="flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-medium">
                                 Machine: {machineOptions.find(m => String(m.value) === String(appliedFilters.machineId))?.label || appliedFilters.machineId}
@@ -968,13 +750,13 @@ const ProductionOrderList: React.FC = () => {
                             </span>
                         )}
 
-                        <button
-                            type="button"
+                        <CustomButton
+                            text="Clear all"
+                            variant="secondary"
+                            size="sm"
                             onClick={handleClearFilters}
-                            className="text-xs text-ink-subtle hover:text-danger underline ml-1 cursor-pointer bg-transparent border-none p-0"
-                        >
-                            Clear all
-                        </button>
+                            className="!h-6 !px-2.5 !text-xs !rounded-full !font-medium hover:!text-danger ml-1"
+                        />
                     </div>
                 )}
 
@@ -988,7 +770,7 @@ const ProductionOrderList: React.FC = () => {
                         emptyMessage="No production orders found."
                         className="border-0 rounded-none shadow-none flex-1 flex flex-col min-h-0"
                         minHeightClassName="min-h-0 flex-1"
-                        rowClassName={(_, idx) => (idx === focusedIndex ? "bg-primary/8 font-medium" : "")}
+                        rowClassName={(_, idx) => (idx === focusedIndex ? "bg-primary/8 font-medium ring-1 ring-inset ring-primary/30" : "")}
                         onRowClick={(item, idx) => {
                             setFocusedIndex(idx);
                             tableRef.current?.focus({ preventScroll: true });
@@ -1011,24 +793,6 @@ const ProductionOrderList: React.FC = () => {
                 </div>
 
             </div>
-
-            {/* VIEW PO MODAL */}
-            <CommonViewModal
-                show={showViewModal}
-                onHide={() => {
-                    setShowViewModal(false);
-                    setSelectedItem(null);
-                    setFullOrder(null);
-                    setTimeout(() => tableRef.current?.focus(), 100);
-                }}
-                modalTitle="Production Order Details"
-                avatarText={selectedItem ? "PO" : ""}
-                headerTitle={selectedItem ? (fullOrder?.productionOrderId || selectedItem.productionOrderId) : ""}
-                headerSubtitle={selectedItem ? `Customer: ${fullOrder?.salesOrderDetails?.customerName || selectedItem.salesOrderDetails?.customerName || "Direct"}` : ""}
-                statusNode={selectedItem ? <StatusBadge status={fullOrder?.status || selectedItem.status} /> : undefined}
-                sections={modalSections}
-                customContent={modalCustomContent}
-            />
 
             {/* DELETE PO MODAL */}
             <CommonConfirmModal
