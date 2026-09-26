@@ -157,7 +157,7 @@ export const HourlyProductionEntryPage: React.FC = () => {
       setEmployees(Array.isArray(empList) ? empList : empList?.employees || []);
       setRawMaterials(Array.isArray(rmRes) ? rmRes : []);
       setWastageStores(Array.isArray(storeRes) ? storeRes : []);
-      const roleList = Array.isArray(roleRes) ? roleRes : roleRes?.data?.roles || roleRes?.roles || roleRes?.data || [];
+      const roleList = Array.isArray(roleRes) ? roleRes : Array.isArray(roleRes?.data) ? roleRes.data : [];
       setRoles(roleList);
 
       // Fetch Product Highest Capacity / Shift Record and PO Stats
