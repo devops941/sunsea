@@ -181,10 +181,12 @@ export const issueRawMaterialsSchema = z.object({
     items: z
       .array(
         z.object({
-          rawMaterialId: z.string().min(1).max(20),
-          storeId: z.string().min(1).max(20),
+          rawMaterialId: z.string().min(1).max(50),
+          storeId: z.string().min(1).max(50),
           issuedQty: z.number().positive("Issued quantity must be greater than 0"),
           remarks: z.string().max(255).optional(),
+          itemType: z.enum(["RAW_MATERIAL", "FINISHED_GOODS"]).optional(),
+          productItemId: z.union([z.string(), z.number()]).optional(),
         })
       )
       .min(1, "At least one item is required"),

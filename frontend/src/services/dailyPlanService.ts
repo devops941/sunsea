@@ -104,7 +104,14 @@ export const dailyPlanService = {
 
   issueRawMaterials: async (
     date: string,
-    items: Array<{ rawMaterialId: string; storeId: string; issuedQty: number; remarks?: string }>
+    items: Array<{
+      rawMaterialId: string;
+      storeId: string;
+      issuedQty: number;
+      remarks?: string;
+      itemType?: "RAW_MATERIAL" | "FINISHED_GOODS";
+      productItemId?: string;
+    }>
   ) => {
     const response = await apiClient.post(`${BASE}/issue-raw-materials`, { date, items });
     return response.data;

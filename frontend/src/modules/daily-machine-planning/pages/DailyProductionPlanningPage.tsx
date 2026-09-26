@@ -4,9 +4,9 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  FaPlus, FaPlay, FaStop, FaCalendarAlt, FaIndustry,
-  FaCheckCircle, FaInfoCircle, FaChartBar, FaBoxOpen,
-  FaEye, FaPencilAlt, FaExclamationTriangle, FaSpinner,
+  FaPlus, FaStop, FaCalendarAlt,
+  FaCheckCircle, FaChartBar, FaBoxOpen,
+  FaEye, FaExclamationTriangle, FaSpinner,
 } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -14,33 +14,25 @@ import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchDailyPlans, updateDailyPlan, dailyPlanCreated, dailyPlanUpdated, dailyPlanDeleted } from "../../../features/daily-plans/dailyPlanSlice";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import CustomButton from "../../../components/ui/Button/Button";
-import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import TextArea from "../../../components/form/TextArea/TextArea";
-import { ProductionOrderViewModal } from "../../production-orders/components/ProductionOrderViewModal";
 import { rawMaterialService } from "../../../services/rawMaterialService";
-import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
 import { usePermission } from "../../../hooks/usePermission";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { useFormShortcuts } from "../../../hooks/useFormShortcuts";
-import DailyPlanViewModal from "../components/DailyPlanViewModal";
 import DailyRawMaterialIssueModal from "../components/DailyRawMaterialIssueModal";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import DailyProductionBoard, {
   DAY_NAMES,
   type DayName,
-  SHIFT_SLOTS,
   type ShiftSlot,
   shortDate,
-  RM_ISSUED_DOT,
-  STATUS_BOARD_DOT,
   calcProduced,
   countLoggedEntries,
-  hasDraftHourly,
 } from "../components/DailyProductionBoard";
 
 // ── Status config ────────────────────────────────────────────
@@ -101,8 +93,6 @@ const DailyProductionPlanningPage: React.FC = () => {
   // ── Modals ────────────────────────────────────────────────
   const [showStatusModal,          setShowStatusModal]          = useState(false);
   const [showStopModal,            setShowStopModal]            = useState(false);
-  const [showDailyPlanViewModal,   setShowDailyPlanViewModal]   = useState(false);
-  const [selectedDailyPlanForView, setSelectedDailyPlanForView] = useState<any>(null);
   const [showPOViewModal,          setShowPOViewModal]          = useState(false);
   const [selectedPOForView,        setSelectedPOForView]        = useState<any>(null);
   const [showDeleteWeekModal,      setShowDeleteWeekModal]      = useState(false);
@@ -130,6 +120,9 @@ const DailyProductionPlanningPage: React.FC = () => {
     samplePlans: Array<{ dailyPlanId: string; productionDate: string; machineName: string; shiftName: string; productName: string; plannedQty: number; status: string; }>;
   }>(null);
 
+  // ── Global Keyboard & Click Listeners ─────────────────────────────────
+  // Closes the card right-click context menu, week selection modal, or resets
+  // day filter to "ALL" when the Escape key is pressed or user clicks outside.
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,6 +146,9 @@ const DailyProductionPlanningPage: React.FC = () => {
     };
   }, [contextMenu, showWeekSelectModal, selectedDay]);
 
+  // ── Load Raw Materials Map ─────────────────────────────────────────────
+  // Loads all raw materials on component mount and builds a lookup Map
+  // (ID -> Material) for quick stock checking and material issuance.
   useEffect(() => {
     rawMaterialService.fetchAll().then((res) => {
       const map = new Map();
@@ -162,7 +158,9 @@ const DailyProductionPlanningPage: React.FC = () => {
     }).catch(console.error);
   }, []);
 
-  // ── Auto-check week when modal is open or date changes ───
+  // ── Auto-Check Week Availability ───────────────────────────────────────
+  // Checks if plans already exist for the selected week whenever the "New Daily Plan"
+  // modal is opened or the chosen date changes, allowing Create vs View/Edit flow.
   useEffect(() => {
     if (!showWeekSelectModal || !weekSelectDate) return;
     const ws = snapToMonday(weekSelectDate);
@@ -176,34 +174,46 @@ const DailyProductionPlanningPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [showWeekSelectModal, weekSelectDate]);
 
-  // ── Data loading ──────────────────────────────────────────
+  // ── Initial Machine Data Fetch ──────────────────────────────────────────
+  // Fetches available production machines from the Redux store on mount.
   useEffect(() => {
     dispatch(fetchMachines({ limit: 1000 }));
   }, [dispatch]);
 
+  // ── Load / Refresh Daily Plans ──────────────────────────────────────────
+  // Dispatches Redux action to load or re-fetch all daily production plans.
   const loadDailyPlans = useCallback(() => {
     dispatch(fetchDailyPlans(undefined));
   }, [dispatch]);
 
+  // Re-fetch daily plans whenever route or location key changes
   useEffect(() => { loadDailyPlans(); }, [loadDailyPlans, location.key]);
 
+  // ── Realtime WebSocket Synchronizations ────────────────────────────────
+  // Listens to socket events and automatically refreshes daily plans when
+  // plans, hourly logs, weekly programs, or orders are updated.
   useSocketSync("dailyPlan", { created: dailyPlanCreated, updated: dailyPlanUpdated, deleted: dailyPlanDeleted }, loadDailyPlans);
   useSocketSync("hourlyProduction", undefined, loadDailyPlans);
   useSocketSync("weeklyProgram",    undefined, loadDailyPlans);
   useSocketSync("productionOrder",  undefined, loadDailyPlans);
 
-  // ── Fetch RM-issued dates whenever the board week changes ────────────────
+  // ── Fetch RM-Issued Dates ──────────────────────────────────────────────
+  // Fetches which dates in the active board week have raw materials already issued,
+  // preventing operators from recording production before materials are handed out.
   const fetchRmIssuedDates = useCallback((week: string) => {
     dailyPlanService.getRmIssuedDates(week)
       .then((dates) => setRmIssuedDates(new Set(dates)))
       .catch(() => {});
   }, []);
 
+  // Re-fetch RM issued status whenever the selected board week changes
   useEffect(() => { fetchRmIssuedDates(boardWeek); }, [boardWeek, fetchRmIssuedDates]);
 
-  // ── Derived ───────────────────────────────────────────────
+  // ── Derived State & Board Calculations ─────────────────────────────────
+  // Sanitizes daily plans from Redux state into a safe array
   const allPlans = useMemo(() => Array.isArray(dailyPlans) ? dailyPlans : [], [dailyPlans]);
 
+  // All planned dates used to highlight dots in the week calendar picker
   const plannedDates = useMemo(() =>
     allPlans
       .filter((p: any) => p.status !== "CANCELLED")
@@ -212,19 +222,26 @@ const DailyProductionPlanningPage: React.FC = () => {
     [allPlans]
   );
 
+  // Array of 6 date strings (Monday through Saturday) for the active board week
   const boardWeekDates = useMemo(() => DAY_NAMES.map((_, i) => addDays(boardWeek, i)), [boardWeek]);
 
+  // Reset day filter to "ALL" whenever the user picks a new week
   useEffect(() => { setSelectedDay("ALL"); }, [boardWeek]);
 
+  // Filters days shown on the board (either all days Monday-Saturday or a single selected day)
   const filteredDays = useMemo<readonly DayName[]>(() =>
     selectedDay === "ALL" ? DAY_NAMES : [selectedDay as DayName], [selectedDay]);
 
+  // Mapping from DayName ("Monday", "Tuesday", etc.) to YYYY-MM-DD date string
   const dayDates = useMemo(() => {
     const m: Record<DayName, string> = {} as any;
     DAY_NAMES.forEach((d, i) => { m[d] = boardWeekDates[i]; });
     return m;
   }, [boardWeekDates]);
 
+  // ── Core Planning Board Matrix (boardMap) ──────────────────────────────
+  // Groups plans by Machine ID -> Day Name -> Shift Slot ("DAY" or "NIGHT").
+  // Filters out unstarted plans if the parent Production Order is already closed or stopped.
   const boardMap = useMemo(() => {
     const map: Record<string, Record<DayName, Record<ShiftSlot, any[]>>> = {};
     allPlans.forEach((plan: any) => {
@@ -251,7 +268,8 @@ const DailyProductionPlanningPage: React.FC = () => {
     return map;
   }, [allPlans, boardWeekDates]);
 
-  // Stats based on selected week
+  // ── Week-Filtered Plans ────────────────────────────────────────────────
+  // Returns all active shift plans belonging to the currently selected Monday-Saturday week.
   const weekPlans = useMemo(() =>
     allPlans.filter((p: any) => {
       const planDate = p.productionDate?.split("T")[0];
@@ -265,20 +283,16 @@ const DailyProductionPlanningPage: React.FC = () => {
     })
   , [allPlans, boardWeekDates]);
 
-  const stats = useMemo(() => ({
-    total:     weekPlans.length,
-    planned:   weekPlans.filter((p: any) => p.status === "PLANNED").length,
-    running:   weekPlans.filter((p: any) => p.status === "IN_PROGRESS").length,
-    completed: weekPlans.filter((p: any) => p.status === "COMPLETED").length,
-  }), [weekPlans]);
-
+  // ── Shift Progress Guard ───────────────────────────────────────────────
+  // Checks if any shift in the week has already started, completed, or stopped,
+  // preventing accidental deletion of the week plan once production is underway.
   const hasNonDraftOrPlannedShifts = useMemo(() =>
     weekPlans.some((p: any) => p.status !== "DRAFT" && p.status !== "PLANNED")
   , [weekPlans]);
 
-  // For each production order, the one shift that "Stop Production Plan" should be offered
-  // on — the chronologically LAST shift that already has real activity (logged hours, or
-  // currently in progress), never an earlier already-finished shift or a future empty one.
+  // ── Find Eligible Shift for Permanent Stop ──────────────────────────────
+  // For each Production Order, finds the chronologically LAST shift that has active work
+  // (logged hours, produced > 0, or IN_PROGRESS) so "Stop Production" is only offered there.
   const lastActivePlanIdByPO = useMemo(() => {
     const getShiftTime = (sId?: string) => {
       if (!sId) return "08:00";
@@ -315,7 +329,10 @@ const DailyProductionPlanningPage: React.FC = () => {
     return result;
   }, [allPlans]);
 
-  // ── Handlers ──────────────────────────────────────────────
+  // ── Action Handlers ────────────────────────────────────────────────────
+
+  // ── Handle Card Click (Navigate to Hourly Production Log) ───────────────
+  // Verifies that raw materials have been issued for the shift date before navigating.
   const handleCardClick = useCallback((plan: any) => {
     const planDate = normalizeDateStr(plan.productionDate);
     const isRmIssued = rmIssuedDates.has(planDate);
@@ -343,6 +360,8 @@ const DailyProductionPlanningPage: React.FC = () => {
     });
   }, [navigate, rmIssuedDates]);
 
+  // ── Handle Card Right-Click (Open Context Menu) ─────────────────────────
+  // Captures right-click on a shift card to display View & Stop action buttons.
   const handleContextMenu = useCallback((e: React.MouseEvent, plan: any) => {
     e.preventDefault();
     e.stopPropagation();
@@ -351,12 +370,15 @@ const DailyProductionPlanningPage: React.FC = () => {
     setContextMenu({ x, y, plan });
   }, []);
 
+  // ── Navigate to Weekly Plan Edit Page ──────────────────────────────────
+  // Opens the multi-machine weekly matrix creation form in Edit mode.
   const handleEditWeek = useCallback(() => {
     navigate(`/daily-production-plans/create?week=${boardWeek}`, {
       state: { weekStart: boardWeek, isEdit: true, existingPlans: weekPlans }
     });
   }, [navigate, boardWeek, weekPlans]);
 
+  // ── Keyboard Shortcuts (Page Level) ────────────────────────────────────
   usePageShortcuts({
     onRefresh: () => loadDailyPlans(),
     onNew:     () => { if (can("daily-machine-planning.create")) openCreateForm(); },
@@ -367,9 +389,9 @@ const DailyProductionPlanningPage: React.FC = () => {
         toast.error("Cannot delete: This week contains shifts that are already in progress, completed, or stopped.");
       }
     },
-    onExport:  () => document.querySelector<HTMLButtonElement>("[data-export-btn]")?.click(),
   });
 
+  // ── Keyboard Shortcuts (Modal Form Level) ──────────────────────────────
   useFormShortcuts({
     onSave: () => {
       if (showStopModal && !isStopping) {
@@ -380,12 +402,15 @@ const DailyProductionPlanningPage: React.FC = () => {
     },
   });
 
+  // ── Open Week Selection Modal (New Daily Plan) ─────────────────────────
   const openCreateForm = () => {
     setWeekSelectDate(todayStr());
     setWeekCheckResult(null);
     setShowWeekSelectModal(true);
   };
 
+  // ── Confirm Bulk Delete of Current Week Plan ───────────────────────────
+  // Deletes all unstarted (DRAFT/PLANNED) shifts for the active week.
   const handleDeleteWeekConfirm = async () => {
     if (weekPlans.length === 0) return;
     if (hasNonDraftOrPlannedShifts) {
@@ -409,7 +434,8 @@ const DailyProductionPlanningPage: React.FC = () => {
     }
   };
 
-
+  // ── Handle Post-Material Issuance Success ──────────────────────────────
+  // Automatically moves shift status to IN_PROGRESS after raw materials are handed over.
   const handleMaterialIssueSuccess = async () => {
     if (!materialIssuePlan) return;
     try {
@@ -421,6 +447,8 @@ const DailyProductionPlanningPage: React.FC = () => {
     } finally { setMaterialIssuePlan(null); setShowMaterialIssueModal(false); }
   };
 
+  // ── Confirm Shift Status Change ────────────────────────────────────────
+  // Advances shift plan to its next workflow state (e.g. DRAFT -> PLANNED -> IN_PROGRESS).
   const confirmStatusChange = async () => {
     const nextStatus = STATUS_FLOW[statusChangePlan?.status]?.next;
     if (!statusChangePlan || !nextStatus) return;
@@ -431,6 +459,8 @@ const DailyProductionPlanningPage: React.FC = () => {
     } catch (err: any) { toast.error(err || "Failed to update status"); }
   };
 
+  // ── Confirm Permanent Stop of Production Plan ──────────────────────────
+  // Permanently stops the current shift and cancels all remaining unstarted shifts for the PO.
   const confirmStopProduction = async () => {
     if (!stopPlan || !stopReason.trim()) { toast.error("Please enter a reason."); return; }
     setIsStopping(true);
@@ -454,29 +484,10 @@ const DailyProductionPlanningPage: React.FC = () => {
     finally { setIsStopping(false); }
   };
 
+  // ── Allowed Active Machines ────────────────────────────────────────────
+  // Excludes inactive or disabled test machines (such as MAC-001) from the board view.
   const allowedMachines = useMemo(() =>
     (machines || []).filter((m: any) => m.machineId !== "MAC-001"), [machines]);
-
-  const fetchDailyPlansForExport = useCallback(async () => {
-    try {
-      const res = await dailyPlanService.getAll();
-      const list = Array.isArray(res) ? res : (res?.data || []);
-      if (Array.isArray(list) && list.length > 0) return list;
-    } catch { /* fallback */ }
-    return Array.isArray(dailyPlans) ? dailyPlans : [];
-  }, [dailyPlans]);
-
-  const csvColumns = useMemo(() => [
-    { header: "Plan ID",      accessor: (i: any) => i.dailyPlanId || "" },
-    { header: "Date",         accessor: (i: any) => i.productionDate?.split("T")[0] || "" },
-    { header: "PO Reference", accessor: (i: any) => i.productionOrderId || "" },
-    { header: "Product",      accessor: (i: any) => i.productionOrder?.productItem?.productName || "" },
-    { header: "Machine",      accessor: (i: any) => i.machine?.machineName || i.machineId || "" },
-    { header: "Shift",        accessor: (i: any) => i.shift?.shiftName || i.shiftId || "" },
-    { header: "Planned Qty",  accessor: (i: any) => i.plannedQty || 0 },
-    { header: "Status",       accessor: (i: any) => STATUS_FLOW[i.status]?.label || i.status || "" },
-  ], []);
-  const csvFilename = `Daily_Plans_${new Date().toISOString().split("T")[0]}.csv`;
 
   // ── Render ────────────────────────────────────────────────
   return (
@@ -552,7 +563,6 @@ const DailyProductionPlanningPage: React.FC = () => {
                 {[
                   { label: "Draft", dot: "bg-amber-500" },
                   { label: "Planned", dot: "bg-sky-500" },
-                  // { label: "In Progress", dot: "bg-indigo-500" },
                   { label: "Completed", dot: "bg-emerald-500" },
                   { label: "Stopped", dot: "bg-red-500" },
                   { label: "RM Issued", dot: "bg-violet-500" },
@@ -635,23 +645,6 @@ const DailyProductionPlanningPage: React.FC = () => {
                 {contextMenu.plan.plannedQty} pcs • {contextMenu.plan.shift?.shiftName || contextMenu.plan.shiftId}
               </div>
             </div>
-
-            <div className="py-1 space-y-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  const p = contextMenu.plan;
-                  setContextMenu(null);
-                  setSelectedDailyPlanForView(p);
-                  setShowDailyPlanViewModal(true);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-ink hover:bg-sky-500/15 hover:text-sky-400 rounded-lg transition-colors cursor-pointer text-left"
-              >
-                <FaEye className="text-sky-400 shrink-0" size={13} />
-                <span>View Hourly Entries & Details</span>
-              </button>
-            </div>
-
             {(() => {
               const plan = contextMenu.plan;
               const poStatus = plan?.productionOrder?.status;
@@ -661,35 +654,49 @@ const DailyProductionPlanningPage: React.FC = () => {
                 Boolean(plan?.remarks?.includes("Permanently Stopped")) ||
                 Boolean(plan?.remarks?.includes("Short Closed"));
 
-              if (
-                !can("daily-machine-planning.edit") ||
-                isAlreadyStopped ||
-                lastActivePlanIdByPO.get(plan.productionOrderId) !== plan.dailyPlanId
-              ) {
-                return null;
+              if (!can("daily-machine-planning.edit")) {
+                return (
+                  <div className="px-3 py-1.5 text-[11px] text-ink-subtle italic">
+                    No permission to edit
+                  </div>
+                );
+              }
+              if (isAlreadyStopped) {
+                return (
+                  <div className="px-3 py-1.5 text-[11px] text-ink-subtle italic">
+                    Plan is already stopped
+                  </div>
+                );
+              }
+              if (lastActivePlanIdByPO.get(plan.productionOrderId) !== plan.dailyPlanId) {
+                return (
+                  <div className="px-3 py-1.5 text-[11px] text-ink-subtle italic">
+                    Stop only allowed on latest shift
+                  </div>
+                );
               }
 
               return (
-                <div className="pt-1">
-                  <button
-                    type="button"
+                <div className="pt-1.5">
+                  <CustomButton
+                    text="Stop Production Plan"
+                    icon={FaStop}
                     onClick={() => {
                       setContextMenu(null);
                       setStopPlan(plan);
                       setShowStopModal(true);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/15 rounded-lg transition-colors cursor-pointer text-left"
-                  >
-                    <FaStop className="text-rose-400 shrink-0" size={12} />
-                    <span>Stop Production Plan</span>
-                  </button>
+                    variant="danger"
+                    width="100%"
+                    className="!justify-start text-xs font-semibold !h-9 !px-3"
+                  />
                 </div>
               );
             })()}
           </div>
         )}
 
-        {/* ══ MODALS ══════════════════════════════════════════ */}
+        {/* ══ stop production MODALS ══════════════════════════════════════════ */}
         <CommonModal
           show={showStopModal}
           onHide={() => { setShowStopModal(false); setStopPlan(null); }}
@@ -760,11 +767,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         </CommonModal>
 
         <CommonConfirmModal show={showStatusModal} onHide={() => { setShowStatusModal(false); setStatusChangePlan(null); }} onConfirm={confirmStatusChange} title={`Change to ${STATUS_FLOW[STATUS_FLOW[statusChangePlan?.status]?.next ?? ""]?.label || "Next Status"}`} message={`Move this plan from "${STATUS_FLOW[statusChangePlan?.status]?.label || statusChangePlan?.status}" to "${STATUS_FLOW[STATUS_FLOW[statusChangePlan?.status]?.next ?? ""]?.label || ""}"?`} confirmText="Confirm" confirmVariant="success" />
-        {showMaterialIssueModal && materialIssuePlan && (
-          <MaterialIssueModal show={showMaterialIssueModal} onHide={() => { setShowMaterialIssueModal(false); setMaterialIssuePlan(null); }} productionOrderId={materialIssuePlan.productionOrderId} rawMaterials={materialIssuePlan.productionOrder?.draftRawMaterials || materialIssuePlan.productionOrder?.rawMaterials || []} rawMaterialsMap={rawMaterialsMap} defaultStoreId={materialIssuePlan.productionOrder?.sourceStoreId} dailyPlanQty={Number(materialIssuePlan.plannedQty || 0)} totalTargetQty={Number(materialIssuePlan.productionOrder?.targetQty || 0)} onSuccess={handleMaterialIssueSuccess} />
-        )}
-        <ProductionOrderViewModal show={showPOViewModal} onHide={() => { setShowPOViewModal(false); setSelectedPOForView(null); }} order={selectedPOForView} />
-        <DailyPlanViewModal show={showDailyPlanViewModal} onHide={() => { setShowDailyPlanViewModal(false); setSelectedDailyPlanForView(null); }} plan={selectedDailyPlanForView} />
+
         <DailyRawMaterialIssueModal
           show={showDailyRmIssueModal}
           onHide={() => setShowDailyRmIssueModal(false)}
@@ -890,6 +893,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           isLoading={isDeletingWeek}
           confirmDisabled={isDeletingWeek || weekPlans.length === 0 || hasNonDraftOrPlannedShifts}
         />
+        
       </div>
     </div>
   );

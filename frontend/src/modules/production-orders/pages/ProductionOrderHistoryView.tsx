@@ -1,7 +1,8 @@
 import { formatDate } from "../../../utils/dateUtils";
+import { formatQtyValue } from "../../../utils/uomConversion";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { 
     FaInfoCircle,
     FaIndustry,
@@ -10,6 +11,9 @@ import {
     FaCheckCircle,
     FaExclamationTriangle,
     FaStopCircle,
+    FaBoxes,
+    FaCalendarAlt,
+    FaCogs,
 } from "react-icons/fa";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -32,14 +36,6 @@ const PRODUCTION_STARTED_STATUSES = [
     "POST_PRODUCTION", "READY_FOR_DISPATCH", "PARTIAL_COMPLETED",
     "COMPLETED_WITH_SHORTFALL", "DISPATCHED", "CLOSED", "CANCELLED",
 ];
-
-const formatDateTime = (dateString?: string) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleString("en-IN", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-    });
-};
 
 const normalizeUom = (uom?: string) => {
     const u = (uom || "").toLowerCase();
@@ -174,7 +170,7 @@ const ProductionOrderHistoryView: React.FC = () => {
     });
 
     // ── Derived values ────────────────────────────────────────────────────────
-    const displayOrder = fullOrder || passedOrder || {};
+    const displayOrder = useMemo(() => fullOrder || passedOrder || {}, [fullOrder, passedOrder]);
     const productionHasStarted = PRODUCTION_STARTED_STATUSES.includes(fullOrder?.status);
 
     const hasInsufficientStock = !productionHasStarted && fullOrder?.products?.some((p: any) =>
@@ -220,18 +216,15 @@ const ProductionOrderHistoryView: React.FC = () => {
                 const hps = plan.hourlyProductions || [];
                 let shiftGrossProduced = 0;
                 let shiftReject = 0;
-                let shiftScrap = 0;
 
                 if (hps.length > 0) {
                     hps.forEach((hp: any) => {
                         // In Prisma model HourlyProduction, fields are totalQtyProduced, totalRejectQty, totalScrapQty
                         const gross = Number(hp.totalQtyProduced !== undefined ? hp.totalQtyProduced : hp.qtyProduced || 0);
                         const rej = Number(hp.totalRejectQty !== undefined ? hp.totalRejectQty : hp.rejectQty || 0);
-                        const scrap = Number(hp.totalScrapQty !== undefined ? hp.totalScrapQty : hp.scrapQty || 0);
                         
                         shiftGrossProduced += gross;
                         shiftReject += rej;
-                        shiftScrap += scrap;
                     });
                 }
 
@@ -333,18 +326,22 @@ const ProductionOrderHistoryView: React.FC = () => {
         [fullOrder]
     );
 
-    // Pre-compute dispatch status per shift in a single pass (fixes mutable closure bug)
+    // Pre-compute dispatch status per shift in a single pass
     const plansWithDispatch = useMemo(() => {
-        let cumulative = 0;
-        return plans.map((plan) => {
+        const result = [];
+        let runningTotal = 0;
+        for (let i = 0; i < plans.length; i++) {
+            const plan = plans[i];
             const hasProduction = plan.producedQty > 0;
             const isFinalized = (plan.status === "COMPLETED" || plan.status === "COMPLETED_WITH_SHORTFALL") && hasProduction;
-            if (isFinalized) cumulative += plan.producedQty;
+            if (isFinalized) {
+                runningTotal += plan.producedQty;
+            }
 
             let dispatchStatus: string;
             if (!hasProduction) {
                 dispatchStatus = "no_production";
-            } else if (isFinalized && totalDispatchedQty > 0 && cumulative <= totalDispatchedQty + 0.001) {
+            } else if (isFinalized && totalDispatchedQty > 0 && runningTotal <= totalDispatchedQty + 0.001) {
                 dispatchStatus = "dispatched";
             } else if (isFinalized) {
                 dispatchStatus = "ready";
@@ -352,8 +349,9 @@ const ProductionOrderHistoryView: React.FC = () => {
                 dispatchStatus = "not_dispatched";
             }
 
-            return { ...plan, dispatchStatus };
-        });
+            result.push({ ...plan, dispatchStatus });
+        }
+        return result;
     }, [plans, totalDispatchedQty]);
 
     const targetVal = Number(fullOrder?.targetQty || displayOrder?.targetQty || 0);
@@ -653,38 +651,14 @@ const ProductionOrderHistoryView: React.FC = () => {
         },
     ], [handleOpenHourlyModal]);
 
-    // Fallback single-row for when no shift plans exist yet
-    const fallbackShiftData = useMemo(() => {
-        if (plans.length > 0) return [];
-        const dispatchStatus = displayOrder?.status === "DISPATCHED"
-            ? "dispatched"
-            : displayOrder?.status === "READY_FOR_DISPATCH" || displayOrder?.status === "COMPLETED"
-                ? "ready"
-                : "none";
-        return [{
-            id: "fallback",
-            date: displayOrder?.orderDate ? formatDate(displayOrder.orderDate) : "-",
-            shiftName: "General Shift",
-            machineName: fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || "-",
-            productName: fullOrder?.productItem?.productName || displayOrder?.productName || fullOrder?.products?.[0]?.productName || "-",
-            productCode: fullOrder?.productItem?.productCode || displayOrder?.productCode || fullOrder?.products?.[0]?.productCode || "",
-            plannedQty: Number(displayOrder?.targetQty || 0),
-            producedQty: Number(displayOrder?.producedQty || 0),
-            status: displayOrder?.status || "-",
-            _dispatchStatus: dispatchStatus,
-            hourlyProductions: [],
-        }];
-    }, [plans, displayOrder, fullOrder]);
-
     // Group shift plans by machine, preserving order
     const machineShiftGroups = useMemo(() => {
-        const dataSource = plansWithDispatch.length > 0 ? plansWithDispatch : fallbackShiftData;
-        if (dataSource.length === 0) return [];
+        if (plansWithDispatch.length === 0) return [];
 
         const groups: { machineKey: string; machineName: string; plans: any[] }[] = [];
         const seenKeys = new Map<string, { machineKey: string; machineName: string; plans: any[] }>();
 
-        dataSource.forEach((plan) => {
+        plansWithDispatch.forEach((plan) => {
             const key = plan.rawPlan?.machineMachineId || plan.rawPlan?.machineId || plan.machineName || "unassigned";
             const name = (plan.machineName && plan.machineName !== "-")
                 ? plan.machineName
@@ -698,7 +672,7 @@ const ProductionOrderHistoryView: React.FC = () => {
         });
 
         return groups;
-    }, [plansWithDispatch, fallbackShiftData]);
+    }, [plansWithDispatch]);
 
     // ── Dispatch history columns ──────────────────────────────────────────────
     const dispatchColumns: DataTableColumn<any>[] = useMemo(() => [
@@ -801,7 +775,7 @@ const ProductionOrderHistoryView: React.FC = () => {
             width: "120px",
             render: (item) => (
                 <span className="text-ink-muted text-xs tabular-nums">
-                    {Number(item.currentQty || 0).toFixed(3)} {item.uom}
+                    {formatQtyValue(item.currentQty, item.uom)} {item.uom}
                 </span>
             ),
         },
@@ -811,7 +785,7 @@ const ProductionOrderHistoryView: React.FC = () => {
             width: "120px",
             render: (item) => (
                 <span className="text-ink-muted text-xs tabular-nums">
-                    {Number(item.adjustedQty || 0).toFixed(3)} {item.uom}
+                    {formatQtyValue(item.adjustedQty, item.uom)} {item.uom}
                 </span>
             ),
         },
@@ -819,11 +793,15 @@ const ProductionOrderHistoryView: React.FC = () => {
             header: "ISSUED QTY",
             align: "right",
             width: "130px",
-            render: (item) => (
-                <span className={`text-xs tabular-nums font-bold whitespace-nowrap ${Number(item.difference) < 0 ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                    {Number(item.difference) < 0 ? "" : "+"}{Number(item.difference || 0).toFixed(3)} {item.uom}
-                </span>
-            ),
+            render: (item) => {
+                const diff = Number(item.difference || 0);
+                const sign = diff < 0 ? "-" : diff > 0 ? "+" : "";
+                return (
+                    <span className={`text-xs tabular-nums font-bold whitespace-nowrap ${diff < 0 ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {sign}{formatQtyValue(Math.abs(diff), item.uom)} {item.uom}
+                    </span>
+                );
+            },
         },
         {
             header: "REMARKS",
@@ -990,7 +968,7 @@ const ProductionOrderHistoryView: React.FC = () => {
 
     // ── Render ────────────────────────────────────────────────────────────────
     const totalProductsCount = fullOrder?.products?.length || 0;
-    const totalShiftsCount = plansWithDispatch.length || (fallbackShiftData.length > 0 ? 1 : 0);
+    const totalShiftsCount = plansWithDispatch.length;
     const totalDispatchesCount = fullOrder?.goodsDispatchItems?.length || 0;
     const totalRmIssuesCount = rmIssues.length;
 
@@ -1064,7 +1042,9 @@ const ProductionOrderHistoryView: React.FC = () => {
                 {isStoppedOrder && (
                     <div className="mx-5 mb-0 mt-4 rounded-xl border border-amber-500/25 dark:border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
                         <div className="flex items-start sm:items-center gap-3.5">
-                           
+                            <div className="w-8 h-8 rounded-lg bg-amber-500/15 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <FaExclamationTriangle className="text-sm" />
+                            </div>
                             <div>
                                 <div className="flex items-center gap-2.5 flex-wrap">
                                     <span className="text-sm font-bold text-ink">
@@ -1103,57 +1083,98 @@ const ProductionOrderHistoryView: React.FC = () => {
                     </div>
                 ) : (
                     <div className="p-5 flex-1 flex flex-col gap-6">
-                        {/* KPI & Summary Grid */}
+                        {/* Summary KPI Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                            {/* Order No & Dates */}
-                            <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
-                                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Order Date</span>
-                                <span className="text-sm font-bold text-ink mt-1">{formatDate(displayOrder?.orderDate)}</span>
-                                <span className="text-[11px] text-ink-subtle mt-2">Due: <strong className="text-ink font-semibold">{formatDate(displayOrder?.dueDate)}</strong></span>
+                            {/* Card 1: Order Dates */}
+                            <div className="bg-white dark:bg-card-2 border border-slate-200/90 dark:border-line rounded-xl p-3.5 flex flex-col justify-between shadow-xs transition-all hover:border-purple-300 dark:hover:border-line-soft">
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-ink-subtle uppercase tracking-wider">
+                                        Order Dates
+                                    </span>
+                                    <span className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                        <FaCalendarAlt size={12} />
+                                    </span>
+                                </div>
+                                <div className="text-base font-black text-slate-900 dark:text-ink mt-0.5">
+                                    {formatDate(displayOrder?.orderDate)}
+                                </div>
+                                <span className="text-[11px] text-slate-500 dark:text-ink-subtle mt-1 font-medium">
+                                    Due: <strong className="text-slate-700 dark:text-ink font-semibold">{formatDate(displayOrder?.dueDate)}</strong>
+                                </span>
                             </div>
 
-                            {/* Target Qty */}
-                            <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
-                                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Target Qty</span>
-                                <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl font-extrabold text-ink">{targetVal.toLocaleString("en-IN")}</span>
-                                    <span className="text-xs text-ink-subtle">pcs</span>
+                            {/* Card 2: Target Qty */}
+                            <div className="bg-white dark:bg-card-2 border border-slate-200/90 dark:border-line rounded-xl p-3.5 flex flex-col justify-between shadow-xs transition-all hover:border-blue-300 dark:hover:border-line-soft">
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-ink-subtle uppercase tracking-wider">
+                                        Target Qty
+                                    </span>
+                                    <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                        <FaBoxes size={12} />
+                                    </span>
                                 </div>
-                                <span className="text-[11px] text-ink-subtle mt-2">{totalProductsCount} Product{totalProductsCount !== 1 ? "s" : ""}</span>
+                                <div className="flex items-baseline gap-1 mt-0.5">
+                                    <span className="text-xl font-black text-slate-900 dark:text-ink">{targetVal.toLocaleString("en-IN")}</span>
+                                    <span className="text-xs font-semibold text-slate-500 dark:text-ink-subtle">pcs</span>
+                                </div>
+                                <span className="text-[11px] text-slate-500 dark:text-ink-subtle mt-1 font-medium">
+                                    {totalProductsCount} Product{totalProductsCount !== 1 ? "s" : ""}
+                                </span>
                             </div>
 
-                            {/* Produced Qty */}
-                            <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
-                                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Produced Qty</span>
-                                <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{producedVal.toLocaleString("en-IN")}</span>
-                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">({completionPercent}%)</span>
+                            {/* Card 3: Produced Qty */}
+                            <div className="bg-white dark:bg-card-2 border border-slate-200/90 dark:border-line rounded-xl p-3.5 flex flex-col justify-between shadow-xs transition-all hover:border-emerald-300 dark:hover:border-line-soft">
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-ink-subtle uppercase tracking-wider">
+                                        Produced Qty
+                                    </span>
+                                    <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                        <FaCheckCircle size={12} />
+                                    </span>
                                 </div>
-                                <div className="w-full bg-card h-1.5 rounded-full mt-2 overflow-hidden border border-line">
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{producedVal.toLocaleString("en-IN")}</span>
+                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">({completionPercent}%)</span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700/50 rounded-full h-1.5 mt-2 overflow-hidden border border-slate-200/60 dark:border-slate-700">
                                     <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${completionPercent}%` }} />
                                 </div>
                             </div>
 
-                            {/* Dispatched Qty */}
-                            <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
-                                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Dispatched Qty</span>
-                                <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl font-extrabold text-blue-600 dark:text-blue-400">{totalDispatchedQty.toLocaleString("en-IN")}</span>
-                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">({dispatchPercent}%)</span>
+                            {/* Card 4: Dispatched Qty */}
+                            <div className="bg-white dark:bg-card-2 border border-slate-200/90 dark:border-line rounded-xl p-3.5 flex flex-col justify-between shadow-xs transition-all hover:border-sky-300 dark:hover:border-line-soft">
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-ink-subtle uppercase tracking-wider">
+                                        Dispatched Qty
+                                    </span>
+                                    <span className="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                                        <FaTruck size={12} />
+                                    </span>
                                 </div>
-                                <div className="w-full bg-card h-1.5 rounded-full mt-2 overflow-hidden border border-line">
-                                    <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${dispatchPercent}%` }} />
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-xl font-black text-sky-600 dark:text-sky-400">{totalDispatchedQty.toLocaleString("en-IN")}</span>
+                                    <span className="text-xs font-bold text-sky-600 dark:text-sky-400">({dispatchPercent}%)</span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700/50 rounded-full h-1.5 mt-2 overflow-hidden border border-slate-200/60 dark:border-slate-700">
+                                    <div className="bg-sky-500 h-full rounded-full transition-all duration-500" style={{ width: `${dispatchPercent}%` }} />
                                 </div>
                             </div>
 
-                            {/* Shifts Logged */}
-                            <div className="bg-card-2/60 p-4 rounded-xl border border-line flex flex-col justify-between">
-                                <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Shift Plans</span>
-                                <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl font-extrabold text-ink">{plans.length}</span>
-                                    <span className="text-xs text-ink-subtle">shifts</span>
+                            {/* Card 5: Shift Plans */}
+                            <div className="bg-white dark:bg-card-2 border border-slate-200/90 dark:border-line rounded-xl p-3.5 flex flex-col justify-between shadow-xs transition-all hover:border-indigo-300 dark:hover:border-line-soft">
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-ink-subtle uppercase tracking-wider">
+                                        Shift Plans
+                                    </span>
+                                    <span className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                        <FaCogs size={12} />
+                                    </span>
                                 </div>
-                                <span className="text-[11px] text-ink-subtle mt-2">
+                                <div className="flex items-baseline gap-1 mt-0.5">
+                                    <span className="text-xl font-black text-slate-900 dark:text-ink">{plans.length}</span>
+                                    <span className="text-xs font-semibold text-slate-500 dark:text-ink-subtle">shifts</span>
+                                </div>
+                                <span className="text-[11px] text-slate-500 dark:text-ink-subtle mt-1 font-medium">
                                     {plans.filter(p => ["COMPLETED", "COMPLETED_WITH_SHORTFALL"].includes(p.status)).length} completed
                                 </span>
                             </div>

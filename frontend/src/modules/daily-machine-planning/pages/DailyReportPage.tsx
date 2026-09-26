@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { usePageShortcuts } from "../../../hooks/usePageShortcuts";
 import { usePermission } from "../../../hooks/usePermission";
 import { 
@@ -23,7 +23,6 @@ import DailyReportMachineCard, { type ReportRow, type HourlyEntryItem, formatHou
 import DailyReportHourlyModal from "../components/DailyReportHourlyModal";
 
 const DailyReportPage: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const passedState = location.state as any;
   const { can } = usePermission();
@@ -46,7 +45,7 @@ const DailyReportPage: React.FC = () => {
   const [activeDetailRow, setActiveDetailRow] = useState<ReportRow | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  // Download PDF handler - renders exact physical log register table layout
+  // Download PDF handler - matching Weekly Machine Program List PDF style in Landscape mode
   const handleDownloadPdf = async () => {
     if (downloadingPdf) return;
     setDownloadingPdf(true);
@@ -61,7 +60,7 @@ const DailyReportPage: React.FC = () => {
       }
 
       const canvas = await html2canvas(element, {
-        scale: 2.5,
+        scale: 3,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
@@ -69,7 +68,7 @@ const DailyReportPage: React.FC = () => {
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("l", "mm", "a4");
-      const margin = 8;
+      const margin = 10;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -94,9 +93,9 @@ const DailyReportPage: React.FC = () => {
         }
       }
 
-      const fileName = `Daily_Production_Report_${selectedDate}.pdf`;
+      const fileName = `Daily_Production_Report_${selectedDate}.pdf`.replace(/\s+/g, "_");
       pdf.save(fileName);
-      toast.success("Daily Production Report PDF downloaded successfully!");
+      toast.success("Daily Production Report PDF downloaded!");
     } catch (err) {
       console.error("Failed to generate PDF:", err);
       toast.error("Failed to generate PDF document");
@@ -162,17 +161,7 @@ const DailyReportPage: React.FC = () => {
       return hp.createdAt?.split("T")[0] === selectedDate;
     });
 
-    let totalPlannedCapacity = 0;
-    let totalActualProduction = 0;
-    let totalRejectedPcs = 0;
-    let totalPerfectPcs = 0;
-    let totalPendingQuantity = 0;
-    let totalRunningHours = 0;
-    let totalDowntimeAll = 0;
-    
     const allRows: ReportRow[] = [];
-    const executedMachineIds = new Set<string>();
-    const plannedMachineIds = new Set<string>();
 
     // Process all plans for the date
     plansForDate.forEach((plan: any) => {
@@ -189,21 +178,38 @@ const DailyReportPage: React.FC = () => {
       );
 
       // Find Shift Object for precise start/end times
-      let shiftName = plan.shift?.shiftName || "Unknown Shift";
+      let shiftName = plan.shift?.shiftName || plan.shiftName || plan.shift?.name || "";
       let shiftTime = "";
       let shiftStartTime = "";
       let shiftEndTime = "";
+
+      const rawShiftId = String(plan.shiftId || plan.shiftCode || "").toUpperCase();
+
       const sObj = shifts.find((sh: any) => 
         sh.id === plan.shiftId || 
         sh.shiftCode === plan.shiftId || 
-        sh.shiftName?.toLowerCase() === plan.shift?.shiftName?.toLowerCase()
+        (sh.shiftCode && sh.shiftCode.toUpperCase() === rawShiftId) ||
+        (sh.shiftName && sh.shiftName.toLowerCase() === String(plan.shift?.shiftName || plan.shiftName || "").toLowerCase()) ||
+        (rawShiftId.includes("DAY") && (sh.shiftCode?.toUpperCase().includes("DAY") || sh.shiftName?.toUpperCase().includes("DAY"))) ||
+        (rawShiftId.includes("NIGHT") && (sh.shiftCode?.toUpperCase().includes("NIGHT") || sh.shiftName?.toUpperCase().includes("NIGHT")))
       );
+
       if (sObj) {
-        shiftName = sObj.shiftName;
+        shiftName = sObj.shiftName || sObj.name || shiftName;
         shiftStartTime = sObj.startTime || "";
         shiftEndTime = sObj.endTime || "";
         if (sObj.startTime && sObj.endTime) {
           shiftTime = `${sObj.startTime} – ${sObj.endTime}`;
+        }
+      }
+
+      if (!shiftName || shiftName.toLowerCase().includes("unknown")) {
+        if (rawShiftId.includes("NIGHT") || rawShiftId.includes("S2") || rawShiftId === "2") {
+          shiftName = "Night Shift";
+          if (!shiftTime) shiftTime = "09:00 PM – 09:00 AM";
+        } else {
+          shiftName = "Day Shift";
+          if (!shiftTime) shiftTime = "09:00 AM – 09:00 PM";
         }
       }
 
@@ -312,14 +318,6 @@ const DailyReportPage: React.FC = () => {
       
       const { statusText, customColor } = getPlanStatusInfo(plannedCapacity, perfectPcs);
       const status = plannedCapacity > 0 ? statusText : (actualProduction > 0 ? statusText : "—");
-      
-      totalPlannedCapacity += plannedCapacity;
-      totalActualProduction += actualProduction;
-      totalRejectedPcs += rejectedPcs;
-      totalPerfectPcs += perfectPcs;
-      totalPendingQuantity += pendingQty;
-      totalRunningHours += rawEntries.filter(e => Number(e.qtyProduced || 0) > 0 || Number(e.downtime || 0) > 0).length;
-      totalDowntimeAll += hpTotalDowntime;
 
       let machineName = "Unknown Machine";
       let machineCode = "";
@@ -338,10 +336,6 @@ const DailyReportPage: React.FC = () => {
       }
 
       const mId = plan.machineId || plan.machineMachineId || machineName;
-      plannedMachineIds.add(mId);
-      if (actualProduction > 0) {
-        executedMachineIds.add(mId);
-      }
 
       const product = plan.product || plan.productionOrder?.productItem;
       const productName = product?.productName || "Unknown Product";
@@ -581,111 +575,98 @@ const DailyReportPage: React.FC = () => {
         onClose={() => setActiveDetailRow(null)}
       />
       
-      {/* ── Hidden Printable Daily Production Report Document (Compact Black & White A4 Register Layout) ── */}
+      {/* ── Hidden Printable Daily Production Report Document (Matching Weekly Machine Program List PDF style) ── */}
       <div
         id="printable-daily-production-report-pdf"
         style={{
           position: "fixed",
           top: 0,
           left: "-9999px",
-          width: "1040px",
+          width: "1000px",
           backgroundColor: "#ffffff",
           color: "#000000",
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-          padding: "16px 20px",
+          padding: "24px",
           boxSizing: "border-box",
           pointerEvents: "none",
         }}
       >
-        {/* Top Centered Main Header (Compact) */}
-        <div style={{ textAlign: "center", marginBottom: "12px", paddingBottom: "6px", borderBottom: "2px solid #000000" }}>
+        {/* Top Centered Header */}
+        <div style={{ textAlign: "center", marginBottom: "18px", paddingBottom: "10px", borderBottom: "1.5px solid #000000" }}>
           <h2
             style={{
-              margin: "0 0 2px 0",
-              fontSize: "16px",
+              margin: "0 0 4px 0",
+              fontSize: "17px",
               fontWeight: 800,
               color: "#000000",
               textTransform: "uppercase",
               letterSpacing: "0.5px",
             }}
           >
-            DAILY PRODUCTION REPORT (MACHINE LOG REGISTER)
+            DAILY PRODUCTION REPORT
           </h2>
           <p
             style={{
               margin: 0,
-              fontSize: "11px",
+              fontSize: "12px",
               fontWeight: 600,
-              color: "#1e293b",
+              color: "#000000",
             }}
           >
-            Machine Shift Execution &amp; Output Log · Date: <strong style={{ color: "#000000" }}>{selectedDate}</strong>
+            Date: {selectedDate}
           </p>
         </div>
 
-        {/* Machine-wise Tables (Compact field heights) */}
+        {/* Machine Tables */}
         {machineWiseGroups.map((group) => (
-          <div key={group.machineName} style={{ marginBottom: "14px" }}>
+          <div key={group.machineName} style={{ marginBottom: "24px" }}>
             
-            {/* Machine Header Bar */}
+            {/* Machine Name Header (OUTER to the Table) */}
             <div
               style={{
-                backgroundColor: "#f8fafc",
-                border: "1.5px solid #000000",
-                borderBottom: "none",
-                padding: "5px 10px",
+                marginBottom: "6px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                boxSizing: "border-box",
               }}
             >
               <h3
                 style={{
                   margin: 0,
-                  fontSize: "12px",
+                  fontSize: "13px",
                   fontWeight: 800,
                   color: "#000000",
                   textTransform: "uppercase",
                   letterSpacing: "0.5px",
                 }}
               >
-                MACHINE - {group.machineName}
+                {group.machineName} MACHINE PROGRAM LIST
               </h3>
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#000000",
-                }}
-              >
-                Date : {selectedDate}
-              </span>
             </div>
 
-            {/* Table */}
+            {/* Clean Black & White Table matching Weekly Plan layout */}
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
                 border: "1.5px solid #000000",
-                fontSize: "10px",
+                fontSize: "12px",
                 color: "#000000",
               }}
             >
               <thead>
-                <tr style={{ backgroundColor: "#f1f5f9", height: "26px" }}>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Shift</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "12%", color: "#000000" }}>Name</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "center", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "10%", color: "#000000" }}>Time</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "16%", color: "#000000" }}>Product Name</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Target</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "7%", color: "#000000" }}>Reject</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Perfect</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "right", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "7%", color: "#000000" }}>Reject Wt</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "center", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Efficiency</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "center", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Status</th>
-                  <th style={{ border: "1px solid #000000", padding: "4px 4px", textAlign: "left", fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", width: "8%", color: "#000000" }}>Remarks</th>
+                <tr style={{ backgroundColor: "#f3f4f6", height: "36px" }}>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "left", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "9%", whiteSpace: "nowrap", color: "#000000" }}>Shift</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "left", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "11%", whiteSpace: "nowrap", color: "#000000" }}>Name</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "center", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "14%", whiteSpace: "nowrap", color: "#000000" }}>Time</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "left", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "19%", color: "#000000" }}>Product Name</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "right", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "7%", whiteSpace: "nowrap", color: "#000000" }}>Target</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "right", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "6%", whiteSpace: "nowrap", color: "#000000" }}>Reject</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "right", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "7%", whiteSpace: "nowrap", color: "#000000" }}>Perfect</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "right", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "7%", whiteSpace: "nowrap", color: "#000000" }}>Reject Wt</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "center", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "6%", whiteSpace: "nowrap", color: "#000000" }}>Eff %</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "center", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "7%", whiteSpace: "nowrap", color: "#000000" }}>Status</th>
+                  <th style={{ border: "1px solid #000000", padding: "8px 10px", textAlign: "left", verticalAlign: "middle", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", width: "7%", color: "#000000" }}>Remarks</th>
                 </tr>
               </thead>
               <tbody>
@@ -694,43 +675,43 @@ const DailyReportPage: React.FC = () => {
                     key={row.id}
                     style={{
                       backgroundColor: idx % 2 === 0 ? "#ffffff" : "#fbfbfb",
-                      height: "26px",
+                      height: "36px",
                     }}
                   >
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", fontWeight: 700, color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap", color: "#000000" }}>
                       {row.shiftName}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", fontWeight: 600, color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", fontWeight: 500, whiteSpace: "nowrap", color: "#000000" }}>
                       {row.operatorName}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "center", fontFamily: "monospace", fontSize: "9.5px", color: "#000000" }}>
-                      {row.shiftTime || "09:00 – 21:00"}
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "center", fontFamily: "monospace", fontSize: "11px", whiteSpace: "nowrap", color: "#000000" }}>
+                      {row.shiftTime || "09:00 AM – 09:00 PM"}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", fontWeight: 700, color: "#000000" }}>
-                      <div>{row.productName}</div>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", color: "#000000" }}>
+                      <div style={{ fontWeight: 700 }}>{row.productName}</div>
                       {row.productionOrderNumber && row.productionOrderNumber !== "-" && (
-                        <div style={{ fontSize: "9px", color: "#475569", fontWeight: "normal" }}>PO: {row.productionOrderNumber}</div>
+                        <div style={{ fontSize: "10px", color: "#475569" }}>PO: {row.productionOrderNumber}</div>
                       )}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "12px", whiteSpace: "nowrap", color: "#000000" }}>
                       {row.shotCounter.toLocaleString()}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "12px", whiteSpace: "nowrap", color: "#000000" }}>
                       {row.rejectedPcs.toLocaleString()}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "12px", whiteSpace: "nowrap", color: "#000000" }}>
                       {row.perfectPcs.toLocaleString()}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", fontSize: "12px", whiteSpace: "nowrap", color: "#000000" }}>
                       {row.rejectedWeight}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 4px", textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#4338ca" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "center", fontFamily: "monospace", fontWeight: 700, fontSize: "12px", whiteSpace: "nowrap", color: "#000000" }}>
                       {row.efficiency ? `${Math.round(Number(row.efficiency))}%` : "—"}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 4px", textAlign: "center", fontWeight: 700, color: row.status === "High" ? "#16a34a" : row.status === "Medium" ? "#d97706" : row.status === "Low" ? "#ea580c" : "#dc2626" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "center", fontWeight: 700, fontSize: "12px", whiteSpace: "nowrap", color: "#000000" }}>
                       {row.status || "—"}
                     </td>
-                    <td style={{ border: "1px solid #000000", padding: "3px 6px", fontSize: "9.5px", color: "#000000" }}>
+                    <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", fontSize: "11px", color: "#000000" }}>
                       {row.downtimeMinutes > 0 && (
                         <span style={{ fontWeight: "bold", marginRight: "4px" }}>[{row.downtimeMinutes}m DT]</span>
                       )}
@@ -740,21 +721,21 @@ const DailyReportPage: React.FC = () => {
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ backgroundColor: "#f1f5f9", fontWeight: 700, height: "24px" }}>
-                  <td colSpan={4} style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "left", color: "#000000", fontSize: "10px" }}>
+                <tr style={{ backgroundColor: "#f3f4f6", height: "36px", fontWeight: 700 }}>
+                  <td colSpan={4} style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", color: "#000000", fontSize: "12px" }}>
                     Machine Summary
                   </td>
-                  <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#000000" }}>
+                  <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", color: "#000000", fontSize: "12px", whiteSpace: "nowrap" }}>
                     {group.rows.reduce((sum, r) => sum + r.shotCounter, 0).toLocaleString()}
                   </td>
-                  <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#000000" }}>
+                  <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", color: "#000000", fontSize: "12px", whiteSpace: "nowrap" }}>
                     {group.rows.reduce((sum, r) => sum + r.rejectedPcs, 0).toLocaleString()}
                   </td>
-                  <td style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#000000" }}>
+                  <td style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "right", fontFamily: "monospace", color: "#000000", fontSize: "12px", whiteSpace: "nowrap" }}>
                     {group.rows.reduce((sum, r) => sum + r.perfectPcs, 0).toLocaleString()}
                   </td>
-                  <td colSpan={4} style={{ border: "1px solid #000000", padding: "3px 6px", textAlign: "left", fontSize: "9.5px", color: "#000000" }}>
-                    Target: {group.rows.reduce((sum, r) => sum + r.shotCounter, 0).toLocaleString()} Pcs
+                  <td colSpan={4} style={{ border: "1px solid #000000", padding: "8px 10px", verticalAlign: "middle", textAlign: "left", fontSize: "11px", color: "#000000" }}>
+                    Total Target: {group.rows.reduce((sum, r) => sum + r.shotCounter, 0).toLocaleString()} Pcs
                   </td>
                 </tr>
               </tfoot>

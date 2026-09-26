@@ -4,12 +4,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   FaClock,
-  FaIndustry,
-  FaCalendarAlt,
   FaLock,
   FaSave,
   FaCheckCircle,
-  FaBoxOpen,
   FaTrophy,
   FaExclamationTriangle,
 } from "react-icons/fa";
@@ -24,15 +21,15 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import AutocompleteInput, { type AutocompleteOption } from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import BusyItemsTable, { type BusyColumn } from "../../../components/form/OrderItemsTable/BusyItemsTable";
-import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { employeeService } from "../../../services/employeeService";
-import { productionWastageService } from "../../../services/productionWastageService";
+import { roleService } from "../../../services/roleService";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { productShiftRecordService } from "../../../services/productShiftRecordService";
 import { productService } from "../../../services/productService";
+import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 
 // ── Dropdown Constants ──────────────────────────────────────────
 const DOWNTIME_REASONS = [
@@ -87,15 +84,6 @@ interface WastageItem {
 }
 
 // ── Time Helpers ────────────────────────────────────────────────
-function parseTime(timeStr?: string): { hour: number; minute: number } {
-  if (!timeStr) return { hour: 9, minute: 0 };
-  const parts = timeStr.trim().split(":");
-  let h = parseInt(parts[0], 10);
-  let m = parseInt(parts[1] || "0", 10);
-  if (isNaN(h)) h = 9;
-  if (isNaN(m)) m = 0;
-  return { hour: h, minute: m };
-}
 
 function formatHourAmPm(hour24: number): string {
   const h = hour24 % 24;
@@ -134,12 +122,13 @@ export const HourlyProductionEntryPage: React.FC = () => {
   const [productHighestMap, setProductHighestMap] = useState<Map<string, number>>(new Map());
   const fetchingHighestRef = useRef<Set<string>>(new Set());
   const [wastages, setWastages] = useState<WastageItem[]>(() => createDefaultWastages(5));
-  const [planRemarks, setPlanRemarks] = useState("");
   const [highestCapacity, setHighestCapacity] = useState<number | null>(null);
   const [poStats, setPoStats] = useState<{ targetQty: number; producedQty: number } | null>(null);
   const [previousShiftsGood, setPreviousShiftsGood] = useState<number>(0);
   const [totalWastageWeight, setTotalWastageWeight] = useState<string | number>("");
   const [totalWastageUom, setTotalWastageUom] = useState<string>("g");
+  const [roles, setRoles] = useState<any[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -155,11 +144,12 @@ export const HourlyProductionEntryPage: React.FC = () => {
       setLoading(true);
       setProductHighestMap(new Map());
       fetchingHighestRef.current = new Set();
-      const [planRes, empList, rmRes, storeRes] = await Promise.all([
+      const [planRes, empList, rmRes, storeRes, roleRes] = await Promise.all([
         dailyPlanService.getById(id),
         employeeService.fetchAll({ limit: 500 }).catch(() => []),
         apiClient.get(config.rawMaterial.base, { params: { limit: 500 } }).then(r => r.data?.data?.rawMaterials || r.data?.data || r.data || []).catch(() => []),
         apiClient.get(config.store.base, { params: { storeCategory: "WASTAGE", limit: 100 } }).then(r => r.data?.data?.stores || r.data?.data || r.data || []).catch(() => []),
+        roleService.fetchAll({ limit: 100 }).catch(() => []),
       ]);
 
       const plan = planRes?.data || planRes;
@@ -167,7 +157,8 @@ export const HourlyProductionEntryPage: React.FC = () => {
       setEmployees(Array.isArray(empList) ? empList : empList?.employees || []);
       setRawMaterials(Array.isArray(rmRes) ? rmRes : []);
       setWastageStores(Array.isArray(storeRes) ? storeRes : []);
-      setPlanRemarks(plan?.remarks || "");
+      const roleList = Array.isArray(roleRes) ? roleRes : Array.isArray(roleRes?.data) ? roleRes.data : [];
+      setRoles(roleList);
 
       // Fetch Product Highest Capacity / Shift Record and PO Stats
       const prodItem = plan?.productionOrder?.productItem;
@@ -468,45 +459,10 @@ export const HourlyProductionEntryPage: React.FC = () => {
       setWastages(finalWastages);
 
       // Generate 12 hourly rows based on shift timing:
-      // Day Shift (Shift 1 / Morning) = 9:00 AM to 9:00 PM (starts at 09:00)
-      // Night / Evening Shift (Shift 2 / Night / Evening) = 9:00 PM to 9:00 AM (starts at 21:00)
+      // Day Shift = 9:00 AM to 9:00 PM (starts at 09:00)
+      // Night / Evening Shift = 9:00 PM to 9:00 AM (starts at 21:00)
       const shiftIdentity = `${plan.shiftId || ""} ${plan.shift?.shiftName || ""} ${plan.shift?.shiftCode || ""}`.toLowerCase();
-      const isMorningOrDay =
-        shiftIdentity.includes("morning") ||
-        shiftIdentity.includes("day") ||
-        shiftIdentity.includes("shift 1") ||
-        shiftIdentity.includes("shift-1") ||
-        shiftIdentity.includes("shift_1") ||
-        shiftIdentity.includes("shift 01") ||
-        shiftIdentity.includes("shift-01") ||
-        shiftIdentity.includes("shift a") ||
-        shiftIdentity.includes("shift-a") ||
-        shiftIdentity.includes("1st") ||
-        shiftIdentity.includes("first") ||
-        shiftIdentity.includes("s1") ||
-        shiftIdentity.includes("sht001");
-
-      const isNightOrEvening = !isMorningOrDay && (
-        shiftIdentity.includes("night") ||
-        shiftIdentity.includes("evening") ||
-        shiftIdentity.includes("shift 2") ||
-        shiftIdentity.includes("shift-2") ||
-        shiftIdentity.includes("shift_2") ||
-        shiftIdentity.includes("shift 02") ||
-        shiftIdentity.includes("shift-02") ||
-        shiftIdentity.includes("shift b") ||
-        shiftIdentity.includes("shift-b") ||
-        shiftIdentity.includes("shift 3") ||
-        shiftIdentity.includes("shift-3") ||
-        shiftIdentity.includes("shift c") ||
-        shiftIdentity.includes("shift-c") ||
-        shiftIdentity.includes("2nd") ||
-        shiftIdentity.includes("second") ||
-        shiftIdentity.includes("s2") ||
-        shiftIdentity.includes("s3") ||
-        shiftIdentity.includes("sht002")
-      );
-
+      const isNightOrEvening = /(night|evening|shift[_\-\s]?(2|3|02|03|b|c)|2nd|3rd|second|third|s2|s3|sht002)/i.test(shiftIdentity);
       const startHour = isNightOrEvening ? 21 : 9;
 
       const now = new Date();
@@ -651,14 +607,39 @@ export const HourlyProductionEntryPage: React.FC = () => {
     }
   }, [dailyPlan?.machineId]);
 
+  // ── Employee Role Filtering ────────────────────────────────────
+  const filteredEmployees = useMemo(() => {
+    if (!employees || employees.length === 0) return [];
+    if (!selectedRoleIds || selectedRoleIds.length === 0) return employees;
+
+    const matchedSelectedRoles = roles.filter((r: any) =>
+      selectedRoleIds.includes(String(r.id || r.roleId || r.code))
+    );
+
+    return employees.filter((emp: any) => {
+      const empRoleId = String(emp.roleId || emp.role?.id || emp.designationId || "");
+      if (selectedRoleIds.includes(empRoleId)) return true;
+      if (
+        matchedSelectedRoles.some(
+          (r: any) =>
+            emp.role?.name === r.name ||
+            emp.roleName === r.name ||
+            emp.designation?.name === r.name
+        )
+      )
+        return true;
+      return false;
+    });
+  }, [employees, selectedRoleIds, roles]);
+
   // ── Employee / Operator Autocomplete Options ────────────────────
   const operatorOptions: AutocompleteOption[] = useMemo(() => {
-    return (employees || []).map((emp: any) => ({
+    return (filteredEmployees || []).map((emp: any) => ({
       value: emp.fullName || emp.empCode || "",
       label: emp.fullName || emp.empCode || "",
       info: emp.empCode ? `[${emp.empCode}]` : undefined,
     }));
-  }, [employees]);
+  }, [filteredEmployees]);
 
   // ── Raw Material / Scrap Options ───────────────────────────────
   const rmScrapOptions: AutocompleteOption[] = useMemo(() => {
@@ -1810,6 +1791,31 @@ export const HourlyProductionEntryPage: React.FC = () => {
           </div>
         )}
 
+        {/* ── 3. Role Filter & Hourly Register Table ───────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-card-2/40 border border-line-soft/60 rounded-xl p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-ink uppercase tracking-wider">
+              Hourly Register Entries
+            </span>
+            <span className="text-[11px] text-ink-subtle font-medium">
+              ({filteredEmployees.length} operator{filteredEmployees.length === 1 ? "" : "s"} available)
+            </span>
+          </div>
+
+          <div className="w-full sm:w-72">
+            <MultiSelect
+              name="selectedRoleIds"
+              options={roles.map((r: any) => ({
+                value: String(r.id || r.roleId || r.code),
+                label: r.name || r.roleName || String(r.id),
+              }))}
+              value={selectedRoleIds}
+              onChange={(_, vals) => setSelectedRoleIds(vals)}
+              placeholder={selectedRoleIds.length > 0 ? `${selectedRoleIds.length} Role(s) Selected` : "Filter Operators by Role..."}
+            />
+          </div>
+        </div>
+
           <BusyItemsTable
             columns={columns}
             rows={rows}
@@ -2099,13 +2105,6 @@ export const HourlyProductionEntryPage: React.FC = () => {
                 {newRecordDetails?.operators || "Shift Team"}
               </span>
             </div>
-          </div>
-
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-400 text-left max-w-lg flex items-start gap-2">
-            <FaCheckCircle className="flex-shrink-0 mt-0.5" />
-            <span>
-              <strong>Forward Target Propagation:</strong> Product Master capacity and all upcoming unstarted shift targets for this machine have been automatically updated to <strong>{Number(newRecordDetails?.newCapacity || 0).toLocaleString()} PCS</strong>.
-            </span>
           </div>
 
           <div className="pt-2 w-full max-w-xs">

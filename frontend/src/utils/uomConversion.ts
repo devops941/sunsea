@@ -52,6 +52,34 @@ const VOLUME_UNITS = new Set(['ml', 'l', 'fl-oz', 'cup', 'pnt', 'qt', 'gal', 'ft
 const LENGTH_UNITS = new Set(['mm', 'cm', 'm', 'km', 'in', 'ft-us', 'ft', 'fathom', 'mi', 'nMi']);
 
 /**
+ * Checks if a UOM is a discrete/countable unit (pcs, nos, pieces, units, ea)
+ */
+export const isPieceUom = (uom?: string | null): boolean => {
+    if (!uom) return false;
+    const first = String(uom).split(",")[0].trim().toLowerCase();
+    return ["pcs", "pc", "piece", "pieces", "ea", "each", "nos", "no", "unit", "units"].includes(first);
+};
+
+/**
+ * Formats a quantity value according to its UOM:
+ * - If piece UOM (pcs, nos, etc.): whole numbers are shown without decimals (e.g. 1000 instead of 1000.000).
+ * - If decimal exists on piece UOM: shown with up to 2 decimal places.
+ * - For continuous units (kg, l, etc.): formatted with defaultDecimals (default 3, e.g. 1000.000).
+ */
+export const formatQtyValue = (
+    qty: number | string | null | undefined,
+    uom?: string | null,
+    defaultDecimals: number = 3
+): string => {
+    const num = Number(qty ?? 0);
+    if (isNaN(num)) return "0";
+    if (isPieceUom(uom)) {
+        return Number.isInteger(num) ? String(num) : parseFloat(num.toFixed(2)).toString();
+    }
+    return num.toFixed(defaultDecimals);
+};
+
+/**
  * Formats a stock quantity for display using the primary (first-listed) UOM code
  * in a comma-separated baseUom string (e.g. "g, kg, mt" -> displays in "g").
  *
@@ -68,11 +96,13 @@ export const formatStockQty = (qty: number | string | null | undefined, uomStr?:
 
     let displayUnit = primaryCode;
     const lower = primaryCode.toLowerCase();
-    if (lower === 'ea' || lower === 'each') {
+    if (lower === 'ea' || lower === 'each' || lower === 'piece' || lower === 'nos') {
         displayUnit = 'pcs';
     }
 
-    const formattedNum = Number(num.toFixed(3));
+    const formattedNum = isPieceUom(displayUnit)
+        ? (Number.isInteger(num) ? String(num) : parseFloat(num.toFixed(2)).toString())
+        : Number(num.toFixed(3));
     return `${formattedNum} ${displayUnit}`;
 };
 

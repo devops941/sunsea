@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaExternalLinkAlt, FaUsers, FaCogs } from "react-icons/fa";
+import { FaUsers, FaCogs } from "react-icons/fa";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
@@ -18,7 +17,6 @@ const DailyReportHourlyModal: React.FC<DailyReportHourlyModalProps> = ({
   selectedDate,
   onClose,
 }) => {
-  const navigate = useNavigate();
 
   const hasOperationCol = useMemo(() => {
     return Boolean(row?.hourlyEntries?.some((e) => Boolean(e.operationName && e.operationName !== "—")));
@@ -420,19 +418,6 @@ const DailyReportHourlyModal: React.FC<DailyReportHourlyModalProps> = ({
         <div className="flex justify-between items-center w-full flex-wrap gap-2">
           <div className="text-xs text-ink-subtle">
             Operator(s): <span className="font-semibold text-ink">{row.operatorName}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {row.dailyPlanId && (
-              <CustomButton
-                variant="secondary"
-                text="Open Hourly Entry Page"
-                icon={FaExternalLinkAlt}
-                onClick={() => {
-                  navigate(`/daily-production-plans/hourly/${row.dailyPlanId}`);
-                }}
-              />
-            )}
-            <CustomButton variant="primary" text="Close" onClick={onClose} />
           </div>
         </div>
       }

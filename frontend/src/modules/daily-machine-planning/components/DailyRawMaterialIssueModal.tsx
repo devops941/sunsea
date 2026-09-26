@@ -11,6 +11,7 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 import AutocompleteInput from "../../../components/form/AutocompleteInput/AutocompleteInput";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
+import { productService } from "../../../services/productService";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,8 @@ interface IssueRow {
   issuedQty: number;
   unit: string;
   isManual: boolean;     // true = user-added, false = from BOM
+  itemType?: "RAW_MATERIAL" | "FINISHED_GOODS";
+  productItemId?: string;
   status?: string;
 }
 
@@ -157,6 +160,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
   const [productBreakdown, setProductBreakdown] = useState<ProductBreakdown[]>([]);
   const [planSummary, setPlanSummary] = useState<PlanSummary[]>([]);
   const [allRawMaterials, setAllRawMaterials] = useState<RawMaterial[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -313,13 +317,19 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     if (show && date) fetchRequirements(date);
   }, [show, date, fetchRequirements]);
 
-  // Fetch RAW_MATERIAL type items only for the manual-add autocomplete
+  // Fetch RAW_MATERIAL and PRODUCTS (strictly Product Type: "PRODUCTION") for manual-add autocomplete
   useEffect(() => {
     if (!show) return;
-    rawMaterialService.fetchAll({ limit: 500, isActive: true }).then((res) => {
-      // fetchAll returns { rawMaterials: [...] } (paginated) or a plain array (legacy)
-      const list = Array.isArray(res) ? res : (Array.isArray(res?.rawMaterials) ? res.rawMaterials : []);
-      setAllRawMaterials(list);
+    Promise.all([
+      rawMaterialService.fetchAll({ limit: 500, isActive: true }).catch(() => []),
+      productService.fetchAll({ limit: 500, isActive: true, productType: "PRODUCTION" }).catch(() => []),
+    ]).then(([rmRes, prodRes]) => {
+      const rmList = Array.isArray(rmRes) ? rmRes : (Array.isArray(rmRes?.rawMaterials) ? rmRes.rawMaterials : []);
+      const rawProdList = Array.isArray(prodRes) ? prodRes : (Array.isArray(prodRes?.products) ? prodRes.products : []);
+      // Filter strictly for Product Type === "PRODUCTION"
+      const prodList = rawProdList.filter((p: any) => p.productType === "PRODUCTION");
+      setAllRawMaterials(rmList);
+      setAllProducts(prodList);
     }).catch(() => {});
   }, [show]);
 
@@ -351,7 +361,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     const cols: BusyColumn<IssueRow>[] = [
     {
       key: "rawMaterialId",
-      header: "Raw Material",
+      header: "Raw Material / Product",
       width: "2fr",
       render: (row, index, update) => {
         if (!row.isManual) {
@@ -360,51 +370,128 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             <span style={{ fontWeight: 700, fontSize: 12, color: "var(--color-ink)" }}>{row.materialName}</span>
           );
         }
-        // Manual row — searchable autocomplete (like Sales Order item column)
+        // Manual row — searchable autocomplete for raw materials & production products
         const safeRms = Array.isArray(allRawMaterials) ? allRawMaterials : [];
-        const alreadyUsed = new Set(issueRows.filter((_, i) => i !== index).map((r) => r.rawMaterialId).filter(Boolean));
-        const opts = safeRms
-          .filter((m) => !alreadyUsed.has(m.rawMaterialId))
+        const safeProds = Array.isArray(allProducts) ? allProducts : [];
+        const alreadyUsed = new Set(
+          issueRows
+            .filter((_, i) => i !== index)
+            .map((r) => {
+              if (!r.rawMaterialId) return "";
+              return r.itemType === "FINISHED_GOODS"
+                ? `PROD:${r.productItemId || r.rawMaterialId}`
+                : `RM:${r.rawMaterialId}`;
+            })
+            .filter(Boolean)
+        );
+
+        const rmOpts = safeRms
+          .filter((m) => !alreadyUsed.has(`RM:${m.rawMaterialId}`))
           .map((m) => ({
-            value: m.rawMaterialId,
+            value: `RM:${m.rawMaterialId}`,
             label: m.materialName,
             selectedLabel: m.materialName,
-            // Stock + normalised primary UOM on the right (ea → pcs)
             info: (
               <span className={`text-[11px] font-bold ${Number(m.onHandQty ?? 0) > 0 ? "text-emerald-400" : "text-rose-400"}`}>
                 {fmtQty(Number(m.onHandQty ?? 0), m.baseUom)}
               </span>
             ),
           }));
+
+        const prodOpts = safeProds
+          .filter((p) => p.productType === "PRODUCTION" && !alreadyUsed.has(`PROD:${p.id || p.productCode}`))
+          .map((p) => {
+            const stock = Array.isArray(p.finishedGoodsStocks)
+              ? p.finishedGoodsStocks.reduce((sum: number, s: any) => sum + Number(s.onHandQty || 0), 0)
+              : Number(p.currentStock ?? p.onHandQty ?? 0);
+            const uomStr = p.uom?.code || p.uom?.uomCode || (typeof p.uom === "string" ? p.uom : "pcs");
+            return {
+              value: `PROD:${p.id || p.productCode}`,
+              label: p.productName,
+              selectedLabel: p.productName,
+              info: (
+                <span className={`text-[11px] font-bold ${stock > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {fmtQty(stock, uomStr)}
+                </span>
+              ),
+            };
+          });
+
+        const opts = [...rmOpts, ...prodOpts];
+        const selectedVal = row.rawMaterialId
+          ? (row.itemType === "FINISHED_GOODS" ? `PROD:${row.productItemId || row.rawMaterialId}` : `RM:${row.rawMaterialId}`)
+          : "";
+
         return (
           <AutocompleteInput
             inline
             name={`issue_rm_${index}`}
-            value={row.rawMaterialId}
+            value={selectedVal}
             options={opts}
-            placeholder="Search raw material..."
+            placeholder="Search raw material or product..."
             onChange={(val) => {
-              const rm = safeRms.find((m) => m.rawMaterialId === val);
-              if (rm) {
-                update({
-                  rawMaterialId: rm.rawMaterialId,
-                  materialName: rm.materialName,
-                  storeId: rm.storeId || "",
-                  storeName: rm.store?.storeName || "",
-                  unit: normUnit(rm.baseUom) || "kg",
-                  currentStock: Number(rm.onHandQty ?? 0),
-                  issuedQty: 0,
-                });
-                setTimeout(() => {
-                  const qtyCell = document.querySelector(`[data-r="${index}"][data-c="3"]`) as HTMLElement | null;
-                  const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
-                  if (qtyInput) {
-                    qtyInput.focus();
-                    qtyInput.select();
-                  } else if (qtyCell) {
-                    qtyCell.focus();
-                  }
-                }, 50);
+              if (val.startsWith("RM:")) {
+                const rmId = val.substring(3);
+                const rm = safeRms.find((m) => m.rawMaterialId === rmId);
+                if (rm) {
+                  update({
+                    rawMaterialId: rm.rawMaterialId,
+                    materialName: rm.materialName,
+                    storeId: rm.storeId || "",
+                    storeName: rm.store?.storeName || "",
+                    unit: normUnit(rm.baseUom) || "kg",
+                    currentStock: Number(rm.onHandQty ?? 0),
+                    issuedQty: 0,
+                    itemType: "RAW_MATERIAL",
+                    productItemId: undefined,
+                  });
+                  setTimeout(() => {
+                    const qtyCell = document.querySelector(`[data-r="${index}"][data-c="3"]`) as HTMLElement | null;
+                    const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                    if (qtyInput) {
+                      qtyInput.focus();
+                      qtyInput.select();
+                    } else if (qtyCell) {
+                      qtyCell.focus();
+                    }
+                  }, 50);
+                }
+              } else if (val.startsWith("PROD:")) {
+                const prodKey = val.substring(5);
+                const prod = safeProds.find((p) => String(p.id) === prodKey || p.productCode === prodKey || val.includes(`:${p.productCode}`) || val.includes(`:${p.id}`));
+                if (prod) {
+                  const primaryStockObj = Array.isArray(prod.finishedGoodsStocks) && prod.finishedGoodsStocks.length > 0
+                    ? prod.finishedGoodsStocks[0]
+                    : null;
+                  const totalStock = Array.isArray(prod.finishedGoodsStocks)
+                    ? prod.finishedGoodsStocks.reduce((sum: number, s: any) => sum + Number(s.onHandQty || 0), 0)
+                    : Number(prod.currentStock ?? prod.onHandQty ?? 0);
+                  const storeId = primaryStockObj?.storeId || "STR003";
+                  const storeName = primaryStockObj?.store?.storeName || (storeId === "STR003" ? "Fineshed Good  Store " : "Store");
+                  const uomStr = normUnit(prod.uom?.code || prod.uom?.uomCode || (typeof prod.uom === "string" ? prod.uom : "pcs")) || "pcs";
+
+                  update({
+                    rawMaterialId: prod.productCode || String(prod.id),
+                    materialName: prod.productName,
+                    storeId,
+                    storeName,
+                    unit: uomStr,
+                    currentStock: totalStock,
+                    issuedQty: 0,
+                    itemType: "FINISHED_GOODS",
+                    productItemId: String(prod.id),
+                  });
+                  setTimeout(() => {
+                    const qtyCell = document.querySelector(`[data-r="${index}"][data-c="3"]`) as HTMLElement | null;
+                    const qtyInput = qtyCell?.querySelector("input") as HTMLInputElement | null;
+                    if (qtyInput) {
+                      qtyInput.focus();
+                      qtyInput.select();
+                    } else if (qtyCell) {
+                      qtyCell.focus();
+                    }
+                  }, 50);
+                }
               }
             }}
           />
@@ -423,15 +510,20 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
       width: "130px",
       align: "right" as const,
       render: (row) => {
-        // Compare using converted qty so "100 g vs 1 kg" does not falsely flag insufficient
-        const safeRmsForStock = Array.isArray(allRawMaterials) ? allRawMaterials : [];
-        const rmStock = safeRmsForStock.find((m) => m.rawMaterialId === row.rawMaterialId);
-        const primaryUomStock  = normUnit(rmStock?.baseUom?.split(",")[0]?.trim()) || normUnit(row.unit) || "kg";
-        const selectedUomStock = normUnit(row.unit) || primaryUomStock;
-        const convertedForCheck = convertToBaseUom(row.issuedQty, selectedUomStock, primaryUomStock);
-        const insufficient = row.rawMaterialId && row.issuedQty > 0 && convertedForCheck > row.currentStock;
-        // Show dynamic unit with the stock value — e.g. "1730 kg", "100 pcs"
-        const stockUnit = normUnit(row.unit) || "kg";
+        let insufficient = false;
+        if (row.rawMaterialId && row.issuedQty > 0) {
+          if (row.itemType === "FINISHED_GOODS") {
+            insufficient = row.issuedQty > row.currentStock;
+          } else {
+            const safeRmsForStock = Array.isArray(allRawMaterials) ? allRawMaterials : [];
+            const rmStock = safeRmsForStock.find((m) => m.rawMaterialId === row.rawMaterialId);
+            const primaryUomStock  = normUnit(rmStock?.baseUom?.split(",")[0]?.trim()) || normUnit(row.unit) || "kg";
+            const selectedUomStock = normUnit(row.unit) || primaryUomStock;
+            const convertedForCheck = convertToBaseUom(row.issuedQty, selectedUomStock, primaryUomStock);
+            insufficient = convertedForCheck > row.currentStock;
+          }
+        }
+        const stockUnit = normUnit(row.unit) || (row.itemType === "FINISHED_GOODS" ? "pcs" : "kg");
         return (
           <span className={`font-semibold text-xs ${insufficient ? "text-rose-500 font-bold" : row.rawMaterialId ? "text-emerald-500 font-medium" : "text-ink-subtle"}`}>
             {row.rawMaterialId ? `${fmtQty(row.currentStock)} ${stockUnit}` : "—"}
@@ -476,14 +568,23 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
       width: "160px",
       align: "right" as const,
       render: (row, _i, update) => {
-        // Derive available UOM list from matching raw material (same as Purchase Order pattern)
-        const safeRmsForUnit = Array.isArray(allRawMaterials) ? allRawMaterials : [];
-        const rm = safeRmsForUnit.find((m) => m.rawMaterialId === row.rawMaterialId);
-        const rawUomStr = rm?.baseUom || row.unit || "kg";
-        const uomList = [...new Set(
-          rawUomStr.split(",").map((u: string) => normUnit(u.trim())).filter(Boolean)
-        )];
-        const currentUom = normUnit(row.unit) || uomList[0] || "kg";
+        let uomList: string[] = [];
+        if (row.itemType === "FINISHED_GOODS") {
+          const safeProds = Array.isArray(allProducts) ? allProducts : [];
+          const prod = safeProds.find((p) => p.productCode === row.rawMaterialId || String(p.id) === row.productItemId);
+          const rawUomStr = prod?.uom?.code || prod?.uom?.uomCode || (typeof prod?.uom === "string" ? prod?.uom : row.unit) || "pcs";
+          uomList = Array.from(new Set<string>(
+            rawUomStr.split(",").map((u: string) => normUnit(u.trim())).filter(Boolean)
+          ));
+        } else {
+          const safeRmsForUnit = Array.isArray(allRawMaterials) ? allRawMaterials : [];
+          const rm = safeRmsForUnit.find((m) => m.rawMaterialId === row.rawMaterialId);
+          const rawUomStr = rm?.baseUom || row.unit || "kg";
+          uomList = Array.from(new Set<string>(
+            rawUomStr.split(",").map((u: string) => normUnit(u.trim())).filter(Boolean)
+          ));
+        }
+        const currentUom = normUnit(row.unit) || uomList[0] || (row.itemType === "FINISHED_GOODS" ? "pcs" : "kg");
 
         return (
           <div className="flex items-center w-full h-full gap-0">
@@ -513,13 +614,16 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     },
     ];
     return cols;
-  }, [allRawMaterials, issueRows, alreadyIssued]);
+  }, [allRawMaterials, allProducts, issueRows, alreadyIssued]);
 
   // ─────────────────────────────────────────────────────────────────────────
 
   const hasInsufficientStock = useMemo(() => {
     return issueRows.some((r) => {
       if (!r.rawMaterialId || r.issuedQty <= 0) return false;
+      if (r.itemType === "FINISHED_GOODS") {
+        return r.issuedQty > r.currentStock;
+      }
       const rm = allRawMaterials.find((m) => m.rawMaterialId === r.rawMaterialId);
       const primaryUom  = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(r.unit) || "kg";
       const selectedUom = normUnit(r.unit) || primaryUom;
@@ -533,9 +637,9 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     const filledRows = issueRows.filter((r) => r.rawMaterialId);
     if (filledRows.length === 0) return;
 
-    const missingRM = issueRows.find((r) => r.isManual && !r.rawMaterialId);
-    if (missingRM) {
-      toast.error("Please select a raw material for all added rows, or remove empty rows.");
+    const missingItem = issueRows.find((r) => r.isManual && !r.rawMaterialId);
+    if (missingItem) {
+      toast.error("Please select a raw material or product for all added rows, or remove empty rows.");
       return;
     }
     const positiveRows = filledRows.filter((r) => r.issuedQty > 0);
@@ -545,7 +649,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     }
 
     if (hasInsufficientStock) {
-      toast.error("Some materials have insufficient stock. Reduce issue quantity or replenish stock before issuing.");
+      toast.error("Some materials or products have insufficient stock. Reduce issue quantity or replenish stock before issuing.");
       return;
     }
 
@@ -563,18 +667,32 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
     setIssuing(true);
     try {
       const items = filledRows.map((r) => {
+        if (r.itemType === "FINISHED_GOODS") {
+          return {
+            rawMaterialId: r.rawMaterialId,
+            itemType: "FINISHED_GOODS" as const,
+            productItemId: r.productItemId,
+            storeId: r.storeId,
+            issuedQty: r.issuedQty,
+          };
+        }
         const rm = allRawMaterials.find((m) => m.rawMaterialId === r.rawMaterialId);
         const primaryUom  = normUnit(rm?.baseUom?.split(",")[0]?.trim()) || normUnit(r.unit) || "kg";
         const selectedUom = normUnit(r.unit) || primaryUom;
         const convertedQty = parseFloat(
           convertToBaseUom(r.issuedQty, selectedUom, primaryUom).toFixed(6)
         );
-        return { rawMaterialId: r.rawMaterialId, storeId: r.storeId, issuedQty: convertedQty };
+        return {
+          rawMaterialId: r.rawMaterialId,
+          itemType: "RAW_MATERIAL" as const,
+          storeId: r.storeId,
+          issuedQty: convertedQty,
+        };
       });
 
       await dailyPlanService.issueRawMaterials(date, items);
       setShowConfirmDialog(false);
-      toast.success(`Raw materials issued successfully for ${date}!`);
+      toast.success(`Materials issued successfully for ${date}!`);
       onSuccess?.();
       onHide();
     } catch (err: any) {
@@ -775,7 +893,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="flex items-end gap-3 flex-wrap bg-card-2 p-3.5 rounded-xl border border-line-soft">
+        <div className="flex items-end gap-3 flex-wrap border-b border-line-soft/60 pb-4 mb-1">
           <div className="w-48">
             <DatePickerCalendar
               name="issueDate"
@@ -785,7 +903,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             />
           </div>
           <div className="flex items-center gap-3 mb-1">
-            {planCount > 0 && <span className="text-xs font-bold text-ink-subtle bg-card border border-line-soft px-2.5 py-1.5 rounded-lg">{planCount} plans</span>}
+            {planCount > 0 && <span className="text-xs font-bold text-ink-subtle bg-card-2 border border-line-soft px-2.5 py-1.5 rounded-lg">{planCount} plans</span>}
             {alreadyIssued && (
               <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
                 <FaCheckCircle size={11} className="text-emerald-400" />
@@ -797,10 +915,10 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
 
         {!loading && planCount === 0 && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs text-amber-200">
-              <FaExclamationTriangle size={14} className="shrink-0 text-amber-400" />
+            <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs text-amber-800 dark:text-amber-200 font-medium">
+              <FaExclamationTriangle size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
               <span>
-                No scheduled daily production plans found for <strong>{date}</strong>. Please select a date with scheduled plans, or add raw materials manually below to issue for this date.
+                No scheduled daily production plans found for <strong className="font-bold text-amber-950 dark:text-amber-100">{date}</strong>. Please select a date with scheduled plans, or add raw materials manually below to issue for this date.
               </span>
             </div>
 
@@ -846,10 +964,10 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             {activeTab === "detail" && (
               <div className="flex flex-col gap-4">
                 {/* Day & Night summary badges together side by side */}
-                <div className="flex items-center justify-between gap-3 flex-wrap bg-card-2 p-3.5 rounded-xl border border-line">
+                <div className="flex items-center justify-between gap-3 flex-wrap py-2 border-b border-line-soft/40">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     {dayTotalQty > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line text-xs font-semibold text-ink-subtle shadow-xs">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card-2 border border-line-soft text-xs font-semibold text-ink-subtle shadow-xs">
                         <span>Day Shift:</span>
                         <span className="font-mono text-[11px] font-extrabold text-ink">
                           {dayTotalQty.toLocaleString()} pcs
@@ -857,14 +975,14 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                       </div>
                     )}
                     {nightTotalQty > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line text-xs font-semibold text-ink-subtle shadow-xs">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card-2 border border-line-soft text-xs font-semibold text-ink-subtle shadow-xs">
                         <span>Night Shift:</span>
                         <span className="font-mono text-[11px] font-extrabold text-ink">
                           {nightTotalQty.toLocaleString()} pcs
                         </span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-line text-xs font-semibold text-ink-subtle shadow-xs">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card-2 border border-line-soft text-xs font-semibold text-ink-subtle shadow-xs">
                       <span>Total Planned:</span>
                       <span className="font-mono text-[11px] font-extrabold text-ink">
                         {grandTotalQty.toLocaleString()} pcs
@@ -873,7 +991,7 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
                   </div>
 
                   {uniqueShifts.length > 1 && (
-                    <div className="flex items-center bg-card border border-line rounded-lg p-0.5 text-[11px] font-semibold">
+                    <div className="flex items-center bg-card-2 border border-line-soft rounded-lg p-0.5 text-[11px] font-semibold">
                       <button
                         type="button"
                         onClick={() => setShiftFilter("ALL")}
@@ -979,11 +1097,11 @@ const DailyRawMaterialIssueModal: React.FC<Props> = ({ show, onHide, defaultDate
             {activeTab === "issue" && (
               <div className="flex flex-col gap-3">
                 {alreadyIssued && (
-                  <div className="flex items-center justify-between gap-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-300">
+                  <div className="flex items-center justify-between gap-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
                     <div className="flex items-center gap-2">
-                      <FaCheckCircle size={14} className="shrink-0 text-emerald-400" />
+                      <FaCheckCircle size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
                       <span>
-                        Raw materials have already been issued for <strong>{date}</strong>
+                        Raw materials have already been issued for <strong className="font-bold text-emerald-950 dark:text-emerald-100">{date}</strong>
                         {issueNumber ? ` (Issue Ref: ${issueNumber})` : ""}.
                         Issued quantities are shown below. To issue extra material, enter the quantity in "Issue Additional".
                       </span>

@@ -88,7 +88,7 @@ const cellStyle: React.CSSProperties = {
 };
 const hdStyle: React.CSSProperties = {
   ...cellStyle, fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-  letterSpacing: 0.4, padding: "5px 6px",
+  letterSpacing: 0.4, padding: "5px 6px", color: "var(--color-ink, #0f172a)",
 };
 
 // ─── Helpers for Form Integration & Boundary Check ────────────────────────────
@@ -534,7 +534,7 @@ function BusyItemsTable<T extends Record<string, any>>({
                 >
                   {/* S.N. */}
                   <div
-                    style={{ ...cellStyle, justifyContent: "center", color: "var(--color-ink-subtle)", fontWeight: 500 }}
+                    style={{ ...cellStyle, justifyContent: "center", color: "var(--color-ink-muted, #475569)", fontWeight: 600 }}
                     onClick={() => {
                       if (!real) {
                         if (onChange && emptyRow) {

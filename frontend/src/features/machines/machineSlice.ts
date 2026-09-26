@@ -1,12 +1,15 @@
-                   import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { machineService } from "../../services/machineService";
 import type { MachineState } from "./types";
 
-export const fetchMachines = createAsyncThunk(
+export const fetchMachines = createAsyncThunk<
+  any,
+  { search?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc" } | void
+>(
   "machines/fetchAll",
-  async (params: { search?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc" } | undefined, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      return await machineService.getAll(params);
+      return await machineService.getAll(params || undefined);
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Failed to fetch machines");
     }

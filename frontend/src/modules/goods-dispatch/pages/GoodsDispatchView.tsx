@@ -13,6 +13,9 @@ import {
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import CustomButton from "../../../components/ui/Button/Button";
+import DataTable from "../../../components/ui/table/DataTable";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import { formatDate, formatDateTime } from "../../../utils/dateUtils";
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -25,8 +28,8 @@ const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) 
 
 const formatUOM = (code: string | null | undefined) => {
   if (!code) return "PCS";
-  const upper = code.toUpperCase();
-  return upper === "EA" || upper === "EACH" ? "PCS" : upper;
+  const upper = (code || "").toUpperCase();
+  return upper === "EA" || upper === "EACH" ? "PCS" : upper || "PCS";
 };
 
 const GoodsDispatchView: React.FC = () => {
@@ -147,12 +150,102 @@ const GoodsDispatchView: React.FC = () => {
     },
   ];
 
+  const itemColumns: DataTableColumn<any>[] = [
+    {
+      header: "PO No",
+      width: "150px",
+      render: (item: any) => (
+        <div className="font-bold text-ink">
+          <div>{item.productionOrder?.productionOrderId}</div>
+          {item.bypassGate && (
+            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              ✓ Direct
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: "Product",
+      width: "minmax(180px, 1fr)",
+      render: (item: any) => (
+        <div>
+          <div className="font-bold text-ink">{item.product?.productName}</div>
+          <div className="text-xs text-ink-subtle font-mono mt-0.5">{item.product?.productCode}</div>
+        </div>
+      ),
+    },
+    {
+      header: "Dispatch Qty",
+      width: "140px",
+      align: "right",
+      render: (item: any) => (
+        <span className="font-bold text-ink">
+          {Number(item.dispatchQty)} {formatUOM(item.uom)}
+        </span>
+      ),
+    },
+    {
+      header: "Received Qty",
+      width: "190px",
+      align: "right",
+      render: (item: any) => {
+        if (isStore && canAct) {
+          return (
+            <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+              <div className="w-24">
+                <TextInput
+                  name={`receivedQty-${item.id}`}
+                  type="number"
+                  min={0}
+                  max={Number(item.dispatchQty)}
+                  bottom={true}
+                  value={receivedQuantities[item.id] ?? ""}
+                  onChange={(e: any) => {
+                    let val = Number(e.target.value);
+                    if (val > Number(item.dispatchQty)) val = Number(item.dispatchQty);
+                    setReceivedQuantities((prev) => ({ ...prev, [item.id]: String(val) }));
+                  }}
+                />
+              </div>
+              <span className="text-xs text-ink-subtle font-semibold">{formatUOM(item.uom)}</span>
+            </div>
+          );
+        }
+        if (item.bypassGate) {
+          return (
+            <div className="flex flex-col items-end gap-1">
+              <span className="font-bold text-emerald-400">
+                {Number(item.dispatchQty)} {formatUOM(item.uom)}
+              </span>
+              <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30">
+                ✓ Stock Added Directly
+              </span>
+            </div>
+          );
+        }
+        return (
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-bold text-primary">
+              {item.receivedQty != null ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}
+            </span>
+            {item.receivedQty != null && Number(item.receivedQty) < Number(item.dispatchQty) && (
+              <span className="inline-flex items-center bg-red-500/15 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
+                {Number(item.dispatchQty) - Number(item.receivedQty)} {formatUOM(item.uom)} Missing
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="w-full bg-card rounded-2xl border border-line shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-line shrink-0">
         <div>
-          <h2 className="text-base font-bold text-ink flex items-center gap-3">
+          <h2 className="text-base font-bold text-ink flex items-center gap-2.5">
             {dispatchData.dispatchNumber}
             <StatusBadge status={dispatchData.status} />
           </h2>
@@ -165,186 +258,114 @@ const GoodsDispatchView: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="p-4 sm:p-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4">
             {/* Dispatched Items */}
-            <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
-                <h3 className="font-extrabold text-ink text-base">Dispatched Items</h3>
+            <div className="rounded-xl border border-line-soft shadow-xs bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-card-2 border-b border-line-soft">
+                <h3 className="font-extrabold text-ink text-sm">Dispatched Items</h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-card-2 border-b border-line-soft">
-                    <tr>
-                      {["PO No", "Product", "Dispatch Qty", "Received Qty"].map((h, i) => (
-                        <th
-                          key={h}
-                          className={`text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold px-4 py-3 ${i >= 2 ? "text-right" : "text-left"}`}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line-soft bg-card">
-                    {itemsToDisplay.map((item: any) => (
-                      <tr key={item.id} className="hover:bg-card-2/60 transition-colors">
-                        <td className="px-4 py-3 text-sm text-ink font-bold">
-                          <div>{item.productionOrder?.productionOrderId}</div>
-                          {item.bypassGate && (
-                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                              ✓ Direct
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-ink">
-                          <div className="font-bold text-ink">{item.product?.productName}</div>
-                          <div className="text-xs text-ink-subtle font-mono mt-0.5">{item.product?.productCode}</div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-bold text-ink">
-                          {Number(item.dispatchQty)} {formatUOM(item.uom)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {isStore && canAct ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-24">
-                                <TextInput
-                                  name={`receivedQty-${item.id}`}
-                                  type="number"
-                                  min={0}
-                                  max={Number(item.dispatchQty)}
-                                  bottom={true}
-                                  value={receivedQuantities[item.id] ?? ""}
-                                  onChange={(e: any) => {
-                                    let val = Number(e.target.value);
-                                    if (val > Number(item.dispatchQty)) val = Number(item.dispatchQty);
-                                    setReceivedQuantities((prev) => ({ ...prev, [item.id]: String(val) }));
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs text-ink-subtle font-semibold">{formatUOM(item.uom)}</span>
-                            </div>
-                          ) : item.bypassGate ? (
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="font-bold text-emerald-400">
-                                {Number(item.dispatchQty)} {formatUOM(item.uom)}
-                              </span>
-                              <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30">
-                                ✓ Stock Added Directly
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="font-bold text-primary">
-                                {item.receivedQty != null ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}
-                              </span>
-                              {item.receivedQty != null && Number(item.receivedQty) < Number(item.dispatchQty) && (
-                                <span className="inline-flex items-center bg-red-500/15 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
-                                  {Number(item.dispatchQty) - Number(item.receivedQty)} {formatUOM(item.uom)} Missing
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                columns={itemColumns}
+                data={itemsToDisplay}
+                rowKey={(item) => item.id.toString()}
+                emptyMessage="No dispatched items found"
+                minHeightClassName="min-h-0"
+                maxHeightClassName="max-h-[300px] overflow-auto"
+                density="compact"
+              />
             </div>
 
             {/* Vehicle Information */}
-            <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
-                <h3 className="font-extrabold text-ink text-base">Vehicle Information</h3>
+            <div className="rounded-xl border border-line-soft shadow-xs bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-card-2 border-b border-line-soft">
+                <h3 className="font-extrabold text-ink text-sm">Vehicle Information</h3>
               </div>
-              <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-5">
+              <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
                 <InfoField label="Vehicle Number" value={dispatchData.vehicleNumber} />
                 <InfoField label="Driver Name" value={dispatchData.driverName} />
                 <InfoField label="Driver Mobile" value={dispatchData.driverMobile} />
                 <InfoField label="DC Number" value={dispatchData.dcNumber} />
                 <InfoField label="Loading Time" value={dispatchData.loadingTime} />
-                <div className="col-span-2 md:col-span-3">
-                  <InfoField label="Remarks" value={dispatchData.remarks} />
-                </div>
+                <InfoField label="Remarks" value={dispatchData.remarks} />
               </div>
             </div>
           </div>
 
           {/* Right Column */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-4">
             {/* Action Panel — only when actionable and user has permission */}
             {canAct && (
-              <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
-                  <h3 className="font-extrabold text-ink text-base">
+              <div className="rounded-xl border border-line-soft shadow-xs bg-card overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-card-2 border-b border-line-soft">
+                  <h3 className="font-extrabold text-ink text-sm">
                     {isGate ? "Gate Approval" : "Store Receipt"}
                   </h3>
                 </div>
-                <div className="p-5 space-y-4">
+                <div className="p-4 space-y-3">
                   {isStore && (
-                    <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2.5">
+                    <div className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
                       <p className="text-xs text-primary font-medium">
                         Approving will automatically update Finished Goods Stock in{" "}
                         <span className="font-bold">{dispatchData.store?.storeName || "the destination store"}</span>.
                       </p>
                     </div>
                   )}
-                  <textarea
-                    className="w-full px-3 py-2.5 border border-line-soft rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none placeholder:text-ink-subtle bg-card-2"
+                  <TextInput
+                    name="remarks"
                     placeholder={isGate ? "Enter approval or rejection remarks..." : "Enter receipt or rejection remarks..."}
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    rows={3}
+                    as="textarea"
+                    rows={2}
                   />
-                  <div className="flex gap-3">
-                    <button
+                  <div className="flex items-center gap-3 pt-1">
+                    <CustomButton
+                      text={isGate ? "Approve" : "Receive Stock"}
+                      icon={FaCheck}
                       onClick={handleApprove}
                       disabled={loading}
-                      className={`flex-1 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors ${
-                        isGate ? "bg-emerald-500 hover:bg-emerald-600" : "bg-primary hover:bg-primary/90"
-                      }`}
-                    >
-                      <FaCheck className="w-3.5 h-3.5" />
-                      {isGate ? "Approve" : "Receive Stock"}
-                    </button>
-                    <button
+                      variant="primary"
+                      width="100%"
+                    />
+                    <CustomButton
+                      text="Reject"
+                      icon={FaTimes}
                       onClick={handleReject}
                       disabled={loading}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-                    >
-                      <FaTimes className="w-3.5 h-3.5" /> Reject
-                    </button>
+                      variant="danger"
+                      width="100%"
+                    />
                   </div>
                 </div>
               </div>
             )}
 
             {/* Status History */}
-            <div className="rounded-2xl border border-line-soft shadow-xs bg-card overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-4 bg-card-2 border-b border-line-soft">
-                <h3 className="font-extrabold text-ink text-base">Status History</h3>
+            <div className="rounded-xl border border-line-soft shadow-xs bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-card-2 border-b border-line-soft">
+                <h3 className="font-extrabold text-ink text-sm">Status History</h3>
               </div>
-              <div className="p-5">
+              <div className="p-4">
                 <div className="flex flex-col gap-0">
                   {steps.map((step, idx) => (
                     <div key={idx} className="flex items-start gap-3">
                       <div className="flex flex-col items-center">
                         <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-extrabold shadow-sm shrink-0
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-extrabold shadow-sm shrink-0
                             ${step.done ? step.color : "bg-card-2 border-2 border-line-soft"}`}
                         >
                           {step.done ? (
-                            step.rejected ? <FaTimes className="w-3 h-3" /> : <FaCheck className="w-3 h-3" />
+                            step.rejected ? <FaTimes className="w-2.5 h-2.5" /> : <FaCheck className="w-2.5 h-2.5" />
                           ) : (
-                            <span className="w-2 h-2 rounded-full bg-line-soft" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-line-soft" />
                           )}
                         </div>
                         {idx < steps.length - 1 && (
                           <div
-                            className={`w-0.5 flex-1 min-h-[28px] mt-1 ${
+                            className={`w-0.5 flex-1 min-h-[20px] mt-1 ${
                               steps[idx + 1].done
                                 ? steps[idx + 1].rejected ? "bg-red-500/40" : "bg-primary/40"
                                 : "bg-line-soft"
@@ -352,17 +373,17 @@ const GoodsDispatchView: React.FC = () => {
                           />
                         )}
                       </div>
-                      <div className={`pb-4 ${idx === steps.length - 1 ? "pb-0" : ""}`}>
+                      <div className={`pb-2.5 ${idx === steps.length - 1 ? "pb-0" : ""}`}>
                         <p className={`text-[12px] font-extrabold leading-tight ${step.rejected ? "text-red-400" : step.done ? "text-ink" : "text-ink-subtle"}`}>
                           {step.label}
                         </p>
                         {step.date && (
-                          <p className="text-[11px] text-ink-subtle font-semibold mt-0.5 leading-tight">
+                          <p className="text-[10px] text-ink-subtle font-semibold mt-0.5 leading-tight">
                             {formatDateTime(step.date)}
                           </p>
                         )}
                         {step.remarks && (
-                          <p className="text-[11px] text-ink-subtle mt-1 italic leading-tight">"{step.remarks}"</p>
+                          <p className="text-[10px] text-ink-subtle mt-0.5 italic leading-tight">"{step.remarks}"</p>
                         )}
                       </div>
                     </div>

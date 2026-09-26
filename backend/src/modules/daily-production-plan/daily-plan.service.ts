@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { getIO } from "../../socket/socket";
+import Decimal from "decimal.js";
 import dailyPlanRepository from "./daily-plan.repository";
 import { CreateDailyPlanInput, UpdateDailyPlanInput, BulkCreateDailyPlanInput } from "./daily-plan.validation";
 import { StatusSyncService } from "../../utils/status-sync.util";
@@ -1183,10 +1184,11 @@ class DailyPlanService {
       }
       const dateMap = issuedMapByDate.get(issueDate)!;
       for (const item of issue.items) {
-        if (item.rawMaterialId) {
-          const prev = dateMap.get(item.rawMaterialId) || 0;
+        const key = item.rawMaterialId || (item.productItemId ? item.productItemId.toString() : null);
+        if (key) {
+          const prev = dateMap.get(key) || 0;
           const qtyIssued = Math.abs(Number(item.difference || 0)) || (Number(item.currentQty || 0) - Number(item.adjustedQty || 0));
-          dateMap.set(item.rawMaterialId, Number((prev + qtyIssued).toFixed(3)));
+          dateMap.set(key, Number((prev + qtyIssued).toFixed(3)));
         }
       }
     }
@@ -1709,6 +1711,8 @@ class DailyPlanService {
         status: i.status,
         items: (i.items || []).map((it) => ({
           rawMaterialId: it.rawMaterialId,
+          productItemId: it.productItemId?.toString(),
+          itemType: it.itemType,
           qty: Math.abs(Number(it.difference || 0)),
           difference: it.difference,
           remarks: it.remarks,
@@ -1756,23 +1760,121 @@ class DailyPlanService {
     return Array.from(result);
   }
 
-  // ── Issue Raw Materials for a Day ────────────────────────────────────────
+  // ── Issue Raw Materials / Products for a Day ─────────────────────────────
   async issueRawMaterialsForDay(
     date: string,
-    items: Array<{ rawMaterialId: string; storeId: string; issuedQty: number; remarks?: string }>,
+    items: Array<{
+      rawMaterialId: string;
+      storeId: string;
+      issuedQty: number;
+      remarks?: string;
+      itemType?: "RAW_MATERIAL" | "FINISHED_GOODS";
+      productItemId?: string | number;
+    }>,
     userId: string
   ) {
-    const rmData: Array<{ rm: any; item: typeof items[0] }> = [];
+    const validatedItems: Array<{
+      type: "RAW_MATERIAL" | "FINISHED_GOODS";
+      rm?: any;
+      prod?: any;
+      item: typeof items[0];
+      storeId: string;
+      currentQty: number;
+    }> = [];
+
     for (const item of items) {
       if (item.issuedQty <= 0) continue;
+
+      // 1. If explicitly marked FINISHED_GOODS or has productItemId
+      if (item.itemType === "FINISHED_GOODS" || item.productItemId) {
+        let prod = null;
+        if (item.productItemId) {
+          try {
+            prod = await prisma.product.findUnique({
+              where: { id: BigInt(item.productItemId) },
+              include: { finishedGoodsStocks: true },
+            });
+          } catch (_) {}
+        }
+        if (!prod && item.rawMaterialId) {
+          const isNumeric = /^\d+$/.test(item.rawMaterialId);
+          prod = await prisma.product.findFirst({
+            where: {
+              OR: [
+                { productCode: item.rawMaterialId },
+                ...(isNumeric ? [{ id: BigInt(item.rawMaterialId) }] : []),
+              ],
+            },
+            include: { finishedGoodsStocks: true },
+          });
+        }
+        if (!prod) throw new ApiError(404, `Product ${item.productItemId || item.rawMaterialId} not found`);
+
+        const storeToUse = item.storeId || prod.finishedGoodsStocks?.[0]?.storeId || "STR003";
+        const fgStock = prod.finishedGoodsStocks?.find((s: any) => s.storeId === storeToUse);
+        const currentQty = Number(fgStock?.onHandQty || 0);
+
+        validatedItems.push({
+          type: "FINISHED_GOODS",
+          prod,
+          item,
+          storeId: storeToUse,
+          currentQty,
+        });
+        continue;
+      }
+
+      // 2. Otherwise try to find as Raw Material first
       const rm = await prisma.rawMaterial.findUnique({
         where: { rawMaterialId: item.rawMaterialId },
       });
-      if (!rm) throw new ApiError(404, `Raw Material ${item.rawMaterialId} not found`);
-      rmData.push({ rm, item });
+
+      if (rm) {
+        const storeToUse = item.storeId || rm.storeId || "";
+        validatedItems.push({
+          type: "RAW_MATERIAL",
+          rm,
+          item,
+          storeId: storeToUse,
+          currentQty: Number(rm.onHandQty || 0),
+        });
+        continue;
+      }
+
+      // 3. Fallback: try to find as Product by productCode or id
+      let prod = null;
+      try {
+        const isNumeric = /^\d+$/.test(item.rawMaterialId);
+        prod = await prisma.product.findFirst({
+          where: {
+            OR: [
+              { productCode: item.rawMaterialId },
+              ...(isNumeric ? [{ id: BigInt(item.rawMaterialId) }] : []),
+            ],
+          },
+          include: { finishedGoodsStocks: true },
+        });
+      } catch (_) {}
+
+      if (prod) {
+        const storeToUse = item.storeId || prod.finishedGoodsStocks?.[0]?.storeId || "STR003";
+        const fgStock = prod.finishedGoodsStocks?.find((s: any) => s.storeId === storeToUse);
+        const currentQty = Number(fgStock?.onHandQty || 0);
+
+        validatedItems.push({
+          type: "FINISHED_GOODS",
+          prod,
+          item,
+          storeId: storeToUse,
+          currentQty,
+        });
+        continue;
+      }
+
+      throw new ApiError(404, `Material/Product ${item.rawMaterialId} not found`);
     }
 
-    if (rmData.length === 0) {
+    if (validatedItems.length === 0) {
       throw new ApiError(400, "No valid items to issue. Quantity must be greater than zero.");
     }
 
@@ -1784,7 +1886,7 @@ class DailyPlanService {
           adjustmentNumber,
           adjustmentDate: new Date(`${date}T00:00:00.000Z`),
           adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
-          reason: `Daily production raw material issue for ${date}`,
+          reason: `Daily production material issue for ${date}`,
           status: "APPROVED",
           sourceDocument: "DAILY_PLAN",
           sourceDocId: date,
@@ -1794,14 +1896,14 @@ class DailyPlanService {
           createdBy: userId,
           updatedBy: userId,
           items: {
-            create: rmData.map(({ rm, item }) => {
-              const currentQty = Number(rm.onHandQty || 0);
+            create: validatedItems.map(({ type, rm, prod, item, storeId, currentQty }) => {
               const adjustedQty = Number((currentQty - item.issuedQty).toFixed(3));
               const difference = Number((adjustedQty - currentQty).toFixed(3));
               return {
-                itemType: "RAW_MATERIAL",
-                rawMaterialId: item.rawMaterialId,
-                storeId: item.storeId || rm.storeId,
+                itemType: type,
+                rawMaterialId: type === "RAW_MATERIAL" ? item.rawMaterialId : null,
+                productItemId: type === "FINISHED_GOODS" ? prod.id : null,
+                storeId,
                 currentQty,
                 adjustedQty,
                 difference,
@@ -1812,26 +1914,72 @@ class DailyPlanService {
         },
       });
 
-      for (const { rm, item } of rmData) {
-        const storeToUse = item.storeId || rm.storeId;
-        await tx.rawMaterial.update({
-          where: { rawMaterialId: item.rawMaterialId },
-          data: {
-            onHandQty: { decrement: item.issuedQty },
-            lastMovementAt: new Date(),
-            updatedBy: userId,
-          },
-        });
-
-        if (storeToUse) {
-          await tx.rawMaterialTransaction.create({
+      for (const vi of validatedItems) {
+        const { type, rm, prod, item, storeId } = vi;
+        if (type === "RAW_MATERIAL") {
+          await tx.rawMaterial.update({
+            where: { rawMaterialId: item.rawMaterialId },
             data: {
-              storeId: storeToUse,
-              rawMaterialId: item.rawMaterialId,
-              txnType: "STOCK_ADJUSTMENT_OUT",
-              qty: item.issuedQty,
+              onHandQty: { decrement: item.issuedQty },
+              lastMovementAt: new Date(),
+              updatedBy: userId,
+            },
+          });
+
+          if (storeId) {
+            await tx.rawMaterialTransaction.create({
+              data: {
+                storeId,
+                rawMaterialId: item.rawMaterialId,
+                txnType: "STOCK_ADJUSTMENT_OUT",
+                qty: item.issuedQty,
+                txnDateTime: new Date(),
+                remarks: `Daily issue ${adjustmentNumber}: ${date}`,
+              },
+            });
+          }
+        } else if (type === "FINISHED_GOODS") {
+          // Decrement finishedGoodsStock
+          const fgStock = await tx.finishedGoodsStock.findUnique({
+            where: {
+              storeId_productItemId: {
+                storeId,
+                productItemId: prod.id,
+              },
+            },
+          });
+
+          if (fgStock) {
+            await tx.finishedGoodsStock.update({
+              where: {
+                storeId_productItemId: {
+                  storeId,
+                  productItemId: prod.id,
+                },
+              },
+              data: { onHandQty: { decrement: item.issuedQty } },
+            });
+          } else {
+            await tx.finishedGoodsStock.create({
+              data: {
+                storeId,
+                productItemId: prod.id,
+                onHandQty: -item.issuedQty,
+              },
+            });
+          }
+
+          // Create Finished Goods Transaction
+          await tx.finishedGoodsTransaction.create({
+            data: {
               txnDateTime: new Date(),
+              storeId,
+              productItemId: prod.id,
+              txnType: "STOCK_ADJUSTMENT_OUT",
+              qty: new Decimal(item.issuedQty),
+              relatedDocNo: adjustmentNumber,
               remarks: `Daily issue ${adjustmentNumber}: ${date}`,
+              createdBy: userId,
             },
           });
         }
@@ -1841,7 +1989,7 @@ class DailyPlanService {
         adjustmentId: adjustment.id.toString(),
         adjustmentNumber: adjustment.adjustmentNumber,
         date,
-        itemsIssued: rmData.length,
+        itemsIssued: validatedItems.length,
       };
     }, { timeout: 15000, maxWait: 10000 });
 
